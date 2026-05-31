@@ -1,0 +1,750 @@
+{
+  "info": {
+    "name": "ERG Spring API - Auth",
+    "description": "Versioned ERG Spring Boot API surface. Requests include sample path variables, query params, headers, and JSON bodies generated from OpenAPI plus ERG domain samples.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "tenantId",
+      "value": "erg"
+    },
+    {
+      "key": "requestId",
+      "value": "{{$guid}}"
+    },
+    {
+      "key": "sessionId",
+      "value": ""
+    },
+    {
+      "key": "schoolId",
+      "value": "school-binh-an"
+    },
+    {
+      "key": "academicYear",
+      "value": "2025-2026"
+    },
+    {
+      "key": "taxonomyNodeId",
+      "value": "subject_demo_001"
+    },
+    {
+      "key": "subjectId",
+      "value": "subject_demo_001"
+    },
+    {
+      "key": "groupId",
+      "value": "group_demo_001"
+    },
+    {
+      "key": "lessonId",
+      "value": "lesson_demo_001"
+    },
+    {
+      "key": "resourceId",
+      "value": "resource_demo_001"
+    },
+    {
+      "key": "assetId",
+      "value": "asset_demo_001"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Auth",
+      "item": [
+        {
+          "name": "POST - auth/verify-pin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "verify-pin"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"code\": \"123456\",\n  \"purpose\": \"register\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/reset-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reset-password"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"code\": \"123456\",\n  \"new_password\": \"NewPassword@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/resend-pin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/resend-pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "resend-pin"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"purpose\": \"register\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"password\": \"Password@123\",\n  \"fullName\": \"Teacher Demo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\",\n  \"deviceId\": \"postman-device\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/oauth/apple",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/oauth/apple",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "oauth",
+                "apple"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"providerId\": \"apple-sub-demo\",\n  \"fullName\": \"Teacher Demo\",\n  \"emailVerified\": true,\n  \"deviceId\": \"postman-device\",\n  \"deviceName\": \"Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"password\": \"Password@123\",\n  \"deviceId\": \"postman-device\",\n  \"deviceName\": \"Postman\",\n  \"deviceFingerprint\": \"postman-local\",\n  \"rememberMe\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json.data || {};",
+                  "if (data.accessToken) pm.environment.set('accessToken', data.accessToken);",
+                  "if (data.refreshToken) pm.environment.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST - auth/google/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/google/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "google",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"fullName\": \"Teacher Demo\",\n  \"googleSub\": \"google-sub-demo\",\n  \"emailVerified\": true,\n  \"deviceId\": \"postman-device\",\n  \"deviceName\": \"Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - auth/forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "forgot-password"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - auth/security/ip-status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/security/ip-status?email=teacher%40example.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "security",
+                "ip-status"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "teacher@example.com",
+                  "description": "optional"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Query params mẫu đã được điền sẵn trong tab Params."
+          },
+          "response": []
+        },
+        {
+          "name": "GET - auth/oauth/:provider",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/oauth/:provider?state=postman-state&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Foauth%2Fcallback",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "oauth",
+                ":provider"
+              ],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "postman-state",
+                  "description": "optional"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "http://localhost:3000/oauth/callback",
+                  "description": "optional"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "provider",
+                  "value": "google",
+                  "description": "Sample path variable"
+                }
+              ]
+            },
+            "description": "Path params: provider=google\nQuery params mẫu đã được điền sẵn trong tab Params."
+          },
+          "response": []
+        },
+        {
+          "name": "GET - auth/oauth/:provider/callback",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/oauth/:provider/callback?code=oauth-code-demo&state=postman-state",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "oauth",
+                ":provider",
+                "callback"
+              ],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "oauth-code-demo",
+                  "description": "required"
+                },
+                {
+                  "key": "state",
+                  "value": "postman-state",
+                  "description": "optional"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "provider",
+                  "value": "google",
+                  "description": "Sample path variable"
+                }
+              ]
+            },
+            "description": "Path params: provider=google\nQuery params mẫu đã được điền sẵn trong tab Params."
+          },
+          "response": []
+        },
+        {
+          "name": "GET - auth/login-attempts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}",
+                "type": "text"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "{{requestId}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login-attempts?email=teacher%40example.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login-attempts"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "teacher@example.com",
+                  "description": "optional"
+                }
+              ],
+              "variable": []
+            },
+            "description": "Query params mẫu đã được điền sẵn trong tab Params."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

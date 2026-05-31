@@ -1,0 +1,316 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  application:
+    name: erg-spring
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    driver-class-name: org.postgresql.Driver
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      pool-name: erg-hikari
+      maximum-pool-size: ${DB__MAX_OPEN_CONNS:25}
+      minimum-idle: ${DB__MAX_IDLE_CONNS:5}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:300000}
+      max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:1800000}
+      auto-commit: false
+  flyway:
+    enabled: false
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:${MONGODB__URI}}
+      database: ${SPRING_DATA_MONGODB_DATABASE:${MONGODB__DATABASE}}
+      authentication-database: ${SPRING_DATA_MONGODB_AUTHENTICATION_DATABASE:${MONGODB__AUTH_SOURCE}}
+      auto-index-creation: ${SPRING_DATA_MONGODB_AUTO_INDEX_CREATION:false}
+    redis:
+      url: ${SPRING_DATA_REDIS_URL}
+      database: ${SPRING_DATA_REDIS_DATABASE:${REDIS__DB:0}}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:${REDIS__READ_TIMEOUT:3s}}
+      connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:${REDIS__DIAL_TIMEOUT:5s}}
+      lettuce:
+        pool:
+          max-active: ${REDIS__POOL_SIZE:10}
+          max-idle: ${REDIS__POOL_SIZE:10}
+          min-idle: ${REDIS__MIN_IDLE_CONNS:5}
+          max-wait: ${SPRING_DATA_REDIS_LETTUCE_POOL_MAX_WAIT:5s}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Ho_Chi_Minh
+  mail:
+    # SMTP in Spring Boot is configured through `spring.mail.*`, not through a custom app namespace.
+    host: ${SPRING_MAIL_HOST:${SMTP__HOST}}
+    port: ${SPRING_MAIL_PORT:${SMTP__PORT}}
+    username: ${SPRING_MAIL_USERNAME:${SMTP__USERNAME}}
+    password: ${SPRING_MAIL_PASSWORD:${SECRET_SMTP__PASSWORD:${SMTP__PASSWORD}}}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: ${SMTP__TLS:true}
+          starttls:
+            enable: false
+            required: false
+  web:
+    error:
+      include-message: always
+      include-stacktrace: on_param
+      include-binding-errors: always
+
+server:
+  address: ${SERVER_ADDRESS:${HTTP__HOST:${APP__HOST:0.0.0.0}}}
+  port: ${SERVER_PORT:${HTTP__PORT:${APP__PORT:8080}}}
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+
+scalar:
+  enabled: true
+  path: /scalar
+  url: /v3/api-docs
+
+logging:
+  level:
+    root: ${ROOT_LOG_LEVEL:INFO}
+    com.erg.ergspringboot: ${LOGGING__LEVEL:DEBUG}
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:OFF}
+    org.hibernate.orm.jdbc.bind: ${HIBERNATE_BIND_LOG_LEVEL:OFF}
+    org.springframework.jdbc.core: ${SPRING_JDBC_LOG_LEVEL:OFF}
+
+erg:
+  openapi:
+    server-url: ${ERG_OPENAPI_SERVER_URL:/}
+  app:
+    env: ${APP__ENV:development}
+    read-timeout: ${APP__READ_TIMEOUT:15s}
+    write-timeout: ${APP__WRITE_TIMEOUT:15s}
+    idle-timeout: ${APP__IDLE_TIMEOUT:60s}
+    shutdown-time: ${APP__SHUTDOWN_TIME:30s}
+  auth:
+    jwt-issuer: ${AUTH__JWT_ISSUER:erg-server}
+    jwt-algorithms: ${AUTH__JWT_ALGORITHMS:HS256}
+    jwt-public-key: ${AUTH__JWT_PUBLIC_KEY:}
+    bearer-prefix: ${AUTH__BEARER_PREFIX:Bearer}
+    jwt-secret: ${SECRET_AUTH__JWT_SECRET:}
+    jwt-refresh-secret: ${SECRET_AUTH__JWT_REFRESH_SECRET:}
+    access-token-ttl: ${AUTH__ACCESS_TOKEN_TTL:3h}
+    refresh-token-ttl: ${AUTH__REFRESH_TOKEN_TTL:7d}
+    google-bridge-secret: ${AUTH__GOOGLE_BRIDGE_SECRET:}
+    admin-email: ${AUTH__ADMIN_EMAIL:admin@erg.edu.vn}
+    argon2-memory: ${AUTH__ARGON2_MEMORY:32768}
+    argon2-iterations: ${AUTH__ARGON2_ITERATIONS:2}
+    max-failed-login: ${AUTH__MAX_FAILED_LOGIN:5}
+    failed-login-window: ${AUTH__FAILED_LOGIN_WINDOW:15m}
+    block-duration: ${AUTH__BLOCK_DURATION:15m}
+    geo-block-enabled: ${AUTH__GEO_BLOCK_ENABLED:true}
+    block-unknown-geo: ${AUTH__BLOCK_UNKNOWN_GEO:false}
+    allowed-continents: ${AUTH__ALLOWED_CONTINENTS:AS}
+    cookie:
+      enabled: ${AUTH__COOKIE__ENABLED:true}
+      domain: ${AUTH__COOKIE__DOMAIN:}
+      secure: ${AUTH__COOKIE__SECURE:false}
+      same-site: ${AUTH__COOKIE__SAME_SITE:lax}
+      access-token-name: ${AUTH__COOKIE__ACCESS_TOKEN_NAME:erg_access_token}
+      refresh-token-name: ${AUTH__COOKIE__REFRESH_TOKEN_NAME:erg_refresh_token}
+    oauth:
+      google:
+        client-id: ${AUTH__GOOGLE_CLIENT_ID:}
+        client-ids: ${AUTH__GOOGLE_CLIENT_IDS:}
+        authorization-uri: ${AUTH__GOOGLE_AUTHORIZATION_URI:https://accounts.google.com/o/oauth2/v2/auth}
+      facebook:
+        client-id: ${AUTH__FACEBOOK_CLIENT_ID:}
+        authorization-uri: ${AUTH__FACEBOOK_AUTHORIZATION_URI:https://www.facebook.com/v19.0/dialog/oauth}
+  http:
+    host: ${HTTP__HOST:${APP__HOST:0.0.0.0}}
+    port: ${HTTP__PORT:${APP__PORT:8080}}
+    read-timeout: ${HTTP__READ_TIMEOUT:${APP__READ_TIMEOUT:15s}}
+    write-timeout: ${HTTP__WRITE_TIMEOUT:${APP__WRITE_TIMEOUT:15s}}
+    idle-timeout: ${HTTP__IDLE_TIMEOUT:${APP__IDLE_TIMEOUT:60s}}
+    shutdown-timeout: ${HTTP__SHUTDOWN_TIMEOUT:${APP__SHUTDOWN_TIME:30s}}
+    trusted-proxy-cidrs: ${HTTP__TRUSTED_PROXY_CIDRS:}
+    rate-limit:
+      enabled: ${HTTP__RATE_LIMIT__ENABLED:true}
+      requests-per-minute: ${HTTP__RATE_LIMIT__REQUESTS_PER_MINUTE:100}
+      burst: ${HTTP__RATE_LIMIT__BURST:20}
+    cors:
+      allowed-origins: ${HTTP__CORS__ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3003,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3003,http://crm.erg.edu.vn:3001,http://lcms.erg.edu.vn:3001,http://lms.erg.edu.vn:3001,http://elearning.erg.edu.vn:3001,https://crm.erg.edu.vn:3001,https://lcms.erg.edu.vn:3001,https://lms.erg.edu.vn:3001,https://elearning.erg.edu.vn:3001}
+      allowed-methods: ${HTTP__CORS__ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
+      allowed-headers: ${HTTP__CORS__ALLOWED_HEADERS:Accept,Authorization,Content-Type,X-Tenant-ID,X-Request-ID,X-Trace-ID,X-Idempotency-Key,X-Portal}
+      exposed-headers: ${HTTP__CORS__EXPOSED_HEADERS:X-Request-ID,X-Trace-ID}
+      allow-credentials: ${HTTP__CORS__ALLOW_CREDENTIALS:true}
+      max-age: ${HTTP__CORS__MAX_AGE:86400}
+  queue:
+    redis:
+      host: ${QUEUE__REDIS_HOST:${REDIS__HOST:localhost}}
+      port: ${QUEUE__REDIS_PORT:${REDIS__PORT:6379}}
+      username: ${QUEUE__REDIS_USERNAME:${REDIS__USERNAME:}}
+      password: ${SECRET_QUEUE__REDIS_PASSWORD:${QUEUE__REDIS_PASSWORD:${SECRET_REDIS__PASSWORD:${REDIS__PASSWORD:}}}}
+      database: ${QUEUE__REDIS_DB:0}
+      tls: ${QUEUE__REDIS_TLS:${REDIS__TLS:false}}
+    concurrency: ${QUEUE__CONCURRENCY:10}
+    retry-delay: ${QUEUE__RETRY_DELAY:10s}
+    max-retry: ${QUEUE__MAX_RETRY:3}
+    queue-name: ${QUEUE__QUEUE_NAME:default}
+    dlq-queue-name: ${QUEUE__DLQ_QUEUE_NAME:erg-dlq}
+    retry-backoff: ${QUEUE__RETRY_BACKOFF:true}
+    is-server: ${QUEUE__IS_SERVER:true}
+  r2:
+    endpoint: ${R2__ENDPOINT:}
+    access-key-id: ${SECRET_R2__ACCESS_KEY_ID:${R2__ACCESS_KEY_ID:}}
+    secret-key: ${SECRET_R2__SECRET_KEY:${R2__SECRET_KEY:}}
+    bucket-name: ${R2__BUCKET_NAME:}
+    public-domain: ${R2__PUBLIC_DOMAIN:}
+    region: ${R2__REGION:auto}
+  ai:
+    provider: ${AI__PROVIDER:groq}
+    api-key-encryption-secret: ${SECRET_AI__API_KEY_ENCRYPTION_SECRET:${AI__API_KEY_ENCRYPTION_SECRET:}}
+    gemini-api-key: ${SECRET_AI__GEMINI_API_KEY:${AI__GEMINI_API_KEY:}}
+    gemini-model: ${AI__GEMINI_MODEL:gemini-3-flash-preview}
+    gemini-timeout: ${AI__GEMINI_TIMEOUT:10s}
+    groq-base-url: ${AI__GROQ_BASE_URL:https://api.groq.com/openai/v1}
+    groq-model: ${AI__GROQ_MODEL:openai/gpt-oss-120b}
+    groq-api-key: ${SECRET_AI__GROQ_API_KEY:${AI__GROQ_API_KEY:}}
+    groq-timeout: ${AI__GROQ_TIMEOUT:30s}
+    groq-max-completion-tokens: ${AI__GROQ_MAX_COMPLETION_TOKENS:4096}
+    groq-temperature: ${AI__GROQ_TEMPERATURE:1}
+    groq-reasoning-effort: ${AI__GROQ_REASONING_EFFORT:medium}
+    huggingface-image-base-url: ${AI__HUGGINGFACE_IMAGE_BASE_URL:https://router.huggingface.co}
+    huggingface-image-api-key: ${SECRET_AI__HUGGINGFACE_IMAGE_API_KEY:${AI__HUGGINGFACE_IMAGE_API_KEY:}}
+    huggingface-image-provider: ${AI__HUGGINGFACE_IMAGE_PROVIDER:fal-ai}
+    huggingface-image-model: ${AI__HUGGINGFACE_IMAGE_MODEL:black-forest-labs/FLUX.1-Krea-dev}
+    huggingface-image-timeout: ${AI__HUGGINGFACE_IMAGE_TIMEOUT:90s}
+    huggingface-image-width: ${AI__HUGGINGFACE_IMAGE_WIDTH:1024}
+    huggingface-image-height: ${AI__HUGGINGFACE_IMAGE_HEIGHT:576}
+    huggingface-image-steps: ${AI__HUGGINGFACE_IMAGE_STEPS:28}
+    huggingface-image-guidance: ${AI__HUGGINGFACE_IMAGE_GUIDANCE:7}
+    huggingface-image-negative-prompt: ${AI__HUGGINGFACE_IMAGE_NEGATIVE_PROMPT:text, watermark, logo, blurry, distorted, low quality, extra fingers}
+    cache-ttl: ${AI__CACHE_TTL:24h}
+    batch-size: ${AI__BATCH_SIZE:10}
+  telemetry:
+    enabled: ${TELEMETRY__ENABLED:false}
+    service-name: ${TELEMETRY__SERVICE_NAME:erg-server}
+    service-version: ${TELEMETRY__SERVICE_VERSION:0.1.0}
+    environment: ${TELEMETRY__ENVIRONMENT:${APP__ENV:development}}
+    jaeger-endpoint: ${TELEMETRY__JAEGER_ENDPOINT:}
+  logging:
+    format: ${LOGGING__FORMAT:console}
+    time-format: ${LOGGING__TIME_FORMAT:rfc3339}
+  scraper:
+    min-delay: ${SCRAPER__MIN_DELAY:3s}
+    max-delay: ${SCRAPER__MAX_DELAY:10s}
+    timeout: ${SCRAPER__TIMEOUT:30s}
+    max-response-size: ${SCRAPER__MAX_RESPONSE_SIZE:10485760}
+    respect-robots-txt: ${SCRAPER__RESPECT_ROBOTS_TXT:true}
+    max-retries: ${SCRAPER__MAX_RETRIES:3}
+  trending:
+    refresh-cron: ${TRENDING__REFRESH_CRON:*/30 * * * *}
+    cache-ttl: ${TRENDING__CACHE_TTL:25m}
+    feed-limit: ${TRENDING__FEED_LIMIT:100}
+    topics-limit: ${TRENDING__TOPICS_LIMIT:20}
+    news-limit: ${TRENDING__NEWS_LIMIT:20}
+    min-hot-score: ${TRENDING__MIN_HOT_SCORE:75}
+  modules:
+    enabled: ${MODULES__ENABLED:}
+  compose:
+    enabled: ${COMPOSE__ENABLED:false}
+    deploy-manifest-path: ${COMPOSE__DEPLOY_MANIFEST_PATH:deploy.yaml}
+  tenant:
+    enabled: ${TENANT__ENABLED:false}
+    isolation: ${TENANT__ISOLATION:field}
+    default-id: ${TENANT__DEFAULT_ID:default}
+  lifecycle:
+    auth-bootstrap-admin-on-startup: ${LIFECYCLE__AUTH_BOOTSTRAP_ADMIN_ON_STARTUP:false}
+    profile-backfill-on-startup: ${LIFECYCLE__PROFILE_BACKFILL_ON_STARTUP:false}
+    operation-seed-on-startup: ${LIFECYCLE__OPERATION_SEED_ON_STARTUP:false}
+    trending-refresh-on-startup: ${LIFECYCLE__TRENDING_REFRESH_ON_STARTUP:false}
+    lms-seed-on-startup: ${LIFECYCLE__LMS_SEED_ON_STARTUP:false}
+    hoclieu-seed-on-startup: ${LIFECYCLE__HOCLIEU_SEED_ON_STARTUP:false}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:erg_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017
+      database: erg_test
+    redis:
+      host: localhost
+      port: 6379
+  jpa:
+    hibernate:
+      ddl-auto: validate
+erg:
+  lifecycle:
+    auth-bootstrap-admin-on-startup: false
+    profile-backfill-on-startup: false
+    operation-seed-on-startup: false
+    trending-refresh-on-startup: false
+    lms-seed-on-startup: false
+    hoclieu-seed-on-startup: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+
+logging:
+  level:
+    com.erg.ergspringboot: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    org.springframework.jdbc.core: OFF
