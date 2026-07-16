@@ -1,6 +1,6 @@
 # ERG Redis 8.8 Upgrade and Distributed Cache Design
 
-**Status:** Approved design direction on 2026-07-16; written specification awaiting final review
+**Status:** Approved by the user on 2026-07-16
 
 **Scope:** Spring Boot code, Redis-backed cache and rate limiting, Docker Compose, Native Image compatibility, observability, destructive local migration, and performance acceptance
 
