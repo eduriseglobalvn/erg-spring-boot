@@ -1,0 +1,265 @@
+# Docker cho local, test và production
+
+Tài liệu này quy định bốn quy trình riêng biệt. Tất cả lệnh Windows được chạy tại thư mục gốc `D:\ERG\erg-spring`. Tất cả lệnh Linux được chạy tại thư mục gốc của dự án trên server.
+
+## 1. Phân biệt các chế độ
+
+| Chế độ | Spring Boot chạy ở đâu? | Dịch vụ Docker | File env | Lệnh chính |
+| --- | --- | --- | --- | --- |
+| Local dev | IDE trên Windows, port `1606` | PostgreSQL, Redis, Nginx | `ops/docker/.env.dev` | `.\scripts\docker.ps1 dev` |
+| Local native test | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `.\scripts\docker.ps1 up 2 -Image erg-spring:local-native` |
+| Build release | BuildKit/GraalVM trong Linux container | Không chạy stack ứng dụng | Không dùng env runtime | `.\scripts\docker.ps1 build -Image <registry/image:tag>` |
+| Production | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `./scripts/docker.sh deploy 3` |
+
+Ý nghĩa các action:
+
+- `dev`: chỉ bật hạ tầng local. Không build và không chạy source Spring Boot trong Docker.
+- `build`: compile source thành native image `linux/amd64`. Không bật stack.
+- `up`: chạy image đã có ở local. Không build lại.
+- `push`: đẩy image đã build lên Registry.
+- `deploy`: server pull image rồi chạy với `--no-build`. Server tuyệt đối không compile.
+- `logs`: xem log Nginx và các backend của stack native.
+- `down`: dừng cả stack dev và stack native, không xóa volume dữ liệu.
+- `config`: kiểm tra cú pháp cả hai cấu hình Compose.
+
+## 2. Local dev trên Windows
+
+Mục tiêu của chế độ này là sửa code nhanh bằng IDE. Docker chỉ chạy PostgreSQL, Redis và Nginx.
+
+### Bước 1: bật hạ tầng
+
+```powershell
+.\scripts\docker.ps1 dev
+```
+
+Lần đầu chạy, script tự tạo `ops/docker/.env.dev` từ `.env.dev.example` và không ghi đè file đã tồn tại.
+
+### Bước 2: cấu hình Spring Boot trong IDE
+
+Dùng các biến trong `ops/docker/.env.dev` cho Run Configuration của IDE. Dự án cũng tự đọc file `.env` ở thư mục chạy, nên có thể đưa các giá trị tương ứng vào `.env` tại root nếu IDE không hỗ trợ env file.
+
+Các biến kết nối quan trọng:
+
+```dotenv
+SPRING_PROFILES_ACTIVE=dev
+SERVER_PORT=1606
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/erg
+SPRING_DATASOURCE_USERNAME=erg
+SPRING_DATASOURCE_PASSWORD=erg-local-password
+SPRING_DATA_REDIS_URL=redis://:erg-local-redis-state@localhost:6379
+ERG_REDIS_STATE_URL=redis://:erg-local-redis-state@localhost:6379
+ERG_REDIS_CACHE_URL=redis://:erg-local-redis-cache@localhost:6380
+FLYWAY_ENABLED=true
+```
+
+Khởi động `ErgSpringApplication` trong IDE với port `1606`.
+
+### Bước 3: gọi API qua Nginx
+
+```powershell
+Invoke-RestMethod http://localhost:8080/actuator/health/readiness
+```
+
+Luồng request:
+
+```text
+Client -> localhost:8080 -> Nginx trong Docker
+       -> host.docker.internal:1606 -> Spring Boot trong IDE
+```
+
+Địa chỉ local:
+
+| Dịch vụ | Địa chỉ |
+| --- | --- |
+| API qua Nginx | `http://localhost:8080` |
+| Spring Boot trong IDE | `http://localhost:1606` |
+| PostgreSQL | `localhost:5432`, database/user `erg` |
+| Redis state/session/rate-limit | `localhost:6379` |
+| Redis business cache | `localhost:6380` |
+
+Xem trạng thái hạ tầng:
+
+```powershell
+docker compose --project-directory ops/docker --env-file ops/docker/.env.dev `
+  -f ops/docker/compose.yml -f ops/docker/compose.dev.yml ps
+```
+
+## 3. Local test giống production
+
+Chế độ này build source thành native image Linux rồi chạy toàn bộ ứng dụng trong Docker. Không có hot reload; mỗi thay đổi source cần chạy lại `build`.
+
+### Bước 1: tạo env chạy container
+
+```powershell
+Copy-Item ops/docker/.env.production.example ops/docker/.env.production
+```
+
+Nếu file đã tồn tại thì không copy đè. Khi chỉ test local, có thể giữ các giá trị placeholder cho tích hợp đang tắt, nhưng PostgreSQL password, Redis password và các giá trị Spring phải đồng nhất trong file.
+
+### Bước 2: build native image local
+
+```powershell
+.\scripts\docker.ps1 build -Image erg-spring:local-native
+```
+
+Docker sẽ:
+
+1. Dùng GraalVM 25 bên trong Linux builder container.
+2. Compile source với profile AOT `prod`.
+3. Tạo native executable tương thích x86_64 bằng `-march=compatibility`.
+4. Đóng executable vào runtime image Linux `amd64` chạy bằng user `erg`.
+
+Windows không cần cài Maven, JDK hoặc GraalVM để thực hiện build này. Native build dùng nhiều tài nguyên; nên cấp Docker Desktop khoảng 16 GB RAM nếu máy cho phép.
+
+### Bước 3: chạy nhiều backend sau Nginx
+
+Nếu stack dev vẫn dùng `8080`, đổi cổng native test sang `18080`:
+
+```powershell
+$env:ERG_HTTP_PORT = "18080"
+.\scripts\docker.ps1 up 2 -Image erg-spring:local-native
+```
+
+Số `2` là số backend. Có thể dùng `up 3`, `up 4`, v.v. Backend chỉ mở port `1606` trong Docker network; chỉ Nginx publish port ra máy Windows.
+
+### Bước 4: kiểm tra
+
+```powershell
+Invoke-RestMethod http://localhost:18080/nginx-health
+Invoke-RestMethod http://localhost:18080/actuator/health/readiness
+.\scripts\docker.ps1 logs
+```
+
+Kiểm tra đủ số replica:
+
+```powershell
+$env:ERG_HTTP_PORT = "18080"
+docker compose --project-directory ops/docker --env-file ops/docker/.env.production `
+  -f ops/docker/compose.yml -f ops/docker/compose.native.yml ps
+```
+
+## 4. Build và push bản release tại Windows
+
+Luôn dùng tag bất biến, ví dụ Git commit SHA. Không chỉ dùng `latest` cho production vì khó rollback và khó xác định phiên bản đang chạy.
+
+Ví dụ với GitHub Container Registry:
+
+```powershell
+$tag = git rev-parse --short HEAD
+$image = "ghcr.io/your-org/erg-spring:$tag"
+
+docker login ghcr.io
+.\scripts\docker.ps1 build -Image $image
+.\scripts\docker.ps1 push -Image $image
+```
+
+Sau bước này Registry đã chứa image hoàn chỉnh cho Linux x86_64. Không cần và không được build lại trên server.
+
+## 5. Deploy production trên Linux
+
+Server cần Docker Engine, Docker Compose v2 và quyền pull image. Server không cần JDK, Maven hoặc GraalVM.
+
+Các file tối thiểu cần có trên server:
+
+```text
+ops/docker/compose.yml
+ops/docker/compose.native.yml
+ops/docker/nginx/native.conf
+ops/docker/.env.production
+scripts/docker.sh
+```
+
+### Deploy lần đầu
+
+```bash
+cp ops/docker/.env.production.example ops/docker/.env.production
+chmod 600 ops/docker/.env.production
+nano ops/docker/.env.production
+```
+
+Phải thay ít nhất các giá trị sau:
+
+- `ERG_APP_IMAGE`: image và tag vừa push.
+- `POSTGRES_PASSWORD`, `REDIS_STATE_PASSWORD` và `REDIS_CACHE_PASSWORD`.
+- `SECRET_AUTH__JWT_SECRET` và `SECRET_AUTH__JWT_REFRESH_SECRET`.
+- `HTTP__CORS__ALLOWED_ORIGINS` và `AUTH__COOKIE__DOMAIN`.
+- Secret của SMTP, Firebase, R2 hoặc AI nếu tích hợp tương ứng được bật.
+
+Chạy ba backend:
+
+```bash
+docker login ghcr.io
+chmod +x scripts/docker.sh
+./scripts/docker.sh config
+./scripts/docker.sh deploy 3
+./scripts/docker.sh logs
+```
+
+`deploy` chỉ chạy hai thao tác:
+
+```text
+docker compose pull
+docker compose up --no-build --scale backend=3
+```
+
+### Phát hành phiên bản mới
+
+1. Build và push một tag mới từ Windows.
+2. Đổi `ERG_APP_IMAGE` trong `ops/docker/.env.production` trên server.
+3. Chạy lại:
+
+```bash
+./scripts/docker.sh deploy 3
+```
+
+### Rollback
+
+Đổi `ERG_APP_IMAGE` về tag cũ rồi chạy lại cùng lệnh `deploy`. Named volume PostgreSQL và Redis không bị xóa khi container được recreate.
+
+## 6. File env
+
+| File | Dùng ở đâu? | Có commit không? |
+| --- | --- | --- |
+| `.env.dev.example` | Mẫu local dev: IDE + PostgreSQL/Redis/Nginx | Có |
+| `.env.dev` | Giá trị local dev thực tế | Không |
+| `.env.production.example` | Mẫu local native test và production | Có |
+| `.env.production` | Giá trị runtime container thực tế | Không |
+| `.env` ở root | Cấu hình cá nhân mà Spring Boot có thể tự đọc | Không |
+
+Không đưa password, token, private key hoặc service-account JSON vào Git hay Docker image.
+
+## 7. Lệnh vận hành
+
+Windows:
+
+```powershell
+.\scripts\docker.ps1 config
+.\scripts\docker.ps1 logs
+.\scripts\docker.ps1 down
+```
+
+Linux:
+
+```bash
+./scripts/docker.sh config
+./scripts/docker.sh logs
+./scripts/docker.sh down
+```
+
+`down` không xóa named volume. Chỉ dùng `docker compose down --volumes` khi chủ động muốn xóa toàn bộ dữ liệu của đúng Compose project.
+
+## 8. Cấu trúc file
+
+```text
+Dockerfile                         Build native image Linux amd64
+.dockerignore                      Loại secret, target và file thừa khỏi build context
+ops/docker/compose.yml             PostgreSQL, Redis, network và volume dùng chung
+ops/docker/compose.dev.yml         Local dev: publish DB/Redis và proxy về IDE
+ops/docker/compose.native.yml      Native test/production: backend image + Nginx
+ops/docker/nginx/dev.conf          Proxy tới host.docker.internal:1606
+ops/docker/nginx/native.conf       Cân bằng tải các container backend
+ops/docker/.env.dev.example        Mẫu env local dev và Spring Boot IDE
+ops/docker/.env.production.example Mẫu env container/production
+scripts/docker.ps1                 Lệnh cho Windows
+scripts/docker.sh                  Lệnh cho Linux
+```
