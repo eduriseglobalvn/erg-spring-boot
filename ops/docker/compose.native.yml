@@ -1,0 +1,53 @@
+services:
+  backend:
+    image: ${ERG_APP_IMAGE:?set ERG_APP_IMAGE to an immutable registry tag}
+    platform: linux/amd64
+    restart: unless-stopped
+    env_file:
+      - ${ERG_SPRING_ENV_FILE:-.env.production}
+    environment:
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 1606
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-erg}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-erg}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
+      ERG_REDIS_STATE_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
+      ERG_REDIS_CACHE_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379
+      QUEUE__REDIS_HOST: redis-state
+      SECRET_QUEUE__REDIS_PASSWORD: ${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-state:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - edge
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:1606/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    stop_grace_period: 30s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./nginx/native.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${ERG_HTTP_PORT:-8080}:8080"
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/nginx-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
