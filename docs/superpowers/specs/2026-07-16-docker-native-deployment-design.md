@@ -1,80 +1,80 @@
-# Docker Native Deployment Design
+# Thiết kế triển khai Docker Native Image
 
-## Goal
+## Mục tiêu
 
-Provide one Docker-based workflow that supports:
+Cung cấp một quy trình dựa trên Docker, hỗ trợ:
 
-- Local infrastructure for running the Spring Boot source from a Windows IDE.
-- A production-like local stack using the same Linux amd64 native image deployed to the server.
-- Multiple stateless backend instances behind Nginx.
-- Native compilation on the developer machine only. The production server only pulls and runs a prebuilt image.
+- Hạ tầng local để chạy mã nguồn Spring Boot từ IDE trên Windows.
+- Môi trường local gần giống production, sử dụng đúng native image Linux amd64 sẽ triển khai lên server.
+- Nhiều backend stateless chạy sau Nginx để cân bằng tải.
+- Chỉ biên dịch native image trên máy phát triển. Server production chỉ kéo và chạy image đã được build sẵn.
 
-## Environments
+## Các môi trường
 
-### Local IDE development
+### Phát triển local bằng IDE
 
-Docker Compose starts PostgreSQL, Redis, and Nginx. The Spring Boot application runs from the Windows IDE on port 1606. Nginx reaches it through `host.docker.internal:1606` and exposes the same public entry point used by the containerized stack.
+Docker Compose khởi động PostgreSQL, Redis và Nginx. Ứng dụng Spring Boot được chạy từ IDE trên Windows qua cổng 1606. Nginx kết nối đến ứng dụng qua `host.docker.internal:1606` và cung cấp cùng một đầu vào HTTP như stack chạy hoàn toàn bằng container.
 
-PostgreSQL and Redis use named volumes so local data survives container restarts. Their host ports are published on loopback for IDE access. Health checks gate dependent services.
+PostgreSQL và Redis sử dụng named volume để dữ liệu local không bị mất khi khởi động lại container. Cổng của chúng chỉ được publish trên loopback để IDE có thể truy cập. Health check kiểm soát thứ tự khởi động của các dịch vụ phụ thuộc.
 
-### Local native verification
+### Kiểm thử native image tại local
 
-Docker Desktop builds a Linux amd64 native image from the current source using a multi-stage Dockerfile. Compose runs that image as multiple backend containers, a dedicated background worker, and Nginx, together with the same PostgreSQL and Redis services.
+Docker Desktop build native image Linux amd64 từ mã nguồn hiện tại bằng Dockerfile nhiều stage. Docker Compose chạy image này thành nhiều container backend, một container worker chuyên xử lý tác vụ nền và Nginx, cùng với PostgreSQL và Redis.
 
-The API containers disable scheduled outbox, reporting, and notification processing. The single worker container enables those jobs so scaling the HTTP tier does not duplicate background work.
+Các container API tắt tác vụ định kỳ cho outbox, báo cáo và thông báo. Container worker duy nhất bật các tác vụ này để việc tăng số lượng HTTP backend không làm một công việc nền bị xử lý trùng lặp.
 
 ### Production
 
-The developer or CI machine builds and pushes an immutable Linux amd64 image tag to a Docker Registry. The server uses a production environment file to select that exact tag, runs `docker compose pull`, and recreates the services. No compiler, Maven dependency download, GraalVM build, or Docker build runs on the server.
+Máy phát triển hoặc CI build và push image Linux amd64 với tag bất biến lên Docker Registry. Server sử dụng file biến môi trường production để chọn chính xác tag đó, chạy `docker compose pull` và tạo lại các dịch vụ. Server không chạy compiler, không tải dependency Maven, không build GraalVM và không chạy Docker build.
 
-Rollback consists of selecting the previous immutable image tag and recreating the stack.
+Để rollback, chọn lại tag image bất biến của phiên bản trước rồi tạo lại stack.
 
-## Files And Commands
+## File và câu lệnh
 
-- A multi-stage `Dockerfile` builds the native executable and copies it into a minimal non-root runtime image.
-- A base Compose file defines PostgreSQL, Redis, private networks, volumes, backend, worker, and shared health checks.
-- Development and production-like Compose overlays select the appropriate Nginx configuration and published ports.
-- Nginx development configuration proxies to `host.docker.internal:1606`.
-- Nginx container configuration resolves all healthy backend replicas through Docker DNS and balances requests across them.
-- PowerShell commands support Windows development; shell commands support Linux server operation.
+- `Dockerfile` nhiều stage build file thực thi native rồi sao chép nó vào runtime image tối giản, chạy bằng user không phải root.
+- Compose file nền định nghĩa PostgreSQL, Redis, private network, volume, backend, worker và các health check dùng chung.
+- Các Compose overlay cho development và môi trường gần production lựa chọn cấu hình Nginx cùng các cổng cần publish.
+- Cấu hình Nginx development proxy đến `host.docker.internal:1606`.
+- Cấu hình Nginx container tìm tất cả backend replica khỏe mạnh qua Docker DNS và cân bằng request giữa chúng.
+- Script PowerShell hỗ trợ phát triển trên Windows; shell script hỗ trợ vận hành server Linux.
 
-The supported operations are:
+Các thao tác được hỗ trợ:
 
-- `dev`: start PostgreSQL, Redis, and development Nginx for an IDE-run backend.
-- `build`: build the Linux amd64 native image locally.
-- `push`: push a versioned native image to the configured registry.
-- `up`: start the production-like stack with a configurable backend replica count.
-- `deploy`: pull an already-built tag and recreate services on the server without building.
-- `down`, `logs`, and `config`: operate and validate the stack.
+- `dev`: khởi động PostgreSQL, Redis và Nginx development để backend chạy từ IDE sử dụng.
+- `build`: build native image Linux amd64 tại local.
+- `push`: push native image có version lên Registry đã cấu hình.
+- `up`: khởi động stack gần production với số lượng backend replica có thể tùy chỉnh.
+- `deploy`: kéo tag đã build sẵn và tạo lại các dịch vụ trên server mà không build.
+- `down`, `logs` và `config`: vận hành và kiểm tra stack.
 
-## Networking And Load Balancing
+## Mạng và cân bằng tải
 
-Only Nginx exposes the application HTTP port in production. PostgreSQL, Redis, backend replicas, and the worker communicate over private Compose networks. Local development may publish PostgreSQL and Redis on loopback for the IDE.
+Trong production, chỉ Nginx mở cổng HTTP của ứng dụng ra bên ngoài. PostgreSQL, Redis, các backend replica và worker giao tiếp qua private network của Compose. Ở môi trường phát triển local, PostgreSQL và Redis có thể publish cổng trên loopback để IDE kết nối.
 
-Nginx forwards standard proxy headers and uses the Docker embedded DNS resolver so scaled backend containers can be discovered without generating a static upstream list. WebSocket upgrade headers and conservative connection/read timeouts are included for GraphQL and future streaming endpoints.
+Nginx chuyển tiếp các proxy header tiêu chuẩn và sử dụng DNS resolver tích hợp của Docker. Nhờ đó, Nginx có thể phát hiện các backend container được scale mà không cần tạo danh sách upstream tĩnh. Cấu hình bao gồm header nâng cấp WebSocket và timeout phù hợp cho GraphQL cũng như các endpoint streaming trong tương lai.
 
-Actuator readiness is used by container health checks. Nginx itself exposes a simple health endpoint for host-level checks.
+Health check của container sử dụng Actuator readiness. Nginx cung cấp một health endpoint đơn giản để kiểm tra từ host.
 
-## Configuration And Secrets
+## Cấu hình và secret
 
-Example environment files contain safe placeholders only. Real database passwords, JWT secrets, registry credentials, and external service keys remain outside Git. Runtime environment variables configure datasource and Redis URLs using Compose service names.
+Các file biến môi trường mẫu chỉ chứa giá trị placeholder an toàn. Mật khẩu cơ sở dữ liệu, JWT secret, thông tin đăng nhập Registry và khóa dịch vụ bên ngoài không được lưu trong Git. Các biến môi trường runtime cấu hình URL datasource và Redis bằng service name của Compose.
 
-Images are tagged with a release identifier such as a Git commit SHA, never deployed by relying only on `latest`. The production Compose workflow accepts the full registry image reference through `ERG_APP_IMAGE`.
+Image được gắn tag theo định danh bản phát hành, chẳng hạn Git commit SHA. Quy trình deploy không chỉ dựa vào tag `latest`. Compose production nhận đầy đủ địa chỉ Registry và tag image qua biến `ERG_APP_IMAGE`.
 
-## Failure Handling
+## Xử lý lỗi
 
-- PostgreSQL and Redis must pass health checks before backend startup.
-- Backend containers restart unless stopped and report readiness through Actuator.
-- Nginx retries another upstream for connection errors, timeouts, and selected gateway failures.
-- A failed native build or image push leaves the currently deployed server image untouched.
-- A failed deployment can be rolled back by restoring the previous image tag.
+- PostgreSQL và Redis phải vượt qua health check trước khi backend khởi động.
+- Container backend tự khởi động lại trừ khi bị dừng chủ động và báo trạng thái sẵn sàng qua Actuator.
+- Nginx thử một upstream khác khi gặp lỗi kết nối, timeout và một số lỗi gateway phù hợp.
+- Native build hoặc image push thất bại không ảnh hưởng đến image đang chạy trên server.
+- Có thể rollback deployment thất bại bằng cách khôi phục tag image trước đó.
 
-## Verification
+## Kiểm chứng
 
-Configuration verification includes Docker Compose rendering for both local IDE and native/production modes, Nginx syntax checks, and Dockerfile build-stage inspection.
+Kiểm tra cấu hình bao gồm render Docker Compose cho cả chế độ IDE local lẫn native/production, kiểm tra cú pháp Nginx và kiểm tra các stage của Dockerfile.
 
-Runtime verification includes starting local dependencies, confirming PostgreSQL and Redis health, confirming Nginx can proxy to an IDE-run backend, building the Linux amd64 image, scaling at least two backend containers, and observing requests through Nginx. Native compilation may expose application AOT issues and is therefore reported separately from static Compose validation.
+Kiểm tra runtime bao gồm khởi động dependency local; xác nhận PostgreSQL và Redis khỏe mạnh; xác nhận Nginx proxy được đến backend chạy từ IDE; build image Linux amd64; scale ít nhất hai backend container; và quan sát request đi qua Nginx. Quá trình biên dịch native có thể phát hiện lỗi AOT trong ứng dụng, vì vậy kết quả này được báo cáo riêng với kết quả kiểm tra tĩnh của Compose.
 
-## Scope
+## Phạm vi
 
-This design uses plain Docker Compose and Nginx. It assumes an existing Docker Hub, GHCR, or private Registry account and does not provision a Registry service. It does not introduce Docker Swarm, Kubernetes, TLS certificate automation, or database high availability. Those can be added independently when operational requirements justify them.
+Thiết kế này sử dụng Docker Compose thuần và Nginx. Thiết kế giả định đã có tài khoản Docker Hub, GHCR hoặc Registry riêng và không tự dựng dịch vụ Registry. Phạm vi không bao gồm Docker Swarm, Kubernetes, tự động cấp chứng chỉ TLS hoặc cơ sở dữ liệu high availability. Các phần này có thể được bổ sung độc lập khi nhu cầu vận hành yêu cầu.
