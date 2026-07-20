@@ -54,4 +54,14 @@ class UserQueryUseCaseArchitectureTest {
                 .doesNotContain("findByUserIdAndTenantIdOrderByLastActiveAtDesc(")
                 .doesNotContain("findBySessionIdAndUserIdAndTenantId(");
     }
+
+    @Test
+    void accountProvisioningLivesInItsOwnUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        assertThat(legacy).doesNotContain("request.primaryEmail().trim().toLowerCase()");
+    }
 }

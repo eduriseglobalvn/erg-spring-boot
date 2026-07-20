@@ -76,7 +76,8 @@ public class UserPasswordUseCase {
         activity.setDescription("Account password changed");
         activity.setMetadata(Map.of("before", Map.of("mustChangePassword", previousMustChange,
                 "status", previousStatus == null ? "" : previousStatus),
-                "after", Map.of("mustChangePassword", false, "status", target.getStatus(), "revokedSessions", revoked)));
+                "after", Map.of("mustChangePassword", false,
+                        "status", target.getStatus() == null ? "" : target.getStatus(), "revokedSessions", revoked)));
         activity.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC)); activityRepository.save(activity);
     }
 
