@@ -60,6 +60,7 @@ import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
 import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
 import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
+import com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -93,6 +94,7 @@ public class UserService {
     private final UserPasswordUseCase userPasswordUseCase;
     private final UserSessionUseCase userSessionUseCase;
     private final UserProvisioningUseCase userProvisioningUseCase;
+    private final UserLifecycleUseCase userLifecycleUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -123,6 +125,7 @@ public class UserService {
         this.userSessionUseCase = new UserSessionUseCase(sessionRepository, userActivityRepository);
         this.userProvisioningUseCase = new UserProvisioningUseCase(userRepository, sessionRepository,
                 roleRepository, userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender);
+        this.userLifecycleUseCase = new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository);
     }
 
     @Autowired(required = false)
@@ -286,40 +289,22 @@ public class UserService {
     public UserResponse updateUserStatus(
             String userId, String tenantId, AdminUpdateUserStatusRequest request, AuditContext auditContext
     ) {
-        String status = normalizeStatus(request.status());
-        User user = findUser(userId, tenantId);
-        String previousStatus = safeAuditValue(user.getStatus());
-        user.setStatus(status);
-        userRepository.save(user);
-        revokeActiveSessionsIfLocked(user, normalizeTenant(tenantId), status);
-        recordActivity(user, auditContext, "EMPLOYEE_STATUS_CHANGED", "Employee account status changed",
-                Map.of("status", previousStatus), Map.of("status", status));
-        return toResponse(user);
+        return userLifecycleUseCase.updateStatus(userId, tenantId, request, toPublicAudit(auditContext));
     }
 
     @Transactional
     public BulkOperationResponse deleteUser(String userId, String tenantId) {
-        User user = findUser(userId, tenantId);
-        userRepository.delete(user);
-        return new BulkOperationResponse(1);
+        return userLifecycleUseCase.delete(userId, tenantId);
     }
 
     @Transactional
     public BulkOperationResponse bulkUpdateStatus(String tenantId, BulkStatusRequest request) {
-        String status = normalizeStatus(request.status());
-        List<User> users = findUsers(request.userIds(), tenantId);
-        users.forEach(user -> user.setStatus(status));
-        userRepository.saveAll(users);
-        String normalizedTenant = normalizeTenant(tenantId);
-        users.forEach(user -> revokeActiveSessionsIfLocked(user, normalizedTenant, status));
-        return new BulkOperationResponse(users.size());
+        return userLifecycleUseCase.bulkStatus(tenantId, request);
     }
 
     @Transactional
     public BulkOperationResponse bulkDelete(String tenantId, BulkDeleteRequest request) {
-        List<User> users = findUsers(request.userIds(), tenantId);
-        userRepository.deleteAll(users);
-        return new BulkOperationResponse(users.size());
+        return userLifecycleUseCase.bulkDelete(tenantId, request);
     }
 
     @Transactional

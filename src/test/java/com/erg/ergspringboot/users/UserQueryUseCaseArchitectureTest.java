@@ -64,4 +64,14 @@ class UserQueryUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(legacy).doesNotContain("request.primaryEmail().trim().toLowerCase()");
     }
+
+    @Test
+    void accountLifecycleLivesInItsOwnUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        assertThat(legacy).doesNotContain("normalizeStatus(request.status())");
+    }
 }
