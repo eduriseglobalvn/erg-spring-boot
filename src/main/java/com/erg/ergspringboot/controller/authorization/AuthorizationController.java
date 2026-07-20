@@ -17,11 +17,10 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRo
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
+import com.erg.ergspringboot.authorization.AuthorizationAuditContext;
+import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.authorization.AuthorizationService;
-import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
-import com.erg.ergspringboot.service.users.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -45,16 +44,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 @RequestMapping("/api/v1")
 public class AuthorizationController {
 
-    private final AuthorizationService authorizationService;
-    private ScopedRoleAssignmentService scopedRoleAssignmentService;
+    private final AuthorizationCommandOperations authorizationService;
 
-    public AuthorizationController(AuthorizationService authorizationService) {
+    @Autowired
+    public AuthorizationController(AuthorizationCommandOperations authorizationService) {
         this.authorizationService = authorizationService;
     }
 
-    @Autowired(required = false)
-    void setScopedRoleAssignmentService(ScopedRoleAssignmentService scopedRoleAssignmentService) {
-        this.scopedRoleAssignmentService = scopedRoleAssignmentService;
+    /** Compatibility constructor retained for focused controller tests and old embedders. */
+    @Deprecated
+    public AuthorizationController(com.erg.ergspringboot.service.authorization.AuthorizationService legacy) {
+        this.authorizationService = new AuthorizationCommandOperations(legacy);
+    }
+
+    /** Compatibility injection seam; production wiring uses the facade bean. */
+    @Deprecated
+    public void setScopedRoleAssignmentService(com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService scoped) {
+        authorizationService.setScopedRoleAssignmentService(scoped);
     }
 
     @GetMapping("/roles")
@@ -166,13 +172,10 @@ public class AuthorizationController {
             @Valid @RequestBody AssignScopedRoleRequest body,
             HttpServletRequest request
     ) {
-        if (scopedRoleAssignmentService == null) {
-            throw new IllegalStateException("scoped role assignment service is not configured");
-        }
         ErgPrincipal principal = principal();
         return ok(
                 "Scoped role assigned",
-                scopedRoleAssignmentService.assign(userId, principal.tenantId(), body, principal, auditContext(request)),
+                authorizationService.assignScopedRole(userId, principal.tenantId(), body, principal, auditContext(request)),
                 request
         );
     }
@@ -184,13 +187,10 @@ public class AuthorizationController {
             @RequestBody(required = false) RevokeScopedRoleRequest body,
             HttpServletRequest request
     ) {
-        if (scopedRoleAssignmentService == null) {
-            throw new IllegalStateException("scoped role assignment service is not configured");
-        }
         ErgPrincipal principal = principal();
         return ok(
                 "Scoped role revoked",
-                scopedRoleAssignmentService.revoke(
+                authorizationService.revokeScopedRole(
                         userId, assignmentId, principal.tenantId(), body, principal, auditContext(request)),
                 request
         );
@@ -250,9 +250,9 @@ public class AuthorizationController {
         return principal().userId();
     }
 
-    private UserService.AuditContext auditContext(HttpServletRequest request) {
+    private AuthorizationAuditContext auditContext(HttpServletRequest request) {
         ErgPrincipal principal = principal();
-        return new UserService.AuditContext(
+        return new AuthorizationAuditContext(
                 principal.userId(),
                 requestId(request),
                 request.getRemoteAddr(),

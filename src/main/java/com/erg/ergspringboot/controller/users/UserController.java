@@ -30,8 +30,8 @@ import com.erg.ergspringboot.common.response.users.UserResponses.CredentialDeliv
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
-import com.erg.ergspringboot.service.users.UserService;
 import com.erg.ergspringboot.users.UserOperations;
+import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.service.auth.AccountVerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -84,7 +84,7 @@ public class UserController {
             HttpServletRequest servletRequest
     ) {
         RecoveryEmailChallengeResponse data = accountVerificationService.requestRecoveryEmailChallenge(
-                userId(servletRequest), tenantId(servletRequest), request.recoveryEmail(), auditContext(servletRequest));
+                userId(servletRequest), tenantId(servletRequest), request.recoveryEmail(), auditContext(servletRequest).toLegacy());
         return ok(data, servletRequest);
     }
 
@@ -95,7 +95,7 @@ public class UserController {
     ) {
         RecoveryEmailVerificationResponse data = accountVerificationService.verifyRecoveryEmail(
                 userId(servletRequest), tenantId(servletRequest), request.challengeId(), request.otp(),
-                auditContext(servletRequest));
+                auditContext(servletRequest).toLegacy());
         return ok(data, servletRequest);
     }
 
@@ -318,9 +318,9 @@ public class UserController {
         return requestId == null ? null : requestId.toString();
     }
 
-    private UserService.AuditContext auditContext(HttpServletRequest request) {
+    private UserAuditContext auditContext(HttpServletRequest request) {
         ErgPrincipal principal = principal();
-        return new UserService.AuditContext(
+        return new UserAuditContext(
                 principal == null ? null : principal.userId(),
                 requestId(request),
                 request.getRemoteAddr(),

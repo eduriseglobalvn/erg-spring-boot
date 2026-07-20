@@ -23,9 +23,9 @@ import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
-import com.erg.ergspringboot.service.users.UserService;
 import com.erg.ergspringboot.users.EmployeeOperations;
 import com.erg.ergspringboot.users.UserOperations;
+import com.erg.ergspringboot.users.UserAuditContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -195,9 +195,9 @@ public class AdminEmployeeController {
         return value == null ? request.getHeader(RequestIdFilter.REQUEST_ID_HEADER) : value.toString();
     }
 
-    private UserService.AuditContext auditContext(HttpServletRequest request) {
+    private UserAuditContext auditContext(HttpServletRequest request) {
         ErgPrincipal principal = principal();
-        return new UserService.AuditContext(
+        return new UserAuditContext(
                 principal == null ? null : principal.userId(), requestId(request),
                 request.getRemoteAddr(), request.getHeader("User-Agent"));
     }
