@@ -5,6 +5,8 @@ spring:
     name: erg-spring
   modulith:
     events:
+      registry-trigger-annotation: org.springframework.modulith.events.ApplicationModuleListener
+      completion-mode: delete
       jdbc:
         schema-initialization:
           enabled: false
@@ -170,6 +172,12 @@ erg:
     discord-public-key: ${SECRET_DISCORD_WEBHOOK_PUBLIC_KEY:}
     telegram-secret-token: ${SECRET_TELEGRAM_WEBHOOK_TOKEN:}
   module-events:
+    recovery:
+      enabled: ${ERG_MODULE_EVENTS_RECOVERY_ENABLED:true}
+      fixed-delay: ${ERG_MODULE_EVENTS_RECOVERY_FIXED_DELAY:30s}
+      batch-size: ${ERG_MODULE_EVENTS_RECOVERY_BATCH_SIZE:100}
+      max-in-flight: ${ERG_MODULE_EVENTS_RECOVERY_MAX_IN_FLIGHT:16}
+      min-age: ${ERG_MODULE_EVENTS_RECOVERY_MIN_AGE:30s}
     io:
       core-size: ${ERG_MODULE_EVENTS_IO_CORE_SIZE:8}
       max-size: ${ERG_MODULE_EVENTS_IO_MAX_SIZE:16}
