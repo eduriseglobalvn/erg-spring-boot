@@ -1,7 +1,9 @@
 package com.erg.ergspringboot.users;
 
 import com.erg.ergspringboot.common.request.users.UserRequests.UpdateProfileRequest;
+import com.erg.ergspringboot.common.request.users.UserRequests.*;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.*;
 import com.erg.ergspringboot.service.users.UserService;
 import org.springframework.stereotype.Service;
 
@@ -22,4 +24,52 @@ public class UserOperations {
             UserService.AuditContext auditContext) {
         return legacy.updateProfile(userId, tenantId, request, auditContext);
     }
+
+    public OnboardingResponse completeOnboarding(String userId, String tenantId, OnboardingRequest request) {
+        return legacy.completeOnboarding(userId, tenantId, request);
+    }
+    public PasswordChangeResponse changePassword(String userId, String tenantId, String sessionId,
+            ChangePasswordRequest request, UserService.AuditContext audit) {
+        return legacy.changePassword(userId, tenantId, sessionId, request, audit);
+    }
+    public SessionListResponse listSessions(String userId, String tenantId, String sessionId) {
+        return legacy.listSessions(userId, tenantId, sessionId);
+    }
+    public RevokeSessionResponse revokeSession(String userId, String tenantId, String sessionId) {
+        return legacy.revokeSession(userId, tenantId, sessionId);
+    }
+    public RevokeSessionResponse revokeSession(String userId, String tenantId, String sessionId,
+            UserService.AuditContext audit) {
+        return legacy.revokeSession(userId, tenantId, sessionId, audit);
+    }
+    public UserListResponse listUsers(String tenantId, Integer page, Integer limit, String search, String status, String role) {
+        return legacy.listUsers(tenantId, page, limit, search, status, role);
+    }
+    public UserCreatedResponse createUser(AdminCreateUserRequest request, UserService.AuditContext audit) {
+        return legacy.createUser(request, audit);
+    }
+    public CredentialDeliveryResponse resetCredential(String userId, String tenantId, String delivery,
+            UserService.AuditContext audit) { return legacy.resetCredential(userId, tenantId, delivery, audit); }
+    public BulkOperationResponse bulkUpdateStatus(String tenantId, BulkStatusRequest request) {
+        return legacy.bulkUpdateStatus(tenantId, request);
+    }
+    public BulkOperationResponse bulkDelete(String tenantId, BulkDeleteRequest request) {
+        return legacy.bulkDelete(tenantId, request);
+    }
+    public UserDetailResponse getUserDetail(String userId, String tenantId) { return legacy.getUserDetail(userId, tenantId); }
+    public ActivityListResponse listActivity(String userId, String tenantId, Integer page, Integer limit) {
+        return legacy.listActivity(userId, tenantId, page, limit);
+    }
+    public UserResponse updateUserStatus(String userId, String tenantId, AdminUpdateUserStatusRequest request) {
+        return legacy.updateUserStatus(userId, tenantId, request);
+    }
+    public UserResponse updateUserStatus(String userId, String tenantId, AdminUpdateUserStatusRequest request,
+            UserService.AuditContext audit) { return legacy.updateUserStatus(userId, tenantId, request, audit); }
+    public UserResponse assignRoles(String userId, String tenantId, AdminAssignRolesRequest request,
+            UserService.AuditContext audit) { return legacy.assignRoles(userId, tenantId, request, audit); }
+    public PermissionOverrideResponse assignPermissions(String userId, String tenantId,
+            AdminAssignPermissionsRequest request, UserService.AuditContext audit) {
+        return legacy.assignPermissions(userId, tenantId, request, audit);
+    }
+    public BulkOperationResponse deleteUser(String userId, String tenantId) { return legacy.deleteUser(userId, tenantId); }
 }

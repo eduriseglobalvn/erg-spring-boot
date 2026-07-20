@@ -53,13 +53,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserController {
 
-    private final UserService userService;
     private final UserOperations users;
     private final AccountVerificationService accountVerificationService;
 
-    public UserController(UserService userService, UserOperations users,
+    public UserController(UserOperations users,
             AccountVerificationService accountVerificationService) {
-        this.userService = userService;
         this.users = users;
         this.accountVerificationService = accountVerificationService;
     }
@@ -106,7 +104,7 @@ public class UserController {
             @Valid @RequestBody OnboardingRequest request,
             HttpServletRequest servletRequest
     ) {
-        OnboardingResponse data = userService.completeOnboarding(userId(servletRequest), tenantId(servletRequest), request);
+        OnboardingResponse data = users.completeOnboarding(userId(servletRequest), tenantId(servletRequest), request);
         return ok(data, servletRequest);
     }
 
@@ -115,7 +113,7 @@ public class UserController {
             @Valid @RequestBody ChangePasswordRequest request,
             HttpServletRequest servletRequest
     ) {
-        PasswordChangeResponse data = userService.changePassword(
+        PasswordChangeResponse data = users.changePassword(
                 userId(servletRequest), tenantId(servletRequest), sessionId(servletRequest), request,
                 auditContext(servletRequest));
         return ok(data, servletRequest);
@@ -123,7 +121,7 @@ public class UserController {
 
     @GetMapping("/me/sessions")
     public ResponseEntity<ApiResponse<SessionListResponse>> listSessions(HttpServletRequest servletRequest) {
-        SessionListResponse data = userService.listSessions(
+        SessionListResponse data = users.listSessions(
                 userId(servletRequest),
                 tenantId(servletRequest),
                 sessionId(servletRequest)
@@ -136,7 +134,7 @@ public class UserController {
             @PathVariable String sessionId,
             HttpServletRequest servletRequest
     ) {
-        RevokeSessionResponse data = userService.revokeSession(userId(servletRequest), tenantId(servletRequest), sessionId);
+        RevokeSessionResponse data = users.revokeSession(userId(servletRequest), tenantId(servletRequest), sessionId);
         return ok(data, servletRequest);
     }
 
@@ -149,7 +147,7 @@ public class UserController {
             @RequestParam(required = false) String role,
             HttpServletRequest servletRequest
     ) {
-        UserListResponse data = userService.listUsers(tenantId(servletRequest), page, limit, search, status, role);
+        UserListResponse data = users.listUsers(tenantId(servletRequest), page, limit, search, status, role);
         return ok(data, servletRequest);
     }
 
@@ -158,7 +156,7 @@ public class UserController {
             @Valid @RequestBody AdminCreateUserRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserCreatedResponse data = userService.createUser(request, auditContext(servletRequest));
+        UserCreatedResponse data = users.createUser(request, auditContext(servletRequest));
         ApiResponse<UserCreatedResponse> response = ApiResponse.success(
                 201,
                 "Created",
@@ -176,7 +174,7 @@ public class UserController {
             @PathVariable String userId,
             HttpServletRequest servletRequest
     ) {
-        return ok(userService.resetCredential(
+        return ok(users.resetCredential(
                 userId, tenantId(servletRequest), "EMAIL_INVITE", auditContext(servletRequest)), servletRequest);
     }
 
@@ -186,7 +184,7 @@ public class UserController {
             @Valid @RequestBody CredentialDeliveryRequest request,
             HttpServletRequest servletRequest
     ) {
-        return ok(userService.resetCredential(
+        return ok(users.resetCredential(
                 userId, tenantId(servletRequest), request.credentialDelivery(), auditContext(servletRequest)), servletRequest);
     }
 
@@ -195,7 +193,7 @@ public class UserController {
             @Valid @RequestBody BulkStatusRequest request,
             HttpServletRequest servletRequest
     ) {
-        BulkOperationResponse data = userService.bulkUpdateStatus(tenantId(servletRequest), request);
+        BulkOperationResponse data = users.bulkUpdateStatus(tenantId(servletRequest), request);
         return ok(data, servletRequest);
     }
 
@@ -204,7 +202,7 @@ public class UserController {
             @Valid @RequestBody BulkDeleteRequest request,
             HttpServletRequest servletRequest
     ) {
-        BulkOperationResponse data = userService.bulkDelete(tenantId(servletRequest), request);
+        BulkOperationResponse data = users.bulkDelete(tenantId(servletRequest), request);
         return ok(data, servletRequest);
     }
 
@@ -213,7 +211,7 @@ public class UserController {
             @PathVariable String userId,
             HttpServletRequest servletRequest
     ) {
-        UserDetailResponse data = userService.getUserDetail(userId, tenantId(servletRequest));
+        UserDetailResponse data = users.getUserDetail(userId, tenantId(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -224,7 +222,7 @@ public class UserController {
             @RequestParam(required = false) Integer limit,
             HttpServletRequest servletRequest
     ) {
-        ActivityListResponse data = userService.listActivity(userId, tenantId(servletRequest), page, limit);
+        ActivityListResponse data = users.listActivity(userId, tenantId(servletRequest), page, limit);
         return ok(data, servletRequest);
     }
 
@@ -234,7 +232,7 @@ public class UserController {
             @Valid @RequestBody AdminUpdateUserStatusRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserResponse data = userService.updateUserStatus(userId, tenantId(servletRequest), request);
+        UserResponse data = users.updateUserStatus(userId, tenantId(servletRequest), request);
         return ok(data, servletRequest);
     }
 
@@ -244,7 +242,7 @@ public class UserController {
             @Valid @RequestBody AdminAssignRolesRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserResponse data = userService.assignRoles(
+        UserResponse data = users.assignRoles(
                 userId, tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }
@@ -255,7 +253,7 @@ public class UserController {
             @Valid @RequestBody AdminAssignPermissionsRequest request,
             HttpServletRequest servletRequest
     ) {
-        PermissionOverrideResponse data = userService.assignPermissions(
+        PermissionOverrideResponse data = users.assignPermissions(
                 userId, tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }
@@ -265,7 +263,7 @@ public class UserController {
             @PathVariable String userId,
             HttpServletRequest servletRequest
     ) {
-        BulkOperationResponse data = userService.deleteUser(userId, tenantId(servletRequest));
+        BulkOperationResponse data = users.deleteUser(userId, tenantId(servletRequest));
         return ok(data, servletRequest);
     }
 
