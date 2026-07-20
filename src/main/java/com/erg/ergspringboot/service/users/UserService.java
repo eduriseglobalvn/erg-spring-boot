@@ -55,6 +55,8 @@ import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
 import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
+import com.erg.ergspringboot.users.UserAuditContext;
+import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -84,6 +86,7 @@ public class UserService {
     private final UserAccessScopeRepository userAccessScopeRepository;
     private final AccountMailSender accountMailSender;
     private final UserQueryUseCase userQueryUseCase;
+    private final UserProfileUseCase userProfileUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -108,6 +111,7 @@ public class UserService {
         this.userAccessScopeRepository = userAccessScopeRepository;
         this.accountMailSender = accountMailSender;
         this.userQueryUseCase = new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository);
+        this.userProfileUseCase = new UserProfileUseCase(userRepository, userActivityRepository);
     }
 
     @Autowired(required = false)
@@ -131,37 +135,12 @@ public class UserService {
     public UserResponse updateProfile(
             String userId, String tenantId, UpdateProfileRequest request, AuditContext auditContext
     ) {
-        User user = findUser(userId, tenantId);
-        Map<String, Object> before = profileAuditState(user);
-        applyProfileUpdate(user, request);
-        userRepository.save(user);
-        recordActivity(user, auditContext, "ACCOUNT_PROFILE_UPDATED", "Account profile updated",
-                before, profileAuditState(user));
-        return toResponse(user);
+        return userProfileUseCase.update(userId, tenantId, request, toPublicAudit(auditContext));
     }
 
     @Transactional
     public OnboardingResponse completeOnboarding(String userId, String tenantId, OnboardingRequest request) {
-        User user = findUser(userId, tenantId);
-        user.setFullName(trimToNull(request.fullName()));
-        user.setPhone(trimToNull(request.phone()));
-        user.setBio(trimToNull(request.bio()));
-        user.setGender(trimToNull(request.gender()));
-        user.setDateOfBirth(trimToNull(request.dateOfBirth()));
-        user.setAddress(trimToNull(request.address()));
-        user.setCity(trimToNull(request.city()));
-        user.setDistrict(trimToNull(request.district()));
-        user.setJobTitle(trimToNull(request.jobTitle()));
-        user.setRegion(trimToNull(request.region()));
-        user.setIsProfileCompleted(true);
-        userRepository.save(user);
-        return new OnboardingResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getAvatarUrl(),
-                Boolean.TRUE.equals(user.getIsProfileCompleted())
-        );
+        return userProfileUseCase.completeOnboarding(userId, tenantId, request);
     }
 
     @Transactional(readOnly = true)
@@ -666,44 +645,9 @@ public class UserService {
         return normalized;
     }
 
-    private void applyProfileUpdate(User user, UpdateProfileRequest request) {
-        if (request.fullName() != null) {
-            user.setFullName(trimToNull(request.fullName()));
-        }
-        if (request.phone() != null) {
-            user.setPhone(trimToNull(request.phone()));
-        }
-        if (request.bio() != null) {
-            user.setBio(trimToNull(request.bio()));
-        }
-        if (request.gender() != null) {
-            user.setGender(trimToNull(request.gender()));
-        }
-        if (request.dateOfBirth() != null) {
-            user.setDateOfBirth(trimToNull(request.dateOfBirth()));
-        }
-        if (request.address() != null) {
-            user.setAddress(trimToNull(request.address()));
-        }
-        if (request.city() != null) {
-            user.setCity(trimToNull(request.city()));
-        }
-        if (request.district() != null) {
-            user.setDistrict(trimToNull(request.district()));
-        }
-        if (request.jobTitle() != null) {
-            user.setJobTitle(trimToNull(request.jobTitle()));
-        }
-        if (request.region() != null) {
-            user.setRegion(trimToNull(request.region()));
-        }
-        if (request.socialLinks() != null) {
-            user.setSocialLinks(request.socialLinks());
-        }
-        if (request.avatarUrl() != null) {
-            user.setAvatarUrl(trimToNull(request.avatarUrl()));
-        }
-        user.setIsProfileCompleted(isProfileCompleted(user));
+    private UserAuditContext toPublicAudit(AuditContext audit) {
+        return audit == null ? null
+                : new UserAuditContext(audit.actorUserId(), audit.requestId(), audit.ipAddress(), audit.userAgent());
     }
 
     private UserResponse toResponse(User user) {

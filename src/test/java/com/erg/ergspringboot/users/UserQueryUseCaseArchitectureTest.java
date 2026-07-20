@@ -21,4 +21,15 @@ class UserQueryUseCaseArchitectureTest {
                 .doesNotContain("findAdminListItems(")
                 .doesNotContain("findByTargetUserIdAndTenantIdOrderByCreatedAtDescIdDesc(");
     }
+
+    @Test
+    void profileMutationsLiveInTheirOwnUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.users.internal.profile.UserProfileUseCase"))
+                .doesNotThrowAnyException();
+
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        assertThat(legacy).doesNotContain("applyProfileUpdate(");
+    }
 }
