@@ -15,3 +15,20 @@ The native binary is an acceptance gate, not a replacement for the JVM control r
 The gate passes only when the native process is functionally correct and does not regress
 the agreed latency/error/RSS budgets. A successful compilation alone is not evidence that
 the native runtime gate passed.
+
+The native profile is an explicit build target. Linux/CI build:
+
+```bash
+./mvnw -Pnative -DskipTests native:compile-no-fork
+```
+
+Run with the production profile and external secrets:
+
+```bash
+SPRING_PROFILES_ACTIVE=prod \
+FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres \
+docker compose -f ops/docker/compose.native.yml up --build
+```
+
+Do not bake `.env`, private keys, JWT secrets or webhook tokens into the image.
+Windows developers should use the Linux CI/container smoke path for native builds.
