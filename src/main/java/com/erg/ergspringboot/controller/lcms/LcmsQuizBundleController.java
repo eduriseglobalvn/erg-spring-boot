@@ -2,7 +2,7 @@ package com.erg.ergspringboot.controller.lcms;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.quiz.bundle.PortableQuizBundleService;
+import com.erg.ergspringboot.lcms.LcmsOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LcmsQuizBundleController {
 
-    private final PortableQuizBundleService bundleService;
+    private final LcmsOperations lcms;
 
-    public LcmsQuizBundleController(PortableQuizBundleService bundleService) {
-        this.bundleService = bundleService;
+    public LcmsQuizBundleController(LcmsOperations lcms) {
+        this.lcms = lcms;
     }
 
     @GetMapping("/api/v1/lcms/quizzes/{quizId}/bundle")
@@ -29,7 +29,7 @@ public class LcmsQuizBundleController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Quiz bundle exported", bundleService.exportActive(access.tenantId(), quizId), request);
+        return ok("Quiz bundle exported", lcms.exportActiveBundle(access.tenantId(), quizId), request);
     }
 
     @GetMapping("/api/v1/lcms/quiz-versions/{quizVersionId}/bundle")
@@ -38,7 +38,7 @@ public class LcmsQuizBundleController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Quiz bundle exported", bundleService.exportVersion(access.tenantId(), quizVersionId), request);
+        return ok("Quiz bundle exported", lcms.exportVersionBundle(access.tenantId(), quizVersionId), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
