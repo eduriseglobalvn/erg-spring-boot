@@ -17,9 +17,9 @@ class EmployeeSecurityFeedContractTest {
 
         assertThat(controller)
                 .contains("@GetMapping(\"/security-feed\")")
-                .contains("securityActivityService.listUnifiedFeed(")
-                .contains("employeeManagementService.listEmployees(")
-                .contains("employeeManagementService.createEmployee(");
+                .contains("employees.listUnifiedFeed(")
+                .contains("employees.listEmployees(")
+                .contains("employees.createEmployee(");
         assertThat(dto).contains(
                 "record EmployeeListItemResponse(",
                 "record CreateEmployeeRequest(",
