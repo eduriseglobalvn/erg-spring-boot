@@ -13,8 +13,8 @@ export function setup() { return { base, provider, secret }; }
 export function teardown() { /* restore provider fixtures in the benchmark harness */ }
 
 export default function (data) {
-  const body = JSON.stringify({ update_id: `${__VU}-${__ITER}`, message: { text: 'load-test' } });
-  const response = http.post(`${data.base}/api/v1/webhooks/${data.provider}`, body, {
+  const body = JSON.stringify({ update_id: (__VU * 1000000) + __ITER, message: { text: 'load-test' } });
+  const response = http.post(`${data.base}/webhooks/${data.provider}`, body, {
     headers: {
       'Content-Type': 'application/json',
       'X-Telegram-Bot-Api-Secret-Token': data.secret,

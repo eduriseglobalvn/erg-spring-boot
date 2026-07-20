@@ -4,13 +4,13 @@ on:
   pull_request:
   push:
     branches: [main, 'codex/**']
+    tags: ['v*']
   schedule:
     - cron: '30 2 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   verify:
@@ -51,7 +51,7 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: dependency-check/Dependency-Check_Action@main
+      - uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c
         with:
           project: erg-spring
           path: .
@@ -72,7 +72,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: graalvm
           java-version: '25'
           cache: maven
       - name: Native compile
@@ -84,12 +84,15 @@ jobs:
     name: k6 smoke (benchmark environment only)
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    env:
+      BENCHMARK_BASE_URL: ${{ secrets.BENCHMARK_BASE_URL }}
+      BENCHMARK_WEBHOOK_SECRET: ${{ secrets.BENCHMARK_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: grafana/setup-k6-action@v1
       - name: Run webhook smoke when benchmark URL is supplied
-        if: ${{ secrets.BENCHMARK_BASE_URL != '' && secrets.BENCHMARK_ACCESS_TOKEN != '' }}
+        if: ${{ env.BENCHMARK_BASE_URL != '' && env.BENCHMARK_WEBHOOK_SECRET != '' }}
         env:
-          BASE_URL: ${{ secrets.BENCHMARK_BASE_URL }}
-          ACCESS_TOKEN: ${{ secrets.BENCHMARK_ACCESS_TOKEN }}
+          BASE_URL: ${{ env.BENCHMARK_BASE_URL }}
+          WEBHOOK_SECRET: ${{ env.BENCHMARK_WEBHOOK_SECRET }}
         run: k6 run --vus 2 --iterations 2 load/k6/webhook-burst.js
