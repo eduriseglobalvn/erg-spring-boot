@@ -8,10 +8,20 @@ services:
     environment:
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 1606
+      SPRING_AUTOCONFIGURE_EXCLUDE: >-
+        org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,
+        org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,
+        org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration,
+        org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,
+        org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration,
+        org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration,
+        org.springframework.modulith.observability.autoconfigure.SpringDataRestModuleObservabilityAutoConfiguration,
+        org.springframework.modulith.actuator.autoconfigure.ApplicationModulesEndpointConfiguration
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-erg}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-erg}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres
+      SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED: "false"
       SPRING_DATA_REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
       ERG_REDIS_STATE_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
       ERG_REDIS_CACHE_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379

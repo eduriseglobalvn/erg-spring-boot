@@ -288,17 +288,25 @@
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.graalvm.buildtools</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>build-native</id>
+                                <id>process-aot</id>
                                 <goals>
-                                    <goal>compile-no-fork</goal>
+                                    <goal>process-aot</goal>
                                 </goals>
                             </execution>
                         </executions>
                         <configuration>
+                            <mainClass>com.erg.ergspringboot.ErgSpringApplication</mainClass>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>com.erg.ergspringboot.ErgSpringApplication</mainClass>
                             <imageName>erg-spring-native</imageName>
                             <buildArgs>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
