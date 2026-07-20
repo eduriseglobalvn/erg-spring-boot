@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
+import com.erg.ergspringboot.authorization.AuthorizationOperations;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -12,7 +13,7 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 class PermissionAuthorizationManagerTest {
 
     private final PermissionAuthorizationManager manager =
-            new PermissionAuthorizationManager(new ErgPolicyService());
+            new PermissionAuthorizationManager(new AuthorizationOperations(new ErgPolicyService()));
 
     @Test
     void specificDenyWinsAcrossAllRequireAnyAlternatives() {
