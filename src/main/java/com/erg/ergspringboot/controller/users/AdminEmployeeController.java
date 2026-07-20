@@ -23,9 +23,8 @@ import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
-import com.erg.ergspringboot.service.users.EmployeeManagementService;
-import com.erg.ergspringboot.service.users.EmployeeSecurityActivityService;
 import com.erg.ergspringboot.service.users.UserService;
+import com.erg.ergspringboot.users.EmployeeOperations;
 import com.erg.ergspringboot.users.UserOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -47,17 +46,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminEmployeeController {
 
     private final UserOperations users;
-    private final EmployeeManagementService employeeManagementService;
-    private final EmployeeSecurityActivityService securityActivityService;
+    private final EmployeeOperations employees;
 
     public AdminEmployeeController(
             UserOperations users,
-            EmployeeManagementService employeeManagementService,
-            EmployeeSecurityActivityService securityActivityService
+            EmployeeOperations employees
     ) {
         this.users = users;
-        this.employeeManagementService = employeeManagementService;
-        this.securityActivityService = securityActivityService;
+        this.employees = employees;
     }
 
     @GetMapping({"", "/"})
@@ -69,7 +65,7 @@ public class AdminEmployeeController {
             @RequestParam(required = false) String role,
             HttpServletRequest request
     ) {
-        return ok(employeeManagementService.listEmployees(
+        return ok(employees.listEmployees(
                 tenantId(), page, limit, search, status, role), request);
     }
 
@@ -81,7 +77,7 @@ public class AdminEmployeeController {
             @RequestParam(required = false) Integer limit,
             HttpServletRequest request
     ) {
-        return ok(securityActivityService.listUnifiedFeed(
+        return ok(employees.listUnifiedFeed(
                 tenantId(), userId, sourceType, page, limit), request);
     }
 
@@ -91,7 +87,7 @@ public class AdminEmployeeController {
             HttpServletRequest request
     ) {
         return ResponseEntity.status(201).body(ApiResponse.success(
-                201, "Created", employeeManagementService.createEmployee(
+                201, "Created", employees.createEmployee(
                         tenantId(), body, auditContext(request)),
                 request.getRequestURI(), requestId(request)));
     }
@@ -101,7 +97,7 @@ public class AdminEmployeeController {
             @PathVariable String userId,
             HttpServletRequest request
     ) {
-        return ok(employeeManagementService.getEmployee(userId, tenantId()), request);
+        return ok(employees.getEmployee(userId, tenantId()), request);
     }
 
     @PatchMapping("/{userId}")
@@ -110,7 +106,7 @@ public class AdminEmployeeController {
             @Valid @RequestBody UpdateEmployeeRequest body,
             HttpServletRequest request
     ) {
-        return ok(employeeManagementService.updateEmployee(userId, tenantId(), body, auditContext(request)), request);
+        return ok(employees.updateEmployee(userId, tenantId(), body, auditContext(request)), request);
     }
 
     @PutMapping("/{userId}/status")
@@ -157,7 +153,7 @@ public class AdminEmployeeController {
             @RequestParam(required = false) Integer limit,
             HttpServletRequest request
     ) {
-        return ok(securityActivityService.listSecurityEvents(userId, tenantId(), page, limit), request);
+        return ok(employees.listSecurityEvents(userId, tenantId(), page, limit), request);
     }
 
     @GetMapping("/{userId}/sessions")
