@@ -8,9 +8,8 @@ import com.erg.ergspringboot.common.request.quiz.QuestionBankAuthoringRequests.S
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.DeleteQuestionResponse;
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
-import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService;
 import com.erg.ergspringboot.lcms.LcmsOperations;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -27,13 +26,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class LcmsQuestionBankAuthoringControllerTest {
 
     @Mock
-    private QuestionBankAuthoringService questionBankAuthoringService;
+    private LcmsOperations lcms;
 
     private LcmsQuestionBankAuthoringController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new LcmsQuestionBankAuthoringController(new LcmsOperations(questionBankAuthoringService));
+        controller = new LcmsQuestionBankAuthoringController(lcms);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         new ErgPrincipal(
@@ -63,35 +62,35 @@ class LcmsQuestionBankAuthoringControllerTest {
     void createPassesPrincipalTenantAndUser() {
         SaveQuestionRequest body = requestBody();
         SaveQuestionResponse saved = new SaveQuestionResponse("question-1", "ready");
-        when(questionBankAuthoringService.create("tenant-a", "author-1", body)).thenReturn(saved);
+        when(lcms.createQuestion("tenant-a", "author-1", body)).thenReturn(saved);
 
         ApiResponse<SaveQuestionResponse> response = controller.create(body, request("/api/v1/lcms/questions"));
 
         assertThat(response.data()).isSameAs(saved);
-        verify(questionBankAuthoringService).create("tenant-a", "author-1", body);
+        verify(lcms).createQuestion("tenant-a", "author-1", body);
     }
 
     @Test
     void updatePassesPrincipalTenant() {
         SaveQuestionRequest body = requestBody();
         SaveQuestionResponse saved = new SaveQuestionResponse("question-1", "reviewing");
-        when(questionBankAuthoringService.update("tenant-a", "question-1", body)).thenReturn(saved);
+        when(lcms.updateQuestion("tenant-a", "question-1", body)).thenReturn(saved);
 
         ApiResponse<SaveQuestionResponse> response = controller.update("question-1", body, request("/api/v1/lcms/questions/question-1"));
 
         assertThat(response.data()).isSameAs(saved);
-        verify(questionBankAuthoringService).update("tenant-a", "question-1", body);
+        verify(lcms).updateQuestion("tenant-a", "question-1", body);
     }
 
     @Test
     void deleteArchivesQuestionForTenant() {
         DeleteQuestionResponse deleted = new DeleteQuestionResponse("question-1", true);
-        when(questionBankAuthoringService.archive("tenant-a", "question-1")).thenReturn(deleted);
+        when(lcms.archiveQuestion("tenant-a", "question-1")).thenReturn(deleted);
 
         ApiResponse<DeleteQuestionResponse> response = controller.delete("question-1", request("/api/v1/lcms/questions/question-1"));
 
         assertThat(response.data()).isSameAs(deleted);
-        verify(questionBankAuthoringService).archive("tenant-a", "question-1");
+        verify(lcms).archiveQuestion("tenant-a", "question-1");
     }
 
     private SaveQuestionRequest requestBody() {

@@ -83,9 +83,13 @@ These controllers are explicitly tracked for prototype/direct-service remediatio
   `DocumentController`, `EngagementController`, `AnalyticsOperationsController`,
   `MigrationPlatformController`, `SeoController` and `TrendingBotController` inject or
   delegate to `ModuleWorkflowService`, `CmsService`, `CatalogService` or `DocumentService`.
-- Dynamic `Map<String,Object>` is currently present in AI, CMS, catalog, engagement,
-  operations, platform, SEO, trending, document and selected calendar responses. These are
-  allowlisted only as migration debt; new public routes must use typed records.
+- Public handler signatures still using dynamic `Map<String,Object>` are limited by
+  `PublicApiTypeContractTest` to `AuthController#logout`, `AuthController#logoutAll`,
+  `LcmsQuizBundleController#exportActive`, `LcmsQuizBundleController#exportVersion`,
+  `LearningContentController#deleteContentItem`, `NotificationDeviceController#revoke` and
+  `NotificationDeviceController#unregister`. These are reviewed migration debt (the two quiz
+  bundle exports are provider-neutral dynamic documents); new public handlers must use typed
+  records and every migration must shrink this method-level allowlist.
 - `permitAll` and webhook exceptions are controlled by exact SecurityConfig matchers and are
   re-tested in the webhook/security phase. No route may infer public access from a broad
   controller prefix.

@@ -6,7 +6,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaCommitResponse;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaPresignResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.quiz.media.MediaService;
+import com.erg.ergspringboot.lcms.LcmsOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,10 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LcmsMediaController {
 
-    private final MediaService mediaService;
+    private final LcmsOperations lcms;
 
-    public LcmsMediaController(MediaService mediaService) {
-        this.mediaService = mediaService;
+    public LcmsMediaController(LcmsOperations lcms) {
+        this.lcms = lcms;
     }
 
     @PostMapping("/api/v1/lcms/media/presign")
@@ -32,7 +32,7 @@ public class LcmsMediaController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Media presign resolved", mediaService.presign(access.tenantId(), access.userId(), body), request);
+        return ok("Media presign resolved", lcms.presignMedia(access.tenantId(), access.userId(), body), request);
     }
 
     @PostMapping("/api/v1/lcms/media/{mediaId}/commit")
@@ -47,7 +47,7 @@ public class LcmsMediaController {
                 body == null ? null : body.width(),
                 body == null ? null : body.height()
         );
-        return ok("Media committed", mediaService.commit(access.tenantId(), resolved), request);
+        return ok("Media committed", lcms.commitMedia(access.tenantId(), resolved), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {

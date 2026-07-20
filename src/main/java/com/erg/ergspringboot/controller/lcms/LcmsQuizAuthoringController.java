@@ -12,10 +12,8 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ForkRes
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.PublishResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDraftResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
+import com.erg.ergspringboot.lcms.LcmsOperations;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.quiz.authoring.QuizAuthoringService;
-import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
-import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,18 +32,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LcmsQuizAuthoringController {
 
-    private final QuizAuthoringService quizAuthoringService;
-    private final QuizDraftService quizDraftService;
-    private final QuizPublishService quizPublishService;
+    private final LcmsOperations lcms;
 
-    public LcmsQuizAuthoringController(
-            QuizAuthoringService quizAuthoringService,
-            QuizDraftService quizDraftService,
-            QuizPublishService quizPublishService
-    ) {
-        this.quizAuthoringService = quizAuthoringService;
-        this.quizDraftService = quizDraftService;
-        this.quizPublishService = quizPublishService;
+    public LcmsQuizAuthoringController(LcmsOperations lcms) {
+        this.lcms = lcms;
     }
 
     @PostMapping("/api/v1/lcms/quizzes")
@@ -55,7 +45,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Quiz created", quizAuthoringService.create(access.tenantId(), access.userId(), idempotencyKey, body), request);
+        return ok("Quiz created", lcms.createQuiz(access.tenantId(), access.userId(), idempotencyKey, body), request);
     }
 
     @PutMapping("/api/v1/lcms/quizzes/{quizId}/draft")
@@ -65,7 +55,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Draft saved", quizDraftService.saveDraft(access.tenantId(), quizId, body), request);
+        return ok("Draft saved", lcms.saveDraft(access.tenantId(), quizId, body), request);
     }
 
     @PatchMapping("/api/v1/lcms/quizzes/{quizId}/draft")
@@ -75,7 +65,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Draft saved", quizDraftService.saveDraft(access.tenantId(), quizId, body), request);
+        return ok("Draft saved", lcms.saveDraft(access.tenantId(), quizId, body), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/slides")
@@ -85,7 +75,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Slide upserted", quizDraftService.upsertSlide(access.tenantId(), quizId, body), request);
+        return ok("Slide upserted", lcms.upsertSlide(access.tenantId(), quizId, body), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/reorder")
@@ -95,7 +85,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Slides reordered", quizDraftService.reorder(access.tenantId(), quizId, body), request);
+        return ok("Slides reordered", lcms.reorder(access.tenantId(), quizId, body), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/validate")
@@ -104,7 +94,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Quiz validated", quizPublishService.validate(access.tenantId(), quizId), request);
+        return ok("Quiz validated", lcms.validateQuiz(access.tenantId(), quizId), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/publish")
@@ -117,7 +107,7 @@ public class LcmsQuizAuthoringController {
         UserAccessContext access = UserAccessContext.from(request);
         return ok(
                 "Quiz published",
-                quizPublishService.publish(access.tenantId(), quizId, access.userId(), idempotencyKey, body),
+                lcms.publishQuiz(access.tenantId(), quizId, access.userId(), idempotencyKey, body),
                 request
         );
     }
@@ -129,7 +119,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Quiz version forked", quizPublishService.fork(access.tenantId(), quizId, versionId, access.userId()), request);
+        return ok("Quiz version forked", lcms.forkQuizVersion(access.tenantId(), quizId, versionId, access.userId()), request);
     }
 
     @DeleteMapping("/api/v1/lcms/quizzes/{quizId}")
@@ -138,7 +128,7 @@ public class LcmsQuizAuthoringController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Quiz deleted", quizAuthoringService.delete(access.tenantId(), quizId), request);
+        return ok("Quiz deleted", lcms.deleteQuiz(access.tenantId(), quizId), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {

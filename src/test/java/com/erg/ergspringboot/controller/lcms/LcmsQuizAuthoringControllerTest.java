@@ -10,10 +10,8 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.DeleteQ
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ForkResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.PublishResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
+import com.erg.ergspringboot.lcms.LcmsOperations;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.quiz.authoring.QuizAuthoringService;
-import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
-import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -30,19 +28,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class LcmsQuizAuthoringControllerTest {
 
     @Mock
-    private QuizAuthoringService quizAuthoringService;
-
-    @Mock
-    private QuizDraftService quizDraftService;
-
-    @Mock
-    private QuizPublishService quizPublishService;
+    private LcmsOperations lcms;
 
     private LcmsQuizAuthoringController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new LcmsQuizAuthoringController(quizAuthoringService, quizDraftService, quizPublishService);
+        lcms = org.mockito.Mockito.mock(LcmsOperations.class);
+        controller = new LcmsQuizAuthoringController(lcms);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         new ErgPrincipal(
@@ -71,19 +64,19 @@ class LcmsQuizAuthoringControllerTest {
     @Test
     void validateDelegatesToPublishService() {
         ValidationResultResponse validation = new ValidationResultResponse(true, List.of());
-        when(quizPublishService.validate("tenant-a", "quiz-1")).thenReturn(validation);
+        when(lcms.validateQuiz("tenant-a", "quiz-1")).thenReturn(validation);
 
         ApiResponse<ValidationResultResponse> response = controller.validate("quiz-1", request("/api/v1/lcms/quizzes/quiz-1/validate"));
 
         assertThat(response.data()).isSameAs(validation);
-        verify(quizPublishService).validate("tenant-a", "quiz-1");
+        verify(lcms).validateQuiz("tenant-a", "quiz-1");
     }
 
     @Test
     void publishPassesPrincipalAndIdempotencyKey() {
         PublishRequest requestBody = new PublishRequest(7L, "client-first", "v7");
         PublishResponse published = new PublishResponse("version-1", "v7", 7, "package-1", "hash-1");
-        when(quizPublishService.publish("tenant-a", "quiz-1", "author-1", "publish-key-1", requestBody))
+        when(lcms.publishQuiz("tenant-a", "quiz-1", "author-1", "publish-key-1", requestBody))
                 .thenReturn(published);
 
         ApiResponse<PublishResponse> response = controller.publish(
@@ -94,13 +87,13 @@ class LcmsQuizAuthoringControllerTest {
         );
 
         assertThat(response.data()).isSameAs(published);
-        verify(quizPublishService).publish("tenant-a", "quiz-1", "author-1", "publish-key-1", requestBody);
+        verify(lcms).publishQuiz("tenant-a", "quiz-1", "author-1", "publish-key-1", requestBody);
     }
 
     @Test
     void forkVersionPassesPrincipalUser() {
         ForkResponse fork = new ForkResponse("draft-2", 0, "v1");
-        when(quizPublishService.fork("tenant-a", "quiz-1", "version-1", "author-1")).thenReturn(fork);
+        when(lcms.forkQuizVersion("tenant-a", "quiz-1", "version-1", "author-1")).thenReturn(fork);
 
         ApiResponse<ForkResponse> response = controller.forkVersion(
                 "quiz-1",
@@ -109,13 +102,13 @@ class LcmsQuizAuthoringControllerTest {
         );
 
         assertThat(response.data()).isSameAs(fork);
-        verify(quizPublishService).fork("tenant-a", "quiz-1", "version-1", "author-1");
+        verify(lcms).forkQuizVersion("tenant-a", "quiz-1", "version-1", "author-1");
     }
 
     @Test
     void deletePassesPrincipalTenant() {
         DeleteQuizResponse deleted = new DeleteQuizResponse("quiz-1", true);
-        when(quizAuthoringService.delete("tenant-a", "quiz-1")).thenReturn(deleted);
+        when(lcms.deleteQuiz("tenant-a", "quiz-1")).thenReturn(deleted);
 
         ApiResponse<DeleteQuizResponse> response = controller.delete(
                 "quiz-1",
@@ -123,7 +116,7 @@ class LcmsQuizAuthoringControllerTest {
         );
 
         assertThat(response.data()).isSameAs(deleted);
-        verify(quizAuthoringService).delete("tenant-a", "quiz-1");
+        verify(lcms).deleteQuiz("tenant-a", "quiz-1");
     }
 
     private MockHttpServletRequest request(String path) {

@@ -46,4 +46,30 @@ class DependencyDirectionArchTest {
                 .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
                 .check(classes);
     }
+
+    @Test
+    void migratedLcmsQuizAdapterDependsOnlyOnModuleFacade() {
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.erg.ergspringboot.controller.lcms");
+
+        noClasses()
+                .that().haveSimpleName("LcmsQuizAuthoringController")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
+                .check(classes);
+    }
+
+    @Test
+    void migratedLcmsMediaAdapterDependsOnlyOnModuleFacade() {
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.erg.ergspringboot.controller.lcms");
+
+        noClasses()
+                .that().haveSimpleName("LcmsMediaController")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
+                .check(classes);
+    }
 }
