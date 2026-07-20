@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@org.springframework.context.annotation.Profile("prototype")
 @RequestMapping({"/api/v1/elearning", "/api/v1/admin/elearning"})
 public class ElearningController {
 

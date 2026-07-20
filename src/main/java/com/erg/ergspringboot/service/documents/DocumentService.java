@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
 @Service
+@org.springframework.context.annotation.Profile("prototype")
 public class DocumentService {
 
     private final Map<String, Map<String, Object>> documents = new ConcurrentHashMap<>();

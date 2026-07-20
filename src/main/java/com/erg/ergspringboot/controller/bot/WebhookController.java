@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@org.springframework.context.annotation.Profile("prototype")
 public class WebhookController {
 
     private final ModuleWorkflowService workflows;
