@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
 
 class UserQueryUseCaseArchitectureTest {
@@ -83,5 +84,13 @@ class UserQueryUseCaseArchitectureTest {
         String legacy = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(legacy).doesNotContain("permissionOverrideRepository.deleteByUserId(");
+    }
+
+    @Test
+    void publicUsersFacadeDoesNotStoreTheLegacyMonolith() {
+        for (Field field : UserOperations.class.getDeclaredFields()) {
+            assertThat(field.getType().getName()).isNotEqualTo(
+                    "com.erg.ergspringboot.service.users.UserService");
+        }
     }
 }
