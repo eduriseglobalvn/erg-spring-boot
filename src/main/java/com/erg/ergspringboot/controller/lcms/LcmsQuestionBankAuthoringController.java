@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.DeleteQuestionResponse;
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService;
+import com.erg.ergspringboot.lcms.LcmsOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LcmsQuestionBankAuthoringController {
 
-    private final QuestionBankAuthoringService questionBankAuthoringService;
+    private final LcmsOperations lcms;
 
-    public LcmsQuestionBankAuthoringController(QuestionBankAuthoringService questionBankAuthoringService) {
-        this.questionBankAuthoringService = questionBankAuthoringService;
+    public LcmsQuestionBankAuthoringController(LcmsOperations lcms) {
+        this.lcms = lcms;
     }
 
     @PostMapping("/api/v1/lcms/questions")
@@ -31,7 +31,7 @@ public class LcmsQuestionBankAuthoringController {
         UserAccessContext access = UserAccessContext.from(request);
         return ok(
                 "Question created",
-                questionBankAuthoringService.create(access.tenantId(), access.userId(), body),
+                lcms.createQuestion(access.tenantId(), access.userId(), body),
                 request
         );
     }
@@ -45,7 +45,7 @@ public class LcmsQuestionBankAuthoringController {
         UserAccessContext access = UserAccessContext.from(request);
         return ok(
                 "Question updated",
-                questionBankAuthoringService.update(access.tenantId(), questionId, body),
+                lcms.updateQuestion(access.tenantId(), questionId, body),
                 request
         );
     }
@@ -58,7 +58,7 @@ public class LcmsQuestionBankAuthoringController {
         UserAccessContext access = UserAccessContext.from(request);
         return ok(
                 "Question archived",
-                questionBankAuthoringService.archive(access.tenantId(), questionId),
+                lcms.archiveQuestion(access.tenantId(), questionId),
                 request
         );
     }

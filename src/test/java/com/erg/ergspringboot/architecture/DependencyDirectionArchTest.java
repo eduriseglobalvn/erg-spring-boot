@@ -33,4 +33,17 @@ class DependencyDirectionArchTest {
                 .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
                 .check(classes);
     }
+
+    @Test
+    void migratedLcmsQuestionAdapterDependsOnlyOnModuleFacade() {
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.erg.ergspringboot.controller.lcms");
+
+        noClasses()
+                .that().haveSimpleName("LcmsQuestionBankAuthoringController")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
+                .check(classes);
+    }
 }
