@@ -54,6 +54,7 @@ import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
+import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -82,6 +83,7 @@ public class UserService {
     private final PasswordService passwordService;
     private final UserAccessScopeRepository userAccessScopeRepository;
     private final AccountMailSender accountMailSender;
+    private final UserQueryUseCase userQueryUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -105,6 +107,7 @@ public class UserService {
         this.passwordService = passwordService;
         this.userAccessScopeRepository = userAccessScopeRepository;
         this.accountMailSender = accountMailSender;
+        this.userQueryUseCase = new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository);
     }
 
     @Autowired(required = false)
@@ -116,7 +119,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(String userId, String tenantId) {
-        return toResponse(findUser(userId, tenantId));
+        return userQueryUseCase.current(userId, tenantId);
     }
 
     @Transactional
@@ -254,29 +257,7 @@ public class UserService {
     public UserListResponse listUsers(
             String tenantId, Integer page, Integer limit, String search, String status, String role
     ) {
-        int safePage = page == null || page < 1 ? 1 : page;
-        int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
-        Page<UserListItemProjection> pageItems = userRepository.findAdminListItems(
-                normalizeTenant(tenantId),
-                trimToNull(search),
-                trimToNull(status),
-                trimToNull(role),
-                PageRequest.of(safePage - 1, safeLimit)
-        );
-        List<String> userIds = pageItems.getContent().stream()
-                .map(UserListItemProjection::id)
-                .toList();
-        Map<String, List<String>> rolesByUserId = userIds.isEmpty()
-                ? Map.of()
-                : userRepository.findRoleNamesByUserIds(userIds).stream()
-                        .collect(Collectors.groupingBy(
-                                UserRoleNameProjection::userId,
-                                Collectors.mapping(UserRoleNameProjection::roleName, Collectors.toList())
-                        ));
-        List<UserItemResponse> users = pageItems.getContent().stream()
-                .map(user -> toItemResponse(user, rolesByUserId.get(user.id())))
-                .toList();
-        return new UserListResponse(users, new Meta(safePage, safeLimit, pageItems.getTotalElements(), pageItems.getTotalPages()));
+        return userQueryUseCase.list(tenantId, page, limit, search, status, role);
     }
 
     public UserListResponse listUsers(ListUsersQuery query) {
@@ -285,28 +266,12 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserDetailResponse getUserDetail(String userId, String tenantId) {
-        User user = findUser(userId, tenantId);
-        List<SessionResponse> sessions = sessionRepository
-                .findByUserIdAndTenantIdOrderByLastActiveAtDesc(userId, normalizeTenant(tenantId))
-                .stream()
-                .map(session -> toSessionResponse(session, null))
-                .toList();
-        return new UserDetailResponse(toResponse(user), sessions);
+        return userQueryUseCase.detail(userId, tenantId);
     }
 
     @Transactional(readOnly = true)
     public ActivityListResponse listActivity(String userId, String tenantId, Integer page, Integer limit) {
-        findUser(userId, tenantId);
-        int safePage = page == null || page < 1 ? 1 : page;
-        int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
-        Page<UserActivity> activities = userActivityRepository
-                .findByTargetUserIdAndTenantIdOrderByCreatedAtDescIdDesc(
-                        userId, normalizeTenant(tenantId), PageRequest.of(safePage - 1, safeLimit));
-        List<ActivityResponse> items = activities.getContent().stream()
-                .map(this::toActivityResponse)
-                .toList();
-        return new ActivityListResponse(items, new Meta(
-                safePage, safeLimit, activities.getTotalElements(), activities.getTotalPages()));
+        return userQueryUseCase.activity(userId, tenantId, page, limit);
     }
 
     @Transactional
