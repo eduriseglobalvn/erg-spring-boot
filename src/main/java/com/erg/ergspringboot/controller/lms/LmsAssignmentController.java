@@ -8,7 +8,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssignmentResponse;
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.lms.LmsAssignmentCommandService;
+import com.erg.ergspringboot.lms.LmsOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,10 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LmsAssignmentController {
 
-    private final LmsAssignmentCommandService commandService;
+    private final LmsOperations operations;
 
-    public LmsAssignmentController(LmsAssignmentCommandService commandService) {
-        this.commandService = commandService;
+    public LmsAssignmentController(LmsOperations operations) {
+        this.operations = operations;
     }
 
     @PostMapping("/api/v1/lms/assignments")
@@ -41,7 +41,7 @@ public class LmsAssignmentController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Assignment created",
-                commandService.create(access.tenantId(), access.userId(), idempotencyKey, body), request);
+                operations.createAssignment(access.tenantId(), access.userId(), idempotencyKey, body), request);
     }
 
     @PatchMapping("/api/v1/lms/assignments/{assignmentId}")
@@ -51,7 +51,7 @@ public class LmsAssignmentController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        commandService.updateAssignment(access.tenantId(), assignmentId, body);
+        operations.updateAssignment(access.tenantId(), assignmentId, body);
         return ok("Assignment updated", null, request);
     }
 
@@ -63,13 +63,13 @@ public class LmsAssignmentController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Recipients updated",
-                commandService.updateRecipients(access.tenantId(), assignmentId, body), request);
+                operations.updateAssignmentRecipients(access.tenantId(), assignmentId, body), request);
     }
 
     @DeleteMapping("/api/v1/lms/assignments/{assignmentId}")
     public ApiResponse<Void> delete(@PathVariable String assignmentId, HttpServletRequest request) {
         UserAccessContext access = UserAccessContext.from(request);
-        commandService.delete(access.tenantId(), assignmentId);
+        operations.deleteAssignment(access.tenantId(), assignmentId);
         return ok("Assignment deleted", null, request);
     }
 
@@ -80,7 +80,7 @@ public class LmsAssignmentController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Student group created",
-                commandService.createGroup(access.tenantId(), access.userId(), body), request);
+                operations.createStudentGroup(access.tenantId(), access.userId(), body), request);
     }
 
     @PutMapping("/api/v1/lms/student-groups/{groupId}")
@@ -91,13 +91,13 @@ public class LmsAssignmentController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Student group updated",
-                commandService.updateGroup(access.tenantId(), groupId, body), request);
+                operations.updateStudentGroup(access.tenantId(), groupId, body), request);
     }
 
     @DeleteMapping("/api/v1/lms/student-groups/{groupId}")
     public ApiResponse<Void> deleteGroup(@PathVariable String groupId, HttpServletRequest request) {
         UserAccessContext access = UserAccessContext.from(request);
-        commandService.deleteGroup(access.tenantId(), groupId);
+        operations.deleteStudentGroup(access.tenantId(), groupId);
         return ok("Student group deleted", null, request);
     }
 

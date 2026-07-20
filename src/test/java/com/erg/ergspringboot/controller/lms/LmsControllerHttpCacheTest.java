@@ -48,7 +48,9 @@ class LmsControllerHttpCacheTest {
         LmsRuntimeService runtimeService = org.mockito.Mockito.mock(LmsRuntimeService.class);
         when(runtimeService.getQuizPackage(eq("quiz-1"), any())).thenReturn(packageResponse());
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new LmsController(
-                runtimeService, new com.erg.ergspringboot.lms.LmsOperations(runtimeService))).build();
+                runtimeService, new com.erg.ergspringboot.lms.LmsOperations(runtimeService,
+                        org.mockito.Mockito.mock(com.erg.ergspringboot.service.lms.LmsAssignmentCommandService.class))))
+                .build();
 
         String eTag = mockMvc.perform(get("/api/v1/lms/quizzes/quiz-1/package")
                         .header("X-Request-ID", "req-cache-1"))
