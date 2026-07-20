@@ -393,6 +393,18 @@ erg:
     min-hot-score: ${TRENDING__MIN_HOT_SCORE:75}
   modules:
     enabled: ${MODULES__ENABLED:}
+    calendar:
+      new-handler-enabled: ${ERG_MODULES_CALENDAR_NEW_HANDLER_ENABLED:true}
+    users:
+      new-handler-enabled: ${ERG_MODULES_USERS_NEW_HANDLER_ENABLED:false}
+    authorization:
+      new-handler-enabled: ${ERG_MODULES_AUTHORIZATION_NEW_HANDLER_ENABLED:false}
+    reporting:
+      new-handler-enabled: ${ERG_MODULES_REPORTING_NEW_HANDLER_ENABLED:false}
+    lms:
+      new-handler-enabled: ${ERG_MODULES_LMS_NEW_HANDLER_ENABLED:false}
+    lcms:
+      new-handler-enabled: ${ERG_MODULES_LCMS_NEW_HANDLER_ENABLED:false}
   compose:
     enabled: ${COMPOSE__ENABLED:false}
     deploy-manifest-path: ${COMPOSE__DEPLOY_MANIFEST_PATH:deploy.yaml}

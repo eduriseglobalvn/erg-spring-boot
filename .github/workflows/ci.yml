@@ -1,0 +1,95 @@
+name: erg-spring-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  verify:
+    name: Compile, architecture and integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: erg
+          POSTGRES_USER: erg
+          POSTGRES_PASSWORD: erg
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U erg -d erg"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Verify
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/erg
+          SPRING_DATASOURCE_USERNAME: erg
+          SPRING_DATASOURCE_PASSWORD: erg
+        run: ./mvnw -B -ntp verify
+
+  dependency-and-secret-scan:
+    name: Dependency and secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: erg-spring
+          path: .
+          format: HTML
+          out: reports
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-report
+          path: reports
+
+  native:
+    name: Native contract (nightly/release)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Native compile
+        run: ./mvnw -B -ntp -Pnative -DskipTests native:compile
+      - name: Native compose contract
+        run: docker compose -f ops/docker/compose.yml -f ops/docker/compose.native.yml config --quiet
+
+  k6-smoke:
+    name: k6 smoke (benchmark environment only)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Run webhook smoke when benchmark URL is supplied
+        if: ${{ secrets.BENCHMARK_BASE_URL != '' && secrets.BENCHMARK_ACCESS_TOKEN != '' }}
+        env:
+          BASE_URL: ${{ secrets.BENCHMARK_BASE_URL }}
+          ACCESS_TOKEN: ${{ secrets.BENCHMARK_ACCESS_TOKEN }}
+        run: k6 run --vus 2 --iterations 2 load/k6/webhook-burst.js

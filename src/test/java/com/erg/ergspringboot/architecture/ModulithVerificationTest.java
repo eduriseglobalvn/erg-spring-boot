@@ -15,10 +15,11 @@ class ModulithVerificationTest {
     }
 
     @Test
-    void calendarPilotIsRecognizedAndDependencyGraphIsValid() {
+    void migratedModulesAreRecognizedAndDependencyGraphIsValid() {
         ApplicationModules modules = ApplicationModules.of(ErgSpringApplication.class);
 
         assertThat(modules.getModuleByName("calendar")).isPresent();
+        assertThat(modules.getModuleByName("reporting")).isPresent();
         modules.verify();
     }
 }
