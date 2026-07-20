@@ -18,7 +18,6 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StudentScoreListRespo
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.lms.LmsRuntimeService;
 import com.erg.ergspringboot.lms.LmsOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -43,11 +42,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/lms")
 public class LmsController {
 
-    private final LmsRuntimeService lmsRuntimeService;
     private final LmsOperations lms;
 
-    public LmsController(LmsRuntimeService lmsRuntimeService, LmsOperations lms) {
-        this.lmsRuntimeService = lmsRuntimeService;
+    public LmsController(LmsOperations lms) {
         this.lms = lms;
     }
 
@@ -58,7 +55,7 @@ public class LmsController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        StudentAssignmentListResponse data = lmsRuntimeService.listStudentAssignments(
+        StudentAssignmentListResponse data = lms.listStudentAssignments(
                 access.userId(), access, page == null ? 0 : page, size == null ? 50 : size);
         return ok("Assignments loaded", data, request);
     }
@@ -70,14 +67,14 @@ public class LmsController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        StudentScoreListResponse data = lmsRuntimeService.listStudentScores(
+        StudentScoreListResponse data = lms.listStudentScores(
                 access.userId(), access, page == null ? 0 : page, size == null ? 50 : size);
         return ok("Scores loaded", data, request);
     }
 
     @GetMapping("/quizzes/{quizId}/package")
     public ResponseEntity<ApiResponse<QuizPackageResponse>> quizPackage(@PathVariable String quizId, HttpServletRequest request) {
-        QuizPackageResponse data = lmsRuntimeService.getQuizPackage(quizId, UserAccessContext.from(request));
+        QuizPackageResponse data = lms.getQuizPackage(quizId, UserAccessContext.from(request));
         String eTag = packageETag(data);
         CacheControl cacheControl = CacheControl.maxAge(Duration.ofMinutes(5)).cachePrivate().mustRevalidate();
         if (matchesETag(request.getHeader(HttpHeaders.IF_NONE_MATCH), eTag)) {
@@ -94,7 +91,7 @@ public class LmsController {
 
     @GetMapping("/quizzes/{quizId}")
     public ApiResponse<QuizDetailResponse> quiz(@PathVariable String quizId, HttpServletRequest request) {
-        return ok("Quiz loaded", lmsRuntimeService.getQuiz(quizId, UserAccessContext.from(request)), request);
+        return ok("Quiz loaded", lms.getQuiz(quizId, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts")
@@ -113,7 +110,7 @@ public class LmsController {
             @RequestBody AttemptDraftRequest body,
             HttpServletRequest request
     ) {
-        return ok("Draft saved", lmsRuntimeService.saveDraft(attemptId, body, UserAccessContext.from(request)), request);
+        return ok("Draft saved", lms.saveDraft(attemptId, body, UserAccessContext.from(request)), request);
     }
 
     @PutMapping("/attempts/{attemptId}/answers/{questionId}")
@@ -123,7 +120,7 @@ public class LmsController {
             @RequestBody SaveAnswerRequest body,
             HttpServletRequest request
     ) {
-        return ok("Answer saved", lmsRuntimeService.saveAnswer(attemptId, questionId, body, UserAccessContext.from(request)), request);
+        return ok("Answer saved", lms.saveAnswer(attemptId, questionId, body, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/answers")
@@ -132,7 +129,7 @@ public class LmsController {
             @RequestBody AttemptDraftRequest body,
             HttpServletRequest request
     ) {
-        return ok("Answers saved", lmsRuntimeService.saveDraft(attemptId, body, UserAccessContext.from(request)), request);
+        return ok("Answers saved", lms.saveDraft(attemptId, body, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/sync")
@@ -141,7 +138,7 @@ public class LmsController {
             @Valid @RequestBody AttemptSyncRequest body,
             HttpServletRequest request
     ) {
-        return ok("Attempt synced", lmsRuntimeService.syncAttempt(attemptId, body, UserAccessContext.from(request)), request);
+        return ok("Attempt synced", lms.syncAttempt(attemptId, body, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/submit")
@@ -155,23 +152,23 @@ public class LmsController {
 
     @GetMapping("/quizzes/{quizId}/students")
     public ApiResponse<List<AttemptResponse>> quizStudents(@PathVariable String quizId, HttpServletRequest request) {
-        return ok("Quiz students loaded", lmsRuntimeService.quizStudents(quizId, UserAccessContext.from(request)), request);
+        return ok("Quiz students loaded", lms.quizStudents(quizId, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/assignments/{assignmentId}/progress")
     public ApiResponse<AssignmentProgressResponse> assignmentProgress(@PathVariable String assignmentId, HttpServletRequest request) {
-        return ok("Assignment progress loaded", lmsRuntimeService.assignmentProgress(assignmentId, UserAccessContext.from(request)), request);
+        return ok("Assignment progress loaded", lms.assignmentProgress(assignmentId, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/education-units")
     public ApiResponse<EducationUnitListResponse> educationUnits(HttpServletRequest request) {
-        return ok("Education units loaded", lmsRuntimeService.listEducationUnits(UserAccessContext.from(request)), request);
+        return ok("Education units loaded", lms.listEducationUnits(UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/classes")
     public ApiResponse<ClassesBySchoolResponse> classes(@RequestParam(required = false) String schoolId, HttpServletRequest request) {
         // Classes are intentionally fetched by selected school instead of being bundled into session bootstrap.
-        return ok("Classes loaded", lmsRuntimeService.listClassesBySchool(schoolId, UserAccessContext.from(request)), request);
+        return ok("Classes loaded", lms.listClassesBySchool(schoolId, UserAccessContext.from(request)), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {

@@ -2,7 +2,19 @@ package com.erg.ergspringboot.lms;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSubmitResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AnswerResultResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AssignmentProgressResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptDraftRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SaveAnswerRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StartAttemptRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StudentAssignmentListResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StudentScoreListResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.CreateAssignmentRequest;
 import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.StudentGroupRequest;
@@ -13,6 +25,7 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGro
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.lms.LmsAssignmentCommandService;
 import com.erg.ergspringboot.service.lms.LmsRuntimeService;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 /** Public LMS command facade for the attempt hot path. */
@@ -64,5 +77,43 @@ public class LmsOperations {
 
     public void deleteStudentGroup(String tenantId, String groupId) {
         assignments.deleteGroup(tenantId, groupId);
+    }
+
+    public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access,
+            int page, int size) { return legacy.listStudentAssignments(studentId, access, page, size); }
+
+    public StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access, int page, int size) {
+        return legacy.listStudentScores(studentId, access, page, size);
+    }
+
+    public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
+        return legacy.getQuizPackage(quizId, access);
+    }
+
+    public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return legacy.getQuiz(quizId, access); }
+
+    public AttemptResponse saveDraft(String attemptId, AttemptDraftRequest request, UserAccessContext access) {
+        return legacy.saveDraft(attemptId, request, access);
+    }
+
+    public AnswerResultResponse saveAnswer(String attemptId, String questionId, SaveAnswerRequest request,
+            UserAccessContext access) { return legacy.saveAnswer(attemptId, questionId, request, access); }
+
+    public AttemptSyncResponse syncAttempt(String attemptId, AttemptSyncRequest request, UserAccessContext access) {
+        return legacy.syncAttempt(attemptId, request, access);
+    }
+
+    public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) {
+        return legacy.quizStudents(quizId, access);
+    }
+
+    public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) {
+        return legacy.assignmentProgress(assignmentId, access);
+    }
+
+    public EducationUnitListResponse listEducationUnits(UserAccessContext access) { return legacy.listEducationUnits(access); }
+
+    public ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access) {
+        return legacy.listClassesBySchool(schoolId, access);
     }
 }
