@@ -23,7 +23,10 @@ class NativeImageBuildContractTest {
                 .doesNotContain("native:compile-no-fork");
         assertThat(Files.exists(Path.of("ops/native/README.md"))).isTrue();
         assertThat(Files.readString(Path.of("Dockerfile")))
-                .contains("org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration");
+                .contains("org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration")
+                .contains("ERG_REDIS_STATE_ENABLED=true", "ERG_REDIS_CACHE_ENABLED=true")
+                .contains("ERG_REDIS_STATE_URL=redis://:native-build-placeholder@redis-state:6379")
+                .contains("ERG_REDIS_CACHE_URL=redis://:native-build-placeholder@redis-cache:6379");
     }
 
     @Test
@@ -32,6 +35,8 @@ class NativeImageBuildContractTest {
         assertThat(compose)
                 .contains("FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres")
                 .contains("SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED: \"false\"")
+                .contains("ERG_REDIS_STATE_ENABLED: ${ERG_REDIS_STATE_ENABLED:-true}")
+                .contains("ERG_REDIS_CACHE_ENABLED: ${ERG_REDIS_CACHE_ENABLED:-true}")
                 .contains("org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration");
     }
 

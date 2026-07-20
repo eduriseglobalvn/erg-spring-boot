@@ -8,6 +8,10 @@ ENV LANG=C \
     NATIVE_IMAGE_OPTIONS=-march=compatibility \
     SPRING_PROFILES_ACTIVE=prod \
     FLYWAY_ENABLED=true \
+    ERG_REDIS_STATE_ENABLED=true \
+    ERG_REDIS_STATE_URL=redis://:native-build-placeholder@redis-state:6379 \
+    ERG_REDIS_CACHE_ENABLED=true \
+    ERG_REDIS_CACHE_URL=redis://:native-build-placeholder@redis-cache:6379 \
     SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration,org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration,org.springframework.modulith.observability.autoconfigure.SpringDataRestModuleObservabilityAutoConfiguration,org.springframework.modulith.actuator.autoconfigure.ApplicationModulesEndpointConfiguration
 WORKDIR /workspace
 

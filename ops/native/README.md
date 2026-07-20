@@ -39,10 +39,13 @@ observability because ArchUnit classpath scanning does not support native
 `resource:/` locations. Module verification, diagrams and Insight remain JVM
 CI/staging gates.
 
-The 2026-07-20 local Linux-builder smoke produced a 316.81 MB executable,
-started the production-profile AOT application in 9.067 seconds, applied
-Flyway through V73 and returned HTTP 200 from `/ready` with PostgreSQL healthy.
-This is a functional smoke result, not a JVM-vs-native throughput decision.
+The 2026-07-20 Docker Linux/amd64 rebuild after the Modulith migration produced
+a 322.77 MB executable. The production-profile container applied Flyway through
+V73 and returned HTTP 200 from `/ready` with `app=true`, `db.postgres=true` and
+`redis=true`. Redis is deliberately enabled during AOT generation as well as at
+runtime; otherwise its conditional bean definitions are removed from the native
+executable. This is a functional smoke result, not a JVM-vs-native throughput
+decision.
 
 Do not bake `.env`, private keys, JWT secrets or webhook tokens into the image.
 Windows developers should use the Linux CI/container smoke path for native builds.
