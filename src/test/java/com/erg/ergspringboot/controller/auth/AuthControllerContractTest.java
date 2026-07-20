@@ -15,6 +15,7 @@ import com.erg.ergspringboot.common.response.auth.AuthResponses.TokenResponse;
 import com.erg.ergspringboot.exception.GlobalExceptionHandler;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.service.auth.AuthService;
+import com.erg.ergspringboot.auth.AuthOperations;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,7 +59,7 @@ class AuthControllerContractTest {
 
     private MockMvc mockMvc() {
         return MockMvcBuilders.standaloneSetup(new AuthController(
-                        new FakeAuthService(),
+                        new AuthOperations(new FakeAuthService()),
                         new com.erg.ergspringboot.platform.security.TrustedClientIpResolver("")))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilters(new RequestIdFilter())
