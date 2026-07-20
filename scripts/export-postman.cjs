@@ -2,12 +2,11 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
-const openApiPath = path.join(root, "src/main/resources/api-export/erg-openapi.json");
+const openApiPath = path.join(root, "contracts/openapi/erg-openapi.json");
 const outDir = path.join(root, "postman");
 const fullOut = path.join(outDir, "erg-spring-full.postman_collection.json");
 const authOut = path.join(outDir, "erg-spring-auth.postman_collection.json");
 const envOut = path.join(outDir, "erg-spring-local.postman_environment.json");
-const apiExportPostmanOut = path.join(root, "src/main/resources/api-export/erg-postman-collection.json");
 
 const openapi = JSON.parse(fs.readFileSync(openApiPath, "utf8").replace(/^\uFEFF/, ""));
 const schemas = openapi.components?.schemas ?? {};
@@ -556,7 +555,6 @@ const auth = buildCollection("ERG Spring API - Auth", (_path, _method, operation
 fs.writeFileSync(fullOut, `${JSON.stringify(full, null, 2)}\n`);
 fs.writeFileSync(authOut, `${JSON.stringify(auth, null, 2)}\n`);
 fs.writeFileSync(envOut, `${JSON.stringify(buildEnvironment(), null, 2)}\n`);
-fs.writeFileSync(apiExportPostmanOut, `${JSON.stringify(full, null, 2)}\n`);
 
 const allRequests = full.item.reduce((sum, folder) => sum + folder.item.length, 0);
 const authRequests = auth.item.reduce((sum, folder) => sum + folder.item.length, 0);
@@ -564,7 +562,6 @@ console.log(JSON.stringify({
   fullOut: path.relative(root, fullOut),
   authOut: path.relative(root, authOut),
   envOut: path.relative(root, envOut),
-  apiExportPostmanOut: path.relative(root, apiExportPostmanOut),
   allRequests,
   authRequests,
 }, null, 2));
