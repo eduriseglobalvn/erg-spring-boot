@@ -59,6 +59,7 @@ import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
 import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
 import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
+import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -91,6 +92,7 @@ public class UserService {
     private final UserProfileUseCase userProfileUseCase;
     private final UserPasswordUseCase userPasswordUseCase;
     private final UserSessionUseCase userSessionUseCase;
+    private final UserProvisioningUseCase userProvisioningUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -119,6 +121,8 @@ public class UserService {
         this.userPasswordUseCase = new UserPasswordUseCase(
                 userRepository, sessionRepository, userActivityRepository, passwordService);
         this.userSessionUseCase = new UserSessionUseCase(sessionRepository, userActivityRepository);
+        this.userProvisioningUseCase = new UserProvisioningUseCase(userRepository, sessionRepository,
+                roleRepository, userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender);
     }
 
     @Autowired(required = false)
@@ -227,80 +231,7 @@ public class UserService {
     public UserCreatedResponse createUser(
             AdminCreateUserRequest request, AuditContext auditContext, ErgPrincipal actor
     ) {
-        String email = request.primaryEmail().trim().toLowerCase();
-        String username = email;
-        String recoveryEmail = normalizeOptionalEmail(request.recoveryEmail());
-        if (email.equals(recoveryEmail)) {
-            throw new BadRequestException("recovery email must differ from primary email");
-        }
-        String credentialDelivery = request.credentialDelivery().trim().toUpperCase();
-        if (!List.of("EMAIL_INVITE", "ONE_TIME_PASSWORD").contains(credentialDelivery)) {
-            throw new BadRequestException("invalid credential delivery");
-        }
-        if (userRepository.existsByUsernameIgnoreCase(username)) {
-            throw new ConflictException("username already registered");
-        }
-        if (email != null && userRepository.existsByEmailIgnoreCase(email)) {
-            throw new ConflictException("email already registered");
-        }
-        String temporaryCredential = IdGenerator.newId() + "Aa1!";
-        List<String> requestedRoleGroups = request.roleGroupIds().stream()
-                .map(String::trim).filter(value -> !value.isBlank()).distinct().toList();
-        List<Role> roleGroups = roleRepository.findByNameInIgnoreCase(requestedRoleGroups);
-        if (roleGroups.size() != requestedRoleGroups.size()) {
-            throw new BadRequestException("one or more role groups were not found");
-        }
-        protectedRolePolicy.assertCanGrant(actor, roleGroups);
-        Set<String> requestedRoleSet = new LinkedHashSet<>(requestedRoleGroups);
-        if (request.policies().stream().anyMatch(policy -> !requestedRoleSet.contains(policy.roleGroup()))) {
-            throw new BadRequestException("policy role group must be assigned to the user");
-        }
-        User user = new User();
-        user.setId(IdGenerator.newId());
-        user.setUsername(username);
-        user.setEmail(email);
-        user.setPasswordHash(passwordService.hash(temporaryCredential));
-        user.setFullName(trimToNull(request.fullName()));
-        user.setPhone(trimToNull(request.phone()));
-        user.setRecoveryEmail(recoveryEmail);
-        user.setRecoveryEmailVerified(false);
-        user.setMustChangePassword(true);
-        user.setStatus("INVITED");
-        user.setProvider("local");
-        user.setAccountType("erg");
-        user.setTenantId(actor == null ? DEFAULT_TENANT : normalizeTenant(actor.tenantId()));
-        user.setIsProfileCompleted(isProfileCompleted(user));
-        user.setLoginCount(0L);
-        user.setRoles(new LinkedHashSet<>(roleGroups));
-        userRepository.save(user);
-        List<UserAccessScope> scopes = request.policies().stream().map(policy -> {
-            UserAccessScope scope = new UserAccessScope();
-            scope.setId(IdGenerator.newId());
-            scope.setUserId(user.getId());
-            scope.setEducationUnitId(policy.scopeId().trim());
-            scope.setRole(policy.roleGroup().trim());
-            scope.setModules(policy.modules().stream().map(String::trim).filter(value -> !value.isBlank())
-                    .distinct().collect(java.util.stream.Collectors.joining(",")));
-            return scope;
-        }).toList();
-        userAccessScopeRepository.saveAll(scopes);
-
-        if ("EMAIL_INVITE".equals(credentialDelivery)) {
-            accountMailSender.sendTeacherInvite(email, user.getFullName(), temporaryCredential);
-        }
-        recordActivity(user, auditContext, "TEACHER_ACCOUNT_PROVISIONED", "Teacher account provisioned",
-                Map.of(), Map.of(
-                        "status", user.getStatus(),
-                        "credentialDelivery", credentialDelivery,
-                        "roleGroups", requestedRoleGroups,
-                        "scopeCount", scopes.size()
-                ));
-        return new UserCreatedResponse(
-                new ProvisionedUserResponse(user.getId(), user.getEmail(), user.getFullName(), user.getStatus()),
-                lifecycle(user),
-                "EMAIL_INVITE".equals(credentialDelivery) ? "QUEUED_FOR_DELIVERY" : "READY",
-                "ONE_TIME_PASSWORD".equals(credentialDelivery) ? temporaryCredential : null
-        );
+        return userProvisioningUseCase.create(request, toPublicAudit(auditContext), actor);
     }
 
     private AccountLifecycleResponse lifecycle(User user) {
@@ -332,38 +263,7 @@ public class UserService {
     public CredentialDeliveryResponse resetCredential(
             String userId, String tenantId, String requestedDelivery, AuditContext auditContext
     ) {
-        User user = findUser(userId, tenantId);
-        String delivery = requestedDelivery == null ? "" : requestedDelivery.trim().toUpperCase();
-        if (!List.of("EMAIL_INVITE", "ONE_TIME_PASSWORD").contains(delivery)) {
-            throw new BadRequestException("invalid credential delivery");
-        }
-        boolean previousMustChangePassword = Boolean.TRUE.equals(user.getMustChangePassword());
-        String temporaryCredential = IdGenerator.newId() + "Aa1!";
-        user.setPasswordHash(passwordService.hash(temporaryCredential));
-        user.setMustChangePassword(true);
-        userRepository.save(user);
-
-        List<AuthSession> sessions = sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(
-                userId, normalizeTenant(tenantId));
-        OffsetDateTime revokedAt = now();
-        sessions.forEach(session -> {
-            session.setRevokedAt(revokedAt);
-            session.setRevokedReason("credential_reset");
-        });
-        if (!sessions.isEmpty()) sessionRepository.saveAll(sessions);
-
-        if ("EMAIL_INVITE".equals(delivery)) {
-            accountMailSender.sendTeacherInvite(user.getEmail(), user.getFullName(), temporaryCredential);
-        }
-        recordActivity(user, auditContext,
-                "EMAIL_INVITE".equals(delivery) ? "TEACHER_INVITE_RESENT" : "TEACHER_CREDENTIAL_RESET",
-                "Teacher temporary credential rotated",
-                Map.of("mustChangePassword", previousMustChangePassword),
-                Map.of("mustChangePassword", true, "credentialDelivery", delivery, "revokedSessions", sessions.size()));
-        return new CredentialDeliveryResponse(
-                "EMAIL_INVITE".equals(delivery) ? "QUEUED_FOR_DELIVERY" : "READY",
-                "ONE_TIME_PASSWORD".equals(delivery) ? temporaryCredential : null
-        );
+        return userProvisioningUseCase.reset(userId, tenantId, requestedDelivery, toPublicAudit(auditContext));
     }
 
     private String normalizeOptionalEmail(String email) {
