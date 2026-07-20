@@ -15,28 +15,38 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.service.calendar.CalendarCommandService;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 
 @Controller
 public class CalendarMutationGraphQlController {
 
-    private final CalendarCommandService commandService;
+    private final CalendarOperations calendar;
     private final GraphQlAccessSupport accessSupport;
     private final CalendarScopeService scopeService;
 
+    @Autowired
     public CalendarMutationGraphQlController(
-            CalendarCommandService commandService,
+            CalendarOperations calendar,
             GraphQlAccessSupport accessSupport,
             CalendarScopeService scopeService
     ) {
-        this.commandService = commandService;
+        this.calendar = calendar;
         this.accessSupport = accessSupport;
         this.scopeService = scopeService;
+    }
+
+    /** Compatibility constructor retained for existing focused adapter tests. */
+    @Deprecated
+    public CalendarMutationGraphQlController(CalendarCommandService commands,
+            GraphQlAccessSupport accessSupport, CalendarScopeService scopeService) {
+        this(new CalendarOperations(commands), accessSupport, scopeService);
     }
 
     @MutationMapping
@@ -45,7 +55,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
         requireManagedSchool(principal, input.schoolId());
-        return commandService.preview(tenantId, input, resolveUserId(principal));
+        return calendar.preview(tenantId, input, resolveUserId(principal));
     }
 
     @MutationMapping
@@ -54,7 +64,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
         requireManagedSchool(principal, input.schoolId());
-        return commandService.create(tenantId, input, resolveUserId(principal));
+        return calendar.create(tenantId, input, resolveUserId(principal));
     }
 
     @MutationMapping
@@ -63,7 +73,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
         scopeService.requireEvent(principal, tenantId, input.eventId());
-        return commandService.updateEvent(tenantId, input, resolveUserId(principal));
+        return calendar.update(tenantId, input, resolveUserId(principal));
     }
 
     @MutationMapping
@@ -72,7 +82,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
         scopeService.requireEvent(principal, tenantId, input.eventId());
-        return commandService.deleteEvent(tenantId, input, resolveUserId(principal));
+        return calendar.delete(tenantId, input, resolveUserId(principal));
     }
 
     @MutationMapping
@@ -81,7 +91,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
         List<String> schoolIds = scopeService.requireManagedSchools(principal, input.schoolIds());
-        return commandService.deleteTeacherSchedule(
+        return calendar.deleteTeacherSchedule(
                 tenantId, input.teacherUserId(), schoolIds,
                 input.dateFrom(), input.dateTo(), resolveUserId(principal));
     }
@@ -92,7 +102,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
-        return commandService.publishBatch(tenantId, batchId, resolveUserId(principal));
+        return calendar.publish(tenantId, batchId, resolveUserId(principal));
     }
 
     @MutationMapping
@@ -101,7 +111,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
-        return commandService.cancelBatch(tenantId, batchId, resolveUserId(principal));
+        return calendar.cancel(tenantId, batchId, resolveUserId(principal));
     }
 
     @MutationMapping
@@ -110,7 +120,7 @@ public class CalendarMutationGraphQlController {
         accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
         requireManagedSchool(principal, input.schoolId());
-        return commandService.createRoom(tenantId, input.schoolId(), input.roomName(), resolveUserId(principal));
+        return calendar.createRoom(tenantId, input.schoolId(), input.roomName(), resolveUserId(principal));
     }
 
     /**
