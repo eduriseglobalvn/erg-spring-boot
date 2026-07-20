@@ -74,4 +74,14 @@ class UserQueryUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(legacy).doesNotContain("normalizeStatus(request.status())");
     }
+
+    @Test
+    void roleAndPermissionMutationsLiveInTheirOwnUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.users.internal.roleassignment.UserRoleAssignmentUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        assertThat(legacy).doesNotContain("permissionOverrideRepository.deleteByUserId(");
+    }
 }

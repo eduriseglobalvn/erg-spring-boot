@@ -61,6 +61,7 @@ import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
 import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
 import com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase;
+import com.erg.ergspringboot.users.internal.roleassignment.UserRoleAssignmentUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -95,6 +96,7 @@ public class UserService {
     private final UserSessionUseCase userSessionUseCase;
     private final UserProvisioningUseCase userProvisioningUseCase;
     private final UserLifecycleUseCase userLifecycleUseCase;
+    private final UserRoleAssignmentUseCase userRoleAssignmentUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -126,6 +128,8 @@ public class UserService {
         this.userProvisioningUseCase = new UserProvisioningUseCase(userRepository, sessionRepository,
                 roleRepository, userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender);
         this.userLifecycleUseCase = new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository);
+        this.userRoleAssignmentUseCase = new UserRoleAssignmentUseCase(userRepository, roleRepository,
+                permissionRepository, permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService);
     }
 
     @Autowired(required = false)
@@ -133,6 +137,7 @@ public class UserService {
             AuthorizationMutationAuditService authorizationMutationAuditService
     ) {
         this.authorizationMutationAuditService = authorizationMutationAuditService;
+        this.userRoleAssignmentUseCase.setAuthorizationMutationAuditService(authorizationMutationAuditService);
     }
 
     @Transactional(readOnly = true)
@@ -327,27 +332,8 @@ public class UserService {
             AuditContext auditContext,
             ErgPrincipal actor
     ) {
-        User user = findUser(userId, tenantId);
-        List<String> previousRoles = roles(user.getRoles());
-        List<String> roleNames = request.roles().stream()
-                .map(this::trimToNull)
-                .filter(name -> name != null)
-                .toList();
-        List<Role> roles = roleRepository.findByNameInIgnoreCase(roleNames);
-        if (roles.size() != new LinkedHashSet<>(roleNames).size()) {
-            throw new BadRequestException("one or more roles were not found");
-        }
-        protectedRolePolicy.assertCanGrant(actor, roles);
-        user.setRoles(new LinkedHashSet<>(roles));
-        userRepository.save(user);
-        recordActivity(user, auditContext, "USER_ROLES_CHANGED", "User role groups changed",
-                Map.of("roles", previousRoles), Map.of("roles", roles(user.getRoles())));
-        authorizationMutationAudit().authorizationChanged(
-                List.of(new UserRef(user.getId(), normalizeTenant(tenantId))),
-                roles.stream().map(Role::getId).sorted().collect(Collectors.joining(",")),
-                "USER_ROLES_CHANGED",
-                mutationContext(user, auditContext));
-        return toResponse(user);
+        return userRoleAssignmentUseCase.assignRoles(userId, tenantId, request,
+                toPublicAudit(auditContext), actor);
     }
 
     @Transactional
@@ -359,39 +345,7 @@ public class UserService {
     public PermissionOverrideResponse assignPermissions(
             String userId, String tenantId, AdminAssignPermissionsRequest request, AuditContext auditContext
     ) {
-        User user = findUser(userId, tenantId);
-        String grantType = normalizeGrantType(request.grantType());
-        List<String> permissionNames = request.permissions().stream()
-                .map(this::trimToNull)
-                .filter(name -> name != null)
-                .toList();
-        List<Permission> permissions = permissionRepository.findByNameInIgnoreCase(permissionNames);
-        if (permissions.size() != new LinkedHashSet<>(permissionNames).size()) {
-            throw new BadRequestException("one or more permissions were not found");
-        }
-        permissionOverrideRepository.deleteByUserId(userId);
-        List<UserPermissionOverride> overrides = permissions.stream()
-                .map(permission -> {
-                    UserPermissionOverride override = new UserPermissionOverride();
-                    override.setId(IdGenerator.newId());
-                    override.setUserId(userId);
-                    override.setPermission(permission.getName());
-                    override.setGrantType(grantType);
-                    override.setReason(trimToNull(request.reason()));
-                    override.setExpiresAt(parseOptionalTimestamp(request.expiresAt()));
-                    override.setCreatedAt(now());
-                    return override;
-                })
-                .toList();
-        permissionOverrideRepository.saveAll(overrides);
-        recordActivity(user, auditContext, "USER_PERMISSIONS_CHANGED", "User permission overrides changed",
-                Map.of(), Map.of("grantType", grantType, "permissions", permissionNames));
-        authorizationMutationAudit().authorizationChanged(
-                List.of(new UserRef(user.getId(), normalizeTenant(tenantId))),
-                permissions.stream().map(Permission::getId).sorted().collect(Collectors.joining(",")),
-                "USER_PERMISSIONS_CHANGED",
-                mutationContext(user, auditContext));
-        return new PermissionOverrideResponse(userId, permissions.stream().map(Permission::getName).toList(), grantType);
+        return userRoleAssignmentUseCase.assignPermissions(userId, tenantId, request, toPublicAudit(auditContext));
     }
 
     private AuthorizationMutationAuditService authorizationMutationAudit() {
