@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.controller.calendar.rest;
 
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
+import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarExcelImportRequest;
@@ -10,21 +11,12 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.model.calendar.CalendarEvent;
-import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
-import com.erg.ergspringboot.model.calendar.CalendarRoom;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarRoomRepository;
-import com.erg.ergspringboot.service.calendar.CalendarCommandService;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.IOException;
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.MediaType;
@@ -46,27 +38,14 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/calendar")
 public class CalendarRestController {
 
-    private static final List<String> COLOR_KEYS = List.of(
-            "blue", "green", "orange", "purple", "red", "teal", "pink", "indigo"
-    );
-
-    private final CalendarReadService readService;
-    private final CalendarCommandService commandService;
-    private final CalendarEventTeacherRepository eventTeacherRepository;
-    private final CalendarRoomRepository roomRepository;
+    private final CalendarOperations calendar;
     private final CalendarScopeService scopeService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public CalendarRestController(
-            CalendarReadService readService,
-            CalendarCommandService commandService,
-            CalendarEventTeacherRepository eventTeacherRepository,
-            CalendarRoomRepository roomRepository,
+            CalendarOperations calendar,
             CalendarScopeService scopeService) {
-        this.readService = readService;
-        this.commandService = commandService;
-        this.eventTeacherRepository = eventTeacherRepository;
-        this.roomRepository = roomRepository;
+        this.calendar = calendar;
         this.scopeService = scopeService;
     }
 
@@ -87,7 +66,7 @@ public class CalendarRestController {
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         List<String> effectiveSchoolIds = scopeService.requireManagedSchools(principal, schoolIds);
         return ok("Calendar workspace loaded",
-                readService.lcmsTeachingCalendarWorkspace(
+                calendar.workspace(
                         effectiveTenantId, effectiveSchoolIds, from, to, viewMode,
                         teacherIds, classIds, subjectIds, levelIds, statuses, principal),
                 request);
@@ -109,7 +88,7 @@ public class CalendarRestController {
                 "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         return ok("My calendar loaded",
-                readService.teacherTeachingCalendarWorkspace(
+                calendar.teacherWorkspace(
                         effectiveTenantId, principal.userId(), from, to, viewMode,
                         schoolIds, classIds, subjectIds, levelIds, statuses, principal),
                 request);
@@ -122,17 +101,8 @@ public class CalendarRestController {
         assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
 
         String tenantId = verifiedTenantId(principal, null);
-        CalendarEvent event = scopeService.requireEvent(principal, tenantId, eventId);
-
-        List<CalendarEventTeacher> teachers =
-                eventTeacherRepository.findByTenantIdAndEventIdIn(event.getTenantId(), List.of(eventId));
-        List<CalendarTeacherAssignmentResponse> teacherResponses = teachers.stream()
-                .map(t -> new CalendarTeacherAssignmentResponse(
-                        t.getTeacherUserId(), t.getDisplayNameSnapshot(), t.getRole(), t.getColorKey()))
-                .toList();
-
-        CalendarEventResponse response = buildEventResponse(event, teacherResponses);
-        return ok("Event loaded", response, request);
+        scopeService.requireEvent(principal, tenantId, eventId);
+        return ok("Event loaded", calendar.event(tenantId, eventId), request);
     }
 
     @GetMapping("/batches")
@@ -148,7 +118,7 @@ public class CalendarRestController {
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         String effectiveSchoolId = resolveScopedSchoolFilter(principal, schoolId);
         return ok("Batches loaded",
-                readService.teachingScheduleBatches(effectiveTenantId, effectiveSchoolId, status, page, size),
+                calendar.batches(effectiveTenantId, effectiveSchoolId, status, page, size),
                 request);
     }
 
@@ -161,7 +131,7 @@ public class CalendarRestController {
         assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         scopeService.requireBatch(principal, effectiveTenantId, batchId);
-        return ok("Batch loaded", readService.teachingScheduleBatch(effectiveTenantId, batchId), request);
+        return ok("Batch loaded", calendar.batch(effectiveTenantId, batchId), request);
     }
 
     @PostMapping("/preview")
@@ -170,7 +140,7 @@ public class CalendarRestController {
         ErgPrincipal principal = getRequiredPrincipal();
         assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         requireManagedSchool(principal, body.schoolId());
-        return ok("Preview generated", commandService.preview(
+        return ok("Preview generated", calendar.preview(
                 verifiedTenantId(principal, body.tenantId()), body, principal.userId()), request);
     }
 
@@ -180,7 +150,7 @@ public class CalendarRestController {
         ErgPrincipal principal = getRequiredPrincipal();
         assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         requireManagedSchool(principal, body.schoolId());
-        return ok("Calendar created", commandService.create(
+        return ok("Calendar created", calendar.create(
                 verifiedTenantId(principal, body.tenantId()), body, principal.userId()), request);
     }
 
@@ -194,7 +164,7 @@ public class CalendarRestController {
         CalendarEventUpdateRequest input = new CalendarEventUpdateRequest(
                 tenantId, eventId, body.roomId(), body.roomName(), body.note());
         scopeService.requireEvent(principal, tenantId, eventId);
-        return ok("Event updated", commandService.updateEvent(tenantId, input, principal.userId()), request);
+        return ok("Event updated", calendar.update(tenantId, input, principal.userId()), request);
     }
 
     @DeleteMapping("/events/{eventId}")
@@ -207,7 +177,7 @@ public class CalendarRestController {
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         CalendarEventDeleteRequest input = new CalendarEventDeleteRequest(effectiveTenantId, eventId);
         scopeService.requireEvent(principal, effectiveTenantId, eventId);
-        return ok("Event cancelled", commandService.deleteEvent(effectiveTenantId, input, principal.userId()), request);
+        return ok("Event cancelled", calendar.delete(effectiveTenantId, input, principal.userId()), request);
     }
 
     @PostMapping("/teachers/delete-bulk")
@@ -217,7 +187,7 @@ public class CalendarRestController {
         assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, body.tenantId());
         List<String> schoolIds = scopeService.requireManagedSchools(principal, body.schoolIds());
-        return ok("Teacher schedule cancelled", commandService.deleteTeacherSchedule(
+        return ok("Teacher schedule cancelled", calendar.deleteTeacherSchedule(
                 tenantId, body.teacherUserId(), schoolIds, body.dateFrom(), body.dateTo(), principal.userId()), request);
     }
 
@@ -228,7 +198,7 @@ public class CalendarRestController {
         assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
-        return ok("Batch published", commandService.publishBatch(tenantId, batchId, principal.userId()), request);
+        return ok("Batch published", calendar.publish(tenantId, batchId, principal.userId()), request);
     }
 
     @PostMapping("/batches/{batchId}/cancel")
@@ -238,27 +208,17 @@ public class CalendarRestController {
         assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
-        return ok("Batch cancelled", commandService.cancelBatch(tenantId, batchId, principal.userId()), request);
+        return ok("Batch cancelled", calendar.cancel(tenantId, batchId, principal.userId()), request);
     }
 
     @GetMapping("/rooms")
-    public ApiResponse<List<Map<String, Object>>> rooms(
+    public ApiResponse<List<CalendarRoomOptionResponse>> rooms(
             @RequestParam(required = false) String schoolId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
         assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, null);
 
-        List<CalendarRoom> rooms = (schoolId != null && !schoolId.isBlank())
-                ? roomRepository.findByTenantIdAndSchoolIdAndStatus(tenantId, schoolId, "ACTIVE")
-                : List.of();
-
-        List<Map<String, Object>> items = rooms.stream().map(r -> {
-            Map<String, Object> m = new HashMap<>();
-            m.put("id", r.getId()); m.put("name", r.getName());
-            m.put("schoolId", r.getSchoolId()); m.put("status", r.getStatus());
-            return m;
-        }).toList();
-        return ok("Rooms loaded", items, request);
+        return ok("Rooms loaded", calendar.rooms(tenantId, schoolId), request);
     }
 
     @PostMapping("/rooms")
@@ -268,7 +228,7 @@ public class CalendarRestController {
         assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, body.tenantId());
         requireManagedSchool(principal, body.schoolId());
-        return ok("Room created", commandService.createRoom(
+        return ok("Room created", calendar.createRoom(
                 tenantId, body.schoolId(), body.roomName(), principal.userId()), request);
     }
 
@@ -282,7 +242,7 @@ public class CalendarRestController {
      *   <li>Parse the Excel workbook using Apache POI</li>
      *   <li>Convert rows into {@code CalendarBulkRowRequest} entries</li>
      *   <li>Construct a {@code CalendarBulkCreateRequest} and delegate to
-     *       {@link CalendarCommandService#preview(String, CalendarBulkCreateRequest, String)}</li>
+     *       {@link CalendarOperations#preview(String, CalendarBulkCreateRequest, String)}</li>
      * </ol>
      *
      * @param file        the uploaded Excel file (.xlsx or .xls)
@@ -391,26 +351,6 @@ public class CalendarRestController {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private CalendarEventResponse buildEventResponse(
-            CalendarEvent event, List<CalendarTeacherAssignmentResponse> teachers) {
-        return new CalendarEventResponse(
-                event.getId(), event.getBatchId(), event.getTitle(),
-                event.getStartAt() != null ? event.getStartAt().toString() : null,
-                event.getEndAt() != null ? event.getEndAt().toString() : null,
-                event.getStartAt() != null ? event.getStartAt().toLocalDate().toString() : null,
-                event.getStartAt() != null
-                        ? event.getStartAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
-                event.getEndAt() != null
-                        ? event.getEndAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
-                event.getSchoolId(), null, event.getAcademicClassId(), null,
-                event.getSubjectId(), null, event.getLevelId(), null,
-                event.getRoomId(), event.getRoomName(),
-                event.getPeriodStart() != null ? event.getPeriodStart() : 0,
-                event.getPeriodCount() != null ? event.getPeriodCount() : 0,
-                teachers, event.getStatus(), event.getNote(),
-                computeColorGroup(event.getSubjectId()));
-    }
-
     private CalendarExcelImportRequest parseImportMetadata(String metadata) {
         try {
             return objectMapper.readValue(metadata, CalendarExcelImportRequest.class);
@@ -419,9 +359,4 @@ public class CalendarRestController {
         }
     }
 
-    private CalendarColorGroupResponse computeColorGroup(String subjectId) {
-        if (subjectId == null) return new CalendarColorGroupResponse("default", null, "subject");
-        int index = Math.abs(subjectId.hashCode()) % COLOR_KEYS.size();
-        return new CalendarColorGroupResponse(COLOR_KEYS.get(index), null, "subject");
-    }
 }

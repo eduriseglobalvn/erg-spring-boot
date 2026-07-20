@@ -101,6 +101,23 @@ public class CalendarReadService {
     // 1. LCMS aggregate teaching calendar workspace
     // -------------------------------------------------------------------------
 
+    public CalendarEventResponse eventDetail(String tenantId, String eventId) {
+        CalendarEvent event = eventRepository.findByTenantIdAndId(tenantId, eventId)
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("Calendar event not found."));
+        List<CalendarEventTeacher> teachers = eventTeacherRepository
+                .findByTenantIdAndEventIdIn(tenantId, List.of(eventId));
+        ReferenceMaps references = buildReferenceMaps(
+                tenantId, List.of(event.getSchoolId()), List.of(event), teachers);
+        return buildEventResponse(event, teachers, references);
+    }
+
+    public List<CalendarRoomOptionResponse> activeRooms(String tenantId, String schoolId) {
+        if (schoolId == null || schoolId.isBlank()) return List.of();
+        return roomRepository.findByTenantIdAndSchoolIdAndStatus(tenantId, schoolId, STATUS_ACTIVE).stream()
+                .map(room -> new CalendarRoomOptionResponse(room.getId(), room.getName(), room.getSchoolId()))
+                .toList();
+    }
+
     @Cacheable(cacheNames = "calendarWorkspace",
             key = "{#tenantId, #schoolIds, #from, #to, #viewMode, #teacherIds, #classIds, #subjectIds, #levelIds, #statuses, #principal.userId(), #principal.permissions(), #principal.deniedPermissions()}")
     public CalendarWorkspaceResponse lcmsTeachingCalendarWorkspace(
