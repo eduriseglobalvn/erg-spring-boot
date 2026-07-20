@@ -12,7 +12,7 @@ import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.controller.lms.graphql.LmsClassWorkspaceGraphQlController.ClassWorkspaceInput;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.lms.readmodel.LmsReadModelService;
+import com.erg.ergspringboot.lms.LmsQueryOperations;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +29,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class LmsClassWorkspaceGraphQlControllerTest {
 
     @Mock
-    private LmsReadModelService lmsReadModelService;
+    private LmsQueryOperations lmsReadModelService;
 
     private LmsClassWorkspaceGraphQlController controller;
 

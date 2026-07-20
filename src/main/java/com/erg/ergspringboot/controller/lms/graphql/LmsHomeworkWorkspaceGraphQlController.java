@@ -6,7 +6,7 @@ import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.T
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.lms.readmodel.LmsReadModelService;
+import com.erg.ergspringboot.lms.LmsQueryOperations;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -15,14 +15,14 @@ import java.util.List;
 @Controller
 public class LmsHomeworkWorkspaceGraphQlController {
 
-    private final LmsReadModelService lmsReadModelService;
+    private final LmsQueryOperations queries;
     private final GraphQlAccessSupport accessSupport;
 
     public LmsHomeworkWorkspaceGraphQlController(
-            LmsReadModelService lmsReadModelService,
+            LmsQueryOperations queries,
             GraphQlAccessSupport accessSupport
     ) {
-        this.lmsReadModelService = lmsReadModelService;
+        this.queries = queries;
         this.accessSupport = accessSupport;
     }
 
@@ -34,7 +34,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
         String teacherId = requirePrincipalUserId(principal);
 
-        return lmsReadModelService.teacherHomeworkWorkspace(
+        return queries.teacherHomeworkWorkspace(
                 tenantId,
                 teacherId,
                 safeInput.status(),
@@ -50,7 +50,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
         accessSupport.assertPermission(principal, "lms.assignment.progress.read", "lms.grade.read", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
 
-        AssignmentProgressWorkspaceResponse response = lmsReadModelService.assignmentProgressWorkspace(
+        AssignmentProgressWorkspaceResponse response = queries.assignmentProgressWorkspace(
                 tenantId,
                 safeInput.assignmentId(),
                 safeInput.attemptStatus(),
@@ -71,7 +71,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
         if (requestedClassId != null) {
             accessSupport.assertClassScope(principal, requestedClassId, null);
         }
-        return lmsReadModelService.studentGroups(
+        return queries.studentGroups(
                 tenantId,
                 requestedClassId,
                 readableClassIds(principal),

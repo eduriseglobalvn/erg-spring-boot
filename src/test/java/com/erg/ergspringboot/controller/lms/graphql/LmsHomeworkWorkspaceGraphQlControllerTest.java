@@ -18,7 +18,7 @@ import com.erg.ergspringboot.controller.lms.graphql.LmsHomeworkWorkspaceGraphQlC
 import com.erg.ergspringboot.controller.lms.graphql.LmsHomeworkWorkspaceGraphQlController.TeacherHomeworkWorkspaceInput;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.lms.readmodel.LmsReadModelService;
+import com.erg.ergspringboot.lms.LmsQueryOperations;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -34,7 +34,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class LmsHomeworkWorkspaceGraphQlControllerTest {
 
     @Mock
-    private LmsReadModelService lmsReadModelService;
+    private LmsQueryOperations lmsReadModelService;
 
     private LmsHomeworkWorkspaceGraphQlController controller;
 

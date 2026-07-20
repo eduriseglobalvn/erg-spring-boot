@@ -3,7 +3,7 @@ package com.erg.ergspringboot.controller.lms.graphql;
 import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.ClassWorkspaceResponse;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.lms.readmodel.LmsReadModelService;
+import com.erg.ergspringboot.lms.LmsQueryOperations;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -11,14 +11,14 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class LmsClassWorkspaceGraphQlController {
 
-    private final LmsReadModelService lmsReadModelService;
+    private final LmsQueryOperations queries;
     private final GraphQlAccessSupport accessSupport;
 
     public LmsClassWorkspaceGraphQlController(
-            LmsReadModelService lmsReadModelService,
+            LmsQueryOperations queries,
             GraphQlAccessSupport accessSupport
     ) {
-        this.lmsReadModelService = lmsReadModelService;
+        this.queries = queries;
         this.accessSupport = accessSupport;
     }
 
@@ -39,7 +39,7 @@ public class LmsClassWorkspaceGraphQlController {
                 "*"
         );
 
-        ClassWorkspaceResponse response = lmsReadModelService.classWorkspace(
+        ClassWorkspaceResponse response = queries.classWorkspace(
                 tenantId,
                 safeInput.classId(),
                 safeInput.schoolId(),
