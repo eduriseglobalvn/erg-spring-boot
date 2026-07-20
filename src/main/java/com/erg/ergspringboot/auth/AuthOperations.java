@@ -8,6 +8,10 @@ import com.erg.ergspringboot.common.response.auth.AuthResponses.IpSecurityStatus
 import com.erg.ergspringboot.common.response.auth.AuthResponses.LoginAttemptResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.TokenResponse;
 import com.erg.ergspringboot.service.auth.AuthService;
+import com.erg.ergspringboot.service.auth.AccountVerificationService;
+import com.erg.ergspringboot.common.request.users.UserRequests.RecoveryEmailChallengeRequest;
+import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailChallengeResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVerificationResponse;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -15,9 +19,29 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthOperations {
     private final AuthService legacy;
+    private final AccountVerificationService verification;
 
-    public AuthOperations(AuthService legacy) {
+    public AuthOperations(AuthService legacy, AccountVerificationService verification) {
         this.legacy = legacy;
+        this.verification = verification;
+    }
+
+    /** Compatibility constructor for focused auth tests. */
+    public AuthOperations(AuthService legacy) { this(legacy, null); }
+
+    public RecoveryEmailChallengeResponse requestRecoveryEmailChallenge(
+            String userId, String tenantId, RecoveryEmailChallengeRequest request, AuthAuditContext audit) {
+        return requireVerification().requestRecoveryEmailChallenge(userId, tenantId, request.recoveryEmail(), audit.toLegacy());
+    }
+
+    public RecoveryEmailVerificationResponse verifyRecoveryEmail(
+            String userId, String tenantId, String challengeId, String otp, AuthAuditContext audit) {
+        return requireVerification().verifyRecoveryEmail(userId, tenantId, challengeId, otp, audit.toLegacy());
+    }
+
+    private AccountVerificationService requireVerification() {
+        if (verification == null) throw new IllegalStateException("account verification service is not configured");
+        return verification;
     }
 
     public AuthResponse login(LoginRequest request, AuthClientContext context) {
