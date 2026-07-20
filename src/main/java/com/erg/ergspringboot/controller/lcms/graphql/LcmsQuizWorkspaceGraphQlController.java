@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizVer
 import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWorkspaceResponse;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.lcms.readmodel.LcmsQuizWorkspaceReadService;
+import com.erg.ergspringboot.lcms.LcmsQueryOperations;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -18,14 +18,14 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class LcmsQuizWorkspaceGraphQlController {
 
-    private final LcmsQuizWorkspaceReadService readService;
+    private final LcmsQueryOperations queries;
     private final GraphQlAccessSupport accessSupport;
 
     public LcmsQuizWorkspaceGraphQlController(
-            LcmsQuizWorkspaceReadService readService,
+            LcmsQueryOperations queries,
             GraphQlAccessSupport accessSupport
     ) {
-        this.readService = readService;
+        this.queries = queries;
         this.accessSupport = accessSupport;
     }
 
@@ -35,7 +35,7 @@ public class LcmsQuizWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "lms.exercise.create", "lms.quiz.create", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
-        return readService.quizWorkspace(
+        return queries.quizWorkspace(
                 tenantId,
                 safeInput.search(),
                 safeInput.subjectId(),
@@ -53,7 +53,7 @@ public class LcmsQuizWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "lms.exercise.create", "lms.quiz.create", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, null);
-        return readService.quizDraft(tenantId, quizId);
+        return queries.quizDraft(tenantId, quizId);
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "quizVersions")
@@ -61,7 +61,7 @@ public class LcmsQuizWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "lms.exercise.create", "lms.quiz.create", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, null);
-        return readService.quizVersions(tenantId, quizId);
+        return queries.quizVersions(tenantId, quizId);
     }
 
     public record QuizWorkspaceInput(

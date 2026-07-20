@@ -14,8 +14,6 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ForkRes
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.PublishResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDraftResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
-import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.AssignmentReportResponse;
-import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.QuestionAnalyticsResponse;
 import com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaCommitRequest;
 import com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaPresignRequest;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaCommitResponse;
@@ -26,7 +24,6 @@ import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
 import com.erg.ergspringboot.service.quiz.bundle.PortableQuizBundleService;
 import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
 import com.erg.ergspringboot.service.quiz.media.MediaService;
-import com.erg.ergspringboot.service.quiz.report.QuizReportService;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
@@ -39,7 +36,6 @@ public class LcmsOperations {
     private final QuizPublishService quizPublishing;
     private final MediaService media;
     private final PortableQuizBundleService bundles;
-    private final QuizReportService reports;
 
     public LcmsOperations(
             QuestionBankAuthoringService legacy,
@@ -47,8 +43,7 @@ public class LcmsOperations {
             QuizDraftService quizDrafts,
             QuizPublishService quizPublishing,
             MediaService media,
-            PortableQuizBundleService bundles,
-            QuizReportService reports
+            PortableQuizBundleService bundles
     ) {
         this.legacy = legacy;
         this.quizAuthoring = quizAuthoring;
@@ -56,7 +51,6 @@ public class LcmsOperations {
         this.quizPublishing = quizPublishing;
         this.media = media;
         this.bundles = bundles;
-        this.reports = reports;
     }
 
     public SaveQuestionResponse createQuestion(String tenantId, String userId, SaveQuestionRequest request) {
@@ -125,11 +119,4 @@ public class LcmsOperations {
         return bundles.exportVersion(tenantId, quizVersionId);
     }
 
-    public QuestionAnalyticsResponse questionAnalyticsByVersion(String tenantId, String quizVersionId) {
-        return reports.questionAnalyticsByVersion(tenantId, quizVersionId);
-    }
-
-    public AssignmentReportResponse assignmentReport(String tenantId, String assignmentId, Integer page, Integer size) {
-        return reports.assignmentReport(tenantId, assignmentId, page, size);
-    }
 }
