@@ -148,6 +148,12 @@ logging:
     org.springframework.jdbc.core: ${SPRING_JDBC_LOG_LEVEL:OFF}
 
 erg:
+  webhook:
+    max-body-bytes: ${ERG_WEBHOOK_MAX_BODY_BYTES:65536}
+    replay-ttl: ${ERG_WEBHOOK_REPLAY_TTL:24h}
+    timestamp-tolerance: ${ERG_WEBHOOK_TIMESTAMP_TOLERANCE:5m}
+    discord-public-key: ${SECRET_DISCORD_WEBHOOK_PUBLIC_KEY:}
+    telegram-secret-token: ${SECRET_TELEGRAM_WEBHOOK_TOKEN:}
   cache:
     l2-enabled: ${ERG_REDIS_CACHE_ENABLED:false}
     l2-names: ${ERG_REDIS_CACHE_L2_NAMES:}

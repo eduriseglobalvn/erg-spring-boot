@@ -12,7 +12,6 @@ class ProductionPrototypeExposureTest {
 
     private static final List<String> PROTOTYPE_CONTROLLERS = List.of(
             "ai/AiContentController.java",
-            "bot/WebhookController.java",
             "catalog/CourseController.java",
             "catalog/ElearningController.java",
             "cms/PageMenuController.java",

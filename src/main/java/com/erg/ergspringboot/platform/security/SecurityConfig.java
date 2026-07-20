@@ -88,6 +88,7 @@ public class SecurityConfig {
                                 "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**",
                                 "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/webhooks/discord", "/webhooks/telegram").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login", "/api/v1/auth/refresh"
                         ).permitAll()

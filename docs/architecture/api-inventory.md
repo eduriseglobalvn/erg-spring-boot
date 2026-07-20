@@ -78,7 +78,7 @@ the canonical `/api/v1/curriculum/tree` contract is green.
 
 These controllers are explicitly tracked for prototype/direct-service remediation:
 
-- `AiContentController`, `WebhookController`, `CourseController`, `ElearningController`,
+- `AiContentController`, `CourseController`, `ElearningController`,
   `PageMenuController`, `PostController`, `CrawlerController`, `RssBlacklistController`,
   `DocumentController`, `EngagementController`, `AnalyticsOperationsController`,
   `MigrationPlatformController`, `SeoController` and `TrendingBotController` inject or

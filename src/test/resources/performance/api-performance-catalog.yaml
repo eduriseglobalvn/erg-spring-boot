@@ -3906,7 +3906,7 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
-    - route: POST /webhooks/discord => com.erg.ergspringboot.controller.bot.WebhookController.webhook
+    - route: POST /webhooks/discord => com.erg.ergspringboot.controller.bot.WebhookController.discord
       classification: process-local-stub
       disposition: disable-in-prod
       statement-budget: 0
@@ -3915,7 +3915,7 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: POST /webhooks/telegram => com.erg.ergspringboot.controller.bot.WebhookController.webhook
+    - route: POST /webhooks/telegram => com.erg.ergspringboot.controller.bot.WebhookController.telegram
       classification: process-local-stub
       disposition: disable-in-prod
       statement-budget: 0
