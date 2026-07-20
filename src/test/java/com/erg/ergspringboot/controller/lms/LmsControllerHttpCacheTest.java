@@ -15,14 +15,33 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizResponse;
 import com.erg.ergspringboot.service.lms.LmsRuntimeService;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class LmsControllerHttpCacheTest {
+
+    @BeforeEach
+    void authenticateRequestFixture() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        new ErgPrincipal("test-user", "session", "tenant-1", List.of(), List.of("*"), List.of(), List.of(), "erg", "user", Map.of()),
+                        null,
+                        List.of()));
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void quizPackageSupportsETagCacheControlAndConditionalGet() throws Exception {
