@@ -6,6 +6,7 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.U
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeviceRegistrationResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.notifications.NotificationOperations;
 import com.erg.ergspringboot.service.notifications.NotificationDeviceService;
 import com.erg.ergspringboot.service.notifications.NotificationSecuritySupport;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,12 +24,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/notification-devices")
 public class NotificationDeviceController {
 
-    private final NotificationDeviceService deviceService;
+    private final NotificationOperations notifications;
     private final NotificationSecuritySupport security;
 
-    public NotificationDeviceController(NotificationDeviceService deviceService, NotificationSecuritySupport security) {
-        this.deviceService = deviceService;
+    @org.springframework.beans.factory.annotation.Autowired
+    public NotificationDeviceController(NotificationOperations notifications, NotificationSecuritySupport security) {
+        this.notifications = notifications;
         this.security = security;
+    }
+
+    @Deprecated
+    NotificationDeviceController(NotificationDeviceService legacy, NotificationSecuritySupport security) {
+        this(new NotificationOperations(null, legacy), security);
     }
 
     @PostMapping
@@ -40,7 +47,7 @@ public class NotificationDeviceController {
         String portal = security.verifiedPortal(principal, body.portal());
         return ok(
                 "Notification device registered",
-                deviceService.register(principal.tenantId(), principal.userId(), portal, body),
+                notifications.registerDevice(principal.tenantId(), principal.userId(), portal, body),
                 request
         );
     }
@@ -52,7 +59,7 @@ public class NotificationDeviceController {
     ) {
         ErgPrincipal principal = security.principal();
         String portal = security.verifiedPortal(principal, body.portal());
-        deviceService.unregister(principal.tenantId(), principal.userId(), portal, body);
+        notifications.unregisterDevice(principal.tenantId(), principal.userId(), portal, body);
         return ok("Notification device unregistered", Map.of("unregistered", true), request);
     }
 
@@ -65,7 +72,7 @@ public class NotificationDeviceController {
         String portal = security.verifiedPortal(principal, body.portal());
         return ok(
                 "Notification device heartbeat accepted",
-                deviceService.heartbeat(principal.tenantId(), principal.userId(), portal, body),
+                notifications.heartbeat(principal.tenantId(), principal.userId(), portal, body),
                 request
         );
     }
@@ -78,7 +85,7 @@ public class NotificationDeviceController {
     ) {
         ErgPrincipal principal = security.principal();
         String verifiedPortal = security.verifiedPortal(principal, portal);
-        deviceService.revokeOwnDevice(principal.tenantId(), principal.userId(), verifiedPortal, deviceId);
+        notifications.revokeDevice(principal.tenantId(), principal.userId(), verifiedPortal, deviceId);
         return ok("Notification device revoked", Map.of("revoked", true), request);
     }
 
