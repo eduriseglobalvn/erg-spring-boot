@@ -3,6 +3,11 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: erg-spring
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
   autoconfigure:
     # MongoDB and Redis are optional infrastructure in the current Spring service.
     # Keep them opt-in so local/dev boots and actuator health do not block on

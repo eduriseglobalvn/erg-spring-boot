@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
+import com.erg.ergspringboot.calendar.CalendarBatchPublished;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
@@ -45,8 +46,6 @@ import com.erg.ergspringboot.service.calendar.CalendarConflictService.ResolveRes
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ExpansionResult;
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
 import com.erg.ergspringboot.service.calendar.CalendarValidationService.RowValidationResult;
-import com.erg.ergspringboot.service.notifications.NotificationCommand;
-import com.erg.ergspringboot.service.notifications.NotificationCommandService;
 import com.erg.ergspringboot.utils.IdGenerator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
@@ -65,6 +64,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Service
 public class CalendarCommandService {
@@ -87,7 +87,6 @@ public class CalendarCommandService {
     private final CalendarValidationService validationService;
     private final CalendarBulkInputNormalizer inputNormalizer;
     private final CalendarConflictService conflictService;
-    private final NotificationCommandService notificationCommandService;
     private final GraphQlAccessSupport accessSupport;
     private final ClassroomRepository classroomRepository;
     private final SubjectRepository subjectRepository;
@@ -95,6 +94,7 @@ public class CalendarCommandService {
     private final UserRepository userRepository;
     private final EducationUnitRepository educationUnitRepository;
     private final EntityManager entityManager;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CalendarCommandService(
             CalendarBatchRepository batchRepository,
@@ -105,14 +105,14 @@ public class CalendarCommandService {
             CalendarValidationService validationService,
             CalendarBulkInputNormalizer inputNormalizer,
             CalendarConflictService conflictService,
-            NotificationCommandService notificationCommandService,
             GraphQlAccessSupport accessSupport,
             ClassroomRepository classroomRepository,
             SubjectRepository subjectRepository,
             LevelRepository levelRepository,
             UserRepository userRepository,
             EducationUnitRepository educationUnitRepository,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            ApplicationEventPublisher eventPublisher) {
         this.batchRepository = batchRepository;
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
@@ -121,7 +121,6 @@ public class CalendarCommandService {
         this.validationService = validationService;
         this.inputNormalizer = inputNormalizer;
         this.conflictService = conflictService;
-        this.notificationCommandService = notificationCommandService;
         this.accessSupport = accessSupport;
         this.classroomRepository = classroomRepository;
         this.subjectRepository = subjectRepository;
@@ -129,6 +128,7 @@ public class CalendarCommandService {
         this.userRepository = userRepository;
         this.educationUnitRepository = educationUnitRepository;
         this.entityManager = entityManager;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional("postgresTransactionManager")
@@ -338,7 +338,8 @@ public class CalendarCommandService {
 
         conflictService.markConflictsResolved(batch.getTenantId(), batchId, userId);
 
-        emitBatchPublishedNotification(batch, events, userId);
+        eventPublisher.publishEvent(new CalendarBatchPublished(
+                "schedule-published:" + batchId, tenantId, batchId, userId, now, 1));
 
         return new CalendarBatchPayload(batchId, STATUS_PUBLISHED, affected);
     }
@@ -557,36 +558,6 @@ public class CalendarCommandService {
         if (principal == null) return List.of();
         String csv = accessSupport.attribute(principal, "managedEducationUnitIds");
         return accessSupport.csv(csv);
-    }
-
-    private void emitBatchPublishedNotification(CalendarBatch batch, List<CalendarEvent> events, String userId) {
-        try {
-            List<String> eventIds = events.stream().map(CalendarEvent::getId).toList();
-            List<CalendarEventTeacher> teacherAssignments =
-                    eventTeacherRepository.findByTenantIdAndEventIdIn(batch.getTenantId(), eventIds);
-            List<String> teacherUserIds = teacherAssignments.stream()
-                    .map(CalendarEventTeacher::getTeacherUserId)
-                    .filter(tuId -> tuId != null && !tuId.isBlank()).distinct().toList();
-
-            if (teacherUserIds.isEmpty()) {
-                log.info("No teachers to notify for published batch {}", batch.getId());
-                return;
-            }
-
-            NotificationCommand command = new NotificationCommand(
-                    batch.getTenantId(), userId, "schedule-published:" + batch.getId(),
-                    "SCHEDULE_PUBLISHED", "teaching_schedule", batch.getId(),
-                    "Lich giang day da duoc xuat ban",
-                    "Lich giang day cho " + batch.getSchoolId()
-                            + " da duoc xuat ban voi " + events.size() + " buoi hoc.",
-                    "/calendar", "normal", "lms", teacherUserIds, null,
-                    Map.of("batchId", batch.getId(), "eventType", "SCHEDULE_PUBLISHED"));
-
-            notificationCommandService.enqueue(command);
-            log.info("Published notification for batch {} to {} teachers", batch.getId(), teacherUserIds.size());
-        } catch (Exception e) {
-            log.warn("Failed to emit publish notification for batch {}: {}", batch.getId(), e.getMessage());
-        }
     }
 
     private void assertTenant(String actualTenantId, String expectedTenantId) {

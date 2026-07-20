@@ -21,6 +21,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
+import com.erg.ergspringboot.calendar.CalendarBatchPublished;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
@@ -55,8 +56,6 @@ import com.erg.ergspringboot.service.calendar.CalendarConflictService.ResolveRes
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ExpansionResult;
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
 import com.erg.ergspringboot.service.calendar.CalendarValidationService.RowValidationResult;
-import com.erg.ergspringboot.service.notifications.NotificationCommand;
-import com.erg.ergspringboot.service.notifications.NotificationCommandService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
@@ -73,6 +72,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class CalendarCommandServiceTest {
@@ -101,8 +101,6 @@ class CalendarCommandServiceTest {
     @Mock
     private CalendarConflictService conflictService;
     @Mock
-    private NotificationCommandService notificationCommandService;
-    @Mock
     private GraphQlAccessSupport accessSupport;
     @Mock
     private ClassroomRepository classroomRepository;
@@ -116,6 +114,8 @@ class CalendarCommandServiceTest {
     private EducationUnitRepository educationUnitRepository;
     @Mock
     private EntityManager entityManager;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private CalendarCommandService service;
 
@@ -124,9 +124,9 @@ class CalendarCommandServiceTest {
         service = new CalendarCommandService(
                 batchRepository, eventRepository, eventTeacherRepository,
                 roomRepository, expansionService, validationService, new CalendarBulkInputNormalizer(), conflictService,
-                notificationCommandService, accessSupport, classroomRepository,
+                accessSupport, classroomRepository,
                 subjectRepository, levelRepository, userRepository,
-                educationUnitRepository, entityManager);
+                educationUnitRepository, entityManager, eventPublisher);
     }
 
     // =========================================================================
@@ -649,7 +649,7 @@ class CalendarCommandServiceTest {
     class PublishBatchTest {
 
         @Test
-        void shouldPublishBatchAndEmitNotification() {
+        void shouldPublishBatchAndEmitDurableModuleEvent() {
             CalendarBatch batch = createBatch("DRAFT");
             CalendarEvent event = createEvent(EVENT_ID);
 
@@ -661,9 +661,6 @@ class CalendarCommandServiceTest {
             when(eventRepository.updateStatusBatch(
                     eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("PUBLISHED"), eq(USER_ID), any()))
                     .thenReturn(1);
-
-            when(eventTeacherRepository.findByTenantIdAndEventIdIn(TENANT_ID, List.of(EVENT_ID)))
-                    .thenReturn(List.of(createTeacherAssignment(EVENT_ID, "teacher-1", "MAIN")));
 
             CalendarBatchPayload payload = service.publishBatch(TENANT_ID, BATCH_ID, USER_ID);
 
@@ -678,9 +675,15 @@ class CalendarCommandServiceTest {
 
             verify(eventRepository).updateStatusBatch(
                     eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("PUBLISHED"), eq(USER_ID), any());
-            verify(notificationCommandService).enqueue(argThat(command ->
-                    ("schedule-published:" + BATCH_ID).equals(command.idempotencyKey())
-                            && "/calendar".equals(command.actionUrl())));
+            ArgumentCaptor<Object> publishedEvent = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher).publishEvent(publishedEvent.capture());
+            assertTrue(publishedEvent.getValue() instanceof CalendarBatchPublished);
+            CalendarBatchPublished published = (CalendarBatchPublished) publishedEvent.getValue();
+            assertEquals("schedule-published:" + BATCH_ID, published.eventId());
+            assertEquals(TENANT_ID, published.tenantId());
+            assertEquals(BATCH_ID, published.batchId());
+            assertEquals(USER_ID, published.actorId());
+            assertEquals(1, published.schemaVersion());
         }
 
         @Test
