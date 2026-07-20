@@ -4,7 +4,7 @@ import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.Sc
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.school.SchoolOperationsReadService;
+import com.erg.ergspringboot.school.SchoolQueryOperations;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -14,11 +14,11 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class LcmsSchoolOperationsGraphQlController {
     private final GraphQlAccessSupport accessSupport;
-    private final SchoolOperationsReadService readService;
+    private final SchoolQueryOperations queries;
 
-    public LcmsSchoolOperationsGraphQlController(GraphQlAccessSupport accessSupport, SchoolOperationsReadService readService) {
+    public LcmsSchoolOperationsGraphQlController(SchoolQueryOperations queries, GraphQlAccessSupport accessSupport) {
+        this.queries = queries;
         this.accessSupport = accessSupport;
-        this.readService = readService;
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "schoolDirectory")
@@ -29,7 +29,7 @@ public class LcmsSchoolOperationsGraphQlController {
         String tenantId = accessSupport.verifiedTenantId(principal, safe.tenantId());
         List<String> scopes = accessSupport.csv(accessSupport.attribute(principal, "managedEducationUnitIds"));
         boolean allScope = accessSupport.isWildcardPrincipal(principal) || scopes.contains("*");
-        return readService.directory(tenantId, scopes, allScope, safe.search(), safe.status(), safe.schoolType(), safe.page(), safe.size());
+        return queries.directory(tenantId, scopes, allScope, safe.search(), safe.status(), safe.schoolType(), safe.page(), safe.size());
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "schoolOperations")
@@ -46,7 +46,7 @@ public class LcmsSchoolOperationsGraphQlController {
         java.util.Set<String> selected = selectionSet.getFields().stream()
                 .map(field -> field.getQualifiedName().substring(field.getQualifiedName().lastIndexOf('.') + 1))
                 .collect(java.util.stream.Collectors.toSet());
-        return readService.operations(tenantId, input.schoolId(),
+        return queries.operations(tenantId, input.schoolId(),
                 accessSupport.isAllowed(principal, "lms.school.create", "*"),
                 accessSupport.isAllowed(principal, "lms.school.update", "*"),
                 accessSupport.isAllowed(principal, "lms.school.archive", "*"),
