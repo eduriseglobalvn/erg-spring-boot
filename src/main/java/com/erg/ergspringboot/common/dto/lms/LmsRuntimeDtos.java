@@ -14,6 +14,13 @@ public final class LmsRuntimeDtos {
     public record ContentScope(String type, String schoolId) {
     }
 
+    public record EducationUnitItem(String id, String name) { }
+    public record EducationUnitListResponse(List<EducationUnitItem> items) { }
+    public record AccessScopeResponse(String tenantId, String currentEducationUnitId, String currentClassId,
+            List<String> managedEducationUnitIds, List<String> managedClassIds) { }
+    public record ClassItem(String id, String name, String schoolId, String grade, String academicYear) { }
+    public record ClassesBySchoolResponse(String schoolId, List<ClassItem> items, AccessScopeResponse scope) { }
+
     public record QuestionChoice(String id, String label, boolean correct) {
     }
 

@@ -4,6 +4,8 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AnswerResultResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AssignmentProgressResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptDraftRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSubmitResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
@@ -22,7 +24,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -163,12 +164,12 @@ public class LmsController {
     }
 
     @GetMapping("/education-units")
-    public ApiResponse<Map<String, Object>> educationUnits(HttpServletRequest request) {
+    public ApiResponse<EducationUnitListResponse> educationUnits(HttpServletRequest request) {
         return ok("Education units loaded", lmsRuntimeService.listEducationUnits(UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/classes")
-    public ApiResponse<Map<String, Object>> classes(@RequestParam(required = false) String schoolId, HttpServletRequest request) {
+    public ApiResponse<ClassesBySchoolResponse> classes(@RequestParam(required = false) String schoolId, HttpServletRequest request) {
         // Classes are intentionally fetched by selected school instead of being bundled into session bootstrap.
         return ok("Classes loaded", lmsRuntimeService.listClassesBySchool(schoolId, UserAccessContext.from(request)), request);
     }

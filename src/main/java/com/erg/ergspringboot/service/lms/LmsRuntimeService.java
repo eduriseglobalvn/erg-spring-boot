@@ -9,6 +9,11 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSubmitResponse
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ContentScope;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AccessScopeResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassItem;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitItem;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizResponse;
@@ -446,27 +451,27 @@ public class LmsRuntimeService {
                 .toList();
     }
 
-    public Map<String, Object> listEducationUnits(UserAccessContext access) {
-        return Map.of("items", educationUnitItems(access));
+    public EducationUnitListResponse listEducationUnits(UserAccessContext access) {
+        return new EducationUnitListResponse(educationUnitItems(access));
     }
 
     @Cacheable(
             cacheNames = "lmsClassesBySchool",
             key = "{#access.tenantId(), #schoolId, #access.currentEducationUnitId(), #access.managedEducationUnitIds().toString()}"
     )
-    public Map<String, Object> listClassesBySchool(String schoolId, UserAccessContext access) {
+    public ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access) {
         String resolvedSchoolId = schoolId == null || schoolId.isBlank() ? access.currentEducationUnitId() : schoolId.trim();
         if (resolvedSchoolId == null || resolvedSchoolId.isBlank()) {
             throw new BadRequestException("schoolId is required");
         }
         ensureEducationUnitAccess(resolvedSchoolId, access);
-        List<Map<String, Object>> items = classroomService
+        List<ClassItem> items = classroomService
                 .findByTenantIdAndSchoolIdOrderByNameAsc(normalizeTenant(access.tenantId()), resolvedSchoolId)
                 .stream()
                 .filter(item -> access.canAccessClass(item.getId()))
                 .map(this::classPayload)
                 .toList();
-        return Map.of("schoolId", resolvedSchoolId, "items", items, "scope", scopePayload(access));
+        return new ClassesBySchoolResponse(resolvedSchoolId, items, scopePayload(access));
     }
 
     private Quiz quiz(String quizId, UserAccessContext access) {
@@ -707,17 +712,12 @@ public class LmsRuntimeService {
                 .orElse(true);
     }
 
-    private Map<String, Object> scopePayload(UserAccessContext access) {
-        Map<String, Object> scope = new LinkedHashMap<>();
-        scope.put("tenantId", access.tenantId());
-        scope.put("currentEducationUnitId", access.currentEducationUnitId());
-        scope.put("currentClassId", access.currentClassId());
-        scope.put("managedEducationUnitIds", access.managedEducationUnitIds());
-        scope.put("managedClassIds", access.managedClassIds());
-        return scope;
+    private AccessScopeResponse scopePayload(UserAccessContext access) {
+        return new AccessScopeResponse(access.tenantId(), access.currentEducationUnitId(), access.currentClassId(),
+                access.managedEducationUnitIds(), access.managedClassIds());
     }
 
-    private List<Map<String, Object>> educationUnitItems(UserAccessContext access) {
+    private List<EducationUnitItem> educationUnitItems(UserAccessContext access) {
         List<String> schoolIds = classroomService.findDistinctSchoolIdsByTenant(normalizeTenant(access.tenantId()));
         if (schoolIds == null) {
             schoolIds = classroomService.findByTenantIdOrderByNameAsc(normalizeTenant(access.tenantId())).stream()
@@ -725,18 +725,13 @@ public class LmsRuntimeService {
         }
         return schoolIds.stream()
                 .filter(access::canAccessEducationUnit)
-                .map(educationUnitId -> Map.<String, Object>of("id", educationUnitId, "name", educationUnitId))
+                .map(educationUnitId -> new EducationUnitItem(educationUnitId, educationUnitId))
                 .toList();
     }
 
-    private Map<String, Object> classPayload(Classroom classroom) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("id", classroom.getId());
-        payload.put("name", classroom.getName());
-        payload.put("schoolId", classroom.getSchoolId());
-        payload.put("grade", classroom.getGrade());
-        payload.put("academicYear", classroom.getAcademicYear());
-        return payload;
+    private ClassItem classPayload(Classroom classroom) {
+        return new ClassItem(classroom.getId(), classroom.getName(), classroom.getSchoolId(),
+                classroom.getGrade(), classroom.getAcademicYear());
     }
 
     private AssignmentResponse toAssignmentResponse(Assignment assignment) {
