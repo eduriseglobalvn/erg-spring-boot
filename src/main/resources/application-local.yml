@@ -1,0 +1,23 @@
+spring:
+  flyway:
+    enabled: true
+  jpa:
+    properties:
+      hibernate:
+        generate_statistics: true
+
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
+
+springdoc:
+  api-docs:
+    enabled: true
+
+scalar:
+  enabled: true
+
+erg:
+  process-local:
+    enabled: true
