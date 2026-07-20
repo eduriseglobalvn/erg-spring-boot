@@ -34,7 +34,8 @@ class LearningResourceLegacyApiRemovalTest {
         ));
 
         assertThat(curriculumController)
-                .doesNotContain("@GetMapping(\"/tree\")")
+                .contains("@RequestMapping(\"/api/v1/curriculum\")")
+                .doesNotContain("@RequestMapping(\"/api/curriculum\")")
                 .doesNotContain("@GetMapping(\"/subjects\")")
                 .doesNotContain("@GetMapping(\"/levels\")")
                 .doesNotContain("@GetMapping(\"/topics\")");

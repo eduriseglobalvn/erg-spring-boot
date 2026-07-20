@@ -39,7 +39,7 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: DELETE /api/curriculum/levels/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteLevel
+    - route: DELETE /api/v1/curriculum/levels/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteLevel
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -47,7 +47,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: DELETE /api/curriculum/subjects/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteSubject
+    - route: DELETE /api/v1/curriculum/subjects/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteSubject
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -55,7 +55,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: DELETE /api/curriculum/topics/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteTopic
+    - route: DELETE /api/v1/curriculum/topics/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteTopic
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -586,7 +586,7 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: GET /api/curriculum/levels/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.levelImpact
+    - route: GET /api/v1/curriculum/levels/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.levelImpact
       classification: persistent-read
       statement-budget: 12
       row-budget: 1000
@@ -594,7 +594,7 @@ rest:
       state-owner: postgresql
       cache-policy: tenant-generation-or-none
       pagination-policy: required-for-collections
-    - route: GET /api/curriculum/subjects/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.subjectImpact
+    - route: GET /api/v1/curriculum/subjects/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.subjectImpact
       classification: persistent-read
       statement-budget: 12
       row-budget: 1000
@@ -602,7 +602,7 @@ rest:
       state-owner: postgresql
       cache-policy: tenant-generation-or-none
       pagination-policy: required-for-collections
-    - route: GET /api/curriculum/topics/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.topicImpact
+    - route: GET /api/v1/curriculum/topics/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.topicImpact
       classification: persistent-read
       statement-budget: 12
       row-budget: 1000
@@ -610,7 +610,7 @@ rest:
       state-owner: postgresql
       cache-policy: tenant-generation-or-none
       pagination-policy: required-for-collections
-    - route: GET /api/curriculum/tree => com.erg.ergspringboot.controller.curriculum.CurriculumController.tree
+    - route: GET /api/v1/curriculum/tree => com.erg.ergspringboot.controller.curriculum.CurriculumController.tree
       classification: persistent-read
       statement-budget: 3
       row-budget: 1500
@@ -2278,7 +2278,7 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: PATCH /api/curriculum/levels/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateLevel
+    - route: PATCH /api/v1/curriculum/levels/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateLevel
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2286,7 +2286,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: PATCH /api/curriculum/subjects/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateSubject
+    - route: PATCH /api/v1/curriculum/subjects/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateSubject
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2294,7 +2294,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: PATCH /api/curriculum/topics/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateTopic
+    - route: PATCH /api/v1/curriculum/topics/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateTopic
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2737,7 +2737,7 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: POST /api/curriculum/levels/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveLevel
+    - route: POST /api/v1/curriculum/levels/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveLevel
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2745,7 +2745,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/curriculum/levels/{levelId}/topics => com.erg.ergspringboot.controller.curriculum.CurriculumController.createTopic
+    - route: POST /api/v1/curriculum/levels/{levelId}/topics => com.erg.ergspringboot.controller.curriculum.CurriculumController.createTopic
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2753,7 +2753,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/curriculum/subjects => com.erg.ergspringboot.controller.curriculum.CurriculumController.createSubject
+    - route: POST /api/v1/curriculum/subjects => com.erg.ergspringboot.controller.curriculum.CurriculumController.createSubject
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2761,7 +2761,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/curriculum/subjects/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveSubject
+    - route: POST /api/v1/curriculum/subjects/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveSubject
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2769,7 +2769,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/curriculum/subjects/{subjectId}/levels => com.erg.ergspringboot.controller.curriculum.CurriculumController.createLevel
+    - route: POST /api/v1/curriculum/subjects/{subjectId}/levels => com.erg.ergspringboot.controller.curriculum.CurriculumController.createLevel
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
@@ -2777,7 +2777,7 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/curriculum/topics/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveTopic
+    - route: POST /api/v1/curriculum/topics/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveTopic
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000

@@ -17,9 +17,12 @@ public record UserAccessContext(
 
     public static UserAccessContext from(HttpServletRequest request) {
         ErgPrincipal principal = principal();
-        String userId = first(principal == null ? null : principal.userId(), "system");
-        String tenantId = first(principal == null ? null : principal.tenantId(), "erg");
-        boolean wildcardPrincipal = principal != null && principal.permissions() != null && principal.permissions().contains("*");
+        String userId = first(principal == null ? null : principal.userId());
+        String tenantId = first(principal == null ? null : principal.tenantId());
+        if (principal == null || userId == null || tenantId == null) {
+            throw new AuthenticationRequiredException();
+        }
+        boolean wildcardPrincipal = principal.permissions() != null && principal.permissions().contains("*");
         List<String> educationUnits = wildcardPrincipal ? List.of("*") : csv(attribute(principal, "managedEducationUnitIds"));
         List<String> classes = wildcardPrincipal ? List.of("*") : csv(attribute(principal, "managedClassIds"));
         String requestedEducationUnitId = first(
@@ -54,7 +57,9 @@ public record UserAccessContext(
 
     private static ErgPrincipal principal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof ErgPrincipal principal) {
+        if (authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof ErgPrincipal principal) {
             return principal;
         }
         return null;

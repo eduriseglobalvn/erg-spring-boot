@@ -21,7 +21,7 @@ import org.springframework.web.servlet.mvc.condition.RequestMethodsRequestCondit
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "prototype"})
 @SpringBootTest(properties = {
         "erg.auth.bff-enabled=true",
         "erg.process-local.enabled=true",

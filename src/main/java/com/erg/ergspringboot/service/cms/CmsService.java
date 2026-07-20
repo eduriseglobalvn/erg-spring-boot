@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
 @Service
+@org.springframework.context.annotation.Profile("prototype")
 public class CmsService {
 
     private final Map<String, Map<String, Object>> posts = new ConcurrentHashMap<>();

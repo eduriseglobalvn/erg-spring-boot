@@ -1,10 +1,11 @@
 # FE guide: curriculum subject-level-topic tree
 
-This is an additive API. No existing payload or GraphQL schema changed.
+This is the canonical versioned API. The legacy `/api/curriculum/tree` mapping is removed;
+clients must use the route below. The payload and GraphQL schema are unchanged.
 
 ## Request
 
-`GET /api/curriculum/tree?status=active`
+`GET /api/v1/curriculum/tree?status=active`
 
 The optional `status` accepts `active`, `draft`, or `archived`; omitted means `active`. Authentication and `X-Tenant-ID` follow the existing API convention.
 

@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/curriculum")
+@RequestMapping("/api/v1/curriculum")
 public class CurriculumController {
 
     private final CurriculumService curriculumService;
