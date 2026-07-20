@@ -86,8 +86,7 @@ public class SecurityConfig {
                                 "/api/v1/health", "/api/v1/ready", "/api/health", "/api/ready",
                                 "/healthz", "/ready", "/metrics",
                                 "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**",
-                                "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml",
-                                "/webhooks/**"
+                                "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login", "/api/v1/auth/refresh"
