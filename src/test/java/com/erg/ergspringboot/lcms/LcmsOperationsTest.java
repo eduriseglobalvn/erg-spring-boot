@@ -28,6 +28,7 @@ import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
 import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
 import com.erg.ergspringboot.service.quiz.media.MediaService;
 import com.erg.ergspringboot.service.quiz.bundle.PortableQuizBundleService;
+import com.erg.ergspringboot.service.quiz.report.QuizReportService;
 import org.junit.jupiter.api.Test;
 
 class LcmsOperationsTest {
@@ -44,7 +45,8 @@ class LcmsOperationsTest {
                 mock(QuizDraftService.class),
                 mock(QuizPublishService.class),
                 mock(MediaService.class),
-                mock(PortableQuizBundleService.class)
+                mock(PortableQuizBundleService.class),
+                mock(QuizReportService.class)
         ).createQuestion("tenant-1", "user-1", request))
                 .isSameAs(expected);
     }
@@ -76,7 +78,7 @@ class LcmsOperationsTest {
         when(authoring.delete("tenant-1", "quiz-1")).thenReturn(deleted);
 
         LcmsOperations operations = new LcmsOperations(mock(QuestionBankAuthoringService.class), authoring, drafts, publishing,
-                mock(MediaService.class), mock(PortableQuizBundleService.class));
+                mock(MediaService.class), mock(PortableQuizBundleService.class), mock(QuizReportService.class));
 
         assertThat(operations.createQuiz("tenant-1", "user-1", "create-key", createRequest)).isSameAs(created);
         assertThat(operations.saveDraft("tenant-1", "quiz-1", draftRequest)).isSameAs(saved);
@@ -99,7 +101,7 @@ class LcmsOperationsTest {
         when(media.commit("tenant-1", commitRequest)).thenReturn(committed);
         LcmsOperations operations = new LcmsOperations(mock(QuestionBankAuthoringService.class),
                 mock(QuizAuthoringService.class), mock(QuizDraftService.class), mock(QuizPublishService.class), media,
-                mock(PortableQuizBundleService.class));
+                mock(PortableQuizBundleService.class), mock(QuizReportService.class));
 
         assertThat(operations.presignMedia("tenant-1", "user-1", presignRequest)).isSameAs(presigned);
         assertThat(operations.commitMedia("tenant-1", commitRequest)).isSameAs(committed);
