@@ -13,6 +13,10 @@ class NativeImageBuildContractTest {
         assertThat(Files.exists(Path.of("pom.xml"))).isTrue();
         assertThat(Files.readString(Path.of("pom.xml")))
                 .contains("org.graalvm.buildtools", "native-maven-plugin");
+        assertThat(Files.readString(Path.of("pom.xml")))
+                .contains("<id>native</id>", "<goal>compile-no-fork</goal>", "<imageName>erg-spring-native</imageName>");
+        assertThat(Files.readString(Path.of("ops/native/README.md")))
+                .contains("SPRING_PROFILES_ACTIVE=prod", "FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres");
         assertThat(Files.exists(Path.of("ops/native/README.md"))).isTrue();
     }
 

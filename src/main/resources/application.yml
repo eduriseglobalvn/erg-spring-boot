@@ -97,6 +97,16 @@ spring:
       introspection:
         enabled: ${SPRING_GRAPHQL_SCHEMA_INTROSPECTION_ENABLED:${ERG_GRAPHQL_INTROSPECTION_ENABLED:false}}
 
+---
+spring:
+  config:
+    activate:
+      on-profile: staging
+  modulith:
+    detection-strategy: explicitly-annotated
+    runtime:
+      verification-enabled: true
+
 server:
   address: ${SERVER_ADDRESS:${HTTP__HOST:${APP__HOST:0.0.0.0}}}
   port: ${SERVER_PORT:${HTTP__PORT:${APP__PORT:1606}}}
@@ -159,6 +169,14 @@ erg:
     timestamp-tolerance: ${ERG_WEBHOOK_TIMESTAMP_TOLERANCE:5m}
     discord-public-key: ${SECRET_DISCORD_WEBHOOK_PUBLIC_KEY:}
     telegram-secret-token: ${SECRET_TELEGRAM_WEBHOOK_TOKEN:}
+  module-events:
+    io:
+      core-size: ${ERG_MODULE_EVENTS_IO_CORE_SIZE:8}
+      max-size: ${ERG_MODULE_EVENTS_IO_MAX_SIZE:16}
+      queue-capacity: ${ERG_MODULE_EVENTS_IO_QUEUE_CAPACITY:0}
+    cpu:
+      parallelism: ${ERG_MODULE_EVENTS_CPU_PARALLELISM:4}
+      queue-capacity: ${ERG_MODULE_EVENTS_CPU_QUEUE_CAPACITY:32}
   cache:
     l2-enabled: ${ERG_REDIS_CACHE_ENABLED:false}
     l2-names: ${ERG_REDIS_CACHE_L2_NAMES:}
