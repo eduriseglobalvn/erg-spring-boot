@@ -4,7 +4,6 @@ import com.erg.ergspringboot.common.dto.users.EmployeeDtos.*;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.users.EmployeeManagementService;
 import com.erg.ergspringboot.service.users.EmployeeSecurityActivityService;
-import com.erg.ergspringboot.service.users.UserService;
 import org.springframework.stereotype.Service;
 
 /** Public employee-management boundary for the users context. */
@@ -26,8 +25,8 @@ public class EmployeeOperations {
         return security.listSecurityEvents(userId, tenantId, page, limit);
     }
     public EmployeeCreatedResponse createEmployee(String tenantId, CreateEmployeeRequest request,
-            UserService.AuditContext audit) { return management.createEmployee(tenantId, request, audit); }
+            UserAuditContext audit) { return management.createEmployee(tenantId, request, audit.toLegacy()); }
     public EmployeeDetailResponse getEmployee(String userId, String tenantId) { return management.getEmployee(userId, tenantId); }
     public EmployeeDetailResponse updateEmployee(String userId, String tenantId, UpdateEmployeeRequest request,
-            UserService.AuditContext audit) { return management.updateEmployee(userId, tenantId, request, audit); }
+            UserAuditContext audit) { return management.updateEmployee(userId, tenantId, request, audit.toLegacy()); }
 }
