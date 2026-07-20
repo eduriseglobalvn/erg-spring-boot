@@ -21,6 +21,10 @@ public class CalendarOperations {
         this.commands = commands;
     }
 
+    /** Compatibility seams for adapters being migrated independently. */
+    public CalendarOperations(CalendarCommandService commands) { this(null, commands); }
+    public CalendarOperations(CalendarReadService reads) { this(reads, null); }
+
     public CalendarWorkspaceResponse workspace(String tenantId, List<String> schools, String from, String to,
             String viewMode, List<String> teachers, List<String> classes, List<String> subjects,
             List<String> levels, List<String> statuses, ErgPrincipal principal) {
@@ -33,6 +37,12 @@ public class CalendarOperations {
             List<String> levels, List<String> statuses, ErgPrincipal principal) {
         return reads.teacherTeachingCalendarWorkspace(tenantId, userId, from, to, viewMode,
                 schools, classes, subjects, levels, statuses, principal);
+    }
+    public CalendarWorkspaceResponse studentWorkspace(String tenantId, String userId, String from, String to,
+            String viewMode, List<String> subjects, List<String> levels, List<String> statuses,
+            ErgPrincipal principal) {
+        return reads.studentTeachingCalendarWorkspace(tenantId, userId, from, to, viewMode,
+                subjects, levels, statuses, principal);
     }
 
     public CalendarEventResponse event(String tenantId, String eventId) { return reads.eventDetail(tenantId, eventId); }

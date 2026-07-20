@@ -9,6 +9,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.service.calendar.CalendarReadService;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import java.util.List;
@@ -19,18 +20,26 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class CalendarLcmsQueryGraphQlController {
 
-    private final CalendarReadService readService;
+    private final CalendarOperations calendar;
     private final GraphQlAccessSupport accessSupport;
     private final CalendarScopeService scopeService;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public CalendarLcmsQueryGraphQlController(
-            CalendarReadService readService,
+            CalendarOperations calendar,
             GraphQlAccessSupport accessSupport,
             CalendarScopeService scopeService
     ) {
-        this.readService = readService;
+        this.calendar = calendar;
         this.accessSupport = accessSupport;
         this.scopeService = scopeService;
+    }
+
+    /** Compatibility constructor retained for existing focused adapter tests. */
+    @Deprecated
+    public CalendarLcmsQueryGraphQlController(CalendarReadService reads,
+            GraphQlAccessSupport accessSupport, CalendarScopeService scopeService) {
+        this(new CalendarOperations(reads), accessSupport, scopeService);
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "teachingCalendarWorkspace")
@@ -42,7 +51,7 @@ public class CalendarLcmsQueryGraphQlController {
         List<String> schoolIds = scopeService.requireManagedSchools(principal, input == null ? null : input.schoolIds());
 
         CalendarWorkspaceRequest safeInput = input == null ? CalendarWorkspaceRequest.empty() : input;
-        return readService.lcmsTeachingCalendarWorkspace(
+        return calendar.workspace(
                 tenantId, schoolIds, safeInput.from(), safeInput.to(), safeInput.viewMode(),
                 safeInput.teacherIds(), safeInput.classIds(), safeInput.subjectIds(), safeInput.levelIds(),
                 safeInput.statuses(), principal);
@@ -57,7 +66,7 @@ public class CalendarLcmsQueryGraphQlController {
                 ? new TeachingScheduleBatchListRequest(null, null, null, null, null)
                 : input;
         String schoolId = resolveScopedSchoolFilter(principal, safeInput.schoolId());
-        return readService.teachingScheduleBatches(
+        return calendar.batches(
                 tenantId, schoolId, safeInput.status(), safeInput.page(), safeInput.size());
     }
 
@@ -70,7 +79,7 @@ public class CalendarLcmsQueryGraphQlController {
             throw new IllegalArgumentException("batchId is required.");
         }
         scopeService.requireBatch(principal, tenantId, input.batchId());
-        return readService.teachingScheduleBatch(tenantId, input.batchId());
+        return calendar.batch(tenantId, input.batchId());
     }
 
     private String resolveScopedSchoolFilter(ErgPrincipal principal, String requestedSchoolId) {

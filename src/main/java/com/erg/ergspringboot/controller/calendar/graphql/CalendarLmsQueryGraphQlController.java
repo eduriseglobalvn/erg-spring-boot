@@ -6,6 +6,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.service.calendar.CalendarReadService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -15,15 +16,23 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class CalendarLmsQueryGraphQlController {
 
-    private final CalendarReadService readService;
+    private final CalendarOperations calendar;
     private final GraphQlAccessSupport accessSupport;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public CalendarLmsQueryGraphQlController(
-            CalendarReadService readService,
+            CalendarOperations calendar,
             GraphQlAccessSupport accessSupport
     ) {
-        this.readService = readService;
+        this.calendar = calendar;
         this.accessSupport = accessSupport;
+    }
+
+    /** Compatibility constructor retained for existing focused adapter tests. */
+    @Deprecated
+    public CalendarLmsQueryGraphQlController(CalendarReadService reads,
+            GraphQlAccessSupport accessSupport) {
+        this(new CalendarOperations(reads), accessSupport);
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "myTeachingCalendar")
@@ -38,7 +47,7 @@ public class CalendarLmsQueryGraphQlController {
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
         String teacherUserId = requirePrincipalUserId(principal);
 
-        return readService.teacherTeachingCalendarWorkspace(
+        return calendar.teacherWorkspace(
                 tenantId, teacherUserId,
                 safeInput.from(), safeInput.to(), safeInput.viewMode(),
                 safeInput.schoolIds(), safeInput.classIds(), safeInput.subjectIds(),
@@ -54,7 +63,7 @@ public class CalendarLmsQueryGraphQlController {
         String tenantId = accessSupport.verifiedTenantId(principal, input == null ? null : input.tenantId());
         String studentUserId = requirePrincipalUserId(principal);
 
-        return readService.studentTeachingCalendarWorkspace(
+        return calendar.studentWorkspace(
                 tenantId, studentUserId,
                 input == null ? null : input.from(),
                 input == null ? null : input.to(),
