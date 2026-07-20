@@ -3,12 +3,16 @@ package com.erg.ergspringboot.model.lms;
 import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 /**
  * Migrated from erg-go internal/modules/lms/application/service/entities.go.
@@ -32,6 +36,12 @@ public class Topic extends BaseEntity {
 
     @Column(name = "level_id")
     private String levelId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "level_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private Level level;
 
     private String name;
 

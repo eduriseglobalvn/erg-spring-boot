@@ -28,7 +28,7 @@ public class CrmReferral extends BaseEntity {
     @Column(name = "school_id", length = 36, nullable = false)
     private String schoolId;
 
-    @Column(name = "referrer_user_id")
+    @Column(name = "referrer_user_id", length = 36)
     private String referrerUserId;
 
     @Column(name = "referrer_name")

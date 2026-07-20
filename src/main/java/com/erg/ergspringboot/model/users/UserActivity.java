@@ -7,12 +7,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Migrated from erg-go internal/modules/users/domain/entity/activity.go.
@@ -53,8 +54,12 @@ public class UserActivity {
 
     private String description;
 
-    @Transient
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata", columnDefinition = "jsonb")
     private Map<String, Object> metadata;
+
+    @Column(name = "request_id", length = 100)
+    private String requestId;
 
     private OffsetDateTime createdAt;
 }

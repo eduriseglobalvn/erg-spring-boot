@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.platform.security;
 
+import java.util.List;
 import java.util.function.Supplier;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationDecision;
@@ -28,8 +29,23 @@ public class PermissionAuthorizationManager {
         if (!(authentication.getPrincipal() instanceof ErgPrincipal principal)) {
             return new AuthorizationDecision(false);
         }
-        String portal = context.getRequest().getHeader("X-Portal");
-        String tenantId = context.getRequest().getHeader("X-Tenant-ID");
-        return new AuthorizationDecision(policyService.isAllowed(principal, permission, portal, tenantId));
+        String portal = SecurityUtils.portalFromPath(context.getRequest().getRequestURI());
+        return new AuthorizationDecision(policyService.isAllowed(principal, permission, portal, principal.tenantId()));
+    }
+
+    public AuthorizationDecision requireAny(
+            Supplier<? extends Authentication> authenticationSupplier,
+            RequestAuthorizationContext context,
+            List<String> permissions
+    ) {
+        Authentication authentication = authenticationSupplier.get();
+        if (authentication == null || authentication instanceof AnonymousAuthenticationToken || !authentication.isAuthenticated()) {
+            return new AuthorizationDecision(false);
+        }
+        if (!(authentication.getPrincipal() instanceof ErgPrincipal principal)) {
+            return new AuthorizationDecision(false);
+        }
+        String portal = SecurityUtils.portalFromPath(context.getRequest().getRequestURI());
+        return new AuthorizationDecision(policyService.isAllowedAny(principal, portal, principal.tenantId(), permissions));
     }
 }

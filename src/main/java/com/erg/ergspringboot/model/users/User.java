@@ -37,6 +37,8 @@ import lombok.ToString;
 @EqualsAndHashCode(callSuper = true)
 public class User extends BaseEntity {
 
+    private String username;
+
     private String email;
 
     private String passwordHash;
@@ -49,15 +51,7 @@ public class User extends BaseEntity {
 
     private String provider;
 
-    private String providerId;
-
     private String accountType;
-
-    private String googleSub;
-
-    private String googleEmail;
-
-    private Boolean googleEmailVerified;
 
     private String lastLoginProvider;
 
@@ -80,11 +74,6 @@ public class User extends BaseEntity {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Set<AuthSession> sessions = new LinkedHashSet<>();
-
-    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
-    private Set<SocialAccount> socialAccounts = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @ToString.Exclude
@@ -148,7 +137,15 @@ public class User extends BaseEntity {
 
     private Boolean isProfileCompleted;
 
+    private Boolean mustChangePassword;
+
+    private String recoveryEmail;
+
+    private Boolean recoveryEmailVerified;
+
     private OffsetDateTime lastLoginAt;
 
     private Long loginCount;
+
+    private Long authzVersion = 1L;
 }

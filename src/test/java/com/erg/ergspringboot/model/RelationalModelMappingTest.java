@@ -6,6 +6,8 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.model.auth.AuthSession;
+import com.erg.ergspringboot.model.users.EmployeeProfile;
+import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.Certificate;
@@ -18,7 +20,6 @@ import com.erg.ergspringboot.model.content.Post;
 import com.erg.ergspringboot.model.recruitment.RecruitmentCandidate;
 import com.erg.ergspringboot.model.recruitment.RecruitmentJob;
 import com.erg.ergspringboot.model.users.Profile;
-import com.erg.ergspringboot.model.users.SocialAccount;
 import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.model.organization.UserAccessScope;
 import com.erg.ergspringboot.model.organization.WorkShift;
@@ -72,6 +73,8 @@ class RelationalModelMappingTest {
     void postgresCoreModelsUseTheirGoTableNames() {
         assertTable(User.class, "users");
         assertTable(AuthSession.class, "user_sessions");
+        assertTable(EmployeeProfile.class, "employee_profiles");
+        assertTable(UserRoleAssignment.class, "user_role_assignments");
         assertTable(Post.class, "posts");
         assertTable(Profile.class, "profiles");
         assertTable(EducationUnit.class, "education_units");
@@ -93,7 +96,6 @@ class RelationalModelMappingTest {
         assertManyToOne(Post.class, "publishedById", "publishedBy", "published_by_id", true);
         assertOneToOne(Profile.class, "userId", "user", "user_id", false);
         assertManyToOne(Certificate.class, "userId", "user", "user_id", false);
-        assertManyToOne(SocialAccount.class, "userId", "user", "user_id", false);
         assertManyToOne(RecruitmentCandidate.class, "jobId", "job", "job_id", false);
         assertManyToOne(RecruitmentJob.class, "createdBy", "createdByUser", "created_by", true);
         assertManyToOne(WorkShift.class, "userId", "user", "user_id", false);

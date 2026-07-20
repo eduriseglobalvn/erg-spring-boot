@@ -1,9 +1,16 @@
 package com.erg.ergspringboot.model.lms;
 
 import com.erg.ergspringboot.model.BaseEntity;
+import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
+import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
+import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -12,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -43,15 +51,50 @@ public class Question extends BaseEntity {
     @Column(name = "subject_id")
     private String subjectId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private CurriculumSubject subject;
+
     @Column(name = "level_id")
     private String levelId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "level_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private CurriculumLevel level;
 
     @Column(name = "topic_id")
     private String topicId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private CurriculumTopic topic;
+
+    @Column(name = "category_id")
+    private String categoryId;
+
     private String type;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "type", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private QuestionType questionType;
+
     private String stem;
+
+    private String objective;
+
+    private String difficulty;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "tags", columnDefinition = "jsonb")
+    private List<String> tags;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "choices", columnDefinition = "jsonb")
@@ -62,11 +105,43 @@ public class Question extends BaseEntity {
     private Object answer;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "content", columnDefinition = "jsonb")
+    private Map<String, Object> content;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "settings", columnDefinition = "jsonb")
+    private Map<String, Object> settings;
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
     private Map<String, Object> metadata;
+
+    @Column(name = "mastery_rate")
+    private Double masteryRate;
+
+    @Column(name = "usage_count")
+    private Integer usageCount;
+
+    @Column(name = "schools_using")
+    private Integer schoolsUsing;
+
+    @Column(name = "owner_user_id")
+    private String ownerUserId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_user_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
+    private User owner;
+
+    @Column(name = "schema_version")
+    private Integer schemaVersion;
 
     private String status;
 
     @Column(name = "archived_at")
     private OffsetDateTime archivedAt;
+
+    @Column(name = "deleted_at")
+    private OffsetDateTime deletedAt;
 }

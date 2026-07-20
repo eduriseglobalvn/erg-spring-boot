@@ -19,4 +19,8 @@ public class LmsStudentService {
     public Optional<Student> findFirstByTenantIdAndAuthUserId(String tenantId, String authUserId) {
         return repository.findFirstByTenantIdAndAuthUserId(tenantId, authUserId);
     }
+
+    public Optional<Student> findByTenantIdAndId(String tenantId, String id) {
+        return repository.findByTenantIdAndId(tenantId, id);
+    }
 }

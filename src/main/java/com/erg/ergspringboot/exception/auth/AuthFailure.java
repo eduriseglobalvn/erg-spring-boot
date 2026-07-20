@@ -51,33 +51,40 @@ public abstract class AuthFailure extends ApiException {
         }
     }
 
+    public static final class AccountDisabled extends AuthFailure {
+        public AccountDisabled() {
+            super(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED", "account is inactive");
+        }
+    }
+
+    public static final class LoginInProgress extends AuthFailure {
+        public LoginInProgress() {
+            super(HttpStatus.CONFLICT, "AUTH_LOGIN_IN_PROGRESS", "another login for this account is still being processed");
+        }
+    }
+
+    public static final class DeviceLimitExceeded extends AuthFailure {
+        public DeviceLimitExceeded() {
+            super(HttpStatus.CONFLICT, "DEVICE_LIMIT_EXCEEDED", "device limit exceeded; existing sessions were revoked");
+        }
+    }
+
+    public static final class PortalForbidden extends AuthFailure {
+        public PortalForbidden() {
+            super(HttpStatus.FORBIDDEN, "PORTAL_FORBIDDEN", "account is not entitled to this portal");
+        }
+    }
+
+    public static final class AccountActivationRequired extends AuthFailure {
+        public AccountActivationRequired() {
+            super(HttpStatus.FORBIDDEN, "ACCOUNT_ACTIVATION_REQUIRED", "account activation and required identity actions are incomplete");
+        }
+    }
+
     public static final class InvalidToken extends AuthFailure {
         public InvalidToken() {
             super(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_TOKEN", "invalid or expired refresh token");
         }
     }
 
-    public static final class InvalidPin extends AuthFailure {
-        public InvalidPin() {
-            super(HttpStatus.BAD_REQUEST, "INVALID_PIN", "invalid or expired PIN");
-        }
-    }
-
-    public static final class GoogleIdentityInvalid extends AuthFailure {
-        public GoogleIdentityInvalid() {
-            super(HttpStatus.UNAUTHORIZED, "GOOGLE_IDENTITY_INVALID", "invalid Google identity");
-        }
-    }
-
-    public static final class SocialIdentityInvalid extends AuthFailure {
-        public SocialIdentityInvalid() {
-            super(HttpStatus.UNAUTHORIZED, "SOCIAL_IDENTITY_INVALID", "invalid social identity");
-        }
-    }
-
-    public static final class OAuthNotConfigured extends AuthFailure {
-        public OAuthNotConfigured() {
-            super(HttpStatus.SERVICE_UNAVAILABLE, "OAUTH_NOT_CONFIGURED", "OAuth provider is not configured");
-        }
-    }
 }

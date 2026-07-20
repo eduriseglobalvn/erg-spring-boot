@@ -36,6 +36,24 @@ public class Permission extends BaseEntity {
 
     private String description;
 
+    private String resource;
+
+    private String action;
+
+    private String portal;
+
+    @Column(name = "supported_scope")
+    private String supportedScope;
+
+    @Column(name = "is_system", nullable = false)
+    private Boolean isSystem = false;
+
+    @Column(nullable = false)
+    private String status = "ACTIVE";
+
+    @Column(name = "deprecated_at")
+    private java.time.OffsetDateTime deprecatedAt;
+
     @ManyToMany(mappedBy = "permissions", fetch = FetchType.LAZY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
@@ -45,4 +63,9 @@ public class Permission extends BaseEntity {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Set<UserPermissionOverride> userOverrides = new LinkedHashSet<>();
+
+    @OneToMany(mappedBy = "permission", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<PermissionBinding> bindings = new LinkedHashSet<>();
 }

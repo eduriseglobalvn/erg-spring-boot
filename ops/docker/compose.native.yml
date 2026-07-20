@@ -11,6 +11,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-erg}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-erg}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres
       SPRING_DATA_REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
       ERG_REDIS_STATE_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
       ERG_REDIS_CACHE_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379
@@ -27,7 +28,7 @@ services:
       - edge
       - data
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:1606/actuator/health/readiness"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:1606/ready"]
       interval: 10s
       timeout: 3s
       retries: 10

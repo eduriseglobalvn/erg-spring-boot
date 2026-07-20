@@ -45,21 +45,38 @@ public class SessionController {
     }
 
     private String sessionId(HttpServletRequest request) {
-        String sessionId = request.getHeader("X-Session-ID");
-        if (sessionId != null && !sessionId.isBlank()) {
-            return sessionId.trim();
-        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof ErgPrincipal principal) {
             String principalSessionId = principal.sessionId();
             if (principalSessionId != null && !principalSessionId.isBlank() && !"token-session".equals(principalSessionId)) {
+                String requestedSessionId = request.getHeader("X-Session-ID");
+                if (requestedSessionId != null && !requestedSessionId.isBlank()
+                        && !principalSessionId.equals(requestedSessionId.trim())) {
+                    throw new UnauthorizedException("session id does not match authenticated principal");
+                }
                 return principalSessionId.trim();
             }
+        }
+        String sessionId = request.getHeader("X-Session-ID");
+        if (sessionId != null && !sessionId.isBlank()) {
+            return sessionId.trim();
         }
         throw new UnauthorizedException("missing session id");
     }
 
     private String tenantId(HttpServletRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof ErgPrincipal principal) {
+            String principalTenantId = principal.tenantId();
+            if (principalTenantId != null && !principalTenantId.isBlank()) {
+                String requestedTenantId = request.getHeader("X-Tenant-ID");
+                if (requestedTenantId != null && !requestedTenantId.isBlank()
+                        && !principalTenantId.equals(requestedTenantId.trim())) {
+                    throw new UnauthorizedException("tenant id does not match authenticated principal");
+                }
+                return principalTenantId.trim();
+            }
+        }
         String tenantId = request.getHeader("X-Tenant-ID");
         return tenantId == null || tenantId.isBlank() ? "erg" : tenantId.trim();
     }

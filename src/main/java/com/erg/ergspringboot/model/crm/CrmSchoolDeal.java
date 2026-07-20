@@ -30,7 +30,7 @@ public class CrmSchoolDeal extends BaseEntity {
     @Column(name = "school_id", length = 36, nullable = false)
     private String schoolId;
 
-    @Column(name = "owner_user_id", nullable = false)
+    @Column(name = "owner_user_id", length = 36, nullable = false)
     private String ownerUserId;
 
     @Column(name = "stage")

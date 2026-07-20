@@ -3,10 +3,12 @@ package com.erg.ergspringboot.platform.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.EntityGraph;
 
 class AuthQueryOptimizationContractTest {
@@ -45,11 +47,34 @@ class AuthQueryOptimizationContractTest {
     }
 
     @Test
-    void bearerPrincipalCacheUnlessExpressionSupportsOptionalUnwrapping() throws Exception {
+    void bearerPrincipalAuthorizationIsNotCrossRequestCached() throws Exception {
         Method method = ErgPrincipalService.class.getMethod("fromBearerToken", String.class, String.class);
-        Cacheable cacheable = method.getAnnotation(Cacheable.class);
+        assertThat(method.getAnnotation(org.springframework.cache.annotation.Cacheable.class)).isNull();
+    }
 
-        assertThat(cacheable).isNotNull();
-        assertThat(cacheable.unless()).isEqualTo("#result == null");
+    @Test
+    void removedCrossRequestSecurityCachesAreNotConfiguredOrInvalidated() throws IOException {
+        String cacheConfig = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/config/CacheConfig.java"));
+        assertThat(cacheConfig)
+                .doesNotContain("descriptor(\"authPrincipal\"")
+                .doesNotContain("descriptor(\"sessionBootstrap\"");
+
+        try (var files = Files.walk(Path.of("src/main/java/com/erg/ergspringboot/service"))) {
+            String services = files.filter(path -> path.toString().endsWith(".java"))
+                    .map(AuthQueryOptimizationContractTest::read)
+                    .reduce("", (left, right) -> left + '\n' + right);
+            assertThat(services)
+                    .doesNotContain("\"authPrincipal\"")
+                    .doesNotContain("\"sessionBootstrap\"");
+        }
+    }
+
+    private static String read(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

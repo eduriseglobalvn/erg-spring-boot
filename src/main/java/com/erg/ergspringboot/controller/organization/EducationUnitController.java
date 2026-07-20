@@ -3,6 +3,7 @@ package com.erg.ergspringboot.controller.organization;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitListResponse;
 import com.erg.ergspringboot.service.organization.EducationUnitService;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +21,7 @@ public class EducationUnitController {
 
     @GetMapping
     public ApiResponse<EducationUnitListResponse> listEducationUnits(HttpServletRequest request) {
-        return ApiResponse.success(200, "Education units loaded", educationUnitService.listEducationUnits(), request.getRequestURI(), requestId(request));
+        return ApiResponse.success(200, "Education units loaded", educationUnitService.listEducationUnits(UserAccessContext.from(request)), request.getRequestURI(), requestId(request));
     }
 
     private String requestId(HttpServletRequest request) {

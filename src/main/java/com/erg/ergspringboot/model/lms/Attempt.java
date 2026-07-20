@@ -88,4 +88,34 @@ public class Attempt {
 
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
+
+    @Column(name = "quiz_version_id")
+    private String quizVersionId;
+
+    @Column(name = "class_id")
+    private String classId;
+
+    @Column(name = "school_id")
+    private String schoolId;
+
+    @Column(name = "mode")
+    private String mode;
+
+    @Column(name = "grading_mode")
+    private String gradingMode;
+
+    @Column(name = "submitted_count")
+    private Integer submittedCount;
+
+    @Column(name = "total_questions")
+    private Integer totalQuestions;
+
+    @Column(name = "last_active_at")
+    private OffsetDateTime lastActiveAt;
+
+    @Column(name = "client_runtime")
+    private String clientRuntime;
+
+    @Column(name = "start_idempotency_key")
+    private String startIdempotencyKey;
 }

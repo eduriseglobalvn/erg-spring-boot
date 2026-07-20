@@ -1,47 +1,44 @@
 package com.erg.ergspringboot.service.auth;
 
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.ForgotPasswordRequest;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.GoogleLoginRequest;
 import com.erg.ergspringboot.common.request.auth.AuthRequests.LoginRequest;
 import com.erg.ergspringboot.common.request.auth.AuthRequests.RefreshRequest;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.RegisterRequest;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.ResendPinRequest;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.ResetPasswordRequest;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.SocialLoginRequest;
-import com.erg.ergspringboot.common.request.auth.AuthRequests.VerifyPinRequest;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.AuthResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.IpSecurityStatusResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.LoginAttemptResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.ProfileResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.SessionDeviceResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.TokenResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
 import com.erg.ergspringboot.exception.auth.AuthFailure;
 import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
-import com.erg.ergspringboot.model.auth.AuthPin;
 import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.model.users.SocialAccount;
+import com.erg.ergspringboot.model.auth.SecurityEvent;
+import com.erg.ergspringboot.model.auth.RefreshTokenHistory;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.repository.auth.AuthLoginAttemptRepository;
-import com.erg.ergspringboot.repository.auth.AuthPinRepository;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository;
+import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.users.SocialAccountRepository;
+import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 
 @Service
 public class AuthService {
@@ -49,280 +46,197 @@ public class AuthService {
     private static final String DEFAULT_TENANT = "erg";
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_BLOCKED = "BLOCKED";
     private static final String PROVIDER_LOCAL = "local";
-    private static final String PROVIDER_GOOGLE = "google";
     private static final String STATUS_BANNED = "BANNED";
     private static final String DEFAULT_PORTAL = "lms";
-    private static final int MAX_ACTIVE_DEVICE_SESSIONS = 2;
-    private static final String PIN_PURPOSE_REGISTER = "register";
-    private static final String PIN_PURPOSE_VERIFY = "verify";
-    private static final String PIN_PURPOSE_FORGOT_PASSWORD = "forgot_password";
     private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(15);
-    private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(30);
-    private static final Duration PIN_TTL = Duration.ofMinutes(15);
+    private static final Duration PRIVILEGED_SESSION_TTL = Duration.ofHours(8);
+    private static final Duration STANDARD_SESSION_TTL = Duration.ofHours(12);
     private static final Duration LOGIN_ATTEMPT_WINDOW = Duration.ofMinutes(15);
     private static final int LOGIN_ATTEMPT_THRESHOLD = 5;
     private static final List<String> FAILED_LOGIN_RESULTS = List.of("FAILED", "FAILURE");
 
     private final UserRepository userRepository;
     private final AuthSessionRepository sessionRepository;
-    private final AuthPinRepository pinRepository;
     private final AuthLoginAttemptRepository loginAttemptRepository;
-    private final SocialAccountRepository socialAccountRepository;
     private final PasswordService passwordService;
     private final AuthTokenService tokenService;
-
-    @Value("${erg.auth.oauth.google.client-id:}")
-    private String googleOauthClientId;
-
-    @Value("${erg.auth.oauth.google.authorization-uri:https://accounts.google.com/o/oauth2/v2/auth}")
-    private String googleAuthorizationUri;
-
-    @Value("${erg.auth.oauth.facebook.client-id:}")
-    private String facebookOauthClientId;
-
-    @Value("${erg.auth.oauth.facebook.authorization-uri:https://www.facebook.com/v19.0/dialog/oauth}")
-    private String facebookAuthorizationUri;
+    private SecurityEventRepository securityEventRepository;
+    private LoginFailureEnforcementService loginFailureEnforcementService;
+    private AuthLoginRateLimiter authLoginRateLimiter;
+    private UserRoleAssignmentRepository userRoleAssignmentRepository;
+    private RefreshTokenHistoryRepository refreshTokenHistoryRepository;
+    @Value("${erg.auth.rapid-session-replacement.threshold:5}")
+    private int rapidSessionReplacementThreshold = 5;
+    @Value("${erg.auth.rapid-session-replacement.window-minutes:10}")
+    private long rapidSessionReplacementWindowMinutes = 10;
 
     public AuthService(
             UserRepository userRepository,
             AuthSessionRepository sessionRepository,
-            AuthPinRepository pinRepository,
             AuthLoginAttemptRepository loginAttemptRepository,
-            SocialAccountRepository socialAccountRepository,
             PasswordService passwordService,
             AuthTokenService tokenService
     ) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
-        this.pinRepository = pinRepository;
         this.loginAttemptRepository = loginAttemptRepository;
-        this.socialAccountRepository = socialAccountRepository;
         this.passwordService = passwordService;
         this.tokenService = tokenService;
     }
 
-    @Transactional
-    public void register(RegisterRequest request) {
-        String email = normalizeEmail(request.email());
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new AuthFailure.EmailExists();
-        }
+    @Autowired(required = false)
+    void setSecurityEventRepository(SecurityEventRepository securityEventRepository) {
+        this.securityEventRepository = securityEventRepository;
+    }
 
-        User user = new User();
-        user.setId(IdGenerator.newId());
-        user.setEmail(email);
-        user.setPasswordHash(passwordService.hash(request.password()));
-        user.setFullName(trimToNull(request.fullName()));
-        user.setStatus(STATUS_PENDING);
-        user.setProvider(PROVIDER_LOCAL);
-        user.setAccountType("erg");
-        user.setLastLoginProvider(PROVIDER_LOCAL);
-        user.setTenantId(DEFAULT_TENANT);
-        user.setIsProfileCompleted(false);
-        user.setLoginCount(0L);
-        userRepository.save(user);
+    @Autowired(required = false)
+    void setLoginFailureEnforcementService(LoginFailureEnforcementService loginFailureEnforcementService) {
+        this.loginFailureEnforcementService = loginFailureEnforcementService;
+    }
 
-        pinRepository.save(newPin(email, PIN_PURPOSE_REGISTER));
+    @Autowired(required = false)
+    void setAuthLoginRateLimiter(AuthLoginRateLimiter authLoginRateLimiter) {
+        this.authLoginRateLimiter = authLoginRateLimiter;
+    }
+
+    @Autowired(required = false)
+    void setUserRoleAssignmentRepository(UserRoleAssignmentRepository userRoleAssignmentRepository) {
+        this.userRoleAssignmentRepository = userRoleAssignmentRepository;
+    }
+
+    @Autowired(required = false)
+    void setRefreshTokenHistoryRepository(RefreshTokenHistoryRepository repository) {
+        this.refreshTokenHistoryRepository = repository;
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request, AuthClientContext context) {
-        String email = normalizeEmail(request.email());
+        String identifier = normalizeIdentifier(request.identifier());
         String portal = normalizePortal(request.portal());
-        User user = userRepository.findByEmailIgnoreCase(email)
+        if (authLoginRateLimiter != null && !authLoginRateLimiter.allow(identifier, context).allowed()) {
+            throw new AuthFailure.TooManyAttempts();
+        }
+        User user = findUserByIdentifier(identifier)
                 .orElseThrow(() -> {
-                    recordLoginAttempt(null, email, context, portal, "FAILED", "invalid_credentials");
+                    passwordService.burnUnknownAccountCheck(request.password());
+                    recordFailure(null, identifier, context, portal, "invalid_credentials", false);
                     return new AuthFailure.InvalidCredentials();
                 });
+        String email = user.getEmail();
 
         if (isLocked(user)) {
-            recordLoginAttempt(user.getId(), email, context, portal, "FAILED", "account_locked");
+            recordFailure(user, email, context, portal, "account_locked", false);
             throw new AuthFailure.AccountLocked();
         }
+        if ("INACTIVE".equalsIgnoreCase(user.getStatus())) {
+            recordFailure(user, email, context, portal, "account_disabled", false);
+            throw new AuthFailure.AccountDisabled();
+        }
+        boolean restrictedFirstLogin = "INVITED".equalsIgnoreCase(user.getStatus())
+                && Boolean.TRUE.equals(user.getMustChangePassword());
+        if ("INVITED".equalsIgnoreCase(user.getStatus()) && !restrictedFirstLogin) {
+            recordFailure(user, email, context, portal, "account_activation_required", false);
+            throw new AuthFailure.AccountActivationRequired();
+        }
         if (STATUS_PENDING.equalsIgnoreCase(user.getStatus()) && PROVIDER_LOCAL.equalsIgnoreCase(user.getProvider())) {
-            recordLoginAttempt(user.getId(), email, context, portal, "FAILED", "email_not_verified");
+            recordFailure(user, email, context, portal, "email_not_verified", false);
             throw new AuthFailure.EmailNotVerified();
         }
         if (!passwordService.matches(request.password(), user.getPasswordHash())) {
-            recordLoginAttempt(user.getId(), email, context, portal, "FAILED", "invalid_credentials");
+            recordFailure(user, email, context, portal, "invalid_credentials", true);
             throw new AuthFailure.InvalidCredentials();
+        }
+
+        if (restrictedFirstLogin) {
+            user.setStatus("ACTIVE");
+            userRepository.save(user);
         }
 
         return issueTokens(user, context, "erg", portal);
     }
 
+    private String normalizeIdentifier(String identifier) {
+        return identifier == null ? "" : identifier.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private java.util.Optional<User> findUserByIdentifier(String identifier) {
+        return userRepository.findForLogin(identifier);
+    }
+
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public TokenResponse refresh(RefreshRequest request, AuthClientContext context) {
         String currentHash = tokenService.hashToken(request.refreshToken());
-        AuthSession session = sessionRepository.findByRefreshTokenHash(currentHash)
+        AuthSession session = sessionRepository.lockByRefreshTokenHash(currentHash)
                 .filter(this::isSessionActive)
-                .orElseThrow(AuthFailure.InvalidToken::new);
+                .orElse(null);
+        if (session == null) {
+            AuthSession replayed = sessionRepository.findByPreviousRefreshTokenHash(currentHash).orElse(null);
+            if (replayed == null && refreshTokenHistoryRepository != null) {
+                replayed = refreshTokenHistoryRepository.findByTokenHash(currentHash)
+                        .flatMap(history -> sessionRepository.findBySessionIdAndTenantId(
+                                history.getSessionId(), history.getTenantId()))
+                        .orElse(null);
+            }
+            if (replayed != null) {
+                handleRefreshTokenReplay(replayed, context);
+            }
+            throw new AuthFailure.InvalidToken();
+        }
 
         String accessToken = tokenService.newToken();
         String refreshToken = tokenService.newToken();
         OffsetDateTime now = now();
+        if (refreshTokenHistoryRepository != null) {
+            RefreshTokenHistory history = new RefreshTokenHistory();
+            history.setId(IdGenerator.newId());
+            history.setTokenHash(currentHash);
+            history.setSessionId(session.getSessionId());
+            history.setUserId(session.getUserId());
+            history.setTenantId(firstNonBlank(session.getTenantId(), DEFAULT_TENANT));
+            history.setConsumedAt(now);
+            history.setExpiresAt(session.getExpiresAt());
+            refreshTokenHistoryRepository.save(history);
+        }
+        session.setPreviousRefreshTokenHash(currentHash);
+        session.setRefreshTokenRotatedAt(now);
         session.setAccessTokenHash(tokenService.hashToken(accessToken));
         session.setRefreshTokenHash(tokenService.hashToken(refreshToken));
         session.setLastActiveAt(now);
-        session.setExpiresAt(now.plus(REFRESH_TOKEN_TTL));
         sessionRepository.save(session);
 
         return new TokenResponse(accessToken, refreshToken, ACCESS_TOKEN_TTL.toSeconds(), "Bearer");
     }
 
-    @Transactional
-    public void verifyPin(VerifyPinRequest request) {
-        String email = normalizeEmail(request.email());
-        String purpose = normalizePurpose(request.purpose());
-        AuthPin pin = consumePin(email, request.code(), purpose);
-
-        if (PIN_PURPOSE_REGISTER.equals(purpose) || PIN_PURPOSE_VERIFY.equals(purpose)) {
-            userRepository.findByEmailIgnoreCase(email).ifPresent(user -> {
-                user.setStatus(STATUS_ACTIVE);
-                userRepository.save(user);
-            });
-        }
-        pinRepository.save(pin);
-    }
-
-    @Transactional
-    public void resendPin(ResendPinRequest request) {
-        String email = normalizeEmail(request.email());
-        if (userRepository.findByEmailIgnoreCase(email).isEmpty()) {
-            return;
-        }
-        pinRepository.save(newPin(email, normalizePurpose(request.purpose())));
-    }
-
-    @Transactional
-    public void forgotPassword(ForgotPasswordRequest request) {
-        String email = normalizeEmail(request.email());
-        if (userRepository.findByEmailIgnoreCase(email).isEmpty()) {
-            return;
-        }
-        pinRepository.save(newPin(email, PIN_PURPOSE_FORGOT_PASSWORD));
-    }
-
-    @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-        String email = normalizeEmail(request.email());
-        AuthPin pin = consumePin(email, request.code(), PIN_PURPOSE_FORGOT_PASSWORD);
-        User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(AuthFailure.InvalidCredentials::new);
-        user.setPasswordHash(passwordService.hash(request.newPassword()));
-        userRepository.save(user);
-        pinRepository.save(pin);
-    }
-
-    @Transactional
-    public AuthResponse googleLogin(GoogleLoginRequest request, AuthClientContext context) {
-        if (!Boolean.TRUE.equals(request.emailVerified()) || isBlank(request.googleSub())) {
-            throw new AuthFailure.GoogleIdentityInvalid();
-        }
-
-        String email = normalizeEmail(request.email());
-        User user = userRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
-            User created = new User();
-            created.setId(IdGenerator.newId());
-            created.setEmail(email);
-            created.setPasswordHash(passwordService.hash(tokenService.newToken()));
-            created.setStatus(STATUS_ACTIVE);
-            created.setTenantId(DEFAULT_TENANT);
-            created.setLoginCount(0L);
-            return created;
+    private void handleRefreshTokenReplay(AuthSession replayed, AuthClientContext context) {
+        OffsetDateTime now = now();
+        List<AuthSession> sessions = activeAccountSessions(replayed.getUserId(),
+                firstNonBlank(replayed.getTenantId(), DEFAULT_TENANT));
+        sessions.forEach(item -> {
+            item.setRevokedAt(now);
+            item.setRevokedReason("refresh_token_reuse");
         });
-
-        user.setFullName(firstNonBlank(request.fullName(), user.getFullName()));
-        user.setAvatarUrl(firstNonBlank(request.avatarUrl(), user.getAvatarUrl()));
-        user.setProvider(PROVIDER_GOOGLE);
-        user.setProviderId(request.googleSub());
-        user.setAccountType(PROVIDER_GOOGLE);
-        user.setGoogleSub(request.googleSub());
-        user.setGoogleEmail(email);
-        user.setGoogleEmailVerified(true);
-        user.setLastLoginProvider(PROVIDER_GOOGLE);
-        user.setIsProfileCompleted(Boolean.TRUE.equals(user.getIsProfileCompleted()));
-        userRepository.save(user);
-        upsertSocialAccount(PROVIDER_GOOGLE, user, request.googleSub(), email, null, null, null);
-
-        return issueTokens(user, context, PROVIDER_GOOGLE, normalizePortal(request.portal()));
-    }
-
-    public String buildOauthAuthorizationUrl(String provider, String state, String redirectUri) {
-        String normalizedProvider = normalizeProvider(provider);
-        String clientId = oauthClientId(normalizedProvider);
-        if (isBlank(clientId) || isBlank(redirectUri)) {
-            throw new AuthFailure.OAuthNotConfigured();
+        if (!sessions.isEmpty()) sessionRepository.saveAll(sessions);
+        if (securityEventRepository != null) {
+            SecurityEvent event = new SecurityEvent();
+            event.setId(IdGenerator.newId());
+            event.setTenantId(replayed.getTenantId());
+            event.setUserId(replayed.getUserId());
+            event.setSessionId(replayed.getSessionId());
+            event.setEventType("REFRESH_TOKEN_REUSE");
+            event.setSeverity("CRITICAL");
+            event.setRiskCode("TOKEN_REPLAY");
+            event.setResult("SESSIONS_REVOKED");
+            event.setReason("rotated_refresh_token_reused");
+            event.setIpAddress(context == null ? null : context.ipAddress());
+            event.setDeviceId(context == null ? null : context.deviceId());
+            event.setOccurredAt(now);
+            securityEventRepository.save(event);
         }
-        String authorizationUri = PROVIDER_GOOGLE.equals(normalizedProvider)
-                ? googleAuthorizationUri
-                : facebookAuthorizationUri;
-        String scope = PROVIDER_GOOGLE.equals(normalizedProvider) ? "openid email profile" : "email public_profile";
-        return authorizationUri
-                + "?response_type=code"
-                + "&client_id=" + encode(clientId)
-                + "&redirect_uri=" + encode(redirectUri)
-                + "&scope=" + encode(scope)
-                + (isBlank(state) ? "" : "&state=" + encode(state));
-    }
-
-    public AuthResponse oauthCallback(String provider, String code, String state, AuthClientContext context) {
-        if (isBlank(code) || isBlank(oauthClientId(normalizeProvider(provider)))) {
-            throw new AuthFailure.OAuthNotConfigured();
-        }
-        throw new AuthFailure.OAuthNotConfigured();
     }
 
     @Transactional
-    public AuthResponse socialLogin(String provider, SocialLoginRequest request, AuthClientContext context) {
-        String normalizedProvider = normalizeProvider(provider);
-        if (!Boolean.TRUE.equals(request.emailVerified()) || isBlank(request.providerId())) {
-            throw new AuthFailure.SocialIdentityInvalid();
-        }
-        String email = normalizeEmail(request.email());
-        String providerId = request.providerId().trim();
-
-        User user = socialAccountRepository.findByProviderAndProviderId(normalizedProvider, providerId)
-                .flatMap(account -> userRepository.findById(account.getUserId()))
-                .or(() -> userRepository.findByEmailIgnoreCase(email))
-                .orElseGet(() -> newSocialUser(normalizedProvider, email, providerId, request));
-
-        if (isLocked(user)) {
-            throw new AuthFailure.AccountLocked();
-        }
-
-        user.setFullName(firstNonBlank(request.fullName(), user.getFullName()));
-        user.setAvatarUrl(firstNonBlank(request.avatarUrl(), user.getAvatarUrl()));
-        if (isBlank(user.getProvider())) {
-            user.setProvider(normalizedProvider);
-        }
-        user.setProviderId(providerId);
-        user.setAccountType(mergeAccountType(user.getAccountType(), user.getProvider(), providerId, normalizedProvider));
-        user.setLastLoginProvider(normalizedProvider);
-        user.setStatus(STATUS_ACTIVE);
-        user.setIsProfileCompleted(isProfileComplete(user.getFullName(), user.getPhone()));
-        if (PROVIDER_GOOGLE.equals(normalizedProvider)) {
-            user.setGoogleSub(providerId);
-            user.setGoogleEmail(email);
-            user.setGoogleEmailVerified(true);
-        }
-        userRepository.save(user);
-        upsertSocialAccount(
-                normalizedProvider,
-                user,
-                providerId,
-                email,
-                request.accessToken(),
-                request.refreshToken(),
-                null
-        );
-        return issueTokens(user, context, normalizedProvider, normalizePortal(request.portal()));
-    }
-
-    @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public void logout(String userId, String tenantId, String sessionId) {
         AuthSession session = sessionRepository.findBySessionIdAndUserIdAndTenantId(sessionId, userId, tenantId)
                 .orElseThrow(AuthFailure.InvalidToken::new);
@@ -331,13 +245,22 @@ public class AuthService {
         sessionRepository.save(session);
     }
 
+    @Transactional
+    public int logoutAll(String userId, String tenantId) {
+        List<AuthSession> sessions = activeAccountSessions(userId, firstNonBlank(tenantId, DEFAULT_TENANT));
+        revokeSessions(sessions, now(), "logout_all");
+        return sessions.size();
+    }
+
     @Transactional(readOnly = true)
     public List<LoginAttemptResponse> listLoginAttempts(String userId, String email) {
+        org.springframework.data.domain.PageRequest limit = org.springframework.data.domain.PageRequest.of(0, 100);
         List<AuthLoginAttempt> attempts;
         if (!isBlank(userId)) {
-            attempts = loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(userId);
+            attempts = loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(userId, limit);
         } else if (!isBlank(email)) {
-            attempts = loginAttemptRepository.findByAttemptedEmailIgnoreCaseOrderByCreatedAtDesc(normalizeEmail(email));
+            attempts = loginAttemptRepository.findByAttemptedEmailIgnoreCaseOrderByCreatedAtDesc(
+                    normalizeEmail(email), limit);
         } else {
             attempts = List.of();
         }
@@ -359,8 +282,20 @@ public class AuthService {
                     FAILED_LOGIN_RESULTS
             );
         }
-        boolean blocked = failedAttemptsIp >= LOGIN_ATTEMPT_THRESHOLD
-                || (failedAttemptsEmail != null && failedAttemptsEmail >= LOGIN_ATTEMPT_THRESHOLD);
+        OffsetDateTime since = now().minus(LOGIN_ATTEMPT_WINDOW);
+        long recentFailedAttemptsIp = isBlank(ip)
+                ? 0
+                : loginAttemptRepository.countByIpAddressAndResultInAndCreatedAtAfter(ip, FAILED_LOGIN_RESULTS, since);
+        Long recentFailedAttemptsEmail = null;
+        if (!isBlank(email)) {
+            recentFailedAttemptsEmail = loginAttemptRepository.countByAttemptedEmailIgnoreCaseAndResultInAndCreatedAtAfter(
+                    normalizeEmail(email),
+                    FAILED_LOGIN_RESULTS,
+                    since
+            );
+        }
+        boolean blocked = recentFailedAttemptsIp >= LOGIN_ATTEMPT_THRESHOLD
+                || (recentFailedAttemptsEmail != null && recentFailedAttemptsEmail >= LOGIN_ATTEMPT_THRESHOLD);
 
         return new IpSecurityStatusResponse(
                 ip,
@@ -393,16 +328,98 @@ public class AuthService {
         loginAttemptRepository.save(attempt);
     }
 
-    private boolean wouldBecomeThirdActiveDevice(List<AuthSession> activeSessions, AuthClientContext context) {
-        Set<String> devices = activeSessions.stream()
-                .map(this::sessionDeviceKey)
-                .collect(Collectors.toSet());
-        devices.add(firstNonBlank(context.deviceId(), context.ipAddress(), context.userAgent(), "web"));
-        return devices.size() > MAX_ACTIVE_DEVICE_SESSIONS;
+    private void recordFailure(
+            User user,
+            String email,
+            AuthClientContext context,
+            String portal,
+            String reason,
+        boolean enforceThreshold
+    ) {
+        if (loginFailureEnforcementService != null) {
+            if (enforceThreshold && "invalid_credentials".equals(reason)) {
+                loginFailureEnforcementService.recordInvalidCredentials(user, email, context, portal);
+            } else {
+                loginFailureEnforcementService.recordFailure(user, email, context, portal, reason, enforceThreshold);
+            }
+            return;
+        }
+        recordLoginAttempt(user == null ? null : user.getId(), email, context, portal, "FAILED", reason);
+        if (enforceThreshold && user != null) {
+            blockUserIfFailedLoginThresholdReached(user, email, context);
+        }
     }
 
-    private String sessionDeviceKey(AuthSession session) {
-        return firstNonBlank(session.getDeviceId(), session.getIpAddress(), session.getUserAgent(), session.getSessionId());
+    private void blockUserIfFailedLoginThresholdReached(User user, String email, AuthClientContext context) {
+        OffsetDateTime since = now().minus(LOGIN_ATTEMPT_WINDOW);
+        boolean emailExceeded = loginAttemptRepository.countByAttemptedEmailIgnoreCaseAndResultInAndCreatedAtAfter(
+                email,
+                FAILED_LOGIN_RESULTS,
+                since
+        ) >= LOGIN_ATTEMPT_THRESHOLD;
+        boolean ipExceeded = !isBlank(context.ipAddress())
+                && loginAttemptRepository.countByIpAddressAndResultInAndCreatedAtAfter(
+                context.ipAddress(),
+                FAILED_LOGIN_RESULTS,
+                since
+        ) >= LOGIN_ATTEMPT_THRESHOLD;
+        if (!emailExceeded && !ipExceeded) {
+            return;
+        }
+        // Never mutate durable account state from attacker-controlled failures.
+        // The distributed abuse limiter owns temporary throttling/challenges.
+    }
+
+    private SessionPlatform sessionPlatform(String deviceId, String deviceName, String userAgent) {
+        String value = String.join(" ",
+                firstNonBlank(deviceId, ""),
+                firstNonBlank(deviceName, ""),
+                firstNonBlank(userAgent, "")
+        ).toLowerCase(Locale.ROOT);
+        return value.matches(".*(mobile|android|iphone|ipad|tablet|pwa).*\\b.*")
+                ? SessionPlatform.WEB_MOBILE
+                : SessionPlatform.WEB_DESKTOP;
+    }
+
+    private SessionPlatform sessionPlatform(AuthSession session) {
+        if (!isBlank(session.getPlatform())) {
+            try {
+                return SessionPlatform.valueOf(session.getPlatform().trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                // Legacy or malformed values are classified from stored request metadata.
+            }
+        }
+        return sessionPlatform(session.getDeviceId(), session.getDeviceName(), session.getUserAgent());
+    }
+
+    private boolean matchesBrowserContext(AuthSession session, AuthClientContext context) {
+        if (!sameKnownValue(session.getDeviceId(), context.deviceId())) return false;
+        String storedFingerprint = trimToNull(session.getDeviceFingerprint());
+        String incomingFingerprint = trimToNull(context.deviceFingerprint());
+        if (storedFingerprint != null && incomingFingerprint != null) {
+            return storedFingerprint.equals(incomingFingerprint);
+        }
+        return sameKnownValue(session.getDeviceName(), context.deviceName())
+                && sameKnownValue(session.getUserAgent(), context.userAgent());
+    }
+
+    private boolean sameKnownValue(String left, String right) {
+        String normalizedLeft = trimToNull(left);
+        String normalizedRight = trimToNull(right);
+        return normalizedLeft != null && normalizedRight != null && normalizedLeft.equalsIgnoreCase(normalizedRight);
+    }
+
+    private enum SessionPlatform {
+        WEB_DESKTOP,
+        WEB_MOBILE
+    }
+
+    private List<AuthSession> activeAccountSessions(String userId, String tenantId) {
+        List<AuthSession> sessions = sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(userId, tenantId);
+        if (sessions == null || sessions.isEmpty()) {
+            return List.of();
+        }
+        return sessions.stream().filter(this::isSessionActive).toList();
     }
 
     private void revokeSessions(List<AuthSession> sessions, OffsetDateTime revokedAt, String reason) {
@@ -417,25 +434,39 @@ public class AuthService {
     }
 
     private AuthResponse issueTokens(User user, AuthClientContext context, String loginProvider, String portal) {
+        List<String> permissions = effectivePermissions(user);
+        List<String> portals = entitledPortals(user, permissions, portal);
+        if (!portals.contains("*") && !portals.contains(portal)) {
+            recordLoginAttempt(user.getId(), user.getEmail(), context, portal, "DENIED", "portal_forbidden");
+            recordSecurityEvent(user, context, portal, "PORTAL_FORBIDDEN", "MEDIUM", "portal entitlement denied");
+            throw new AuthFailure.PortalForbidden();
+        }
         String accessToken = tokenService.newToken();
         String refreshToken = tokenService.newToken();
         OffsetDateTime now = now();
         String tenantId = firstNonBlank(user.getTenantId(), DEFAULT_TENANT);
-        List<AuthSession> activePortalSessions = sessionRepository.findByUserIdAndTenantIdAndPortalAndRevokedAtIsNull(
-                user.getId(),
-                tenantId,
-                portal
-        );
-        activePortalSessions = activePortalSessions == null ? List.of() : activePortalSessions;
-        if (wouldBecomeThirdActiveDevice(activePortalSessions, context)) {
-            user.setStatus(STATUS_BANNED);
-            userRepository.save(user);
-            revokeSessions(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(), tenantId), now, "auto_banned_three_devices");
-            recordLoginAttempt(user.getId(), user.getEmail(), context, portal, "BANNED", "three_active_devices");
-            throw new AuthFailure.AccountLocked();
+        lockUserForSessionMutation(user.getId());
+        List<AuthSession> activeAccountSessions = activeAccountSessions(user.getId(), tenantId);
+        SessionPlatform platform = sessionPlatform(context.deviceId(), context.deviceName(), context.userAgent());
+        boolean knownBrowserContext = activeAccountSessions.stream()
+                .anyMatch(session -> matchesBrowserContext(session, context));
+        boolean knownIpAddress = activeAccountSessions.stream()
+                .anyMatch(session -> sameKnownValue(session.getIpAddress(), context.ipAddress()));
+        List<AuthSession> replacedSessions = knownBrowserContext || knownIpAddress
+                ? List.of()
+                : activeAccountSessions;
+        revokeSessions(replacedSessions, now, "session_replaced");
+        if (!replacedSessions.isEmpty()) {
+            recordSecurityEvent(
+                    user,
+                    context,
+                    portal,
+                    "SESSION_REPLACED",
+                    "MEDIUM",
+                    "active sessions replaced by a new browser context from an unknown IP"
+            );
+            recordRapidSessionReplacementWarningIfRequired(user, context, portal);
         }
-
-        revokeSessions(activePortalSessions, now, "replaced_by_new_login");
 
         AuthSession session = new AuthSession();
         session.setId(IdGenerator.newId());
@@ -443,6 +474,8 @@ public class AuthService {
         session.setSessionId(IdGenerator.newId());
         session.setDeviceId(firstNonBlank(context.deviceId(), "web"));
         session.setDeviceName(firstNonBlank(context.deviceName(), "Browser"));
+        session.setPlatform(platform.name());
+        session.setDeviceFingerprint(trimToNull(context.deviceFingerprint()));
         session.setPortal(portal);
         session.setIpAddress(context.ipAddress());
         session.setUserAgent(context.userAgent());
@@ -450,7 +483,7 @@ public class AuthService {
         session.setRefreshTokenHash(tokenService.hashToken(refreshToken));
         session.setTenantId(tenantId);
         session.setLastActiveAt(now);
-        session.setExpiresAt(now.plus(REFRESH_TOKEN_TTL));
+        session.setExpiresAt(now.plus(sessionTtl(user)));
         sessionRepository.save(session);
         recordLoginAttempt(user.getId(), user.getEmail(), context, portal, "SUCCESS", "login_success");
 
@@ -466,76 +499,143 @@ public class AuthService {
                 ACCESS_TOKEN_TTL.toSeconds(),
                 "Bearer",
                 sessionResponse(session),
-                List.of(),
-                List.of(portal),
+                permissions,
+                portals,
                 firstNonBlank(user.getAccountType(), "erg"),
                 "user"
         );
     }
 
-    private User newSocialUser(String provider, String email, String providerId, SocialLoginRequest request) {
-        User created = new User();
-        created.setId(IdGenerator.newId());
-        created.setEmail(email);
-        created.setPasswordHash(passwordService.hash(tokenService.newToken()));
-        created.setFullName(trimToNull(request.fullName()));
-        created.setAvatarUrl(trimToNull(request.avatarUrl()));
-        created.setStatus(STATUS_ACTIVE);
-        created.setProvider(provider);
-        created.setProviderId(providerId);
-        created.setAccountType(provider);
-        created.setTenantId(DEFAULT_TENANT);
-        created.setLoginCount(0L);
-        created.setIsProfileCompleted(isProfileComplete(created.getFullName(), created.getPhone()));
-        return created;
-    }
-
-    private void upsertSocialAccount(
-            String provider,
-            User user,
-            String providerId,
-            String email,
-            String accessToken,
-            String refreshToken,
-            OffsetDateTime expiresAt
-    ) {
-        SocialAccount account = socialAccountRepository.findByProviderAndProviderId(provider, providerId)
-                .orElseGet(() -> {
-                    SocialAccount created = new SocialAccount();
-                    created.setId(IdGenerator.newId());
-                    created.setProvider(provider);
-                    created.setProviderId(providerId);
-                    return created;
-                });
-        account.setUserId(user.getId());
-        account.setEmail(email);
-        account.setAccessToken(accessToken);
-        account.setRefreshToken(refreshToken);
-        account.setExpiresAt(expiresAt);
-        socialAccountRepository.save(account);
-    }
-
-    private AuthPin consumePin(String email, String code, String purpose) {
-        AuthPin pin = pinRepository
-                .findFirstByEmailIgnoreCaseAndPurposeAndUsedAtIsNullOrderByCreatedAtDesc(email, purpose)
-                .orElseThrow(AuthFailure.InvalidPin::new);
-        if (!code.equals(pin.getCode()) || pin.getExpiresAt() == null || pin.getExpiresAt().isBefore(now())) {
-            throw new AuthFailure.InvalidPin();
+    private void lockUserForSessionMutation(String userId) {
+        try {
+            if (userRepository.lockIdForSessionMutation(userId).isEmpty()) {
+                throw new AuthFailure.InvalidCredentials();
+            }
+        } catch (QueryTimeoutException | PessimisticLockingFailureException exception) {
+            throw new AuthFailure.LoginInProgress();
         }
-        pin.setUsedAt(now());
-        return pin;
     }
 
-    private AuthPin newPin(String email, String purpose) {
-        OffsetDateTime createdAt = now();
-        AuthPin pin = new AuthPin();
-        pin.setId(IdGenerator.newId());
-        pin.setEmail(email);
-        pin.setCode(generatePin());
-        pin.setPurpose(purpose);
-        pin.setCreatedAt(createdAt);
-        pin.setExpiresAt(createdAt.plus(PIN_TTL));
-        return pin;
+    private List<String> effectivePermissions(User user) {
+        Set<String> permissions = new TreeSet<>();
+        if (user.getRoles() != null) {
+            user.getRoles().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .flatMap(role -> role.getPermissions() == null ? java.util.stream.Stream.empty() : role.getPermissions().stream())
+                    .map(permission -> permission == null ? null : trimToNull(permission.getName()))
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(permissions::add);
+        }
+        if (userRoleAssignmentRepository != null && user.getId() != null) {
+            userRoleAssignmentRepository.findActiveForUser(
+                            user.getId(), firstNonBlank(user.getTenantId(), DEFAULT_TENANT), now())
+                    .stream()
+                    .map(UserRoleAssignment::getRole)
+                    .filter(java.util.Objects::nonNull)
+                    .flatMap(role -> role.getPermissions() == null
+                            ? java.util.stream.Stream.empty() : role.getPermissions().stream())
+                    .map(permission -> permission == null ? null : trimToNull(permission.getName()))
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(permissions::add);
+        }
+        if (user.getPermissionOverrides() != null) {
+            user.getPermissionOverrides().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .filter(override -> override.getExpiresAt() == null || override.getExpiresAt().isAfter(now()))
+                    .forEach(override -> {
+                        String permission = trimToNull(override.getPermission());
+                        if (permission == null) return;
+                        if ("deny".equalsIgnoreCase(override.getGrantType())) permissions.remove(permission);
+                        else if ("grant".equalsIgnoreCase(override.getGrantType())) permissions.add(permission);
+                    });
+        }
+        return List.copyOf(permissions);
+    }
+
+    private List<String> entitledPortals(User user, List<String> permissions, String requestedPortal) {
+        if (permissions.contains("*")) return List.of("*");
+
+        Set<String> portals = new TreeSet<>();
+        permissions.forEach(permission -> {
+            int separator = permission.indexOf('.');
+            if (separator <= 0) return;
+            String namespace = permission.substring(0, separator).toLowerCase(Locale.ROOT);
+            if (Set.of("admin", "crm", "lcms", "lms", "elearning").contains(namespace)) portals.add(namespace);
+        });
+        if (portals.isEmpty()) portals.add(requestedPortal);
+        return List.copyOf(portals);
+    }
+
+    private Duration sessionTtl(User user) {
+        boolean privileged = user.getRoles() != null && user.getRoles().stream()
+                .map(Role::getName)
+                .filter(java.util.Objects::nonNull)
+                .map(name -> name.toLowerCase(Locale.ROOT))
+                .anyMatch(name -> name.contains("admin") || name.contains("manager") || name.contains("coordinator"));
+        return privileged ? PRIVILEGED_SESSION_TTL : STANDARD_SESSION_TTL;
+    }
+
+    private void recordSecurityEvent(
+            User user,
+            AuthClientContext context,
+            String portal,
+            String eventType,
+            String severity,
+            String reason
+    ) {
+        if (securityEventRepository == null) {
+            return;
+        }
+        SecurityEvent event = new SecurityEvent();
+        event.setId(IdGenerator.newId());
+        event.setTenantId(firstNonBlank(user.getTenantId(), DEFAULT_TENANT));
+        event.setUserId(user.getId());
+        event.setEventType(eventType);
+        event.setSeverity(severity);
+        event.setPortal(portal);
+        event.setDeviceId(context.deviceId());
+        event.setIpAddress(context.ipAddress());
+        event.setReason(reason);
+        event.setPlatform(sessionPlatform(context.deviceId(), context.deviceName(), context.userAgent()).name());
+        event.setResult("RAPID_SESSION_REPLACEMENT".equals(eventType) ? "WARNING"
+                : eventType.endsWith("FORBIDDEN") ? "DENIED" : "SUCCESS");
+        event.setRiskCode("SESSION_REPLACED".equals(eventType) || "RAPID_SESSION_REPLACEMENT".equals(eventType)
+                || eventType.endsWith("FORBIDDEN") ? eventType : null);
+        event.setMetadata(java.util.Map.of(
+                "deviceName", firstNonBlank(context.deviceName(), "Browser"),
+                "portal", portal
+        ));
+        event.setOccurredAt(now());
+        securityEventRepository.save(event);
+    }
+
+    private void recordRapidSessionReplacementWarningIfRequired(
+            User user,
+            AuthClientContext context,
+            String portal
+    ) {
+        if (securityEventRepository == null) {
+            return;
+        }
+        String tenantId = firstNonBlank(user.getTenantId(), DEFAULT_TENANT);
+        long replacementCount = securityEventRepository
+                .countByTenantIdAndUserIdAndEventTypeAndOccurredAtAfter(
+                        tenantId,
+                        user.getId(),
+                        "SESSION_REPLACED",
+                        now().minusMinutes(rapidSessionReplacementWindowMinutes)
+                );
+        if (replacementCount < rapidSessionReplacementThreshold) {
+            return;
+        }
+        recordSecurityEvent(
+                user,
+                context,
+                portal,
+                "RAPID_SESSION_REPLACEMENT",
+                "HIGH",
+                "session replacement threshold reached; warning only"
+        );
     }
 
     private ProfileResponse profile(User user) {
@@ -549,14 +649,38 @@ public class AuthService {
                 user.getProvider(),
                 firstNonBlank(user.getAccountType(), "erg"),
                 "user",
-                user.getGoogleSub(),
-                user.getGoogleEmail(),
-                user.getGoogleEmailVerified(),
-                user.getLastLoginProvider(),
-                roles(user.getRoles()),
+                  user.getLastLoginProvider(),
+                  roles(user.getRoles()),
+                  Boolean.TRUE.equals(user.getIsProfileCompleted()),
+                  toIso(user.getCreatedAt()),
+                  lifecycle(user)
+          );
+      }
+
+    private AccountLifecycleResponse lifecycle(User user) {
+        List<String> nextSteps = new java.util.ArrayList<>();
+        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
+        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
+        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        String lifecycleStatus = nextSteps.isEmpty()
+                ? "ACTIVE"
+                : ("INVITED".equalsIgnoreCase(user.getStatus()) ? "PROVISIONED" : "FIRST_LOGIN_RESTRICTED");
+        return new AccountLifecycleResponse(
+                lifecycleStatus,
                 Boolean.TRUE.equals(user.getIsProfileCompleted()),
-                toIso(user.getCreatedAt())
+                maskEmail(user.getRecoveryEmail()),
+                Boolean.TRUE.equals(user.getRecoveryEmailVerified()),
+                Boolean.TRUE.equals(user.getMustChangePassword()),
+                List.copyOf(nextSteps)
         );
+    }
+
+    private String maskEmail(String email) {
+        String normalized = trimToNull(email);
+        if (normalized == null) return null;
+        int separator = normalized.indexOf('@');
+        if (separator <= 1) return "***";
+        return normalized.substring(0, 1) + "***" + normalized.substring(separator);
     }
 
     private SessionDeviceResponse sessionResponse(AuthSession session) {
@@ -613,35 +737,11 @@ public class AuthService {
     }
 
     private boolean isLocked(User user) {
-        return "BLOCKED".equalsIgnoreCase(user.getStatus()) || "BANNED".equalsIgnoreCase(user.getStatus());
-    }
-
-    private String normalizeProvider(String provider) {
-        String normalized = isBlank(provider) ? "" : provider.trim().toLowerCase(Locale.ROOT);
-        if (!List.of(PROVIDER_GOOGLE, "facebook", "apple").contains(normalized)) {
-            throw new AuthFailure.SocialIdentityInvalid();
-        }
-        return normalized;
-    }
-
-    private String oauthClientId(String provider) {
-        return PROVIDER_GOOGLE.equals(provider) ? googleOauthClientId : facebookOauthClientId;
-    }
-
-    private String normalizePurpose(String purpose) {
-        if (isBlank(purpose)) {
-            return PIN_PURPOSE_VERIFY;
-        }
-        return purpose.trim().toLowerCase(Locale.ROOT);
+        return STATUS_BLOCKED.equalsIgnoreCase(user.getStatus()) || STATUS_BANNED.equalsIgnoreCase(user.getStatus());
     }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String generatePin() {
-        int value = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 1_000_000);
-        return "%06d".formatted(value);
     }
 
     private OffsetDateTime now() {
@@ -673,7 +773,7 @@ public class AuthService {
     private String normalizePortal(String portal) {
         String normalized = isBlank(portal) ? DEFAULT_PORTAL : portal.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
-            case "admin", "lms", "elearning", "lcms" -> normalized;
+            case "admin", "crm", "lms", "elearning", "lcms" -> normalized;
             default -> DEFAULT_PORTAL;
         };
     }
@@ -682,26 +782,8 @@ public class AuthService {
         return !isBlank(fullName) && !isBlank(phone);
     }
 
-    private String mergeAccountType(String current, String provider, String providerId, String loginProvider) {
-        String normalizedCurrent = isBlank(current) ? "" : current.trim().toLowerCase(Locale.ROOT);
-        if ("hybrid".equals(normalizedCurrent)) {
-            return "hybrid";
-        }
-        if ("erg".equals(normalizedCurrent) && !isBlank(providerId)) {
-            return "hybrid";
-        }
-        if (!isBlank(providerId)) {
-            return loginProvider;
-        }
-        return firstNonBlank(provider, "erg");
-    }
-
-    private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
-    }
-
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
-}
 
+}

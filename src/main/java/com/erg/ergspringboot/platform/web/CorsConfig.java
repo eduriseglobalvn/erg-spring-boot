@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -48,6 +49,7 @@ public class CorsConfig implements WebMvcConfigurer {
     private final long maxAge;
 
     public CorsConfig(
+            Environment environment,
             @Value("${erg.http.cors.allowed-origins:}") String allowedOrigins,
             @Value("${erg.http.cors.allowed-methods:GET,POST,PUT,DELETE,PATCH,OPTIONS}") String allowedMethods,
             @Value("${erg.http.cors.allowed-headers:Accept,Authorization,Content-Type,X-Tenant-ID,X-Request-ID,X-Trace-ID,X-Idempotency-Key}") String allowedHeaders,
@@ -55,7 +57,13 @@ public class CorsConfig implements WebMvcConfigurer {
             @Value("${erg.http.cors.allow-credentials:true}") boolean allowCredentials,
             @Value("${erg.http.cors.max-age:86400}") long maxAge
     ) {
-        this.allowedOrigins = mergeCsv(allowedOrigins, REQUIRED_ALLOWED_ORIGINS);
+        boolean productionProfile = Arrays.asList(environment.getActiveProfiles()).contains("prod");
+        // In prod, allowed origins come solely from configuration so the baked-in dev origins
+        // (including plaintext http://) cannot silently widen the allowlist. Outside prod they
+        // are merged in for local convenience.
+        this.allowedOrigins = productionProfile
+                ? csv(allowedOrigins)
+                : mergeCsv(allowedOrigins, REQUIRED_ALLOWED_ORIGINS);
         this.allowedMethods = csv(allowedMethods);
         this.allowedHeaders = mergeCsv(allowedHeaders, REQUIRED_ALLOWED_HEADERS);
         this.exposedHeaders = csv(exposedHeaders);

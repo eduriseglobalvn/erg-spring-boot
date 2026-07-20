@@ -1,0 +1,18 @@
+-- V18__validate_teaching_schedule_foreign_keys.sql
+ALTER TABLE teaching_schedule_batches VALIDATE CONSTRAINT fk_tsb_school;
+ALTER TABLE teaching_schedule_batches VALIDATE CONSTRAINT fk_tsb_created_by;
+ALTER TABLE teaching_schedule_batches VALIDATE CONSTRAINT fk_tsb_published_by;
+
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_batch;
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_school;
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_class;
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_subject;
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_level;
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_created_by;
+ALTER TABLE teaching_schedule_events VALIDATE CONSTRAINT fk_tse_updated_by;
+
+ALTER TABLE teaching_schedule_event_teachers VALIDATE CONSTRAINT fk_tset_event;
+ALTER TABLE teaching_schedule_event_teachers VALIDATE CONSTRAINT fk_tset_teacher_user;
+
+ALTER TABLE teaching_schedule_rooms VALIDATE CONSTRAINT fk_tsr_school;
+ALTER TABLE teaching_schedule_rooms VALIDATE CONSTRAINT fk_tsr_created_by;

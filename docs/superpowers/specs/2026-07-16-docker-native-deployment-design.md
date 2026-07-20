@@ -19,9 +19,9 @@ PostgreSQL và Redis sử dụng named volume để dữ liệu local không b�
 
 ### Kiểm thử native image tại local
 
-Docker Desktop build native image Linux amd64 từ mã nguồn hiện tại bằng Dockerfile nhiều stage. Docker Compose chạy image này thành nhiều container backend, một container worker chuyên xử lý tác vụ nền và Nginx, cùng với PostgreSQL và Redis.
+Docker Desktop build native image Linux amd64 từ mã nguồn hiện tại bằng Dockerfile nhiều stage. Docker Compose chạy image này thành nhiều container backend và Nginx, cùng với PostgreSQL và Redis.
 
-Các container API tắt tác vụ định kỳ cho outbox, báo cáo và thông báo. Container worker duy nhất bật các tác vụ này để việc tăng số lượng HTTP backend không làm một công việc nền bị xử lý trùng lặp.
+Mỗi backend có thể chạy tác vụ nền vì các worker outbox, báo cáo và thông báo hiện tại claim công việc theo transaction, lease và `FOR UPDATE SKIP LOCKED`. Thiết kế này phù hợp với giới hạn của Spring AOT đối với bean được bật/tắt bằng `@ConditionalOnProperty`, đồng thời tránh phải native-compile hai binary khác nhau.
 
 ### Production
 
@@ -32,7 +32,7 @@ Máy phát triển hoặc CI build và push image Linux amd64 với tag bất bi
 ## File và câu lệnh
 
 - `Dockerfile` nhiều stage build file thực thi native rồi sao chép nó vào runtime image tối giản, chạy bằng user không phải root.
-- Compose file nền định nghĩa PostgreSQL, Redis, private network, volume, backend, worker và các health check dùng chung.
+- Compose file nền định nghĩa PostgreSQL, Redis, private network, volume, backend và các health check dùng chung.
 - Các Compose overlay cho development và môi trường gần production lựa chọn cấu hình Nginx cùng các cổng cần publish.
 - Cấu hình Nginx development proxy đến `host.docker.internal:1606`.
 - Cấu hình Nginx container tìm tất cả backend replica khỏe mạnh qua Docker DNS và cân bằng request giữa chúng.
@@ -49,7 +49,7 @@ Các thao tác được hỗ trợ:
 
 ## Mạng và cân bằng tải
 
-Trong production, chỉ Nginx mở cổng HTTP của ứng dụng ra bên ngoài. PostgreSQL, Redis, các backend replica và worker giao tiếp qua private network của Compose. Ở môi trường phát triển local, PostgreSQL và Redis có thể publish cổng trên loopback để IDE kết nối.
+Trong production, chỉ Nginx mở cổng HTTP của ứng dụng ra bên ngoài. PostgreSQL, Redis và các backend replica giao tiếp qua private network của Compose. Ở môi trường phát triển local, PostgreSQL và Redis có thể publish cổng trên loopback để IDE kết nối.
 
 Nginx chuyển tiếp các proxy header tiêu chuẩn và sử dụng DNS resolver tích hợp của Docker. Nhờ đó, Nginx có thể phát hiện các backend container được scale mà không cần tạo danh sách upstream tĩnh. Cấu hình bao gồm header nâng cấp WebSocket và timeout phù hợp cho GraphQL cũng như các endpoint streaming trong tương lai.
 

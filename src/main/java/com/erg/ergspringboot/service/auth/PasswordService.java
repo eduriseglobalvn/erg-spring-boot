@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 public class PasswordService {
 
     private final Argon2PasswordEncoder argon2PasswordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+    private final String dummyHash = argon2PasswordEncoder.encode("erg-invalid-login-dummy-secret");
 
     public String hash(String rawPassword) {
         return argon2PasswordEncoder.encode(rawPassword);
@@ -22,5 +23,10 @@ public class PasswordService {
         } catch (IllegalArgumentException ex) {
             return false;
         }
+    }
+
+    /** Performs the same-cost password verification when the account identifier is unknown. */
+    public void burnUnknownAccountCheck(String rawPassword) {
+        matches(rawPassword, dummyHash);
     }
 }

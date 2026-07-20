@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.service.sessions;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -10,6 +11,8 @@ import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBo
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.model.lms.Classroom;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
@@ -20,10 +23,13 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
+import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class SessionServiceTest {
@@ -50,6 +56,7 @@ class SessionServiceTest {
         session.setUser(user);
         session.setSessionId("s1");
         session.setTenantId("erg");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
         EducationUnit school = educationUnit("school-1", "THCS Binh An", "school", null);
 
         when(sessionRepository.findWithUserBySessionIdAndTenantId("s1", "erg")).thenReturn(Optional.of(session));
@@ -64,8 +71,108 @@ class SessionServiceTest {
 
         assertThat(response.manageableUnits()).hasSize(1);
         assertThat(response.manageableUnits().getFirst().id()).isEqualTo("school-1");
+        assertThat(response.portals()).containsExactly("lms");
+        assertThat(response.lifecycle().status()).isEqualTo("FIRST_LOGIN_RESTRICTED");
         verify(educationUnitRepository, never()).findAllByOrderByNameAsc();
         verify(educationUnitRepository, never()).findByParentIdInOrderByNameAsc(any());
+    }
+
+    @Test
+    void currentBootstrapReturnsWildcardPortalForSystemSuperAdmin() {
+        SessionService service = new SessionService(
+                sessionRepository,
+                educationUnitRepository,
+                classroomRepository,
+                userPermissionOverrideRepository
+        );
+        User user = userWithRole("u-admin", "system.super_admin");
+        user.setIsProfileCompleted(true);
+        user.setRecoveryEmailVerified(true);
+        user.setMustChangePassword(false);
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s-admin");
+        session.setTenantId("erg");
+        session.setPortal("admin");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+
+        when(sessionRepository.findWithUserBySessionIdAndTenantId("s-admin", "erg"))
+                .thenReturn(Optional.of(session));
+        when(educationUnitRepository.findTop500ByOrderByNameAsc()).thenReturn(List.of());
+
+        SessionBootstrapResponse response = service.currentBootstrap(
+                "s-admin",
+                "erg",
+                new UserAccessContext("u-admin", "erg", List.of(), List.of(), null, null)
+        );
+
+        assertThat(response.portals()).containsExactly("*");
+        assertThat(response.lifecycle().status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void currentBootstrapKeepsGenericAdminWithinTheLoginPortal() {
+        SessionService service = new SessionService(
+                sessionRepository,
+                educationUnitRepository,
+                classroomRepository,
+                userPermissionOverrideRepository
+        );
+        User user = userWithRole("u-local-admin", "admin");
+        user.setIsProfileCompleted(true);
+        user.setRecoveryEmailVerified(true);
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s-local-admin");
+        session.setTenantId("erg");
+        session.setPortal("admin");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+
+        when(sessionRepository.findWithUserBySessionIdAndTenantId("s-local-admin", "erg"))
+                .thenReturn(Optional.of(session));
+        when(educationUnitRepository.findTop500ByOrderByNameAsc()).thenReturn(List.of());
+
+        SessionBootstrapResponse response = service.currentBootstrap(
+                "s-local-admin",
+                "erg",
+                new UserAccessContext("u-local-admin", "erg", List.of(), List.of(), null, null)
+        );
+
+        assertThat(response.portals()).containsExactly("admin");
+    }
+
+    @Test
+    void currentBootstrapRejectsMoreThanFiveHundredManageableClasses() {
+        SessionService service = new SessionService(
+                sessionRepository, educationUnitRepository, classroomRepository, userPermissionOverrideRepository);
+        User user = userWithRole("u-admin", "system.super_admin");
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s-large");
+        session.setTenantId("erg");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+        EducationUnit school = educationUnit("school-1", "Large school", "school", null);
+        List<Classroom> classes = IntStream.range(0, 501).mapToObj(index -> {
+            Classroom classroom = new Classroom();
+            classroom.setId("class-" + index);
+            classroom.setSchoolId("school-1");
+            classroom.setTenantId("erg");
+            return classroom;
+        }).toList();
+        when(sessionRepository.findWithUserBySessionIdAndTenantId("s-large", "erg"))
+                .thenReturn(Optional.of(session));
+        when(educationUnitRepository.findTop500ByOrderByNameAsc()).thenReturn(List.of(school));
+        when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
+                org.mockito.ArgumentMatchers.eq("erg"),
+                org.mockito.ArgumentMatchers.eq(List.of("school-1")),
+                any(Pageable.class)))
+                .thenReturn(classes);
+
+        assertThatThrownBy(() -> service.currentBootstrap(
+                "s-large", "erg", new UserAccessContext("u-admin", "erg", List.of(), List.of(), null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("500")
+                .hasMessageContaining("classes");
     }
 
     private User userWithRole(String userId, String roleName) {
@@ -75,6 +182,7 @@ class SessionServiceTest {
         user.setId(userId);
         user.setFullName("Teacher");
         user.setEmail("teacher@erg.edu.vn");
+        user.setStatus("ACTIVE");
         user.setRoles(new LinkedHashSet<>(List.of(role)));
         return user;
     }

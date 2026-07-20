@@ -15,7 +15,7 @@ class SessionResponsesTest {
     @Test
     void sessionBootstrapCarriesManageableUnitsAndClassesForTeacherScope() {
         assertThat(recordComponentNames(SessionBootstrapResponse.class))
-                .containsExactly("user", "permissions", "currentScope", "manageableUnits", "manageableClasses");
+                .containsExactly("user", "permissions", "portals", "lifecycle", "currentScope", "manageableUnits", "manageableClasses");
         assertThat(recordComponentNames(SessionBootstrapScope.class))
                 .containsExactly("level", "unitId", "classId");
         assertThat(recordComponentNames(SessionBootstrapUnit.class))

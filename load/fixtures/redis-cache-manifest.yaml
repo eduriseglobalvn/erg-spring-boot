@@ -1,0 +1,39 @@
+version: 1
+fixture: deterministic-redis-8-8-cache
+base_fixture: load/fixtures/manifest.yaml
+required_workflows:
+  - session-bootstrap
+  - student-dashboard
+  - assignment-list-detail
+  - quiz-runtime
+  - question-bank
+  - teacher-workspace
+  - analytics-report
+  - calendar
+  - graphql-combined
+  - submission-burst
+cache_families:
+  - organizationEducationUnits
+  - lcmsSchoolDirectory
+  - quizRuntimePackage
+  - lcmsQuestionBankWorkspace
+  - lcmsQuizWorkspace
+  - lmsStudentGroups
+  - lmsAssignmentProgress
+  - lmsClassWorkspace
+  - lmsHomeworkWorkspace
+  - studentDashboard
+  - quizQuestionAnalytics
+  - quizAssignmentReport
+  - calendarWorkspace
+acceptance:
+  concurrent_workflows: 5000
+  completed_rps_minimum: 500
+  duration: 30m
+  error_rate_maximum: 0.001
+  interactive_p95_ms: 500
+  interactive_p99_ms: 1000
+  submission_p95_ms: 1000
+  hikari_acquire_p95_ms: 50
+  redis_memory_warning_ratio: 0.70
+  redis_memory_critical_ratio: 0.85

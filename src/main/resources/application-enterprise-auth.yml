@@ -1,0 +1,36 @@
+spring:
+  autoconfigure:
+    exclude: ${SPRING_AUTOCONFIGURE_EXCLUDE:org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration}
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: ${ERG_KEYCLOAK_ISSUER_URI}
+        registration:
+          erg-api:
+            provider: keycloak
+            client-id: ${ERG_KEYCLOAK_CLIENT_ID:erg-api}
+            client-secret: ${ERG_KEYCLOAK_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            scope: openid,profile,email
+  session:
+    timeout: ${ERG_SESSION_IDLE_TIMEOUT:2h}
+    redis:
+      namespace: erg:session
+      flush-mode: on-save
+
+server:
+  servlet:
+    session:
+      cookie:
+        name: __Host-erg_session
+        http-only: true
+        secure: true
+        same-site: lax
+        path: /
+
+erg:
+  auth:
+    bff-enabled: true
+    local-login-enabled: false

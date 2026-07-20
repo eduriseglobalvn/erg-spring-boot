@@ -26,7 +26,8 @@ import lombok.NoArgsConstructor;
                 @Index(name = "idx_user_sessions_session_tenant", columnList = "session_id, tenant_id"),
                 @Index(name = "idx_user_sessions_access_token_tenant", columnList = "access_token_hash, tenant_id"),
                 @Index(name = "idx_user_sessions_refresh_token_tenant", columnList = "refresh_token_hash, tenant_id"),
-                @Index(name = "idx_user_sessions_user_tenant_active", columnList = "user_id, tenant_id, revoked_at")
+                @Index(name = "idx_user_sessions_user_tenant_active", columnList = "user_id, tenant_id, revoked_at"),
+                @Index(name = "idx_user_sessions_user_tenant_device_active", columnList = "user_id, tenant_id, device_fingerprint, device_id, revoked_at")
         }
 )
 @Data
@@ -48,6 +49,11 @@ public class AuthSession extends BaseEntity {
 
     private String deviceName;
 
+    @Column(name = "platform", length = 32)
+    private String platform;
+
+    private String deviceFingerprint;
+
     private String portal;
 
     private String ipAddress;
@@ -55,6 +61,8 @@ public class AuthSession extends BaseEntity {
     private String userAgent;
 
     private String refreshTokenHash;
+    private String previousRefreshTokenHash;
+    private OffsetDateTime refreshTokenRotatedAt;
 
     private String accessTokenHash;
 

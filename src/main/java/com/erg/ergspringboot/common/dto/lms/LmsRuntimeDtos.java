@@ -49,7 +49,8 @@ public final class LmsRuntimeDtos {
             String contentHash,
             String signature,
             String gradingMode,
-            QuizDetailResponse quiz
+            QuizDetailResponse quiz,
+            Map<String, Object> answerKey
     ) {
     }
 
@@ -84,7 +85,17 @@ public final class LmsRuntimeDtos {
     public record AssignmentProgressResponse(int submitted, int inProgress, int notStarted, int needsReview) {
     }
 
-    public record StudentAssignmentListResponse(List<AssignmentResponse> items) {
+    public record StudentAssignmentListResponse(
+            List<AssignmentResponse> items,
+            int page,
+            int size,
+            long totalItems,
+            int totalPages,
+            boolean hasNext
+    ) {
+        public StudentAssignmentListResponse(List<AssignmentResponse> items) {
+            this(items, 0, items == null ? 0 : items.size(), items == null ? 0 : items.size(), 1, false);
+        }
     }
 
     public record AttemptAnswer(Object answer, Map<String, Object> clientResult, OffsetDateTime answeredAt) {
@@ -136,7 +147,14 @@ public final class LmsRuntimeDtos {
     public record AnswerResultResponse(String attemptId, String questionId, boolean saved) {
     }
 
-    public record SubmitAttemptRequest(Map<String, Object> answers, OffsetDateTime submittedAt) {
+    public record SubmitAttemptRequest(
+            Map<String, Object> answers,
+            OffsetDateTime submittedAt,
+            String packageHash,
+            String quizVersion,
+            Map<String, Object> clientResult,
+            List<Map<String, Object>> clientEvents
+    ) {
     }
 
     public record AttemptSubmitResponse(double score, double maxScore, double percent, boolean passed) {
@@ -161,6 +179,16 @@ public final class LmsRuntimeDtos {
     ) {
     }
 
-    public record StudentScoreListResponse(List<StudentScoreItem> items) {
+    public record StudentScoreListResponse(
+            List<StudentScoreItem> items,
+            int page,
+            int size,
+            long totalItems,
+            int totalPages,
+            boolean hasNext
+    ) {
+        public StudentScoreListResponse(List<StudentScoreItem> items) {
+            this(items, 0, items == null ? 0 : items.size(), items == null ? 0 : items.size(), 1, false);
+        }
     }
 }

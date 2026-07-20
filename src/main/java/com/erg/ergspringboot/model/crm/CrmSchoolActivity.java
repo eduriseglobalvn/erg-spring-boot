@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
         name = "crm_school_activities",
         indexes = {
                 @Index(name = "idx_crm_school_activities_school", columnList = "school_id"),
+                @Index(name = "idx_crm_school_activities_deal", columnList = "deal_id"),
                 @Index(name = "idx_crm_school_activities_actor", columnList = "actor_user_id"),
                 @Index(name = "idx_crm_school_activities_follow_up", columnList = "next_follow_up_at")
         }
@@ -32,7 +33,7 @@ public class CrmSchoolActivity extends BaseEntity {
     @Column(name = "deal_id", length = 36)
     private String dealId;
 
-    @Column(name = "actor_user_id")
+    @Column(name = "actor_user_id", length = 36)
     private String actorUserId;
 
     @Column(name = "type")

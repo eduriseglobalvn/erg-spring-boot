@@ -45,12 +45,12 @@ case "$ACTION" in
     [[ -n "$IMAGE" ]] || { echo "Set ERG_APP_IMAGE to a versioned Registry tag" >&2; exit 2; }
     docker push "$IMAGE"
     ;;
-  up)
+  test|up)
     ensure_local_env "$PRODUCTION_ENV" ".env.production.example"
     export ERG_APP_IMAGE="${IMAGE:-erg-spring:local-native}"
     compose_native up -d --remove-orphans --scale "backend=$REPLICAS"
     ;;
-  deploy)
+  prod|deploy)
     [[ -f "$PRODUCTION_ENV" ]] || { echo "Missing $PRODUCTION_ENV" >&2; exit 2; }
     compose_native pull
     compose_native up -d --no-build --remove-orphans --scale "backend=$REPLICAS"
@@ -81,8 +81,10 @@ Usage: ./scripts/docker.sh <action> [replicas]
   dev       Start PostgreSQL, Redis and Nginx for an IDE-run backend.
   build     Build a Linux amd64 native image locally.
   push      Push ERG_APP_IMAGE to the Registry.
-  up        Run the native image locally with N backend replicas.
-  deploy    Pull and run the prebuilt image. Never builds on the server.
+  test      Run the already-built native image locally with N backend replicas.
+  up        Alias of test.
+  prod      Pull and run the prebuilt image. Never builds on the server.
+  deploy    Alias of prod.
   down      Stop development and native stacks.
   logs      Follow Nginx and backend logs.
   config    Validate both Compose configurations.

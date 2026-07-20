@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class ApiResponseTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void buildsSuccessResponseWithMetadata() {
@@ -23,8 +26,24 @@ class ApiResponseTest {
         assertThat(response.data()).isEqualTo("user-1");
         assertThat(response.errors()).isNull();
         assertThat(response.path()).isEqualTo("/api/v1/users/1");
-        assertThat(response.request_id()).isEqualTo("req-123");
+        assertThat(response.requestId()).isEqualTo("req-123");
         assertThat(response.timestamp()).isBeforeOrEqualTo(OffsetDateTime.now());
+    }
+
+    @Test
+    void keepsRequestIdWireFormatSnakeCase() throws Exception {
+        ApiResponse<String> response = ApiResponse.success(
+                200,
+                "Loaded user",
+                "user-1",
+                "/api/v1/users/1",
+                "req-123"
+        );
+
+        String json = objectMapper.writeValueAsString(response);
+
+        assertThat(json).contains("\"request_id\":\"req-123\"");
+        assertThat(json).doesNotContain("\"requestId\"");
     }
 
     @Test
@@ -42,7 +61,7 @@ class ApiResponseTest {
         assertThat(response.data()).isNull();
         assertThat(response.errors()).isEqualTo(error.details());
         assertThat(response.path()).isEqualTo("/api/v1/users");
-        assertThat(response.request_id()).isEqualTo("req-456");
+        assertThat(response.requestId()).isEqualTo("req-456");
     }
 
     @Test

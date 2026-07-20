@@ -26,9 +26,6 @@ public final class UserResponses {
             String status,
             String provider,
             String accountType,
-            String googleSub,
-            String googleEmail,
-            Boolean googleEmailVerified,
             String lastLoginProvider,
             List<String> roles,
             Map<String, String> socialLinks,
@@ -37,7 +34,8 @@ public final class UserResponses {
             Long loginCount,
             String tenantId,
             String createdAt,
-            String updatedAt
+            String updatedAt,
+            AccountLifecycleResponse lifecycle
     ) {
     }
 
@@ -46,8 +44,7 @@ public final class UserResponses {
 
     public record UserDetailResponse(
             UserResponse user,
-            List<SessionResponse> sessions,
-            List<SocialAccountResponse> socialAccounts
+            List<SessionResponse> sessions
     ) {
     }
 
@@ -91,15 +88,6 @@ public final class UserResponses {
     public record SessionListResponse(List<SessionResponse> items) {
     }
 
-    public record SocialAccountResponse(
-            String id,
-            String provider,
-            String providerId,
-            String email,
-            String createdAt
-    ) {
-    }
-
     public record RevokeSessionResponse(boolean success, String revokedAt) {
     }
 
@@ -128,7 +116,56 @@ public final class UserResponses {
     public record BulkOperationResponse(@JsonProperty("modified_count") long modifiedCount) {
     }
 
-    public record UserCreatedResponse(String id, String email, String fullName, String status) {
+    public record UserCreatedResponse(
+            ProvisionedUserResponse user,
+            AccountLifecycleResponse lifecycle,
+            String deliveryStatus,
+            String oneTimePassword
+    ) {
+    }
+
+    public record ProvisionedUserResponse(
+            String id,
+            String primaryEmail,
+            String fullName,
+            String status
+    ) {
+    }
+
+    public record AccountLifecycleResponse(
+            String status,
+            boolean isProfileCompleted,
+            String recoveryEmailMasked,
+            boolean recoveryEmailVerified,
+            boolean mustChangePassword,
+            List<String> nextSteps
+    ) {
+    }
+
+    public record RecoveryEmailChallengeResponse(
+            String challengeId,
+            String maskedEmail,
+            String expiresAt,
+            long retryAfterSeconds
+    ) {
+    }
+
+    public record RecoveryEmailVerificationResponse(
+            boolean verified,
+            AccountLifecycleResponse lifecycle
+    ) {
+    }
+
+    public record PasswordChangeResponse(
+            AccountLifecycleResponse lifecycle,
+            int revokedSessions
+    ) {
+    }
+
+    public record CredentialDeliveryResponse(
+            String deliveryStatus,
+            String oneTimePassword
+    ) {
     }
 
     public record OnboardingResponse(
