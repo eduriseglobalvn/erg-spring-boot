@@ -2,6 +2,7 @@ package com.erg.ergspringboot.platform.security;
 
 import java.util.List;
 import java.util.function.Supplier;
+import com.erg.ergspringboot.authorization.AuthorizationOperations;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.core.Authentication;
@@ -11,10 +12,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class PermissionAuthorizationManager {
 
-    private final ErgPolicyService policyService;
+    private final AuthorizationOperations authorization;
 
-    public PermissionAuthorizationManager(ErgPolicyService policyService) {
-        this.policyService = policyService;
+    public PermissionAuthorizationManager(AuthorizationOperations authorization) {
+        this.authorization = authorization;
     }
 
     public AuthorizationDecision require(
@@ -30,7 +31,7 @@ public class PermissionAuthorizationManager {
             return new AuthorizationDecision(false);
         }
         String portal = SecurityUtils.portalFromPath(context.getRequest().getRequestURI());
-        return new AuthorizationDecision(policyService.isAllowed(principal, permission, portal, principal.tenantId()));
+        return new AuthorizationDecision(authorization.isAllowed(principal, permission, portal, principal.tenantId()));
     }
 
     public AuthorizationDecision requireAny(
@@ -46,6 +47,6 @@ public class PermissionAuthorizationManager {
             return new AuthorizationDecision(false);
         }
         String portal = SecurityUtils.portalFromPath(context.getRequest().getRequestURI());
-        return new AuthorizationDecision(policyService.isAllowedAny(principal, portal, principal.tenantId(), permissions));
+        return new AuthorizationDecision(authorization.isAllowedAny(principal, portal, principal.tenantId(), permissions));
     }
 }
