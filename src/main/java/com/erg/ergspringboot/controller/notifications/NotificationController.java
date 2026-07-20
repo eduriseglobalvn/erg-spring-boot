@@ -9,6 +9,7 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.NotificationPreferenceResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.UnreadCountResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.notifications.NotificationOperations;
 import com.erg.ergspringboot.service.notifications.NotificationSecuritySupport;
 import com.erg.ergspringboot.service.notifications.NotificationService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,12 +29,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
 
-    private final NotificationService notificationService;
+    private final NotificationOperations notifications;
     private final NotificationSecuritySupport security;
 
-    public NotificationController(NotificationService notificationService, NotificationSecuritySupport security) {
-        this.notificationService = notificationService;
+    @org.springframework.beans.factory.annotation.Autowired
+    public NotificationController(NotificationOperations notifications, NotificationSecuritySupport security) {
+        this.notifications = notifications;
         this.security = security;
+    }
+
+    @Deprecated
+    NotificationController(NotificationService legacy, NotificationSecuritySupport security) {
+        this(new NotificationOperations(legacy, null), security);
     }
 
     @GetMapping
@@ -46,7 +53,7 @@ public class NotificationController {
     ) {
         ErgPrincipal principal = security.principal();
         String verifiedPortal = security.verifiedPortal(principal, portal);
-        PageResponse<NotificationItemResponse> data = notificationService.listInbox(
+        PageResponse<NotificationItemResponse> data = notifications.listInbox(
                 principal.tenantId(),
                 principal.userId(),
                 verifiedPortal,
@@ -66,7 +73,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         return ok(
                 "Unread count loaded",
-                notificationService.unreadCount(principal.tenantId(), principal.userId(), verifiedPortal),
+                notifications.unreadCount(principal.tenantId(), principal.userId(), verifiedPortal),
                 request
         );
     }
@@ -81,7 +88,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         return ok(
                 "Notification loaded",
-                notificationService.detail(principal.tenantId(), principal.userId(), verifiedPortal, id),
+                notifications.detail(principal.tenantId(), principal.userId(), verifiedPortal, id),
                 request
         );
     }
@@ -95,7 +102,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         return ok(
                 "Notifications marked read",
-                notificationService.markAllRead(principal.tenantId(), principal.userId(), verifiedPortal),
+                notifications.markAllRead(principal.tenantId(), principal.userId(), verifiedPortal),
                 request
         );
     }
@@ -110,7 +117,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         return ok(
                 "Notification marked read",
-                notificationService.markRead(principal.tenantId(), principal.userId(), verifiedPortal, id),
+                notifications.markRead(principal.tenantId(), principal.userId(), verifiedPortal, id),
                 request
         );
     }
@@ -125,7 +132,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         return ok(
                 "Notification archived",
-                notificationService.archive(principal.tenantId(), principal.userId(), verifiedPortal, id),
+                notifications.archive(principal.tenantId(), principal.userId(), verifiedPortal, id),
                 request
         );
     }
@@ -139,7 +146,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         return ok(
                 "Notification preferences loaded",
-                notificationService.preferences(principal.tenantId(), principal.userId(), verifiedPortal),
+                notifications.preferences(principal.tenantId(), principal.userId(), verifiedPortal),
                 request
         );
     }
@@ -153,7 +160,7 @@ public class NotificationController {
         String verifiedPortal = security.verifiedPortal(principal, body.portal());
         return ok(
                 "Notification preferences updated",
-                notificationService.updatePreferences(principal.tenantId(), principal.userId(), verifiedPortal, body.preferences()),
+                notifications.updatePreferences(principal.tenantId(), principal.userId(), verifiedPortal, body.preferences()),
                 request
         );
     }
