@@ -26,6 +26,7 @@ import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.service.users.EmployeeManagementService;
 import com.erg.ergspringboot.service.users.EmployeeSecurityActivityService;
 import com.erg.ergspringboot.service.users.UserService;
+import com.erg.ergspringboot.users.UserOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -45,16 +46,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/users")
 public class AdminEmployeeController {
 
-    private final UserService userService;
+    private final UserOperations users;
     private final EmployeeManagementService employeeManagementService;
     private final EmployeeSecurityActivityService securityActivityService;
 
     public AdminEmployeeController(
-            UserService userService,
+            UserOperations users,
             EmployeeManagementService employeeManagementService,
             EmployeeSecurityActivityService securityActivityService
     ) {
-        this.userService = userService;
+        this.users = users;
         this.employeeManagementService = employeeManagementService;
         this.securityActivityService = securityActivityService;
     }
@@ -118,7 +119,7 @@ public class AdminEmployeeController {
             @Valid @RequestBody AdminUpdateUserStatusRequest body,
             HttpServletRequest request
     ) {
-        return ok(userService.updateUserStatus(userId, tenantId(), body, auditContext(request)), request);
+        return ok(users.updateUserStatus(userId, tenantId(), body, auditContext(request)), request);
     }
 
     @PostMapping("/{userId}/roles")
@@ -127,7 +128,7 @@ public class AdminEmployeeController {
             @Valid @RequestBody AdminAssignRolesRequest body,
             HttpServletRequest request
     ) {
-        return ok(userService.assignRoles(userId, tenantId(), body, auditContext(request)), request);
+        return ok(users.assignRoles(userId, tenantId(), body, auditContext(request)), request);
     }
 
     @PostMapping("/{userId}/reset-credential")
@@ -136,7 +137,7 @@ public class AdminEmployeeController {
             @Valid @RequestBody CredentialDeliveryRequest body,
             HttpServletRequest request
     ) {
-        return ok(userService.resetCredential(userId, tenantId(), body.credentialDelivery(), auditContext(request)), request);
+        return ok(users.resetCredential(userId, tenantId(), body.credentialDelivery(), auditContext(request)), request);
     }
 
     @GetMapping("/{userId}/activity")
@@ -146,7 +147,7 @@ public class AdminEmployeeController {
             @RequestParam(required = false) Integer limit,
             HttpServletRequest request
     ) {
-        return ok(userService.listActivity(userId, tenantId(), page, limit), request);
+        return ok(users.listActivity(userId, tenantId(), page, limit), request);
     }
 
     @GetMapping("/{userId}/security-events")
@@ -164,7 +165,7 @@ public class AdminEmployeeController {
             @PathVariable String userId,
             HttpServletRequest request
     ) {
-        return ok(userService.listSessions(userId, tenantId(), null), request);
+        return ok(users.listSessions(userId, tenantId(), null), request);
     }
 
     @PostMapping("/{userId}/sessions/revoke")
@@ -173,7 +174,7 @@ public class AdminEmployeeController {
             @Valid @RequestBody RevokeEmployeeSessionRequest body,
             HttpServletRequest request
     ) {
-        return ok(userService.revokeSession(userId, tenantId(), body.sessionId(), auditContext(request)), request);
+        return ok(users.revokeSession(userId, tenantId(), body.sessionId(), auditContext(request)), request);
     }
 
     private <T> ResponseEntity<ApiResponse<T>> ok(T data, HttpServletRequest request) {

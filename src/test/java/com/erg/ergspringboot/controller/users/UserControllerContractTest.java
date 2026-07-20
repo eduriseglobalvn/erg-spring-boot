@@ -290,7 +290,6 @@ class UserControllerContractTest {
                 new UsernamePasswordAuthenticationToken(principal, null, List.of())
         );
                 return MockMvcBuilders.standaloneSetup(new UserController(
-                        userService,
                         new UserOperations(userService),
                         mock(com.erg.ergspringboot.service.auth.AccountVerificationService.class)
                 ))
