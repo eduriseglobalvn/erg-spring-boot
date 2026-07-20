@@ -11,7 +11,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.platform.security.TrustedClientIpResolver;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
-import com.erg.ergspringboot.service.auth.AuthService;
+import com.erg.ergspringboot.auth.AuthOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -32,11 +32,11 @@ public class AuthController {
 
     private static final String LOGOUT_MESSAGE = "Logout successful";
 
-    private final AuthService authService;
+    private final AuthOperations auth;
     private final TrustedClientIpResolver clientIpResolver;
 
-    public AuthController(AuthService authService, TrustedClientIpResolver clientIpResolver) {
-        this.authService = authService;
+    public AuthController(AuthOperations auth, TrustedClientIpResolver clientIpResolver) {
+        this.auth = auth;
         this.clientIpResolver = clientIpResolver;
     }
 
@@ -45,7 +45,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest
     ) {
-        AuthResponse authResponse = authService.login(request, clientContext(request, servletRequest));
+        AuthResponse authResponse = auth.login(request, clientContext(request, servletRequest));
         ApiResponse<AuthResponse> response = ApiResponse.success(
                 200,
                 "Success",
@@ -63,19 +63,19 @@ public class AuthController {
             @Valid @RequestBody RefreshRequest request,
             HttpServletRequest servletRequest
     ) {
-        TokenResponse tokenResponse = authService.refresh(request, clientContext(request, servletRequest));
+        TokenResponse tokenResponse = auth.refresh(request, clientContext(request, servletRequest));
         return ok(tokenResponse, servletRequest);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Map<String, String>>> logout(HttpServletRequest servletRequest) {
-        authService.logout(userId(servletRequest), tenantId(servletRequest), sessionId(servletRequest));
+        auth.logout(userId(servletRequest), tenantId(servletRequest), sessionId(servletRequest));
         return ok(Map.of("message", LOGOUT_MESSAGE), servletRequest);
     }
 
     @PostMapping("/logout-all")
     public ResponseEntity<ApiResponse<Map<String, Object>>> logoutAll(HttpServletRequest servletRequest) {
-        int revokedSessions = authService.logoutAll(userId(servletRequest), tenantId(servletRequest));
+        int revokedSessions = auth.logoutAll(userId(servletRequest), tenantId(servletRequest));
         return ok(Map.of("message", "All sessions revoked", "revokedSessions", revokedSessions), servletRequest);
     }
 
@@ -84,7 +84,7 @@ public class AuthController {
             @RequestParam(required = false) String email,
             HttpServletRequest servletRequest
     ) {
-        List<LoginAttemptResponse> data = authService.listLoginAttempts(userIdOrNull(servletRequest), email);
+        List<LoginAttemptResponse> data = auth.loginAttempts(userIdOrNull(servletRequest), email);
         return ok(data, servletRequest);
     }
 
@@ -93,7 +93,7 @@ public class AuthController {
             @RequestParam(required = false) String email,
             HttpServletRequest servletRequest
     ) {
-        IpSecurityStatusResponse data = authService.ipSecurityStatus(
+        IpSecurityStatusResponse data = auth.ipSecurityStatus(
                 email,
                 new AuthClientContext(clientIp(servletRequest), servletRequest.getHeader("User-Agent"), null, null, null)
         );

@@ -22,6 +22,7 @@ class ModulithVerificationTest {
         assertThat(modules.getModuleByName("reporting")).isPresent();
         assertThat(modules.getModuleByName("authorization")).isPresent();
         assertThat(modules.getModuleByName("users")).isPresent();
+        assertThat(modules.getModuleByName("auth")).isPresent();
         modules.verify();
     }
 }
