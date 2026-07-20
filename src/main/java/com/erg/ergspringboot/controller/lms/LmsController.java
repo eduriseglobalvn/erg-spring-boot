@@ -17,6 +17,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.lms.LmsRuntimeService;
+import com.erg.ergspringboot.lms.LmsOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
@@ -42,9 +43,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class LmsController {
 
     private final LmsRuntimeService lmsRuntimeService;
+    private final LmsOperations lms;
 
-    public LmsController(LmsRuntimeService lmsRuntimeService) {
+    public LmsController(LmsRuntimeService lmsRuntimeService, LmsOperations lms) {
         this.lmsRuntimeService = lmsRuntimeService;
+        this.lms = lms;
     }
 
     @GetMapping("/students/me/assignments")
@@ -100,7 +103,7 @@ public class LmsController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Attempt started", lmsRuntimeService.startAttempt(access.userId(), body, idempotencyKey, access), request);
+        return ok("Attempt started", lms.startAttempt(access.userId(), body, idempotencyKey, access), request);
     }
 
     @PatchMapping("/attempts/{attemptId}/draft")
@@ -146,7 +149,7 @@ public class LmsController {
             @RequestBody SubmitAttemptRequest body,
             HttpServletRequest request
     ) {
-        return ok("Attempt submitted", lmsRuntimeService.submitAttempt(attemptId, body, UserAccessContext.from(request)), request);
+        return ok("Attempt submitted", lms.submitAttempt(attemptId, body, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/quizzes/{quizId}/students")
