@@ -1,5 +1,6 @@
 HELP.md
 target/
+.worktrees/
 .env
 .env.*
 !.env.example
