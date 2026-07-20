@@ -20,6 +20,9 @@ class EventPublicationRegistryContractTest {
                 .contains("completion_attempts int")
                 .contains("last_resubmission_date timestamptz");
         assertThat(configuration).contains("schema-initialization:", "enabled: false");
+        assertThat(configuration)
+                .contains("registry-trigger-annotation: org.springframework.modulith.events.ApplicationModuleListener")
+                .contains("completion-mode: delete");
     }
 
     @Test
