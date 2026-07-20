@@ -13,6 +13,7 @@ import com.erg.ergspringboot.common.request.users.UserRequests.RecoveryEmailChal
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailChallengeResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVerificationResponse;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** Public authentication facade for login, refresh and session lifecycle. */
@@ -21,6 +22,7 @@ public class AuthOperations {
     private final AuthService legacy;
     private final AccountVerificationService verification;
 
+    @Autowired
     public AuthOperations(AuthService legacy, AccountVerificationService verification) {
         this.legacy = legacy;
         this.verification = verification;

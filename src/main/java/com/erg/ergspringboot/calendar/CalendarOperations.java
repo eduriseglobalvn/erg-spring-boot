@@ -8,6 +8,7 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.service.calendar.CalendarCommandService;
 import com.erg.ergspringboot.service.calendar.CalendarReadService;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** Public facade for calendar use cases. No repository or JPA type is exposed. */
@@ -16,6 +17,7 @@ public class CalendarOperations {
     private final CalendarReadService reads;
     private final CalendarCommandService commands;
 
+    @Autowired
     public CalendarOperations(CalendarReadService reads, CalendarCommandService commands) {
         this.reads = reads;
         this.commands = commands;
