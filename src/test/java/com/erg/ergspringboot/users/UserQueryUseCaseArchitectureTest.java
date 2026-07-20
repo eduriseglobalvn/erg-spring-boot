@@ -32,4 +32,14 @@ class UserQueryUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(legacy).doesNotContain("applyProfileUpdate(");
     }
+
+    @Test
+    void passwordMutationsLiveInTheirOwnUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.users.internal.password.UserPasswordUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        assertThat(legacy).doesNotContain("passwordService.matches(");
+    }
 }
