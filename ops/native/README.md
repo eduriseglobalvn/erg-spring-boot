@@ -19,7 +19,7 @@ the native runtime gate passed.
 The native profile is an explicit build target. Linux/CI build:
 
 ```bash
-./mvnw -Pnative -DskipTests native:compile-no-fork
+./mvnw -Pnative -DskipTests native:compile
 ```
 
 Run with the production profile and external secrets:
@@ -27,8 +27,22 @@ Run with the production profile and external secrets:
 ```bash
 SPRING_PROFILES_ACTIVE=prod \
 FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres \
-docker compose -f ops/docker/compose.native.yml up --build
+docker compose --env-file ops/docker/.env.production \
+  -f ops/docker/compose.yml \
+  -f ops/docker/compose.native.yml up -d
 ```
+
+`compose.native.yml` is an overlay; `compose.yml` owns PostgreSQL, Redis and
+the `edge`/`data` networks. Native AOT keeps the Modulith event registry and
+generated module metadata, but excludes Modulith Insight runtime graph
+observability because ArchUnit classpath scanning does not support native
+`resource:/` locations. Module verification, diagrams and Insight remain JVM
+CI/staging gates.
+
+The 2026-07-20 local Linux-builder smoke produced a 316.81 MB executable,
+started the production-profile AOT application in 9.067 seconds, applied
+Flyway through V73 and returned HTTP 200 from `/ready` with PostgreSQL healthy.
+This is a functional smoke result, not a JVM-vs-native throughput decision.
 
 Do not bake `.env`, private keys, JWT secrets or webhook tokens into the image.
 Windows developers should use the Linux CI/container smoke path for native builds.

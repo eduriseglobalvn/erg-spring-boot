@@ -5,8 +5,11 @@ package com.erg.ergspringboot;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ImportRuntimeHints;
+import com.erg.ergspringboot.platform.nativeimage.ModulithNativeRuntimeHints;
 
 @SpringBootApplication
+@ImportRuntimeHints(ModulithNativeRuntimeHints.class)
 public class ErgSpringApplication {
 
     public static void main(String[] args) {
