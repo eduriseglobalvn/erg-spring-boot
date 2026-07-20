@@ -4,7 +4,7 @@ import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.AccessM
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.lcms.readmodel.LcmsWorkspaceReadService;
+import com.erg.ergspringboot.lcms.LcmsQueryOperations;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -14,14 +14,14 @@ import org.springframework.stereotype.Controller;
 public class LcmsWorkspaceGraphQlController {
 
     private final GraphQlAccessSupport accessSupport;
-    private final LcmsWorkspaceReadService readService;
+    private final LcmsQueryOperations queries;
 
     public LcmsWorkspaceGraphQlController(
-            GraphQlAccessSupport accessSupport,
-            LcmsWorkspaceReadService readService
+            LcmsQueryOperations queries,
+            GraphQlAccessSupport accessSupport
     ) {
         this.accessSupport = accessSupport;
-        this.readService = readService;
+        this.queries = queries;
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "questionBankWorkspace")
@@ -30,7 +30,7 @@ public class LcmsWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "content.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
-        return readService.questionBankWorkspace(
+        return queries.questionBankWorkspace(
                 tenantId,
                 safeInput.search(),
                 safeInput.subjectId(),
@@ -50,7 +50,7 @@ public class LcmsWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.scope.read", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
-        return readService.accessManagementWorkspace(
+        return queries.accessManagementWorkspace(
                 tenantId,
                 safeInput.search(),
                 safeInput.roleId(),

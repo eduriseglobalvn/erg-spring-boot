@@ -12,6 +12,6 @@ class LcmsReportGraphQlBoundaryTest {
         assertThat(LcmsReportGraphQlController.class.getConstructors())
                 .singleElement()
                 .satisfies(constructor -> assertThat(constructor.getParameterTypes())
-                        .containsExactly(LcmsOperations.class, GraphQlAccessSupport.class));
+                        .containsExactly(LcmsQueryOperations.class, GraphQlAccessSupport.class));
     }
 }
