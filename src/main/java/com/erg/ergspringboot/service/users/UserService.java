@@ -58,6 +58,7 @@ import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
 import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
+import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -89,6 +90,7 @@ public class UserService {
     private final UserQueryUseCase userQueryUseCase;
     private final UserProfileUseCase userProfileUseCase;
     private final UserPasswordUseCase userPasswordUseCase;
+    private final UserSessionUseCase userSessionUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -116,6 +118,7 @@ public class UserService {
         this.userProfileUseCase = new UserProfileUseCase(userRepository, userActivityRepository);
         this.userPasswordUseCase = new UserPasswordUseCase(
                 userRepository, sessionRepository, userActivityRepository, passwordService);
+        this.userSessionUseCase = new UserSessionUseCase(sessionRepository, userActivityRepository);
     }
 
     @Autowired(required = false)
@@ -149,12 +152,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public SessionListResponse listSessions(String userId, String tenantId, String currentSessionId) {
-        List<SessionResponse> items = sessionRepository
-                .findByUserIdAndTenantIdOrderByLastActiveAtDesc(userId, normalizeTenant(tenantId))
-                .stream()
-                .map(session -> toSessionResponse(session, currentSessionId))
-                .toList();
-        return new SessionListResponse(items);
+        return userSessionUseCase.list(userId, tenantId, currentSessionId);
     }
 
     @Transactional
@@ -166,22 +164,7 @@ public class UserService {
     public RevokeSessionResponse revokeSession(
             String userId, String tenantId, String sessionId, AuditContext auditContext
     ) {
-        AuthSession session = sessionRepository.findBySessionIdAndUserIdAndTenantId(sessionId, userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("session not found"));
-        OffsetDateTime revokedAt = now();
-        session.setRevokedAt(revokedAt);
-        session.setRevokedReason("user_revoked");
-        sessionRepository.save(session);
-        User target = session.getUser();
-        if (target == null) {
-            target = new User();
-            target.setId(userId);
-            target.setTenantId(normalizeTenant(tenantId));
-        }
-        recordActivity(target, auditContext, "EMPLOYEE_SESSION_REVOKED", "Employee session revoked",
-                Map.of("sessionId", sessionId, "revoked", false),
-                Map.of("sessionId", sessionId, "revoked", true, "reason", "user_revoked"));
-        return new RevokeSessionResponse(true, toIso(revokedAt));
+        return userSessionUseCase.revoke(userId, tenantId, sessionId, toPublicAudit(auditContext));
     }
 
     @Transactional

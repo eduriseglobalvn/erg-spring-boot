@@ -42,4 +42,16 @@ class UserQueryUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(legacy).doesNotContain("passwordService.matches(");
     }
+
+    @Test
+    void sessionMutationsLiveInTheirOwnUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.users.internal.session.UserSessionUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        assertThat(legacy)
+                .doesNotContain("findByUserIdAndTenantIdOrderByLastActiveAtDesc(")
+                .doesNotContain("findBySessionIdAndUserIdAndTenantId(");
+    }
 }
