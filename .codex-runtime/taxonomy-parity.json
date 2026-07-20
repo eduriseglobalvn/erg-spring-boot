@@ -1,0 +1,403 @@
+{
+    "data":  {
+                 "lms":  {
+                             "learningResourceLibrary":  {
+                                                             "taxonomyTree":  [
+                                                                                  {
+                                                                                      "id":  "sub_dia_ly",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Đ�?a Lý",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_dia_ly"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_hoa_hoc",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Hóa Học",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_hoa_hoc"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_lich_su",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "L�?ch Sử",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_lich_su"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_math",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Mathematics",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_math"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_ngu_van",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Ngữ V�?n",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_ngu_van"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_sinh_hoc",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Sinh Học",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_sinh_hoc"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_tieng_anh",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Tiếng Anh",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_tieng_anh"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_toan",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Toán",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_toan"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_vat_ly",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Vật Lý",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_vat_ly"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_ic3",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "IC3 Digital Literacy",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_ic3"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_tin_hoc",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Tin hoc",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_tin_hoc"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_python",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "Python",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_python"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "sub_mos",
+                                                                                      "kind":  "subject",
+                                                                                      "label":  "MOS",
+                                                                                      "parentId":  null,
+                                                                                      "subjectId":  "sub_mos"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_math_g6",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "Grade 6 Mathematics",
+                                                                                      "parentId":  "sub_math",
+                                                                                      "subjectId":  "sub_math"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_toan_cb",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "Toán Cơ Bản",
+                                                                                      "parentId":  "sub_toan",
+                                                                                      "subjectId":  "sub_toan"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_van_cb",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "V�?n Cơ Bản",
+                                                                                      "parentId":  "sub_ngu_van",
+                                                                                      "subjectId":  "sub_ngu_van"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_toan_nc",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "Toán Nâng Cao",
+                                                                                      "parentId":  "sub_toan",
+                                                                                      "subjectId":  "sub_toan"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_ic3_gs6_l1",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "IC3 GS6 Level 1",
+                                                                                      "parentId":  "sub_ic3",
+                                                                                      "subjectId":  "sub_ic3"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_mos_word",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "MOS Word",
+                                                                                      "parentId":  "sub_mos",
+                                                                                      "subjectId":  "sub_mos"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_python_foundation",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "Python Foundation",
+                                                                                      "parentId":  "sub_python",
+                                                                                      "subjectId":  "sub_python"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_mos_excel",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "MOS Excel",
+                                                                                      "parentId":  "sub_mos",
+                                                                                      "subjectId":  "sub_mos"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_python_intermediate",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "Python Intermediate",
+                                                                                      "parentId":  "sub_python",
+                                                                                      "subjectId":  "sub_python"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_tin_hoc_6",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "Tin hoc 6",
+                                                                                      "parentId":  "sub_tin_hoc",
+                                                                                      "subjectId":  "sub_tin_hoc"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "lvl_mos_powerpoint",
+                                                                                      "kind":  "level",
+                                                                                      "label":  "MOS PowerPoint",
+                                                                                      "parentId":  "sub_mos",
+                                                                                      "subjectId":  "sub_mos"
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_math_g6_num",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Natural Numbers",
+                                                                                      "parentId":  "lvl_math_g6",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_ic3_intro",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Intro to Computing",
+                                                                                      "parentId":  "lvl_ic3_gs6_l1",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_mos_excel",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Microsoft Excel",
+                                                                                      "parentId":  "lvl_mos_excel",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_mos_powerpoint",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Microsoft PowerPoint",
+                                                                                      "parentId":  "lvl_mos_powerpoint",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_mos_word",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Microsoft Word",
+                                                                                      "parentId":  "lvl_mos_word",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_python_foundation",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Python Foundation",
+                                                                                      "parentId":  "lvl_python_foundation",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_python_intermediate",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Python Intermediate",
+                                                                                      "parentId":  "lvl_python_intermediate",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_ic3_safety",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Internet Safety",
+                                                                                      "parentId":  "lvl_ic3_gs6_l1",
+                                                                                      "subjectId":  null
+                                                                                  },
+                                                                                  {
+                                                                                      "id":  "top_tin_hoc_algo",
+                                                                                      "kind":  "topic",
+                                                                                      "label":  "Algorithm Basics",
+                                                                                      "parentId":  "lvl_tin_hoc_6",
+                                                                                      "subjectId":  null
+                                                                                  }
+                                                                              ]
+                                                         }
+                         },
+                 "lcms":  {
+                              "questionBankWorkspace":  {
+                                                            "subjects":  [
+                                                                             {
+                                                                                 "id":  "sub_dia_ly",
+                                                                                 "label":  "Đ�?a Lý"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_hoa_hoc",
+                                                                                 "label":  "Hóa Học"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_lich_su",
+                                                                                 "label":  "L�?ch Sử"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_math",
+                                                                                 "label":  "Mathematics"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_ngu_van",
+                                                                                 "label":  "Ngữ V�?n"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_sinh_hoc",
+                                                                                 "label":  "Sinh Học"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_tieng_anh",
+                                                                                 "label":  "Tiếng Anh"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_toan",
+                                                                                 "label":  "Toán"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_vat_ly",
+                                                                                 "label":  "Vật Lý"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_ic3",
+                                                                                 "label":  "IC3 Digital Literacy"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_tin_hoc",
+                                                                                 "label":  "Tin hoc"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_python",
+                                                                                 "label":  "Python"
+                                                                             },
+                                                                             {
+                                                                                 "id":  "sub_mos",
+                                                                                 "label":  "MOS"
+                                                                             }
+                                                                         ],
+                                                            "levels":  [
+                                                                           {
+                                                                               "id":  "lvl_math_g6",
+                                                                               "label":  "Grade 6 Mathematics",
+                                                                               "subjectId":  "sub_math"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_toan_cb",
+                                                                               "label":  "Toán Cơ Bản",
+                                                                               "subjectId":  "sub_toan"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_van_cb",
+                                                                               "label":  "V�?n Cơ Bản",
+                                                                               "subjectId":  "sub_ngu_van"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_toan_nc",
+                                                                               "label":  "Toán Nâng Cao",
+                                                                               "subjectId":  "sub_toan"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_ic3_gs6_l1",
+                                                                               "label":  "IC3 GS6 Level 1",
+                                                                               "subjectId":  "sub_ic3"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_mos_word",
+                                                                               "label":  "MOS Word",
+                                                                               "subjectId":  "sub_mos"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_python_foundation",
+                                                                               "label":  "Python Foundation",
+                                                                               "subjectId":  "sub_python"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_mos_excel",
+                                                                               "label":  "MOS Excel",
+                                                                               "subjectId":  "sub_mos"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_python_intermediate",
+                                                                               "label":  "Python Intermediate",
+                                                                               "subjectId":  "sub_python"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_tin_hoc_6",
+                                                                               "label":  "Tin hoc 6",
+                                                                               "subjectId":  "sub_tin_hoc"
+                                                                           },
+                                                                           {
+                                                                               "id":  "lvl_mos_powerpoint",
+                                                                               "label":  "MOS PowerPoint",
+                                                                               "subjectId":  "sub_mos"
+                                                                           }
+                                                                       ],
+                                                            "topics":  [
+                                                                           {
+                                                                               "id":  "top_math_g6_num",
+                                                                               "label":  "Natural Numbers",
+                                                                               "levelId":  "lvl_math_g6"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_ic3_intro",
+                                                                               "label":  "Intro to Computing",
+                                                                               "levelId":  "lvl_ic3_gs6_l1"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_mos_excel",
+                                                                               "label":  "Microsoft Excel",
+                                                                               "levelId":  "lvl_mos_excel"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_mos_powerpoint",
+                                                                               "label":  "Microsoft PowerPoint",
+                                                                               "levelId":  "lvl_mos_powerpoint"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_mos_word",
+                                                                               "label":  "Microsoft Word",
+                                                                               "levelId":  "lvl_mos_word"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_python_foundation",
+                                                                               "label":  "Python Foundation",
+                                                                               "levelId":  "lvl_python_foundation"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_python_intermediate",
+                                                                               "label":  "Python Intermediate",
+                                                                               "levelId":  "lvl_python_intermediate"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_ic3_safety",
+                                                                               "label":  "Internet Safety",
+                                                                               "levelId":  "lvl_ic3_gs6_l1"
+                                                                           },
+                                                                           {
+                                                                               "id":  "top_tin_hoc_algo",
+                                                                               "label":  "Algorithm Basics",
+                                                                               "levelId":  "lvl_tin_hoc_6"
+                                                                           }
+                                                                       ]
+                                                        }
+                          }
+             }
+}

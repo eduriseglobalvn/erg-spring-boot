@@ -1,8 +1,13 @@
 package com.erg.ergspringboot.controller.documents;
 
+import com.erg.ergspringboot.common.request.documents.DocumentRequests.UpdateDocumentRequest;
+import com.erg.ergspringboot.common.request.documents.DocumentRequests.UploadDocumentRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
+import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.service.documents.DocumentService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,8 +30,11 @@ public class DocumentController {
     }
 
     @PostMapping
-    public ApiResponse<Map<String, Object>> upload(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
-        return ok("Document uploaded", documentService.upload(body, userId(request), tenantId(request)), request);
+    public ApiResponse<Map<String, Object>> upload(@Valid @RequestBody(required = false) UploadDocumentRequest body, HttpServletRequest request) {
+        if (body == null) {
+            throw new BadRequestException("Request body is required for document upload");
+        }
+        return ok("Document uploaded", documentService.upload(body.toMap(), userId(), tenantId()), request);
     }
 
     @GetMapping
@@ -45,8 +53,11 @@ public class DocumentController {
     }
 
     @PatchMapping("/{id}")
-    public ApiResponse<Map<String, Object>> update(@PathVariable String id, @RequestBody Map<String, Object> body, HttpServletRequest request) {
-        return ok("Document updated", documentService.update(id, body), request);
+    public ApiResponse<Map<String, Object>> update(@PathVariable String id, @Valid @RequestBody UpdateDocumentRequest body, HttpServletRequest request) {
+        if (body == null) {
+            throw new BadRequestException("Request body is required for document update");
+        }
+        return ok("Document updated", documentService.update(id, body.toMap()), request);
     }
 
     @DeleteMapping("/{id}")
@@ -58,14 +69,13 @@ public class DocumentController {
         return ApiResponse.success(200, message, data, request.getRequestURI(), requestId(request));
     }
 
-    private String userId(HttpServletRequest request) {
-        String value = request.getHeader("X-User-ID");
-        return value == null || value.isBlank() ? "system" : value.trim();
+    private String userId() {
+        var principal = SecurityUtils.principal();
+        return principal != null ? principal.userId() : "system";
     }
 
-    private String tenantId(HttpServletRequest request) {
-        String value = request.getHeader("X-Tenant-ID");
-        return value == null || value.isBlank() ? "erg" : value.trim();
+    private String tenantId() {
+        return SecurityUtils.normalizeTenant(SecurityUtils.principal() != null ? SecurityUtils.principal().tenantId() : null);
     }
 
     private String requestId(HttpServletRequest request) {

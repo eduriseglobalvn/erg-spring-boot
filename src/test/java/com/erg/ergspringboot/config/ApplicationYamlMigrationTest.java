@@ -27,6 +27,16 @@ class ApplicationYamlMigrationTest {
     }
 
     @Test
+    void pilotConnectionBudgetDefaultsFitTheSingleHostPostgresBudget() throws IOException {
+        String applicationYaml = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertThat(applicationYaml)
+                .contains("maximum-pool-size: ${DB__MAX_OPEN_CONNS:8}")
+                .contains("minimum-idle: ${DB__MAX_IDLE_CONNS:1}")
+                .contains("connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:1000}");
+    }
+
+    @Test
     void postgresCoreSchemaContainsAuthenticationColumnsWithoutPatchMigrations() throws IOException {
         String migration = Files.readString(Path.of(
                 "src/main/resources/db/migration/postgres/V1__postgres_core_schema.sql"

@@ -7,17 +7,19 @@ Tài liệu này quy định bốn quy trình riêng biệt. Tất cả lệnh W
 | Chế độ | Spring Boot chạy ở đâu? | Dịch vụ Docker | File env | Lệnh chính |
 | --- | --- | --- | --- | --- |
 | Local dev | IDE trên Windows, port `1606` | PostgreSQL, Redis, Nginx | `ops/docker/.env.dev` | `.\scripts\docker.ps1 dev` |
-| Local native test | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `.\scripts\docker.ps1 up 2 -Image erg-spring:local-native` |
+| Local Docker test | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `.\scripts\docker.ps1 test 2 -Image erg-spring:local-native` |
 | Build release | BuildKit/GraalVM trong Linux container | Không chạy stack ứng dụng | Không dùng env runtime | `.\scripts\docker.ps1 build -Image <registry/image:tag>` |
-| Production | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `./scripts/docker.sh deploy 3` |
+| Production | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `./scripts/docker.sh prod 3` |
 
 Ý nghĩa các action:
 
 - `dev`: chỉ bật hạ tầng local. Không build và không chạy source Spring Boot trong Docker.
+- `test`: chạy image native đã build ở local để kiểm tra gần giống production. Không tự build lại image.
 - `build`: compile source thành native image `linux/amd64`. Không bật stack.
-- `up`: chạy image đã có ở local. Không build lại.
+- `up`: bí danh của `test`.
 - `push`: đẩy image đã build lên Registry.
-- `deploy`: server pull image rồi chạy với `--no-build`. Server tuyệt đối không compile.
+- `prod`: server pull image rồi chạy với `--no-build`. Server tuyệt đối không compile.
+- `deploy`: bí danh của `prod`.
 - `logs`: xem log Nginx và các backend của stack native.
 - `down`: dừng cả stack dev và stack native, không xóa volume dữ liệu.
 - `config`: kiểm tra cú pháp cả hai cấu hình Compose.
@@ -57,7 +59,7 @@ Khởi động `ErgSpringApplication` trong IDE với port `1606`.
 ### Bước 3: gọi API qua Nginx
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/actuator/health/readiness
+Invoke-RestMethod http://localhost:8080/ready
 ```
 
 Luồng request:
@@ -117,16 +119,16 @@ Nếu stack dev vẫn dùng `8080`, đổi cổng native test sang `18080`:
 
 ```powershell
 $env:ERG_HTTP_PORT = "18080"
-.\scripts\docker.ps1 up 2 -Image erg-spring:local-native
+.\scripts\docker.ps1 test 2 -Image erg-spring:local-native
 ```
 
-Số `2` là số backend. Có thể dùng `up 3`, `up 4`, v.v. Backend chỉ mở port `1606` trong Docker network; chỉ Nginx publish port ra máy Windows.
+Số `2` là số backend. Có thể dùng `test 3`, `test 4`, v.v. Backend chỉ mở port `1606` trong Docker network; chỉ Nginx publish port ra máy Windows.
 
 ### Bước 4: kiểm tra
 
 ```powershell
 Invoke-RestMethod http://localhost:18080/nginx-health
-Invoke-RestMethod http://localhost:18080/actuator/health/readiness
+Invoke-RestMethod http://localhost:18080/ready
 .\scripts\docker.ps1 logs
 ```
 
@@ -136,6 +138,25 @@ Kiểm tra đủ số replica:
 $env:ERG_HTTP_PORT = "18080"
 docker compose --project-directory ops/docker --env-file ops/docker/.env.production `
   -f ops/docker/compose.yml -f ops/docker/compose.native.yml ps
+```
+
+### Test mã nguồn và test runtime Docker
+
+`mvn test` là unit/integration test của mã nguồn. Lệnh này không khởi động Nginx và không kiểm tra native image:
+
+```powershell
+.\mvnw.cmd -Dspring.profiles.active=test test
+```
+
+`docker.ps1 test` là smoke test runtime: chạy đúng image Linux amd64 đã build, kết nối PostgreSQL/Redis bằng tên service Docker và đi qua Nginx. Quy trình local đầy đủ:
+
+```text
+1. dev:         .\scripts\docker.ps1 dev
+2. test mã:     .\mvnw.cmd -Dspring.profiles.active=test test
+3. build:       .\scripts\docker.ps1 build -Image <registry>/erg-spring:<git-sha>
+4. test Docker: .\scripts\docker.ps1 test 2 -Image <registry>/erg-spring:<git-sha>
+5. push:        .\scripts\docker.ps1 push -Image <registry>/erg-spring:<git-sha>
+6. prod:        ./scripts/docker.sh prod 3
 ```
 
 ## 4. Build và push bản release tại Windows
@@ -191,11 +212,11 @@ Chạy ba backend:
 docker login ghcr.io
 chmod +x scripts/docker.sh
 ./scripts/docker.sh config
-./scripts/docker.sh deploy 3
+./scripts/docker.sh prod 3
 ./scripts/docker.sh logs
 ```
 
-`deploy` chỉ chạy hai thao tác:
+`prod` (và bí danh `deploy`) chỉ chạy hai thao tác:
 
 ```text
 docker compose pull
@@ -209,12 +230,12 @@ docker compose up --no-build --scale backend=3
 3. Chạy lại:
 
 ```bash
-./scripts/docker.sh deploy 3
+./scripts/docker.sh prod 3
 ```
 
 ### Rollback
 
-Đổi `ERG_APP_IMAGE` về tag cũ rồi chạy lại cùng lệnh `deploy`. Named volume PostgreSQL và Redis không bị xóa khi container được recreate.
+Đổi `ERG_APP_IMAGE` về tag cũ rồi chạy lại cùng lệnh `prod`. Named volume PostgreSQL và Redis không bị xóa khi container được recreate.
 
 ## 6. File env
 

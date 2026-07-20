@@ -1,0 +1,23 @@
+{
+  "skill_name": "erg-spring-enterprise",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit security cho erg-spring va lap ke hoach sua header auth, managed scope, RBAC cho LMS GraphQL.",
+      "expected_output": "A Vietnamese audit that identifies header-auth spoofing, authoritative scope requirements, service-level guards, GraphQL field permissions, and concrete tests.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Them GraphQL query lms.classWorkspace cho man hinh quan ly lop, dam bao khong N+1.",
+      "expected_output": "A design/implementation plan using read-model service, paginated students, batch assignment/attempt summary queries, scope checks, and query-count tests.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Review DTO va response cua mot endpoint moi trong erg-spring theo chuan enterprise.",
+      "expected_output": "A review that requires ApiResponse<T>, typed request/response records, validation, pagination, sensitive-field exclusion, and native-image friendly design.",
+      "files": []
+    }
+  ]
+}

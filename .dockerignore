@@ -1,0 +1,17 @@
+.git
+.gitattributes
+.gitignore
+.idea
+.codex-runtime
+.claude
+.env
+.env.*
+target
+backups
+docs
+load
+postman
+ops
+*.iml
+*.log
+

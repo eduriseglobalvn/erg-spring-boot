@@ -7,17 +7,27 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.FeatureC
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionGroupResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionOverrideResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionResponse;
+import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionPageResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PreviewChangesRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PreviewChangesResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RoleResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
+import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
+import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRoleAssignmentResponse;
+import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
+import com.erg.ergspringboot.exception.UnauthorizedException;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.service.authorization.AuthorizationService;
+import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.service.users.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,15 +38,23 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController
 @RequestMapping("/api/v1")
 public class AuthorizationController {
 
     private final AuthorizationService authorizationService;
+    private ScopedRoleAssignmentService scopedRoleAssignmentService;
 
     public AuthorizationController(AuthorizationService authorizationService) {
         this.authorizationService = authorizationService;
+    }
+
+    @Autowired(required = false)
+    void setScopedRoleAssignmentService(ScopedRoleAssignmentService scopedRoleAssignmentService) {
+        this.scopedRoleAssignmentService = scopedRoleAssignmentService;
     }
 
     @GetMapping("/roles")
@@ -52,7 +70,13 @@ public class AuthorizationController {
     @PostMapping("/roles")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<RoleResponse> createRole(@Valid @RequestBody CreateRoleRequest body, HttpServletRequest request) {
-        return ApiResponse.success(201, "Role created", authorizationService.createRole(body), request.getRequestURI(), requestId(request));
+        ErgPrincipal principal = principal();
+        return ApiResponse.success(
+                201,
+                "Role created",
+                authorizationService.createRole(body, principal, auditContext(request)),
+                request.getRequestURI(),
+                requestId(request));
     }
 
     @RequestMapping(method = {RequestMethod.PUT, RequestMethod.PATCH}, path = "/roles/{roleId}")
@@ -61,18 +85,49 @@ public class AuthorizationController {
             @Valid @RequestBody UpdateRoleRequest body,
             HttpServletRequest request
     ) {
-        return ok("Role updated", authorizationService.updateRole(roleId, body), request);
+        ErgPrincipal principal = principal();
+        return ok(
+                "Role updated",
+                authorizationService.updateRole(roleId, body, principal, auditContext(request)),
+                request);
     }
 
     @DeleteMapping("/roles/{roleId}")
     public ApiResponse<Void> deleteRole(@PathVariable String roleId, HttpServletRequest request) {
-        authorizationService.deleteRole(roleId);
+        ErgPrincipal principal = principal();
+        authorizationService.deleteRole(roleId, principal, auditContext(request));
         return ok("Role deleted", null, request);
     }
 
     @GetMapping("/permissions")
     public ApiResponse<List<PermissionResponse>> listPermissions(HttpServletRequest request) {
         return ok("Permissions loaded", authorizationService.listPermissions(), request);
+    }
+
+    @GetMapping("/permissions/catalog")
+    public ApiResponse<PermissionPageResponse> permissionCatalog(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String group,
+            @RequestParam(required = false) String portal,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean used,
+            HttpServletRequest request
+    ) {
+        return ok(
+                "Permission catalog loaded",
+                authorizationService.searchPermissions(page, limit, search, group, portal, status, used),
+                request
+        );
+    }
+
+    @GetMapping("/permissions/{permissionId}")
+    public ApiResponse<PermissionResponse> permissionDetail(
+            @PathVariable String permissionId,
+            HttpServletRequest request
+    ) {
+        return ok("Permission loaded", authorizationService.getPermission(permissionId), request);
     }
 
     @GetMapping("/permission-groups")
@@ -86,7 +141,9 @@ public class AuthorizationController {
             @PathVariable String roleId,
             HttpServletRequest request
     ) {
-        authorizationService.removeRole(userId, roleId);
+        ErgPrincipal principal = principal();
+        authorizationService.removeRole(
+                userId, roleId, principal.tenantId(), principal, auditContext(request));
         return ok("Role removed", null, request);
     }
 
@@ -95,7 +152,48 @@ public class AuthorizationController {
             @Valid @RequestBody BulkAssignRoleRequest body,
             HttpServletRequest request
     ) {
-        return ok("Role assigned", new BulkOperationResponse(authorizationService.bulkAssignRole(body)), request);
+        ErgPrincipal principal = principal();
+        return ok(
+                "Role assigned",
+                new BulkOperationResponse(authorizationService.bulkAssignRole(
+                        body, principal.tenantId(), principal, auditContext(request))),
+                request);
+    }
+
+    @PostMapping("/users/{userId}/role-assignments")
+    public ApiResponse<ScopedRoleAssignmentResponse> assignScopedRole(
+            @PathVariable String userId,
+            @Valid @RequestBody AssignScopedRoleRequest body,
+            HttpServletRequest request
+    ) {
+        if (scopedRoleAssignmentService == null) {
+            throw new IllegalStateException("scoped role assignment service is not configured");
+        }
+        ErgPrincipal principal = principal();
+        return ok(
+                "Scoped role assigned",
+                scopedRoleAssignmentService.assign(userId, principal.tenantId(), body, principal, auditContext(request)),
+                request
+        );
+    }
+
+    @DeleteMapping("/users/{userId}/role-assignments/{assignmentId}")
+    public ApiResponse<ScopedRoleAssignmentResponse> revokeScopedRole(
+            @PathVariable String userId,
+            @PathVariable String assignmentId,
+            @RequestBody(required = false) RevokeScopedRoleRequest body,
+            HttpServletRequest request
+    ) {
+        if (scopedRoleAssignmentService == null) {
+            throw new IllegalStateException("scoped role assignment service is not configured");
+        }
+        ErgPrincipal principal = principal();
+        return ok(
+                "Scoped role revoked",
+                scopedRoleAssignmentService.revoke(
+                        userId, assignmentId, principal.tenantId(), body, principal, auditContext(request)),
+                request
+        );
     }
 
     @DeleteMapping("/users/{userId}/permissions/{overrideId}")
@@ -104,7 +202,9 @@ public class AuthorizationController {
             @PathVariable String overrideId,
             HttpServletRequest request
     ) {
-        authorizationService.deletePermissionOverride(userId, overrideId);
+        ErgPrincipal principal = principal();
+        authorizationService.deletePermissionOverride(
+                userId, overrideId, principal.tenantId(), auditContext(request));
         return ok("Permission override deleted", null, request);
     }
 
@@ -147,7 +247,26 @@ public class AuthorizationController {
     }
 
     private String userId(HttpServletRequest request) {
-        String value = request.getHeader("X-User-ID");
-        return value == null || value.isBlank() ? "system" : value.trim();
+        return principal().userId();
+    }
+
+    private UserService.AuditContext auditContext(HttpServletRequest request) {
+        ErgPrincipal principal = principal();
+        return new UserService.AuditContext(
+                principal.userId(),
+                requestId(request),
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
+    }
+
+    private ErgPrincipal principal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof ErgPrincipal principal
+                && principal.userId() != null && !principal.userId().isBlank()
+                && principal.tenantId() != null && !principal.tenantId().isBlank()) {
+            return principal;
+        }
+        throw new UnauthorizedException("missing authenticated principal");
     }
 }

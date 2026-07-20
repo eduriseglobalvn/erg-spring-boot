@@ -1,6 +1,5 @@
 # Documentation-only ACL sketch. Generate real password hashes outside Git.
 # Redis 8 contains more command families than Redis 7; do not grant +@all in production.
 user default off
-user erg-state on #replace-with-sha256-password ~erg:state:* +ping +hello +client +command|info +get +set +del +unlink +exists +expire +pexpire +pexpireat +pttl +incr +incrby +hget +hset +hdel +hgetall +sadd +srem +smembers +publish +subscribe +psubscribe +unsubscribe +punsubscribe +evalsha +script|load
-user erg-cache on #replace-with-different-sha256-password ~erg:cache:* +ping +hello +client +get +set +mget +mset +del +unlink +exists +expire +pexpire +pttl
-
+user erg-state on #replace-with-sha256-password ~erg:state:* &erg:state:* +ping +hello +client|setname +command|info +get +set +del +unlink +exists +expire +pexpire +pexpireat +pttl +ttl +persist +incr +incrby +increx +hget +hset +hdel +hgetall +sadd +srem +smembers +publish +subscribe +psubscribe +unsubscribe +punsubscribe +eval +evalsha +script|load
+user erg-cache on #replace-with-different-sha256-password ~erg:cache:* +ping +hello +client|setname +get +set +mget +mset +del +unlink +exists +expire +pexpire +pexpireat +pttl +ttl

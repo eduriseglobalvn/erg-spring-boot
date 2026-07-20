@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.common.response.auth;
 
+import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
 import java.util.List;
 
 public final class AuthResponses {
@@ -55,13 +56,11 @@ public final class AuthResponses {
             String provider,
             String accountType,
             String accessLevel,
-            String googleSub,
-            String googleEmail,
-            Boolean googleEmailVerified,
             String lastLoginProvider,
             List<String> roles,
             boolean isProfileCompleted,
-            String createdAt
+            String createdAt,
+            AccountLifecycleResponse lifecycle
     ) {
     }
 

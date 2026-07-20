@@ -1,0 +1,108 @@
+{
+  "realm": "erg",
+  "enabled": true,
+  "displayName": "ERG Internal Identity",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 7200,
+  "ssoSessionMaxLifespan": 43200,
+  "offlineSessionMaxLifespanEnabled": false,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA256",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "identityProviders": [],
+  "requiredActions": [
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10
+    },
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 20
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "staff", "description": "ERG internal staff; provisioning must assign CONFIGURE_TOTP" },
+      { "name": "student", "description": "ERG internal learner" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "erg-api",
+      "name": "ERG API BFF",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "CHANGE_ME_AT_DEPLOYMENT",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://api.erg.edu.vn/login/oauth2/code/erg-api", "http://localhost:8080/login/oauth2/code/erg-api"],
+      "webOrigins": ["https://lms.erg.edu.vn", "https://lcms.erg.edu.vn", "https://elearning.erg.edu.vn"]
+    },
+    {
+      "clientId": "erg-lms",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "CHANGE_ME_AT_DEPLOYMENT",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://lms.erg.edu.vn/*"],
+      "webOrigins": ["https://lms.erg.edu.vn"]
+    },
+    {
+      "clientId": "erg-lcms",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "CHANGE_ME_AT_DEPLOYMENT",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://lcms.erg.edu.vn/*"],
+      "webOrigins": ["https://lcms.erg.edu.vn"]
+    },
+    {
+      "clientId": "erg-elearning",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "CHANGE_ME_AT_DEPLOYMENT",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://elearning.erg.edu.vn/*"],
+      "webOrigins": ["https://elearning.erg.edu.vn"]
+    }
+  ]
+}

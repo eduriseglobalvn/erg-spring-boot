@@ -19,9 +19,11 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StudentScoreItem;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StudentScoreListResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.lms.Assignment;
+import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.lms.Attempt;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Quiz;
@@ -34,56 +36,124 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
 public class LmsRuntimeService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LmsRuntimeService.class);
+    private static final List<String> ATTEMPT_READ_CACHES = List.of(
+            "lmsHomeworkWorkspace",
+            "lmsClassWorkspace",
+            "lmsAssignmentProgress",
+            "studentDashboard",
+            "quizAssignmentReport",
+            "quizQuestionAnalytics"
+    );
 
     private final LmsClassroomService classroomService;
     private final LmsAssignmentService assignmentService;
     private final LmsQuizService quizService;
     private final LmsAttemptService attemptService;
     private final LmsStudentService studentService;
+    private final com.erg.ergspringboot.service.quiz.runtime.QuizRuntimePackageService runtimePackageService;
+    private final com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService attemptGradingService;
+    private final com.erg.ergspringboot.service.quiz.runtime.AttemptEventRecorder attemptEventRecorder;
+    private final CacheManager cacheManager;
 
     public LmsRuntimeService(
             LmsClassroomService classroomService,
             LmsAssignmentService assignmentService,
             LmsQuizService quizService,
             LmsAttemptService attemptService,
-            LmsStudentService studentService
+            LmsStudentService studentService,
+            com.erg.ergspringboot.service.quiz.runtime.QuizRuntimePackageService runtimePackageService,
+            com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService attemptGradingService,
+            com.erg.ergspringboot.service.quiz.runtime.AttemptEventRecorder attemptEventRecorder,
+            CacheManager cacheManager
     ) {
         this.classroomService = classroomService;
         this.assignmentService = assignmentService;
         this.quizService = quizService;
         this.attemptService = attemptService;
         this.studentService = studentService;
+        this.runtimePackageService = runtimePackageService;
+        this.attemptGradingService = attemptGradingService;
+        this.attemptEventRecorder = attemptEventRecorder;
+        this.cacheManager = cacheManager;
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access) {
         String tenantId = normalizeTenant(access.tenantId());
-        List<AssignmentResponse> items = assignmentService.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .filter(item -> assignedToStudent(item, studentId))
-                .filter(item -> classAllowed(item.getAcademicClassId(), access))
+        java.util.Optional<String> studentAcademicClassId = studentService
+                .findFirstByTenantIdAndAuthUserId(tenantId, studentId)
+                .map(student -> student.getAcademicClassId());
+        List<Assignment> assignments = assignmentService.findByTenantIdOrderByCreatedAtDesc(tenantId);
+        Map<String, Classroom> classroomsById = classroomsById(tenantId, assignments);
+        List<AssignmentResponse> items = assignments.stream()
+                .filter(item -> assignedToStudent(item, studentId, studentAcademicClassId))
+                .filter(item -> classAllowed(item.getAcademicClassId(), access, classroomsById))
                 .sorted(Comparator.comparing(Assignment::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toAssignmentResponse)
                 .toList();
         return new StudentAssignmentListResponse(items);
     }
 
+    public StudentAssignmentListResponse listStudentAssignments(
+            String studentId, UserAccessContext access, int page, int size
+    ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, Math.min(size, 100));
+        String tenantId = normalizeTenant(access.tenantId());
+        Student student = studentService.findFirstByTenantIdAndAuthUserId(tenantId, studentId)
+                .orElse(null);
+        String canonicalStudentId = student == null ? studentId : student.getId();
+        String academicClassId = student == null ? null : student.getAcademicClassId();
+        Page<Assignment> assignmentPage = assignmentService.findStudentAssignments(
+                tenantId, canonicalStudentId, academicClassId,
+                PageRequest.of(safePage, safeSize)
+        );
+        Map<String, Classroom> classroomsById = classroomsById(tenantId, assignmentPage.getContent());
+        List<AssignmentResponse> items = assignmentPage.getContent().stream()
+                .filter(item -> classAllowed(item.getAcademicClassId(), access, classroomsById))
+                .map(this::toAssignmentResponse)
+                .toList();
+        return new StudentAssignmentListResponse(
+                items, assignmentPage.getNumber(), assignmentPage.getSize(), assignmentPage.getTotalElements(),
+                assignmentPage.getTotalPages(), assignmentPage.hasNext());
+    }
+
     public StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access) {
         String tenantId = normalizeTenant(access.tenantId());
-        List<StudentScoreItem> items = assignmentService.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
-                .filter(assignment -> assignedToStudent(assignment, studentId))
-                .filter(assignment -> classAllowed(assignment.getAcademicClassId(), access))
+        java.util.Optional<String> studentAcademicClassId = studentService
+                .findFirstByTenantIdAndAuthUserId(tenantId, studentId)
+                .map(student -> student.getAcademicClassId());
+        List<Assignment> assignments = assignmentService.findByTenantIdOrderByCreatedAtDesc(tenantId);
+        Map<String, Classroom> classroomsById = classroomsById(tenantId, assignments);
+        assignments = assignments.stream()
+                .filter(assignment -> assignedToStudent(assignment, studentId, studentAcademicClassId))
+                .filter(assignment -> classAllowed(assignment.getAcademicClassId(), access, classroomsById))
+                .toList();
+        Map<String, List<AttemptResponse>> recentAttemptsByAssignment = attemptService
+                .findTop3ByAssignmentsAndStudent(
+                        tenantId,
+                        assignments.stream().map(Assignment::getId).toList(),
+                        studentId)
+                .stream()
+                .map(this::toAttemptResponse)
+                .collect(java.util.stream.Collectors.groupingBy(AttemptResponse::assignmentId));
+        List<StudentScoreItem> items = assignments.stream()
                 .map(assignment -> {
-                    List<AttemptResponse> recent = attemptService
-                            .findTop3ByAssignmentAndStudent(tenantId, assignment.getId(), studentId)
-                            .stream()
-                            .map(this::toAttemptResponse)
-                            .toList();
+                    List<AttemptResponse> recent = recentAttemptsByAssignment.getOrDefault(assignment.getId(), List.of());
                     double bestScore = recent.stream()
                             .mapToDouble(AttemptResponse::score)
                             .max()
@@ -94,8 +164,46 @@ public class LmsRuntimeService {
         return new StudentScoreListResponse(items);
     }
 
+    public StudentScoreListResponse listStudentScores(
+            String studentId, UserAccessContext access, int page, int size
+    ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.max(1, Math.min(size, 100));
+        String tenantId = normalizeTenant(access.tenantId());
+        String academicClassId = studentService.findFirstByTenantIdAndAuthUserId(tenantId, studentId)
+                .map(item -> item.getAcademicClassId()).orElse(null);
+        Page<Assignment> assignmentPage = assignmentService.findStudentAssignments(
+                tenantId, studentId, academicClassId,
+                PageRequest.of(safePage, safeSize)
+        );
+        Map<String, Classroom> classroomsById = classroomsById(tenantId, assignmentPage.getContent());
+        List<Assignment> assignments = assignmentPage.getContent().stream()
+                .filter(item -> classAllowed(item.getAcademicClassId(), access, classroomsById)).toList();
+        Map<String, List<AttemptResponse>> recentAttemptsByAssignment = attemptService
+                .findTop3ByAssignmentsAndStudent(tenantId, assignments.stream().map(Assignment::getId).toList(), studentId)
+                .stream().map(this::toAttemptResponse)
+                .collect(java.util.stream.Collectors.groupingBy(AttemptResponse::assignmentId));
+        List<StudentScoreItem> items = assignments.stream().map(assignment -> {
+            List<AttemptResponse> recent = recentAttemptsByAssignment.getOrDefault(assignment.getId(), List.of());
+            double bestScore = recent.stream().mapToDouble(AttemptResponse::score).max().orElse(0);
+            return new StudentScoreItem(toAssignmentResponse(assignment), bestScore, recent);
+        }).toList();
+        return new StudentScoreListResponse(
+                items, assignmentPage.getNumber(), assignmentPage.getSize(), assignmentPage.getTotalElements(),
+                assignmentPage.getTotalPages(), assignmentPage.hasNext());
+    }
+
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
         Quiz quiz = quiz(quizId, access);
+        // Prefer the published, signed package from the version lineage (spec §3, Phase 2/3). Legacy
+        // monolithic quizzes with no published version fall back to the embedded authoring blob until
+        // they are (re)published — keeps existing runtime callers working during the transition.
+        QuizPackageResponse published = runtimePackageService
+                .activePackage(normalizeTenant(access.tenantId()), quizId)
+                .orElse(null);
+        if (published != null) {
+            return published;
+        }
         QuizResponse response = toQuizResponse(quiz);
         QuizDetailResponse detail = new QuizDetailResponse(
                 response,
@@ -104,7 +212,7 @@ public class LmsRuntimeService {
                 nullToMap(quiz.getResult()),
                 nullToMap(quiz.getTheme())
         );
-        return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail);
+        return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail, Map.of());
     }
 
     public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) {
@@ -113,6 +221,16 @@ public class LmsRuntimeService {
 
     @Transactional("postgresTransactionManager")
     public AttemptResponse startAttempt(String studentId, StartAttemptRequest request, UserAccessContext access) {
+        return startAttempt(studentId, request, null, access);
+    }
+
+    @Transactional("postgresTransactionManager")
+    public AttemptResponse startAttempt(
+            String studentId,
+            StartAttemptRequest request,
+            String idempotencyKey,
+            UserAccessContext access
+    ) {
         String tenantId = normalizeTenant(access.tenantId());
         Assignment assignment = assignment(request.assignmentId(), tenantId);
         ensureClassAccess(assignment.getAcademicClassId(), access);
@@ -122,10 +240,41 @@ public class LmsRuntimeService {
         if (!assignedToStudent(assignment, studentId)) {
             throw new BadRequestException("student is not assigned");
         }
+        // API callers identify students by auth_user_id, while runtime FKs use lms_students.id.
+        // Resolve once before the idempotency/attempt queries so all writes use the canonical key.
+        String persistedStudentId = studentService
+                .findFirstByTenantIdAndAuthUserId(tenantId, studentId)
+                .map(com.erg.ergspringboot.model.lms.Student::getId)
+                .orElse(studentId);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        ensureAssignmentOpenForStart(assignment, now);
+        String startIdempotencyKey = blankToNull(idempotencyKey);
+        if (startIdempotencyKey != null) {
+            java.util.Optional<Attempt> idempotentAttempt = attemptService.findByStartIdempotencyKey(
+                    tenantId, request.assignmentId(), request.quizId(), persistedStudentId, startIdempotencyKey);
+            if (idempotentAttempt.isPresent()) {
+                return toAttemptResponse(idempotentAttempt.get());
+            }
+        }
         Attempt attempt = attemptService
-                .findInProgress(tenantId, request.assignmentId(), request.quizId(), studentId)
-                .orElseGet(() -> newAttempt(tenantId, studentId, request));
-        return toAttemptResponse(attemptService.save(attempt));
+                .findInProgress(tenantId, request.assignmentId(), request.quizId(), persistedStudentId)
+                .orElseGet(() -> {
+                    ensureAttemptLimitAvailable(assignment, tenantId, request.quizId(), persistedStudentId);
+                    return newAttempt(tenantId, persistedStudentId, request, now, startIdempotencyKey);
+                });
+        // Pin the attempt to the currently active published version so grading/report use a frozen key.
+        runtimePackageService.activePackageEntity(tenantId, request.quizId()).ifPresent(pkg -> {
+            if (attempt.getQuizVersionId() == null) {
+                attempt.setQuizVersionId(pkg.getQuizVersionId());
+            }
+            attempt.setGradingMode(pkg.getGradingMode());
+            attempt.setTotalQuestions(totalQuestions(pkg.getPackageJson()));
+        });
+        quizService.findById(request.quizId()).ifPresent(quiz -> attempt.setMode(runtimeMode(quiz.getKind())));
+        attempt.setLastActiveAt(now);
+        Attempt saved = attemptService.save(attempt);
+        evictAttemptReadCachesAfterCommit();
+        return toAttemptResponse(saved);
     }
 
     @Transactional("postgresTransactionManager")
@@ -141,7 +290,13 @@ public class LmsRuntimeService {
         attempt.setEvents(request == null ? attempt.getEvents() : request.events());
         attempt.setClient(request == null ? attempt.getClient() : request.client());
         attempt.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        return toAttemptResponse(attemptService.save(attempt));
+        Attempt saved = attemptService.save(attempt);
+        if (request != null) {
+            attemptEventRecorder.recordClientBatch(
+                    saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.events());
+        }
+        evictAttemptReadCachesAfterCommit();
+        return toAttemptResponse(saved);
     }
 
     @Transactional("postgresTransactionManager")
@@ -160,21 +315,35 @@ public class LmsRuntimeService {
         ));
         attempt.setAnswers(answers);
         attempt.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        attemptService.save(attempt);
+        Attempt saved = attemptService.save(attempt);
+        attemptEventRecorder.record(
+                null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(),
+                "answer_saved", questionId,
+                request == null ? null : request.answer(),
+                request == null ? null : request.clientResult(),
+                request == null ? null : request.answeredAt());
+        evictAttemptReadCachesAfterCommit();
         return new AnswerResultResponse(attemptId, questionId, true);
     }
 
+    @Transactional("postgresTransactionManager")
     public AttemptSyncResponse syncAttempt(String attemptId, AttemptSyncRequest request, UserAccessContext access) {
         Attempt attempt = mutableAttempt(attemptId, access);
         if (!Objects.equals(attempt.getPackageHash(), request.packageHash())) {
             return new AttemptSyncResponse("conflict", toAttemptResponse(attempt), List.of("package_hash"));
         }
+        // Replay the offline client event log idempotently into the append-only audit table (spec §1.7).
+        attemptEventRecorder.recordClientBatch(
+                attempt.getTenantId(), attempt.getId(), attempt.getQuizId(), attempt.getPackageId(), request.events());
         return new AttemptSyncResponse(attempt.getStatus(), toAttemptResponse(attempt), List.of());
     }
 
     @Transactional("postgresTransactionManager")
     public AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access) {
         Attempt attempt = mutableAttempt(attemptId, access);
+        if (request != null && request.packageHash() != null && !Objects.equals(attempt.getPackageHash(), request.packageHash())) {
+            throw new BadRequestException("package_hash conflict");
+        }
         if ("submitted".equalsIgnoreCase(attempt.getStatus())) {
             return new AttemptSubmitResponse(value(attempt.getScore()), value(attempt.getMaxScore()), value(attempt.getPercent()), Boolean.TRUE.equals(attempt.getPassed()));
         }
@@ -183,20 +352,68 @@ public class LmsRuntimeService {
             request.answers().forEach((questionId, answer) ->
                     answers.put(questionId, modelAnswer(questionId, answer, Map.of(), OffsetDateTime.now(ZoneOffset.UTC))));
         }
-        Quiz quiz = quiz(attempt.getQuizId(), access);
-        double score = answers.size();
-        double maxScore = Math.max(1, nullToList(quiz.getQuestionIds()).size());
-        double percent = Math.min(100, score / maxScore * 100);
+        OffsetDateTime submittedAt = request == null || request.submittedAt() == null
+                ? OffsetDateTime.now(ZoneOffset.UTC) : request.submittedAt();
+        Assignment assignment = assignment(attempt.getAssignmentId(), normalizeTenant(access.tenantId()));
+        ensureAttemptSubmitAllowed(attempt, assignment, submittedAt);
         attempt.setAnswers(answers);
         attempt.setStatus("submitted");
+        attempt.setSubmittedAt(submittedAt);
+        attempt.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        attempt.setLastActiveAt(attempt.getUpdatedAt());
+
+        // Prefer server-authoritative grading against the pinned published version (spec §6). When the
+        // attempt predates the version lineage (no quiz_version_id) fall back to the legacy count-based
+        // score so existing quizzes keep submitting.
+        double score;
+        double maxScore;
+        double percent;
+        boolean passed;
+        int totalQuestions;
+        var graded = attempt.getQuizVersionId() == null
+                ? java.util.Optional.<com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService.GradedAttempt>empty()
+                : attemptGradingService.gradeSubmission(
+                        normalizeTenant(access.tenantId()),
+                        attempt.getId(),
+                        attempt.getQuizVersionId(),
+                        rawAnswersByQuestionId(answers));
+        if (graded.isPresent()) {
+            com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService.GradedAttempt result = graded.get();
+            score = result.score().doubleValue();
+            maxScore = result.maxScore().doubleValue();
+            percent = result.percent();
+            passed = result.passed();
+            totalQuestions = result.totalQuestions();
+            attempt.setStatus(result.needsManualGrade() ? "needs_review" : "submitted");
+        } else {
+            Quiz quiz = quiz(attempt.getQuizId(), access);
+            score = answers.size();
+            maxScore = Math.max(1, nullToList(quiz.getQuestionIds()).size());
+            percent = Math.min(100, score / maxScore * 100);
+            passed = percent >= 50;
+            totalQuestions = (int) Math.round(maxScore);
+        }
         attempt.setScore(score);
         attempt.setMaxScore(maxScore);
         attempt.setPercent(percent);
-        attempt.setPassed(percent >= 50);
-        attempt.setSubmittedAt(request == null || request.submittedAt() == null ? OffsetDateTime.now(ZoneOffset.UTC) : request.submittedAt());
-        attempt.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        attemptService.save(attempt);
-        return new AttemptSubmitResponse(score, maxScore, percent, percent >= 50);
+        attempt.setPassed(passed);
+        attempt.setSubmittedCount(answers.size());
+        attempt.setTotalQuestions(totalQuestions);
+        Attempt savedAttempt = attemptService.save(attempt);
+
+        // Audit the submission and refresh the live progress projection the teacher dashboard reads (§1.7).
+        attemptEventRecorder.record(
+                null, savedAttempt.getTenantId(), savedAttempt.getId(), savedAttempt.getQuizId(),
+                savedAttempt.getPackageId(), "attempt_submitted", null, null,
+                java.util.Map.of("score", score, "percent", percent, "passed", passed), submittedAt);
+        if (request != null) {
+            attemptEventRecorder.recordClientBatch(
+                    savedAttempt.getTenantId(), savedAttempt.getId(), savedAttempt.getQuizId(),
+                    savedAttempt.getPackageId(), request.clientEvents());
+        }
+        projectSubmitProgress(savedAttempt, answers.size(), totalQuestions, score, passed, access);
+        evictAttemptReadCachesAfterCommit();
+        return new AttemptSubmitResponse(score, maxScore, percent, passed);
     }
 
     public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) {
@@ -211,44 +428,31 @@ public class LmsRuntimeService {
 
     public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) {
         quiz(quizId, access);
-        return attemptService.findByQuiz(normalizeTenant(access.tenantId()), quizId).stream()
-                .filter(attempt -> classAllowed(assignment(attempt.getAssignmentId(), normalizeTenant(access.tenantId())).getAcademicClassId(), access))
+        String tenantId = normalizeTenant(access.tenantId());
+        List<Attempt> attempts = attemptService.findByQuiz(tenantId, quizId);
+        Map<String, Assignment> assignmentsById = assignmentService.findByTenantIdAndIdIn(
+                        tenantId,
+                        attempts.stream().map(Attempt::getAssignmentId).filter(Objects::nonNull).distinct().toList())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(Assignment::getId, item -> item, (left, right) -> left));
+        Map<String, Classroom> classroomsById = classroomsById(tenantId, new java.util.ArrayList<>(assignmentsById.values()));
+        return attempts.stream()
+                .filter(attempt -> {
+                    Assignment assignment = assignmentsById.get(attempt.getAssignmentId());
+                    return assignment != null
+                            && classAllowed(assignment.getAcademicClassId(), access, classroomsById);
+                })
                 .map(this::toAttemptResponse)
                 .toList();
     }
 
-    public Map<String, Object> adminPlaceholder(String name, UserAccessContext access) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("module", "lms");
-        data.put("operation", name);
-        data.put("status", "available");
-        data.put("scope", scopePayload(access));
-        if (name.endsWith("/centers") || name.endsWith("/education-units")) {
-            data.put("items", educationUnitItems(access));
-        } else if (name.endsWith("/classes")) {
-            data.put("items", classItems(access));
-        } else if (name.endsWith("/subjects")) {
-            data.put("items", List.of());
-        }
-        return data;
-    }
-
-    public Map<String, Object> deprecatedBootstrapReplacement(String name, UserAccessContext access) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("deprecated", true);
-        data.put("operation", name);
-        data.put("replacement", "/api/v1/sessions/current");
-        data.put("message", "Use session bootstrap for current user scope and managed schools");
-        data.put("scope", scopePayload(access));
-        if (name.endsWith("/centers") || name.endsWith("/education-units")) {
-            data.put("items", educationUnitItems(access));
-        }
-        return data;
+    public Map<String, Object> listEducationUnits(UserAccessContext access) {
+        return Map.of("items", educationUnitItems(access));
     }
 
     @Cacheable(
             cacheNames = "lmsClassesBySchool",
-            key = "{#access.tenantId(), #schoolId, #access.managedEducationUnitIds().toString()}"
+            key = "{#access.tenantId(), #schoolId, #access.currentEducationUnitId(), #access.managedEducationUnitIds().toString()}"
     )
     public Map<String, Object> listClassesBySchool(String schoolId, UserAccessContext access) {
         String resolvedSchoolId = schoolId == null || schoolId.isBlank() ? access.currentEducationUnitId() : schoolId.trim();
@@ -263,40 +467,6 @@ public class LmsRuntimeService {
                 .map(this::classPayload)
                 .toList();
         return Map.of("schoolId", resolvedSchoolId, "items", items, "scope", scopePayload(access));
-    }
-
-    public Map<String, Object> normalizeScope(Map<String, Object> body, UserAccessContext access) {
-        String educationUnitId = stringValue(body, "educationUnitId", stringValue(body, "centerId", access.currentEducationUnitId()));
-        String academicClassId = stringValue(body, "academicClassId", stringValue(body, "classId", access.currentClassId()));
-        ensureEducationUnitAccess(educationUnitId, access);
-        ensureClassAccess(academicClassId, access);
-        Map<String, Object> scope = new LinkedHashMap<>();
-        scope.put("tenantId", access.tenantId());
-        scope.put("educationUnitId", educationUnitId);
-        scope.put("academicClassId", academicClassId);
-        scope.put("managedEducationUnitIds", access.managedEducationUnitIds());
-        scope.put("managedClassIds", access.managedClassIds());
-        return scope;
-    }
-
-    public Map<String, Object> acceptAdminOperation(Map<String, Object> body, UserAccessContext access) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("accepted", true);
-        data.put("scope", normalizeScope(body, access));
-        data.put("payload", body == null ? Map.of() : body);
-        return data;
-    }
-
-    public Map<String, Object> acceptAdminUpdate(String id, Map<String, Object> body, UserAccessContext access) {
-        Map<String, Object> data = acceptAdminOperation(body, access);
-        data.put("id", id);
-        return data;
-    }
-
-    public Map<String, Object> reportExport(Map<String, String> query, UserAccessContext access) {
-        ensureEducationUnitAccess(stringValue(query, "educationUnitId", query.get("centerId")), access);
-        ensureClassAccess(stringValue(query, "academicClassId", query.get("classId")), access);
-        return Map.of("ready", true, "format", query.getOrDefault("format", "xlsx"), "scope", normalizeScope(new LinkedHashMap<>(query), access));
     }
 
     private Quiz quiz(String quizId, UserAccessContext access) {
@@ -320,8 +490,13 @@ public class LmsRuntimeService {
         return attempt;
     }
 
-    private Attempt newAttempt(String tenantId, String studentId, StartAttemptRequest request) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+    private Attempt newAttempt(
+            String tenantId,
+            String studentId,
+            StartAttemptRequest request,
+            OffsetDateTime now,
+            String startIdempotencyKey
+    ) {
         Attempt attempt = new Attempt();
         attempt.setId(IdGenerator.newId());
         attempt.setTenantId(tenantId);
@@ -330,7 +505,12 @@ public class LmsRuntimeService {
         attempt.setStudentId(studentId);
         attempt.setPackageId(request.packageId());
         attempt.setPackageHash(request.packageHash());
+        attempt.setStartIdempotencyKey(startIdempotencyKey);
+        attempt.setMode("training");
         attempt.setStatus("in_progress");
+        attempt.setSubmittedCount(0);
+        attempt.setTotalQuestions(0);
+        attempt.setLastActiveAt(now);
         attempt.setAnswers(new LinkedHashMap<>());
         attempt.setEvents(List.of());
         attempt.setClient(Map.of());
@@ -343,10 +523,147 @@ public class LmsRuntimeService {
         return attempt;
     }
 
+    private void ensureAssignmentOpenForStart(Assignment assignment, OffsetDateTime now) {
+        if (assignment.getStartAt() != null && now.isBefore(assignment.getStartAt())) {
+            throw new BadRequestException("assignment has not started");
+        }
+        if (assignment.getDueAt() != null && now.isAfter(assignment.getDueAt())) {
+            throw new BadRequestException("assignment is past due");
+        }
+    }
+
+    private void ensureAttemptLimitAvailable(Assignment assignment, String tenantId, String quizId, String studentId) {
+        Integer limit = assignment.getAttemptLimit();
+        if (limit == null || limit <= 0) {
+            return;
+        }
+        long completedAttempts = attemptService.countCompletedForLimit(tenantId, assignment.getId(), quizId, studentId);
+        if (completedAttempts >= limit) {
+            throw new ConflictException("attempt limit reached");
+        }
+    }
+
+    private void ensureAttemptSubmitAllowed(Attempt attempt, Assignment assignment, OffsetDateTime submittedAt) {
+        if (assignment.getDueAt() != null && submittedAt.isAfter(assignment.getDueAt())) {
+            throw new BadRequestException("assignment is past due");
+        }
+        Integer maxDurationMinutes = assignment.getMaxDurationMinutes();
+        if (maxDurationMinutes == null || maxDurationMinutes <= 0 || attempt.getStartedAt() == null) {
+            return;
+        }
+        OffsetDateTime deadline = attempt.getStartedAt().plusMinutes(maxDurationMinutes);
+        if (submittedAt.isAfter(deadline)) {
+            throw new BadRequestException("attempt duration exceeded");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private int totalQuestions(Map<String, Object> packageJson) {
+        Object quiz = packageJson == null ? null : packageJson.get("quiz");
+        if (!(quiz instanceof Map<?, ?> quizMap)) {
+            return 0;
+        }
+        Object sections = ((Map<String, Object>) quizMap).get("sections");
+        if (!(sections instanceof List<?> sectionList)) {
+            return 0;
+        }
+        int total = 0;
+        for (Object section : sectionList) {
+            if (section instanceof Map<?, ?> sectionMap) {
+                Object questions = ((Map<String, Object>) sectionMap).get("questions");
+                if (questions instanceof List<?> questionList) {
+                    total += questionList.size();
+                }
+            }
+        }
+        return total;
+    }
+
+    private String runtimeMode(String quizKind) {
+        return "test".equalsIgnoreCase(quizKind) || "testing".equalsIgnoreCase(quizKind) ? "testing" : "training";
+    }
+
     private void ensureEditable(Attempt attempt) {
         if ("submitted".equalsIgnoreCase(attempt.getStatus())) {
             throw new BadRequestException("attempt already submitted");
         }
+    }
+
+    /** Flattens the stored answer map (questionId -> AttemptAnswer) to questionId -> raw answer for grading. */
+    private Map<String, Object> rawAnswersByQuestionId(
+            Map<String, com.erg.ergspringboot.model.lms.AttemptAnswer> answers
+    ) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        answers.forEach((questionId, answer) -> raw.put(questionId, answer == null ? null : answer.getAnswer()));
+        return raw;
+    }
+
+    /**
+     * Refreshes the live {@code student_progress} row the teacher dashboard/report reads (spec §1.7).
+     * Best-effort: a projection failure never blocks a submit, since the authoritative attempt is already
+     * persisted and the projection can be rebuilt.
+     */
+    private void projectSubmitProgress(
+            Attempt attempt,
+            int answeredCount,
+            int totalQuestions,
+            double score,
+            boolean passed,
+            UserAccessContext access
+    ) {
+        try {
+            String tenantId = normalizeTenant(access.tenantId());
+            Assignment assignment = assignmentService.findById(attempt.getAssignmentId()).orElse(null);
+            String classId = assignment == null ? attempt.getClassId() : assignment.getAcademicClassId();
+            com.erg.ergspringboot.model.lms.Student student = studentService
+                    .findByTenantIdAndId(tenantId, attempt.getStudentId())
+                    .or(() -> studentService.findFirstByTenantIdAndAuthUserId(tenantId, attempt.getStudentId()))
+                    .orElse(null);
+            String studentName = student == null ? null : student.getFullName();
+            String progressStudentId = student == null || student.getAuthUserId() == null
+                    ? attempt.getStudentId()
+                    : student.getAuthUserId();
+            String quizTitle = quizService.findById(attempt.getQuizId())
+                    .map(quiz -> quiz.getTitle())
+                    .orElse(null);
+            attemptGradingService.projectProgress(
+                    tenantId,
+                    progressStudentId,
+                    studentName,
+                    attempt.getQuizId(),
+                    quizTitle,
+                    attempt.getAssignmentId(),
+                    classId,
+                    attempt.getMode(),
+                    attempt.getStatus(),
+                    answeredCount,
+                    totalQuestions,
+                    java.math.BigDecimal.valueOf(score),
+                    passed,
+                    attempt.getStartedAt(),
+                    attempt.getSubmittedAt());
+        } catch (RuntimeException ex) {
+            log.warn("Failed to project student_progress for attempt {}: {}", attempt.getId(), ex.getMessage());
+        }
+    }
+
+    private void evictAttemptReadCachesAfterCommit() {
+        Runnable evict = () -> ATTEMPT_READ_CACHES.forEach(cacheName -> {
+            Cache cache = cacheManager.getCache(cacheName);
+            if (cache != null) {
+                cache.clear();
+            }
+        });
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            evict.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                evict.run();
+            }
+        });
     }
 
     private void ensureAttemptAccess(Attempt attempt, UserAccessContext access) {
@@ -401,19 +718,14 @@ public class LmsRuntimeService {
     }
 
     private List<Map<String, Object>> educationUnitItems(UserAccessContext access) {
-        return classroomService.findByTenantIdOrderByNameAsc(normalizeTenant(access.tenantId())).stream()
-                .map(Classroom::getSchoolId)
-                .filter(Objects::nonNull)
-                .distinct()
+        List<String> schoolIds = classroomService.findDistinctSchoolIdsByTenant(normalizeTenant(access.tenantId()));
+        if (schoolIds == null) {
+            schoolIds = classroomService.findByTenantIdOrderByNameAsc(normalizeTenant(access.tenantId())).stream()
+                    .map(Classroom::getSchoolId).filter(Objects::nonNull).distinct().toList();
+        }
+        return schoolIds.stream()
                 .filter(access::canAccessEducationUnit)
                 .map(educationUnitId -> Map.<String, Object>of("id", educationUnitId, "name", educationUnitId))
-                .toList();
-    }
-
-    private List<Map<String, Object>> classItems(UserAccessContext access) {
-        return classroomService.findByTenantIdOrderByNameAsc(normalizeTenant(access.tenantId())).stream()
-                .filter(item -> access.canAccessClass(item.getId()) && access.canAccessEducationUnit(item.getSchoolId()))
-                .map(this::classPayload)
                 .toList();
     }
 
@@ -513,12 +825,42 @@ public class LmsRuntimeService {
         return tenantId == null || tenantId.isBlank() ? "erg" : tenantId.trim();
     }
 
-    private String stringValue(Map<?, ?> body, String key, String fallback) {
-        if (body == null) {
-            return fallback;
+    private boolean classAllowed(String classId, UserAccessContext access, Map<String, Classroom> classroomsById) {
+        if (classId == null || classId.isBlank()) {
+            return true;
         }
-        Object value = body.get(key);
-        return value == null || value.toString().isBlank() ? fallback : value.toString().trim();
+        Classroom classroom = classroomsById.get(classId);
+        return classroom != null
+                && normalizeTenant(access.tenantId()).equals(normalizeTenant(classroom.getTenantId()))
+                && access.canAccessClass(classId)
+                && access.canAccessEducationUnit(classroom.getSchoolId());
+    }
+
+    private Map<String, Classroom> classroomsById(String tenantId, List<Assignment> assignments) {
+        List<String> classIds = assignments.stream()
+                .map(Assignment::getAcademicClassId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        return classroomService.findByTenantIdAndIdIn(tenantId, classIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Classroom::getId, item -> item, (left, right) -> left));
+    }
+
+    private boolean assignedToStudent(
+            Assignment assignment,
+            String studentId,
+            java.util.Optional<String> studentAcademicClassId
+    ) {
+        if (assignment.getStudentIds() != null && !assignment.getStudentIds().isEmpty()) {
+            return assignment.getStudentIds().contains(studentId);
+        }
+        return studentAcademicClassId
+                .map(classId -> Objects.equals(classId, assignment.getAcademicClassId()))
+                .orElse(true);
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private double value(Double number) {

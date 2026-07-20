@@ -1,0 +1,57 @@
+{
+    "statusCode":  200,
+    "message":  "Success",
+    "data":  {
+                 "user":  {
+                              "id":  "usr_super_admin",
+                              "email":  "admin@erg.edu.vn",
+                              "fullName":  "ERG Super Admin",
+                              "avatarUrl":  null,
+                              "phone":  null,
+                              "status":  "ACTIVE",
+                              "provider":  "local",
+                              "accountType":  "erg",
+                              "accessLevel":  "user",
+                              "lastLoginProvider":  "erg",
+                              "roles":  [
+                                            "system.super_admin"
+                                        ],
+                              "isProfileCompleted":  true,
+                              "createdAt":  "2026-07-11T03:03:57.348370Z"
+                          },
+                 "accessToken":  "s9gZ2M8fO0UNmMiOsRcjSNQkMrJ_9lTGfRSgvw39PKG8S8AxMJ-1eEdQg88fVU5G",
+                 "refreshToken":  "_6tjFdDiFHtemMw8h8OiFGXIgjwVp9hrTlMZxZrR3JanxeOULK-0jvkJl_CjYBYY",
+                 "expiresIn":  900,
+                 "tokenType":  "Bearer",
+                 "session":  {
+                                 "sessionId":  "019f5022-6bfe-709c-8b10-6a6ac37b2029",
+                                 "deviceId":  "web",
+                                 "deviceName":  "Browser on Desktop",
+                                 "portal":  "lcms",
+                                 "ipAddress":  "0:0:0:0:0:0:0:1",
+                                 "userAgent":  "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-US) WindowsPowerShell/5.1.26100.8655",
+                                 "current":  true,
+                                 "revoked":  false,
+                                 "revokedReason":  null,
+                                 "createdAt":  null,
+                                 "lastSeenAt":  "2026-07-11T07:44:20.863234400Z",
+                                 "expiresAt":  "2026-07-11T15:44:20.863234400Z"
+                             },
+                 "permissions":  [
+                                     "*",
+                                     "lms.class.read",
+                                     "lms.scope.read",
+                                     "lms.unit.read",
+                                     "profile.self"
+                                 ],
+                 "portals":  [
+                                 "*"
+                             ],
+                 "accountType":  "erg",
+                 "accessLevel":  "user"
+             },
+    "errors":  null,
+    "timestamp":  "2026-07-11T14:44:21.719804+07:00",
+    "path":  "/api/v1/auth/login",
+    "request_id":  "08c2dfbf-81b3-4bf7-b275-64e8949b3e9f"
+}

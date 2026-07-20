@@ -28,13 +28,13 @@ public class CrmSchoolProfile extends BaseEntity {
     @Column(name = "school_id", length = 36, nullable = false)
     private String schoolId;
 
-    @Column(name = "owner_user_id")
+    @Column(name = "owner_user_id", length = 36)
     private String ownerUserId;
 
-    @Column(name = "lead_owner_user_id")
+    @Column(name = "lead_owner_user_id", length = 36)
     private String leadOwnerUserId;
 
-    @Column(name = "manager_user_id")
+    @Column(name = "manager_user_id", length = 36)
     private String managerUserId;
 
     @Column(name = "source")
@@ -43,7 +43,7 @@ public class CrmSchoolProfile extends BaseEntity {
     @Column(name = "campaign")
     private String campaign;
 
-    @Column(name = "introduced_by_user_id")
+    @Column(name = "introduced_by_user_id", length = 36)
     private String introducedByUserId;
 
     @Column(name = "introduced_by_name")

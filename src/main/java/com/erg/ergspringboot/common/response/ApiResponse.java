@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.common.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.OffsetDateTime;
 
 public record ApiResponse<T>(
@@ -9,7 +10,8 @@ public record ApiResponse<T>(
         Object errors,
         OffsetDateTime timestamp,
         String path,
-        String request_id
+        @JsonProperty("request_id")
+        String requestId
 ) {
 
     public static <T> ApiResponse<T> success(

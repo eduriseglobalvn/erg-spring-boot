@@ -1,10 +1,17 @@
 package com.erg.ergspringboot.repository.users;
 
 import com.erg.ergspringboot.model.users.UserActivity;
-import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface UserActivityRepository extends JpaRepository<UserActivity, String> {
 
-    List<UserActivity> findByTargetUserIdAndTenantIdOrderByCreatedAtDesc(String targetUserId, String tenantId);
+    Page<UserActivity> findByTargetUserIdAndTenantIdOrderByCreatedAtDescIdDesc(
+            String targetUserId, String tenantId, Pageable pageable);
+
+    Page<UserActivity> findByTenantIdOrderByCreatedAtDescIdDesc(String tenantId, Pageable pageable);
+
+    Page<UserActivity> findByTenantIdAndTargetUserIdOrderByCreatedAtDescIdDesc(
+            String tenantId, String targetUserId, Pageable pageable);
 }

@@ -5,9 +5,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,19 +17,30 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class ErgAuthenticationFilter extends OncePerRequestFilter {
 
-    private final ErgPrincipalService principalService;
+    static final String AUTH_FAILURE_CODE_ATTRIBUTE = "erg.auth.failureCode";
 
-    public ErgAuthenticationFilter(ErgPrincipalService principalService) {
+    private final ErgPrincipalService principalService;
+    private final ErgSecurityProperties securityProperties;
+
+    public ErgAuthenticationFilter(ErgPrincipalService principalService, ErgSecurityProperties securityProperties) {
         this.principalService = principalService;
+        this.securityProperties = securityProperties;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         if (SecurityContextHolder.getContext().getAuthentication() == null && hasAuthenticationInput(request)) {
-            java.util.Optional<ErgPrincipal> principal = principalFrom(request);
+            Optional<ErgPrincipal> principal = principalFrom(request);
+            if (principal.isEmpty()) {
+                markBearerAuthenticationFailure(request);
+            }
             if (principal.isPresent() && !canAccessRequestedPortal(request, principal.get())) {
                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Portal session does not match requested API.");
+                return;
+            }
+            if (principal.isPresent() && isLifecycleRestricted(principal.get()) && !isOnboardingRequest(request)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCOUNT_LIFECYCLE_RESTRICTED");
                 return;
             }
             principal.ifPresent(this::authenticate);
@@ -37,27 +48,62 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean hasAuthenticationInput(HttpServletRequest request) {
-        String authorization = request.getHeader("Authorization");
-        return (authorization != null && authorization.startsWith("Bearer "))
-                || request.getHeader("X-User-ID") != null
-                || request.getHeader("X-Roles") != null
-                || request.getHeader("X-Permissions") != null;
+    private void markBearerAuthenticationFailure(HttpServletRequest request) {
+        String bearerToken = bearerToken(request);
+        if (bearerToken == null) {
+            return;
+        }
+        principalService.authenticationFailureCode(bearerToken, request.getHeader("X-Tenant-ID"))
+                .ifPresent(code -> request.setAttribute(AUTH_FAILURE_CODE_ATTRIBUTE, code));
     }
 
-    private java.util.Optional<ErgPrincipal> principalFrom(HttpServletRequest request) {
+    private boolean hasAuthenticationInput(HttpServletRequest request) {
+        if (bearerToken(request) != null) {
+            return true;
+        }
+        return securityProperties.isTrustedHeaderAuthEnabled()
+                && (request.getHeader("X-User-ID") != null
+                || request.getHeader("X-Roles") != null
+                || request.getHeader("X-Permissions") != null);
+    }
+
+    private Optional<ErgPrincipal> principalFrom(HttpServletRequest request) {
         String bearerToken = bearerToken(request);
         if (bearerToken != null) {
             return principalService.fromBearerToken(bearerToken, request.getHeader("X-Tenant-ID"));
         }
-        String userId = firstPresent(request.getHeader("X-User-ID"), "token-user");
-        String sessionId = firstPresent(request.getHeader("X-Session-ID"), "token-session");
-        String tenantId = firstPresent(request.getHeader("X-Tenant-ID"), "erg");
-        List<String> roles = csv(request.getHeader("X-Roles"));
-        List<String> permissions = csv(request.getHeader("X-Permissions"));
-        List<String> deniedPermissions = csv(request.getHeader("X-Denied-Permissions"));
+        if (!securityProperties.isTrustedHeaderAuthEnabled()) {
+            return Optional.empty();
+        }
+        return Optional.of(headerPrincipal(request));
+    }
+
+    private ErgPrincipal headerPrincipal(HttpServletRequest request) {
+        String userId = SecurityUtils.firstPresent(request.getHeader("X-User-ID"), "token-user");
+        String sessionId = SecurityUtils.firstPresent(request.getHeader("X-Session-ID"), "token-session");
+        String tenantId = SecurityUtils.firstPresent(request.getHeader("X-Tenant-ID"), "erg");
+        List<String> roles = SecurityUtils.csv(request.getHeader("X-Roles"));
+        List<String> permissions = SecurityUtils.csv(request.getHeader("X-Permissions"));
+        List<String> deniedPermissions = SecurityUtils.csv(request.getHeader("X-Denied-Permissions"));
         List<String> portals = csvOrDefault(request.getHeader("X-Portals"), List.of("*"));
-        return java.util.Optional.of(new ErgPrincipal(
+        String managedEducationUnitIds = SecurityUtils.firstNonBlank(
+                request.getHeader("X-Managed-EducationUnit-IDs"),
+                request.getHeader("X-Managed-Education-Unit-IDs"),
+                request.getHeader("X-Managed-Center-IDs")
+        );
+        String currentEducationUnitId = SecurityUtils.firstNonBlank(
+                request.getHeader("X-Current-EducationUnit-ID"),
+                request.getHeader("X-Current-Education-Unit-ID"),
+                request.getHeader("X-Current-Center-ID"),
+                request.getHeader("X-EducationUnit-ID"),
+                request.getHeader("X-Education-Unit-ID"),
+                request.getHeader("X-Center-ID")
+        );
+        String currentClassId = SecurityUtils.firstNonBlank(
+                request.getHeader("X-Current-Class-ID"),
+                request.getHeader("X-Class-ID")
+        );
+        return new ErgPrincipal(
                 userId,
                 sessionId,
                 tenantId,
@@ -65,33 +111,15 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
                 permissions,
                 deniedPermissions,
                 portals,
-                firstPresent(request.getHeader("X-Account-Type"), "erg"),
-                firstPresent(request.getHeader("X-Access-Level"), ""),
+                SecurityUtils.firstPresent(request.getHeader("X-Account-Type"), "erg"),
+                SecurityUtils.firstPresent(request.getHeader("X-Access-Level"), ""),
                 Map.of(
-                        "managedEducationUnitIds", csv(firstPresent(
-                                request.getHeader("X-Managed-EducationUnit-IDs"),
-                                firstPresent(request.getHeader("X-Managed-Education-Unit-IDs"), request.getHeader("X-Managed-Center-IDs"))
-                        )),
-                        "managedClassIds", csv(request.getHeader("X-Managed-Class-IDs")),
-                        "currentEducationUnitId", firstPresent(
-                                request.getHeader("X-Current-EducationUnit-ID"),
-                                firstPresent(
-                                        request.getHeader("X-Current-Education-Unit-ID"),
-                                        firstPresent(
-                                                request.getHeader("X-Current-Center-ID"),
-                                                firstPresent(
-                                                        request.getHeader("X-EducationUnit-ID"),
-                                                        firstPresent(
-                                                                request.getHeader("X-Education-Unit-ID"),
-                                                                firstPresent(request.getHeader("X-Center-ID"), "")
-                                                        )
-                                                )
-                                        )
-                                )
-                        ),
-                        "currentClassId", firstPresent(request.getHeader("X-Current-Class-ID"), firstPresent(request.getHeader("X-Class-ID"), ""))
+                        "managedEducationUnitIds", SecurityUtils.csv(managedEducationUnitIds),
+                        "managedClassIds", SecurityUtils.csv(request.getHeader("X-Managed-Class-IDs")),
+                        "currentEducationUnitId", currentEducationUnitId == null ? "" : currentEducationUnitId,
+                        "currentClassId", currentClassId == null ? "" : currentClassId
                 )
-        ));
+        );
     }
 
     private void authenticate(ErgPrincipal principal) {
@@ -106,26 +134,24 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean canAccessRequestedPortal(HttpServletRequest request, ErgPrincipal principal) {
-        String requiredPortal = portalFromPath(request.getRequestURI());
+        String requiredPortal = SecurityUtils.portalFromPath(request.getRequestURI());
         if (requiredPortal == null) {
             return true;
         }
         return principal.portals().contains("*") || principal.portals().contains(requiredPortal);
     }
 
-    private String portalFromPath(String path) {
-        String normalized = path == null ? "" : path.toLowerCase();
-        if (normalized.startsWith("/api/v1/admin") || normalized.startsWith("/api/admin")) return "admin";
-        if (normalized.startsWith("/api/v1/users") || normalized.startsWith("/api/users")) {
-            if (normalized.startsWith("/api/v1/users/me")) return null;
-            return "admin";
-        }
-        if (normalized.startsWith("/api/lms/access-management") || normalized.startsWith("/api/lms/auth/accounts")) return "admin";
-        if (normalized.startsWith("/api/v1/hoclieu") || normalized.startsWith("/api/hoclieu")) return "hoclieu";
-        if (normalized.startsWith("/api/v1/elearning") || normalized.startsWith("/api/elearning")) return "elearning";
-        if (normalized.startsWith("/api/v1/lms") || normalized.startsWith("/api/lms")) return "lms";
-        if (normalized.startsWith("/api/v1/sessions") || normalized.startsWith("/api/v1/users/me")) return null;
-        return null;
+    private boolean isLifecycleRestricted(ErgPrincipal principal) {
+        return Boolean.TRUE.equals(principal.attributes().get("lifecycleRestricted"));
+    }
+
+    private boolean isOnboardingRequest(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.equals("/api/v1/users/me")
+                || path.startsWith("/api/v1/users/me/")
+                || path.startsWith("/api/v1/sessions/")
+                || path.equals("/api/v1/auth/logout")
+                || path.equals("/api/v1/auth/refresh");
     }
 
     private String bearerToken(HttpServletRequest request) {
@@ -137,23 +163,8 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         return token.isBlank() ? null : token;
     }
 
-    private List<String> csv(String value) {
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(item -> !item.isBlank())
-                .distinct()
-                .toList();
-    }
-
     private List<String> csvOrDefault(String value, List<String> fallback) {
-        List<String> parsed = csv(value);
+        List<String> parsed = SecurityUtils.csv(value);
         return parsed.isEmpty() ? fallback : parsed;
-    }
-
-    private String firstPresent(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value.trim();
     }
 }

@@ -4,7 +4,9 @@ import com.erg.ergspringboot.common.request.profiles.ProfileRequests.CreateProfi
 import com.erg.ergspringboot.common.request.profiles.ProfileRequests.UpdateProfileRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.profiles.ProfileResponses.ProfileResponse;
-import com.erg.ergspringboot.exception.UnauthorizedException;
+import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.service.profiles.ProfileService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -31,12 +33,13 @@ public class ProfileController {
 
     @GetMapping("/{userId}")
     public ApiResponse<ProfileResponse> getProfile(@PathVariable String userId, HttpServletRequest request) {
+        requireOwnProfileOrManage(userId);
         return ok("Profile loaded", profileService.getProfile(userId), request);
     }
 
     @GetMapping("/me")
     public ApiResponse<ProfileResponse> getCurrentProfile(HttpServletRequest request) {
-        return ok("Profile loaded", profileService.getCurrentProfile(userId(request)), request);
+        return ok("Profile loaded", profileService.getCurrentProfile(currentUserId()), request);
     }
 
     @PostMapping
@@ -51,25 +54,30 @@ public class ProfileController {
             @Valid @RequestBody UpdateProfileRequest body,
             HttpServletRequest request
     ) {
+        requireOwnProfileOrManage(userId);
         return ok("Profile updated", profileService.updateProfile(userId, body), request);
     }
 
     @DeleteMapping("/{userId}")
     public ApiResponse<Void> deleteProfile(@PathVariable String userId, HttpServletRequest request) {
+        requireOwnProfileOrManage(userId);
         profileService.deleteProfile(userId);
         return ok("Profile deleted", null, request);
     }
 
-    private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
-        return ApiResponse.success(200, message, data, request.getRequestURI(), requestId(request));
+    private void requireOwnProfileOrManage(String userId) {
+        ErgPrincipal principal = SecurityUtils.requirePrincipal();
+        if (!userId.equals(principal.userId()) && !principal.permissions().contains("users.manage")) {
+            throw new ForbiddenException("You can only access your own profile");
+        }
     }
 
-    private String userId(HttpServletRequest request) {
-        String value = request.getHeader("X-User-ID");
-        if (value == null || value.isBlank()) {
-            throw new UnauthorizedException("missing authenticated user");
-        }
-        return value.trim();
+    private String currentUserId() {
+        return SecurityUtils.requirePrincipal().userId();
+    }
+
+    private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
+        return ApiResponse.success(200, message, data, request.getRequestURI(), requestId(request));
     }
 
     private String requestId(HttpServletRequest request) {

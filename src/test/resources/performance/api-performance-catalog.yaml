@@ -1,0 +1,4165 @@
+version: 2
+profiles:
+  runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
+rest:
+  route-count: 478
+  routes:
+    - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/crawler/blacklist/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.deleteBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/crawler/configs/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.deleteConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/crawler/rss/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssDelete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/curriculum/levels/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteLevel
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/curriculum/subjects/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteSubject
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/curriculum/topics/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.hardDeleteTopic
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/curriculum/topics/{topicId}/content-items/{placementId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.removePlacement
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/admin/elearning/categories/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/admin/elearning/levels/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/admin/elearning/units/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/ai-content/keys/{id} => com.erg.ergspringboot.controller.ai.AiContentController.deleteKey
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/blacklist/{id} => com.erg.ergspringboot.controller.crawler.RssBlacklistController.deleteBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/bot/accounts/{id} => com.erg.ergspringboot.controller.trending.TrendingBotController.deleteAccount
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/calendar/events/{eventId} => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.deleteEvent
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/courses/{id} => com.erg.ergspringboot.controller.catalog.CourseController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/crawler/blacklist/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.deleteBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/crawler/configs/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.deleteConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/crawler/rss/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssDelete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/documents/{id} => com.erg.ergspringboot.controller.documents.DocumentController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/elearning/categories/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/elearning/levels/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/elearning/units/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/lcms/questions/{questionId} => com.erg.ergspringboot.controller.lcms.LcmsQuestionBankAuthoringController.delete
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/lcms/quizzes/{quizId} => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.delete
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/lcms/schools/{schoolId} => com.erg.ergspringboot.controller.lcms.SchoolCommandController.archive
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/lms/assignments/{assignmentId} => com.erg.ergspringboot.controller.lms.LmsAssignmentController.delete
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/lms/student-groups/{groupId} => com.erg.ergspringboot.controller.lms.LmsAssignmentController.deleteGroup
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/notification-devices/{deviceId} => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.revoke
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/notifications/{id} => com.erg.ergspringboot.controller.notifications.NotificationController.archive
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/operations/configs/{id} => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.deleteConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/posts/categories/{id} => com.erg.ergspringboot.controller.cms.PostController.deleteCategory
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/posts/images => com.erg.ergspringboot.controller.cms.PostController.deleteImage
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/posts/images/id/{filename} => com.erg.ergspringboot.controller.cms.PostController.deleteImage
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/posts/{id} => com.erg.ergspringboot.controller.cms.PostController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/posts/{id}/permanent => com.erg.ergspringboot.controller.cms.PostController.permanentDelete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/profiles/{userId} => com.erg.ergspringboot.controller.profiles.ProfileController.deleteProfile
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/public-disclosure/{id} => com.erg.ergspringboot.controller.engagement.EngagementController.deleteDisclosure
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/recruitment/jobs/{id} => com.erg.ergspringboot.controller.engagement.EngagementController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.deleteRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: DELETE /api/v1/rss/feeds/{id} => com.erg.ergspringboot.controller.crawler.RssBlacklistController.deleteFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/seo/keywords/{id} => com.erg.ergspringboot.controller.seo.SeoController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/seo/redirects/{id} => com.erg.ergspringboot.controller.seo.SeoController.delete
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/users/bulk => com.erg.ergspringboot.controller.users.UserController.bulkDelete
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: DELETE /api/v1/users/me/sessions/{sessionId} => com.erg.ergspringboot.controller.users.UserController.revokeSession
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: DELETE /api/v1/users/{userId} => com.erg.ergspringboot.controller.users.UserController.deleteUser
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: DELETE /api/v1/users/{userId}/permissions/{overrideId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.deletePermissionOverride
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: DELETE /api/v1/users/{userId}/role-assignments/{assignmentId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.revokeScopedRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: DELETE /api/v1/users/{userId}/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.removeRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/crawler/active-pipelines => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/ai-quota => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/blacklist => com.erg.ergspringboot.controller.crawler.CrawlerController.blacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/configs => com.erg.ergspringboot.controller.crawler.CrawlerController.configs
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/crawl/{jobId} => com.erg.ergspringboot.controller.crawler.CrawlerController.jobStatus
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/crawl/{jobId}/stream => com.erg.ergspringboot.controller.crawler.CrawlerController.stream
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/cron-presets => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/dedup-stats => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/history => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/history/{jobId} => com.erg.ergspringboot.controller.crawler.CrawlerController.jobStatus
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/pipeline-status => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/quality-stats => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/rss => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRss
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/rss/peek/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRss
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/scheduler-status => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/sitemap/discover => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/stats => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/crawler/stream => com.erg.ergspringboot.controller.crawler.CrawlerController.stream
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/curriculum/levels/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.levelImpact
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/curriculum/subjects/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.subjectImpact
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/curriculum/topics/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.topicImpact
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/curriculum/tree => com.erg.ergspringboot.controller.curriculum.CurriculumController.tree
+      classification: persistent-read
+      statement-budget: 3
+      row-budget: 1500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: post-commit-tenant-generation-ttl-900
+      pagination-policy: bounded-500-per-node-type
+    - route: GET /api/v1/admin/elearning/categories => com.erg.ergspringboot.controller.catalog.ElearningController.categories
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/admin/elearning/categories/{slug} => com.erg.ergspringboot.controller.catalog.ElearningController.category
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/admin/elearning/levels/{slug} => com.erg.ergspringboot.controller.catalog.ElearningController.level
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/admin/notifications/stats => com.erg.ergspringboot.controller.notifications.NotificationAdminController.stats
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/admin/users => com.erg.ergspringboot.controller.users.AdminEmployeeController.listUsers
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/admin/users/security-feed => com.erg.ergspringboot.controller.users.AdminEmployeeController.securityFeed
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/admin/users/{userId} => com.erg.ergspringboot.controller.users.AdminEmployeeController.getEmployee
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/admin/users/{userId}/activity => com.erg.ergspringboot.controller.users.AdminEmployeeController.activity
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/admin/users/{userId}/security-events => com.erg.ergspringboot.controller.users.AdminEmployeeController.securityEvents
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/admin/users/{userId}/sessions => com.erg.ergspringboot.controller.users.AdminEmployeeController.sessions
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/ai-content/history => com.erg.ergspringboot.controller.ai.AiContentController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/ai-content/keys/dashboard => com.erg.ergspringboot.controller.ai.AiContentController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/ai-content/keys/my => com.erg.ergspringboot.controller.ai.AiContentController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/ai-content/provider-health => com.erg.ergspringboot.controller.ai.AiContentController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/ai-content/status/{jobId} => com.erg.ergspringboot.controller.ai.AiContentController.status
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/ai-content/templates => com.erg.ergspringboot.controller.ai.AiContentController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/audit/logs => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.auditLogs
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/audit/logs/{id} => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.auditLog
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/auth/csrf => com.erg.ergspringboot.controller.auth.OidcBffController.csrf
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/auth/login => com.erg.ergspringboot.controller.auth.OidcBffController.login
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/auth/login-attempts => com.erg.ergspringboot.controller.auth.AuthController.loginAttempts
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/auth/security/ip-status => com.erg.ergspringboot.controller.auth.AuthController.ipSecurityStatus
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/auth/session => com.erg.ergspringboot.controller.auth.OidcBffController.session
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/blacklist => com.erg.ergspringboot.controller.crawler.RssBlacklistController.blacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/bot/accounts => com.erg.ergspringboot.controller.trending.TrendingBotController.accounts
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/bot/conversations => com.erg.ergspringboot.controller.trending.TrendingBotController.conversations
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/bot/conversations/{id} => com.erg.ergspringboot.controller.trending.TrendingBotController.conversation
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/bot/conversations/{id}/wizard => com.erg.ergspringboot.controller.trending.TrendingBotController.wizard
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/bot/link/{code} => com.erg.ergspringboot.controller.trending.TrendingBotController.linkCode
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/calendar/batches => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.batches
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/calendar/batches/{batchId} => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.batchDetail
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/calendar/events/{eventId} => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.eventDetail
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/calendar/my-calendar => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.myCalendar
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/calendar/rooms => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.rooms
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/calendar/workspace => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.workspace
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/centers => com.erg.ergspringboot.controller.organization.EducationUnitController.listEducationUnits
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/courses => com.erg.ergspringboot.controller.catalog.CourseController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/courses/subdomain/{subdomain} => com.erg.ergspringboot.controller.catalog.CourseController.bySubdomain
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/courses/{id} => com.erg.ergspringboot.controller.catalog.CourseController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/courses/{id}/schema => com.erg.ergspringboot.controller.catalog.CourseController.schema
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/active-pipelines => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/ai-quota => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/blacklist => com.erg.ergspringboot.controller.crawler.CrawlerController.blacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/configs => com.erg.ergspringboot.controller.crawler.CrawlerController.configs
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/crawl/{jobId} => com.erg.ergspringboot.controller.crawler.CrawlerController.jobStatus
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/crawl/{jobId}/stream => com.erg.ergspringboot.controller.crawler.CrawlerController.stream
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/cron-presets => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/dedup-stats => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/history => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/history/{jobId} => com.erg.ergspringboot.controller.crawler.CrawlerController.jobStatus
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/pipeline-status => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/quality-stats => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/rss => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRss
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/rss/peek/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRss
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/scheduler-status => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/sitemap/discover => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/stats => com.erg.ergspringboot.controller.crawler.CrawlerController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crawler/stream => com.erg.ergspringboot.controller.crawler.CrawlerController.stream
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/crm/seo/{seoId}/performance => com.erg.ergspringboot.controller.crm.CrmSchoolController.performance
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/crm/seo/{seoId}/schools => com.erg.ergspringboot.controller.crm.CrmSchoolController.schoolsBySeo
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/documents => com.erg.ergspringboot.controller.documents.DocumentController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/documents/{id} => com.erg.ergspringboot.controller.documents.DocumentController.get
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/documents/{id}/file => com.erg.ergspringboot.controller.documents.DocumentController.file
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/education-units => com.erg.ergspringboot.controller.organization.EducationUnitController.listEducationUnits
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/elearning/categories => com.erg.ergspringboot.controller.catalog.ElearningController.categories
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/elearning/categories/{slug} => com.erg.ergspringboot.controller.catalog.ElearningController.category
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/elearning/levels/{slug} => com.erg.ergspringboot.controller.catalog.ElearningController.level
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/export => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/firebase/stats => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/insights => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/overview => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/posts/summary => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/sessions/{sessionId} => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightSession
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/stats => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/top-content => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/traffic-sources => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/insight/user-journey/{sessionId} => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightSession
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/lcms/quiz-versions/{quizVersionId}/bundle => com.erg.ergspringboot.controller.lcms.LcmsQuizBundleController.exportVersion
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lcms/quizzes/{quizId}/bundle => com.erg.ergspringboot.controller.lcms.LcmsQuizBundleController.exportActive
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/assignments/{assignmentId}/progress => com.erg.ergspringboot.controller.lms.LmsController.assignmentProgress
+      classification: persistent-read
+      statement-budget: 3
+      row-budget: 10000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql-report-job
+      cache-policy: tenant-generation
+      pagination-policy: required-or-job
+    - route: GET /api/v1/lms/classes => com.erg.ergspringboot.controller.lms.LmsController.classes
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/education-units => com.erg.ergspringboot.controller.lms.LmsController.educationUnits
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/quizzes/{quizId} => com.erg.ergspringboot.controller.lms.LmsController.quiz
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/quizzes/{quizId}/package => com.erg.ergspringboot.controller.lms.LmsController.quizPackage
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/quizzes/{quizId}/students => com.erg.ergspringboot.controller.lms.LmsController.quizStudents
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/students/me/assignments => com.erg.ergspringboot.controller.lms.LmsController.assignments
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/students/me/scores => com.erg.ergspringboot.controller.lms.LmsController.scores
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/me/feature-config => com.erg.ergspringboot.controller.authorization.AuthorizationController.currentFeatureConfig
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/menus/structure => com.erg.ergspringboot.controller.cms.PageMenuController.menu
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/migration/cache-key-registry => com.erg.ergspringboot.controller.platform.MigrationPlatformController.cacheKeys
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/migration/cutover-runbook => com.erg.ergspringboot.controller.platform.MigrationPlatformController.cutover
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/migration/data-parity-matrix => com.erg.ergspringboot.controller.platform.MigrationPlatformController.dataParity
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/migration/native-image-assessment => com.erg.ergspringboot.controller.platform.MigrationPlatformController.nativeAssessment
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/notifications => com.erg.ergspringboot.controller.notifications.NotificationController.list
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/notifications/preferences => com.erg.ergspringboot.controller.notifications.NotificationController.preferences
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/notifications/unread-count => com.erg.ergspringboot.controller.notifications.NotificationController.unreadCount
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/notifications/{id} => com.erg.ergspringboot.controller.notifications.NotificationController.get
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/operations/configs => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.configs
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/operations/firewall/check/{ip} => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.firewallCheck
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/operations/firewall/list => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.operationsRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/operations/logs => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.operationsRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/operations/system-status => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.operationsRead
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/pages/{slug} => com.erg.ergspringboot.controller.cms.PageMenuController.page
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/permission-groups => com.erg.ergspringboot.controller.authorization.AuthorizationController.listPermissionGroups
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/permissions => com.erg.ergspringboot.controller.authorization.AuthorizationController.listPermissions
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/permissions/catalog => com.erg.ergspringboot.controller.authorization.AuthorizationController.permissionCatalog
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/permissions/{permissionId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.permissionDetail
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/platform/runtime-wiring => com.erg.ergspringboot.controller.platform.MigrationPlatformController.runtimeWiring
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/platform/shared-libraries => com.erg.ergspringboot.controller.platform.MigrationPlatformController.sharedLibraries
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/platform/tenancy => com.erg.ergspringboot.controller.platform.MigrationPlatformController.tenancy
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts => com.erg.ergspringboot.controller.cms.PostController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/categories => com.erg.ergspringboot.controller.cms.PostController.categories
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/categories/{id} => com.erg.ergspringboot.controller.cms.PostController.category
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/hidden => com.erg.ergspringboot.controller.cms.PostController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/preview/{id} => com.erg.ergspringboot.controller.cms.PostController.preview
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/slug/{slug} => com.erg.ergspringboot.controller.cms.PostController.bySlug
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/trash => com.erg.ergspringboot.controller.cms.PostController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/posts/{id} => com.erg.ergspringboot.controller.cms.PostController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/profiles/me => com.erg.ergspringboot.controller.profiles.ProfileController.getCurrentProfile
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/profiles/{userId} => com.erg.ergspringboot.controller.profiles.ProfileController.getProfile
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/public-disclosure => com.erg.ergspringboot.controller.engagement.EngagementController.disclosures
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/public-disclosure/{id} => com.erg.ergspringboot.controller.engagement.EngagementController.disclosure
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/recruitment/admin/candidates => com.erg.ergspringboot.controller.engagement.EngagementController.candidates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/recruitment/jobs => com.erg.ergspringboot.controller.engagement.EngagementController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/recruitment/jobs/{slug} => com.erg.ergspringboot.controller.engagement.EngagementController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/recruitment/tracking/{code} => com.erg.ergspringboot.controller.engagement.EngagementController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/reports/jobs/{jobId} => com.erg.ergspringboot.controller.reporting.ReportJobController.status
+      classification: persistent-read
+      statement-budget: 3
+      row-budget: 10000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql-report-job
+      cache-policy: tenant-generation
+      pagination-policy: required-or-job
+    - route: GET /api/v1/reviews => com.erg.ergspringboot.controller.engagement.EngagementController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/reviews/admin => com.erg.ergspringboot.controller.engagement.EngagementController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/reviews/admin/all => com.erg.ergspringboot.controller.engagement.EngagementController.list
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/reviews/stats => com.erg.ergspringboot.controller.engagement.EngagementController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/roles => com.erg.ergspringboot.controller.authorization.AuthorizationController.listRoles
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.getRole
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/rss/feeds => com.erg.ergspringboot.controller.crawler.RssBlacklistController.feeds
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/rss/feeds/peek => com.erg.ergspringboot.controller.crawler.RssBlacklistController.feeds
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/rss/feeds/{id} => com.erg.ergspringboot.controller.crawler.RssBlacklistController.feed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/404-logs => com.erg.ergspringboot.controller.seo.SeoController.lists
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/analyze/{postId} => com.erg.ergspringboot.controller.seo.SeoController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/config/{key} => com.erg.ergspringboot.controller.seo.SeoController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/dashboard => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/gsc/auth/url => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/gsc/sync => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/gsc/top-posts => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/gsc/{postId} => com.erg.ergspringboot.controller.seo.SeoController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/health => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/history/{postId} => com.erg.ergspringboot.controller.seo.SeoController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/keyword-research => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/keyword-suggestions => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/keywords => com.erg.ergspringboot.controller.seo.SeoController.lists
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/keywords/autocomplete => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/keywords/suggest => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/keywords/trending => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/performance => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/performance/queries => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/redirects => com.erg.ergspringboot.controller.seo.SeoController.lists
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/schema/{postId} => com.erg.ergspringboot.controller.seo.SeoController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/submission/logs => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/top-posts => com.erg.ergspringboot.controller.seo.SeoController.reads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/seo/trends/{postId} => com.erg.ergspringboot.controller.seo.SeoController.detail
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/session/current => com.erg.ergspringboot.controller.sessions.SessionController.currentBootstrap
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/sessions/context => com.erg.ergspringboot.controller.sessions.SessionController.currentSession
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/sessions/current => com.erg.ergspringboot.controller.sessions.SessionController.currentBootstrap
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/trending/discovery-feed => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/feeds => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/healthz => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/history => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/news => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/ready => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/snapshots => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/sources => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/stats => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/topics => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingReads
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/trending/topics/{topic} => com.erg.ergspringboot.controller.trending.TrendingBotController.topic
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/users => com.erg.ergspringboot.controller.users.UserController.listUsers
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/me => com.erg.ergspringboot.controller.users.UserController.getCurrentUser
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/me/sessions => com.erg.ergspringboot.controller.users.UserController.listSessions
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/{userId} => com.erg.ergspringboot.controller.users.UserController.getUserDetail
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/{userId}/activity => com.erg.ergspringboot.controller.users.UserController.listActivity
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/{userId}/effective-permissions => com.erg.ergspringboot.controller.authorization.AuthorizationController.effectivePermissions
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/{userId}/feature-config => com.erg.ergspringboot.controller.authorization.AuthorizationController.featureConfig
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/users/{userId}/permission-overrides => com.erg.ergspringboot.controller.authorization.AuthorizationController.permissionOverrides
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /robots.txt => com.erg.ergspringboot.controller.seo.SeoController.robots
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /sitemap-{sub}.xml => com.erg.ergspringboot.controller.seo.SeoController.sitemap
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /sitemap.xml => com.erg.ergspringboot.controller.seo.SeoController.sitemap
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /sitemap/data => com.erg.ergspringboot.controller.seo.SeoController.sitemapData
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: GET /sitemap_index.xml => com.erg.ergspringboot.controller.seo.SeoController.sitemap
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/content/assets/{contentAssetId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.updateContentAsset
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.updateContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/crawler/blacklist/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.updateBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/crawler/configs/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.updateConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/crawler/rss/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssUpdate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/curriculum/levels/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateLevel
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/curriculum/subjects/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateSubject
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/curriculum/topics/{id} => com.erg.ergspringboot.controller.curriculum.CurriculumController.updateTopic
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/curriculum/topics/{topicId}/content-items/reorder => com.erg.ergspringboot.controller.learningcontent.LearningContentController.reorderPlacements
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/admin/elearning/categories/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/admin/elearning/levels/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/admin/elearning/units/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/admin/users/{userId} => com.erg.ergspringboot.controller.users.AdminEmployeeController.updateEmployee
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: PATCH /api/v1/courses/{id} => com.erg.ergspringboot.controller.catalog.CourseController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/courses/{id}/theme => com.erg.ergspringboot.controller.catalog.CourseController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/crawler/blacklist/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.updateBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/crawler/configs/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.updateConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/crawler/rss/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssUpdate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/documents/{id} => com.erg.ergspringboot.controller.documents.DocumentController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/elearning/categories/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/elearning/levels/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/elearning/units/{id} => com.erg.ergspringboot.controller.catalog.ElearningController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/lcms/quizzes/{quizId}/draft => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.patchDraft
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/lcms/schools/{schoolId} => com.erg.ergspringboot.controller.lcms.SchoolCommandController.patch
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/lcms/schools/{schoolId}/grades/{gradeId} => com.erg.ergspringboot.controller.lcms.SchoolCommandController.updateGrade
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/lms/assignments/{assignmentId} => com.erg.ergspringboot.controller.lms.LmsAssignmentController.update
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/lms/attempts/{attemptId}/draft => com.erg.ergspringboot.controller.lms.LmsController.saveDraft
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/notifications/read-all => com.erg.ergspringboot.controller.notifications.NotificationController.readAll
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/notifications/{id}/read => com.erg.ergspringboot.controller.notifications.NotificationController.markRead
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/recruitment/admin/candidates/{id}/status => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/recruitment/jobs/{id}/status => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/recruitment/jobs/{id}/toggle-hot => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/recruitment/jobs/{id}/toggle-urgent => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/reviews/{reviewId}/approve => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/reviews/{reviewId}/feature => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/reviews/{reviewId}/reject => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/reviews/{reviewId}/status => com.erg.ergspringboot.controller.engagement.EngagementController.mark
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.updateRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: PATCH /api/v1/users/me => com.erg.ergspringboot.controller.users.UserController.updateProfile
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/content/assets => com.erg.ergspringboot.controller.learningcontent.LearningContentController.createContentAsset
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/content/items => com.erg.ergspringboot.controller.learningcontent.LearningContentController.createContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/content/items/{contentItemId}/assets => com.erg.ergspringboot.controller.learningcontent.LearningContentController.attachContentAsset
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/content/lectures/google-slides => com.erg.ergspringboot.controller.learningcontent.LearningContentController.createGoogleSlidesLecture
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/crawler/auto-crawl => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/blacklist => com.erg.ergspringboot.controller.crawler.CrawlerController.createBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/configs => com.erg.ergspringboot.controller.crawler.CrawlerController.createConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/configs/test-batch => com.erg.ergspringboot.controller.crawler.CrawlerController.createConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/crawl => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/quick-add => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/rss => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/rss/create-selective => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/rss/preview => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/rss/sync/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/rss/trigger => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/sitemap/parse => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/smart-detect => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/smart-selector/analyze => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/crawler/url/run => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/curriculum/levels/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveLevel
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/curriculum/levels/{levelId}/topics => com.erg.ergspringboot.controller.curriculum.CurriculumController.createTopic
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/curriculum/subjects => com.erg.ergspringboot.controller.curriculum.CurriculumController.createSubject
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/curriculum/subjects/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveSubject
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/curriculum/subjects/{subjectId}/levels => com.erg.ergspringboot.controller.curriculum.CurriculumController.createLevel
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/curriculum/topics/{id}/archive => com.erg.ergspringboot.controller.curriculum.CurriculumController.archiveTopic
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/curriculum/topics/{topicId}/content-items => com.erg.ergspringboot.controller.learningcontent.LearningContentController.placeContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/admin/elearning/categories => com.erg.ergspringboot.controller.catalog.ElearningController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/admin/elearning/levels => com.erg.ergspringboot.controller.catalog.ElearningController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/admin/elearning/units => com.erg.ergspringboot.controller.catalog.ElearningController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/admin/notifications/broadcast => com.erg.ergspringboot.controller.notifications.NotificationAdminController.send
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/admin/notifications/outbox/run => com.erg.ergspringboot.controller.notifications.NotificationAdminController.runOutbox
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/admin/notifications/send => com.erg.ergspringboot.controller.notifications.NotificationAdminController.send
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/admin/users => com.erg.ergspringboot.controller.users.AdminEmployeeController.createUser
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/admin/users/{userId}/reset-credential => com.erg.ergspringboot.controller.users.AdminEmployeeController.resetCredential
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/admin/users/{userId}/roles => com.erg.ergspringboot.controller.users.AdminEmployeeController.assignRoles
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/admin/users/{userId}/sessions/revoke => com.erg.ergspringboot.controller.users.AdminEmployeeController.revokeSession
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/ai-content/generate => com.erg.ergspringboot.controller.ai.AiContentController.generate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/ai-content/keys => com.erg.ergspringboot.controller.ai.AiContentController.createKey
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/ai-content/keys/{id}/{action:test|select|reactivate} => com.erg.ergspringboot.controller.ai.AiContentController.keyAction
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/ai-content/refine => com.erg.ergspringboot.controller.ai.AiContentController.generate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/auth/login => com.erg.ergspringboot.controller.auth.AuthController.login
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/auth/logout => com.erg.ergspringboot.controller.auth.AuthController.logout
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/auth/logout-all => com.erg.ergspringboot.controller.auth.AuthController.logoutAll
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/auth/refresh => com.erg.ergspringboot.controller.auth.AuthController.refresh
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/blacklist => com.erg.ergspringboot.controller.crawler.RssBlacklistController.createBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/bot/conversations/{id}/send => com.erg.ergspringboot.controller.trending.TrendingBotController.send
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/bot/link => com.erg.ergspringboot.controller.trending.TrendingBotController.link
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/calendar => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.create
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/calendar/batches/{batchId}/cancel => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.cancelBatch
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/calendar/batches/{batchId}/publish => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.publishBatch
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/calendar/import-excel => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.importExcel
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/calendar/preview => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.preview
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/calendar/rooms => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.createRoom
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/calendar/teachers/delete-bulk => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.deleteTeacherSchedule
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/courses => com.erg.ergspringboot.controller.catalog.CourseController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/courses/{id}/lessons/reorder => com.erg.ergspringboot.controller.catalog.CourseController.reorder
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/auto-crawl => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/blacklist => com.erg.ergspringboot.controller.crawler.CrawlerController.createBlacklist
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/configs => com.erg.ergspringboot.controller.crawler.CrawlerController.createConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/configs/test-batch => com.erg.ergspringboot.controller.crawler.CrawlerController.createConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/crawl => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/quick-add => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/rss => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/rss/create-selective => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/rss/preview => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/rss/sync/{id} => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/rss/trigger => com.erg.ergspringboot.controller.crawler.CrawlerController.legacyRssCreate
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/sitemap/parse => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/smart-detect => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/smart-selector/analyze => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/crawler/url/run => com.erg.ergspringboot.controller.crawler.CrawlerController.job
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/documents => com.erg.ergspringboot.controller.documents.DocumentController.upload
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/elearning/categories => com.erg.ergspringboot.controller.catalog.ElearningController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/elearning/levels => com.erg.ergspringboot.controller.catalog.ElearningController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/elearning/units => com.erg.ergspringboot.controller.catalog.ElearningController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/insight/behavior => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightWrite
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/insight/firebase/sync => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightWrite
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/insight/identify => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightWrite
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/insight/session/begin => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.insightWrite
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/lcms/media/presign => com.erg.ergspringboot.controller.lcms.LcmsMediaController.presign
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/media/{mediaId}/commit => com.erg.ergspringboot.controller.lcms.LcmsMediaController.commit
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/questions => com.erg.ergspringboot.controller.lcms.LcmsQuestionBankAuthoringController.create
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/quizzes => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.create
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/quizzes/{quizId}/publish => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.publish
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/quizzes/{quizId}/reorder => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.reorder
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/quizzes/{quizId}/slides => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.upsertSlide
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/quizzes/{quizId}/validate => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.validate
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/quizzes/{quizId}/versions/{versionId}/fork => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.forkVersion
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools => com.erg.ergspringboot.controller.lcms.SchoolCommandController.create
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools/{schoolId}/academic-years => com.erg.ergspringboot.controller.lcms.SchoolCommandController.createYear
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools/{schoolId}/academic-years/{yearId}/activate => com.erg.ergspringboot.controller.lcms.SchoolCommandController.activateYear
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools/{schoolId}/academic-years/{yearId}/close => com.erg.ergspringboot.controller.lcms.SchoolCommandController.closeYear
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools/{schoolId}/grades => com.erg.ergspringboot.controller.lcms.SchoolCommandController.createGrade
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools/{schoolId}/grades/sync-defaults => com.erg.ergspringboot.controller.lcms.SchoolCommandController.syncGrades
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lcms/schools/{schoolId}/restore => com.erg.ergspringboot.controller.lcms.SchoolCommandController.restore
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lms/assignments => com.erg.ergspringboot.controller.lms.LmsAssignmentController.create
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lms/attempts => com.erg.ergspringboot.controller.lms.LmsController.startAttempt
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lms/attempts/{attemptId}/answers => com.erg.ergspringboot.controller.lms.LmsController.saveAnswers
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lms/attempts/{attemptId}/submit => com.erg.ergspringboot.controller.lms.LmsController.submitAttempt
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lms/attempts/{attemptId}/sync => com.erg.ergspringboot.controller.lms.LmsController.syncAttempt
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/lms/student-groups => com.erg.ergspringboot.controller.lms.LmsAssignmentController.createGroup
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/migration/load-test/report => com.erg.ergspringboot.controller.platform.MigrationPlatformController.loadReport
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/notification-devices => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.register
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/notification-devices/heartbeat => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.heartbeat
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/notification-devices/unregister => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.unregister
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/operations/configs => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.createConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/operations/firewall/block => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.firewallMutation
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/operations/firewall/unblock => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.firewallMutation
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/posts => com.erg.ergspringboot.controller.cms.PostController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/posts/categories => com.erg.ergspringboot.controller.cms.PostController.createCategory
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/posts/images/upload => com.erg.ergspringboot.controller.cms.PostController.uploadImage
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/posts/preview => com.erg.ergspringboot.controller.cms.PostController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/posts/{id}/promote => com.erg.ergspringboot.controller.cms.PostController.promote
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/profiles => com.erg.ergspringboot.controller.profiles.ProfileController.createProfile
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/public-disclosure => com.erg.ergspringboot.controller.engagement.EngagementController.createDisclosure
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/recruitment/apply => com.erg.ergspringboot.controller.engagement.EngagementController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/recruitment/jobs => com.erg.ergspringboot.controller.engagement.EngagementController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/reports/jobs/assignment-progress => com.erg.ergspringboot.controller.reporting.ReportJobController.enqueue
+      classification: persistent-write
+      statement-budget: 3
+      row-budget: 10000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql-report-job
+      cache-policy: tenant-generation
+      pagination-policy: required-or-job
+    - route: POST /api/v1/reviews => com.erg.ergspringboot.controller.engagement.EngagementController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/reviews/batch/status => com.erg.ergspringboot.controller.engagement.EngagementController.create
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/reviews/{reviewId}/helpful => com.erg.ergspringboot.controller.engagement.EngagementController.reviewAction
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/reviews/{reviewId}/reply => com.erg.ergspringboot.controller.engagement.EngagementController.reviewAction
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/roles => com.erg.ergspringboot.controller.authorization.AuthorizationController.createRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/rss/feeds => com.erg.ergspringboot.controller.crawler.RssBlacklistController.createFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/rss/feeds/create-selective => com.erg.ergspringboot.controller.crawler.RssBlacklistController.createFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/rss/feeds/preview => com.erg.ergspringboot.controller.crawler.RssBlacklistController.createFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/rss/feeds/trigger => com.erg.ergspringboot.controller.crawler.RssBlacklistController.createFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/rss/feeds/{id}/refresh => com.erg.ergspringboot.controller.crawler.RssBlacklistController.refreshFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/404 => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/analyze-draft => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/check-duplicate => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/dashboard/batch-analyze => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/generate-alt-texts => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/gsc/auth/callback => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/gsc/sync => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/keywords => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/posts/{postId}/robots => com.erg.ergspringboot.controller.seo.SeoController.postOperation
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/redirects => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/schema/{postId} => com.erg.ergspringboot.controller.seo.SeoController.postOperation
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/schema/{postId}/validate => com.erg.ergspringboot.controller.seo.SeoController.postOperation
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/submission/submit => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/suggest-meta => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/seo/suggest-titles => com.erg.ergspringboot.controller.seo.SeoController.creates
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/trending/discover => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingJob
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/trending/refresh => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingJob
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/users => com.erg.ergspringboot.controller.users.UserController.createUser
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/me/recovery-email/challenges => com.erg.ergspringboot.controller.users.UserController.requestRecoveryEmailChallenge
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/me/recovery-email/verify => com.erg.ergspringboot.controller.users.UserController.verifyRecoveryEmailChallenge
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/onboarding => com.erg.ergspringboot.controller.users.UserController.completeOnboarding
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/roles/bulk => com.erg.ergspringboot.controller.authorization.AuthorizationController.bulkAssignRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/permissions => com.erg.ergspringboot.controller.users.UserController.assignPermissions
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/preview => com.erg.ergspringboot.controller.authorization.AuthorizationController.previewChanges
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/resend-invite => com.erg.ergspringboot.controller.users.UserController.resendInvite
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/reset-credential => com.erg.ergspringboot.controller.users.UserController.resetCredential
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/role-assignments => com.erg.ergspringboot.controller.authorization.AuthorizationController.assignScopedRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/roles => com.erg.ergspringboot.controller.users.UserController.assignRoles
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /webhooks/discord => com.erg.ergspringboot.controller.bot.WebhookController.webhook
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: POST /webhooks/telegram => com.erg.ergspringboot.controller.bot.WebhookController.webhook
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/admin/users/{userId}/status => com.erg.ergspringboot.controller.users.AdminEmployeeController.updateStatus
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: PUT /api/v1/calendar/events/{eventId} => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.updateEvent
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/insight/session/{id}/finish => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.finishSession
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/lcms/questions/{questionId} => com.erg.ergspringboot.controller.lcms.LcmsQuestionBankAuthoringController.update
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/lcms/quizzes/{quizId}/draft => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.saveDraft
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/lcms/schools/{schoolId} => com.erg.ergspringboot.controller.lcms.SchoolCommandController.replace
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/lms/assignments/{assignmentId}/recipients => com.erg.ergspringboot.controller.lms.LmsAssignmentController.updateRecipients
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/lms/attempts/{attemptId}/answers/{questionId} => com.erg.ergspringboot.controller.lms.LmsController.saveAnswer
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/lms/student-groups/{groupId} => com.erg.ergspringboot.controller.lms.LmsAssignmentController.updateGroup
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/notifications/preferences => com.erg.ergspringboot.controller.notifications.NotificationController.updatePreferences
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/operations/configs/{id} => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.updateConfig
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/posts/categories/{id} => com.erg.ergspringboot.controller.cms.PostController.updateCategory
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/posts/{id} => com.erg.ergspringboot.controller.cms.PostController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/posts/{id}/restore => com.erg.ergspringboot.controller.cms.PostController.restore
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/profiles/{userId} => com.erg.ergspringboot.controller.profiles.ProfileController.updateProfile
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/recruitment/jobs/{id} => com.erg.ergspringboot.controller.engagement.EngagementController.updateJob
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.updateRole
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: PUT /api/v1/rss/feeds/{id} => com.erg.ergspringboot.controller.crawler.RssBlacklistController.updateFeed
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/seo/apply-autolinks/{postId} => com.erg.ergspringboot.controller.seo.SeoController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/seo/config/{key} => com.erg.ergspringboot.controller.seo.SeoController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/seo/redirects/{id} => com.erg.ergspringboot.controller.seo.SeoController.update
+      classification: process-local-stub
+      disposition: disable-in-prod
+      statement-budget: 0
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: process-local-disabled-prod
+      cache-policy: none
+      pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/users/bulk/status => com.erg.ergspringboot.controller.users.UserController.bulkUpdateStatus
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: PUT /api/v1/users/me/password => com.erg.ergspringboot.controller.users.UserController.changePassword
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: PUT /api/v1/users/{userId}/status => com.erg.ergspringboot.controller.users.UserController.updateUserStatus
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+graphql:
+  mapped-method-count: 33
+  fields:
+    - studentDashboard
+    - learningResourceLibrary
+    - teacherHomeworkWorkspace
+    - assignmentProgressWorkspace
+    - studentGroups
+    - classWorkspace
+    - myTeachingCalendar
+    - myStudentCalendar
+    - teachingCalendarWorkspace
+    - teachingScheduleBatches
+    - teachingScheduleBatch
+    - quizWorkspace
+    - quizDraft
+    - quizVersions
+    - quizQuestionAnalytics
+    - assignmentReport
+    - questionBankWorkspace
+    - accessManagementWorkspace
+    - schoolDirectory
+    - schoolOperations
+    - previewTeachingSchedule
+    - createTeachingSchedule
+    - updateTeachingScheduleEvent
+    - deleteTeachingScheduleEvent
+    - deleteTeacherSchedule
+    - publishTeachingScheduleBatch
+    - cancelTeachingScheduleBatch
+    - createRoom
+    - importTeachingScheduleFromExcel
+    - lms
+    - lcms
+    - crm
+    - elearning
+

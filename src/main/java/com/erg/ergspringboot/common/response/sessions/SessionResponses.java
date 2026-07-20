@@ -2,6 +2,7 @@ package com.erg.ergspringboot.common.response.sessions;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
 
 public final class SessionResponses {
 
@@ -24,6 +25,8 @@ public final class SessionResponses {
     public record SessionBootstrapResponse(
             SessionBootstrapUser user,
             SessionBootstrapPermissions permissions,
+            List<String> portals,
+            AccountLifecycleResponse lifecycle,
             SessionBootstrapScope currentScope,
             List<SessionBootstrapUnit> manageableUnits,
             List<SessionBootstrapClass> manageableClasses

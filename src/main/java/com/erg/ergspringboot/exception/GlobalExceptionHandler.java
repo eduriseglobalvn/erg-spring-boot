@@ -6,6 +6,8 @@ import com.erg.ergspringboot.common.response.FieldErrorDetail;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import java.util.Comparator;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -17,6 +19,8 @@ import org.springframework.web.context.request.WebRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(
@@ -42,7 +46,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.unprocessableEntity()
-                .header("X-Request-ID", response.request_id())
+                .header("X-Request-ID", response.requestId())
                 .body(response);
     }
 
@@ -62,7 +66,26 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .header("X-Request-ID", response.request_id())
+                .header("X-Request-ID", response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler(com.erg.ergspringboot.service.quiz.publish.QuizPublishService.ValidationFailedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleQuizValidationFailed(
+            com.erg.ergspringboot.service.quiz.publish.QuizPublishService.ValidationFailedException exception,
+            WebRequest request
+    ) {
+        List<FieldErrorDetail> details = exception.errors().stream()
+                .map(error -> new FieldErrorDetail(error.path(), error.code(), error.code(), error.message()))
+                .toList();
+        ApiResponse<Void> response = ApiResponse.failure(
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                new ErrDetail(exception.getCode(), exception.getMessage(), details),
+                getRequestPath(request),
+                getRequestId(request)
+        );
+        return ResponseEntity.unprocessableEntity()
+                .header("X-Request-ID", response.requestId())
                 .body(response);
     }
 
@@ -76,8 +99,47 @@ public class GlobalExceptionHandler {
                 request
         );
 
-        return ResponseEntity.status(exception.getStatus())
-                .header("X-Request-ID", response.request_id())
+        var builder = ResponseEntity.status(exception.getStatus())
+                .header("X-Request-ID", response.requestId());
+        if ("AUTH_TOO_MANY_ATTEMPTS".equals(exception.getCode())) {
+            builder.header("Retry-After", "60");
+        }
+        return builder.body(response);
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
+            org.springframework.security.access.AccessDeniedException exception,
+            WebRequest request
+    ) {
+        ApiResponse<Void> response = buildErrorResponse(
+                HttpStatus.FORBIDDEN,
+                "Forbidden",
+                "You do not have permission to access this resource",
+                "ACCESS_DENIED",
+                request
+        );
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .header("X-Request-ID", response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler(org.springframework.security.authentication.AuthenticationCredentialsNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingCredentials(
+            org.springframework.security.authentication.AuthenticationCredentialsNotFoundException exception,
+            WebRequest request
+    ) {
+        ApiResponse<Void> response = buildErrorResponse(
+                HttpStatus.UNAUTHORIZED,
+                "Unauthorized",
+                "Authentication is required",
+                "AUTHENTICATION_REQUIRED",
+                request
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header("X-Request-ID", response.requestId())
                 .body(response);
     }
 
@@ -95,7 +157,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .header("X-Request-ID", response.request_id())
+                .header("X-Request-ID", response.requestId())
                 .body(response);
     }
 
@@ -113,7 +175,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .header("X-Request-ID", response.request_id())
+                .header("X-Request-ID", response.requestId())
                 .body(response);
     }
 
@@ -126,9 +188,10 @@ public class GlobalExceptionHandler {
                 "INTERNAL_SERVER_ERROR",
                 request
         );
+        LOGGER.error("Unhandled API exception [requestId={}]", response.requestId(), exception);
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .header("X-Request-ID", response.request_id())
+                .header("X-Request-ID", response.requestId())
                 .body(response);
     }
 

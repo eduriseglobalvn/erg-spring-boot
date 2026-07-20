@@ -29,7 +29,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().statusCode()).isEqualTo(404);
         assertThat(response.getBody().message()).isEqualTo("User not found");
         assertThat(response.getBody().path()).isEqualTo("/api/v1/users/1");
-        assertThat(response.getBody().request_id()).isEqualTo("req-not-found");
+        assertThat(response.getBody().requestId()).isEqualTo("req-not-found");
         assertThat(response.getBody().errors()).isEqualTo("RESOURCE_NOT_FOUND");
     }
 
@@ -48,5 +48,16 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).isEqualTo("Unexpected server error");
         assertThat(response.getBody().errors()).isEqualTo("INTERNAL_SERVER_ERROR");
         assertThat(response.getBody().path()).isEqualTo("/api/v1/orders");
+    }
+
+    @Test
+    void rateLimitedAuthenticationResponseIncludesRetryAfter() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        ResponseEntity<ApiResponse<Void>> response = handler.handleApiException(
+                new com.erg.ergspringboot.exception.auth.AuthFailure.TooManyAttempts(),
+                new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("60");
     }
 }

@@ -12,16 +12,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.DockerClientFactory;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
+@EnabledIf("postgresFixtureAvailable")
 class LmsRuntimeControllerContractTest {
+
+    static boolean postgresFixtureAvailable() {
+        String configured = System.getProperty("erg.test.postgres.url");
+        if (configured == null || configured.isBlank()) configured = System.getenv("ERG_TEST_POSTGRES_URL");
+        if (configured != null && !configured.isBlank()) return true;
+        try { return DockerClientFactory.instance().isDockerAvailable(); }
+        catch (RuntimeException unavailable) { return false; }
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -121,13 +132,16 @@ class LmsRuntimeControllerContractTest {
     }
 
     @Test
-    void lmsAdminSurfaceIsVersionedAndAvailable() throws Exception {
+    void unusedLmsPlaceholderSurfaceIsRemoved() throws Exception {
         mockMvc.perform(get("/api/v1/lms/dashboard/overview")
                         .header("X-User-ID", "admin")
                         .header("X-Permissions", "*"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.module").value("lms"))
-                .andExpect(jsonPath("$.data.status").value("available"));
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/lms/subjects")
+                        .header("X-User-ID", "admin")
+                        .header("X-Permissions", "*"))
+                .andExpect(status().isNotFound());
 
         mockMvc.perform(post("/api/v1/lms/imports/google-sheet/preview")
                         .contentType("application/json")
@@ -139,8 +153,7 @@ class LmsRuntimeControllerContractTest {
                                   "tab": "students"
                                 }
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("LMS operation accepted"));
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -168,7 +181,7 @@ class LmsRuntimeControllerContractTest {
     void lmsEducationUnitsAliasReturnsOnlyManagedEducationUnits() throws Exception {
         mockMvc.perform(get("/api/v1/lms/education-units")
                         .header("X-User-ID", "teacher")
-                        .header("X-Permissions", "lms.unit.read")
+                        .header("X-Permissions", "lms.class.read")
                         .header("X-Managed-EducationUnit-IDs", "sch_binh_an"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items", hasSize(1)))

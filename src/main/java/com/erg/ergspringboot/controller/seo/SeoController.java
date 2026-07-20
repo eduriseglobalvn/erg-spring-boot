@@ -31,7 +31,9 @@ public class SeoController {
 
     @GetMapping(value = {"/sitemap.xml", "/sitemap_index.xml", "/sitemap-{sub}.xml"}, produces = MediaType.APPLICATION_XML_VALUE)
     public String sitemap(@PathVariable(required = false) String sub) {
-        String loc = sub == null ? "https://erg.local/" : "https://erg.local/" + sub;
+        String loc = sub == null || !sub.matches("[a-z0-9-]{1,64}")
+                ? "https://erg.local/"
+                : "https://erg.local/" + sub;
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>" + loc + "</loc><changefreq>daily</changefreq><priority>0.8</priority></url></urlset>";
     }
 

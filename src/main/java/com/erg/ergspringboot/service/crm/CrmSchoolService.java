@@ -10,6 +10,7 @@ import com.erg.ergspringboot.model.crm.CrmSchoolProfile;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.repository.crm.CrmSchoolContactRepository;
 import com.erg.ergspringboot.repository.crm.CrmSchoolDealRepository;
+import com.erg.ergspringboot.repository.crm.CrmSchoolDealRepository.DealPerformanceAggregate;
 import com.erg.ergspringboot.repository.crm.CrmSchoolProfileRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import java.math.BigDecimal;
@@ -63,6 +64,21 @@ public class CrmSchoolService {
 
     @Transactional(readOnly = true)
     public CrmSchoolPerformanceResponse performance(String seoUserId, OffsetDateTime from, OffsetDateTime to) {
+        DealPerformanceAggregate aggregate = dealRepository.aggregatePerformance(seoUserId, from, to);
+        if (aggregate != null) {
+            long total = value(aggregate.getTotalCount());
+            long signed = value(aggregate.getSignedCount());
+            long lost = value(aggregate.getLostCount());
+            long inProgress = Math.max(0, total - signed - lost);
+            BigDecimal revenue = aggregate.getSignedRevenue() == null ? BigDecimal.ZERO : aggregate.getSignedRevenue();
+            BigDecimal conversion = total == 0
+                    ? BigDecimal.ZERO.setScale(2)
+                    : BigDecimal.valueOf(signed).divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+            BigDecimal average = signed == 0
+                    ? BigDecimal.ZERO
+                    : revenue.divide(BigDecimal.valueOf(signed), 2, RoundingMode.HALF_UP).stripTrailingZeros();
+            return new CrmSchoolPerformanceResponse(total, signed, lost, inProgress, conversion, revenue, average);
+        }
         List<CrmSchoolDeal> deals = dealRepository.findByOwnerUserIdAndCreatedAtBetween(seoUserId, from, to);
         long total = deals.size();
         long signed = deals.stream().filter(deal -> stageIs(deal, SIGNED)).count();
@@ -81,6 +97,10 @@ public class CrmSchoolService {
                 : revenue.divide(BigDecimal.valueOf(signed), 2, RoundingMode.HALF_UP).stripTrailingZeros();
 
         return new CrmSchoolPerformanceResponse(total, signed, lost, inProgress, conversion, revenue, average);
+    }
+
+    private long value(Long value) {
+        return value == null ? 0L : value;
     }
 
     private CrmSchoolSummaryResponse summary(CrmSchoolDeal deal, EducationUnit school, CrmSchoolProfile profile, CrmSchoolContact contact) {

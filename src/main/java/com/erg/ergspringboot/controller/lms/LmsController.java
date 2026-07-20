@@ -19,14 +19,20 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.lms.LmsRuntimeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,20 +48,44 @@ public class LmsController {
     }
 
     @GetMapping("/students/me/assignments")
-    public ApiResponse<StudentAssignmentListResponse> assignments(HttpServletRequest request) {
+    public ApiResponse<StudentAssignmentListResponse> assignments(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            HttpServletRequest request
+    ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Assignments loaded", lmsRuntimeService.listStudentAssignments(access.userId(), access), request);
+        StudentAssignmentListResponse data = lmsRuntimeService.listStudentAssignments(
+                access.userId(), access, page == null ? 0 : page, size == null ? 50 : size);
+        return ok("Assignments loaded", data, request);
     }
 
     @GetMapping("/students/me/scores")
-    public ApiResponse<StudentScoreListResponse> scores(HttpServletRequest request) {
+    public ApiResponse<StudentScoreListResponse> scores(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            HttpServletRequest request
+    ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Scores loaded", lmsRuntimeService.listStudentScores(access.userId(), access), request);
+        StudentScoreListResponse data = lmsRuntimeService.listStudentScores(
+                access.userId(), access, page == null ? 0 : page, size == null ? 50 : size);
+        return ok("Scores loaded", data, request);
     }
 
     @GetMapping("/quizzes/{quizId}/package")
-    public ApiResponse<QuizPackageResponse> quizPackage(@PathVariable String quizId, HttpServletRequest request) {
-        return ok("Quiz package loaded", lmsRuntimeService.getQuizPackage(quizId, UserAccessContext.from(request)), request);
+    public ResponseEntity<ApiResponse<QuizPackageResponse>> quizPackage(@PathVariable String quizId, HttpServletRequest request) {
+        QuizPackageResponse data = lmsRuntimeService.getQuizPackage(quizId, UserAccessContext.from(request));
+        String eTag = packageETag(data);
+        CacheControl cacheControl = CacheControl.maxAge(Duration.ofMinutes(5)).cachePrivate().mustRevalidate();
+        if (matchesETag(request.getHeader(HttpHeaders.IF_NONE_MATCH), eTag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .cacheControl(cacheControl)
+                    .eTag(eTag)
+                    .build();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(cacheControl)
+                .eTag(eTag)
+                .body(ok("Quiz package loaded", data, request));
     }
 
     @GetMapping("/quizzes/{quizId}")
@@ -64,9 +94,13 @@ public class LmsController {
     }
 
     @PostMapping("/attempts")
-    public ApiResponse<AttemptResponse> startAttempt(@Valid @RequestBody StartAttemptRequest body, HttpServletRequest request) {
+    public ApiResponse<AttemptResponse> startAttempt(
+            @Valid @RequestBody StartAttemptRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest request
+    ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Attempt started", lmsRuntimeService.startAttempt(access.userId(), body, access), request);
+        return ok("Attempt started", lmsRuntimeService.startAttempt(access.userId(), body, idempotencyKey, access), request);
     }
 
     @PatchMapping("/attempts/{attemptId}/draft")
@@ -125,60 +159,15 @@ public class LmsController {
         return ok("Assignment progress loaded", lmsRuntimeService.assignmentProgress(assignmentId, UserAccessContext.from(request)), request);
     }
 
-    @GetMapping({"/scopes/me", "/centers", "/education-units"})
-    public ApiResponse<Map<String, Object>> deprecatedScopeReads(HttpServletRequest request) {
-        // These endpoints are kept as lightweight compatibility responses; FE should use /api/v1/sessions/current.
-        return ok("Use session bootstrap instead", lmsRuntimeService.deprecatedBootstrapReplacement(request.getRequestURI(), UserAccessContext.from(request)), request);
+    @GetMapping("/education-units")
+    public ApiResponse<Map<String, Object>> educationUnits(HttpServletRequest request) {
+        return ok("Education units loaded", lmsRuntimeService.listEducationUnits(UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/classes")
     public ApiResponse<Map<String, Object>> classes(@RequestParam(required = false) String schoolId, HttpServletRequest request) {
         // Classes are intentionally fetched by selected school instead of being bundled into session bootstrap.
         return ok("Classes loaded", lmsRuntimeService.listClassesBySchool(schoolId, UserAccessContext.from(request)), request);
-    }
-
-    @GetMapping({
-            "/access-management/options", "/access-management/scopes", "/access-management/users",
-            "/dashboard/overview", "/dashboard/interventions", "/students",
-            "/subjects", "/levels", "/topics", "/questions", "/quizzes", "/assignments", "/reports/classroom",
-            "/discussions", "/announcements", "/internal-documents", "/imports/jobs"
-    })
-    public ApiResponse<Map<String, Object>> adminReads(HttpServletRequest request) {
-        return ok("LMS data loaded", lmsRuntimeService.adminPlaceholder(request.getRequestURI(), UserAccessContext.from(request)), request);
-    }
-
-    @PutMapping("/scopes/current")
-    public ApiResponse<Map<String, Object>> updateCurrentScope(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        UserAccessContext access = UserAccessContext.from(request);
-        return ok("Scope updated", Map.of("scope", lmsRuntimeService.normalizeScope(body, access)), request);
-    }
-
-    @PostMapping({
-            "/access-management/preview", "/centers", "/classes", "/students", "/students/bulk-accounts",
-            "/imports/google-sheet/tabs", "/imports/google-sheet/preview", "/imports/google-sheet/commit",
-            "/questions", "/questions/random-pick", "/quizzes", "/quizzes/from-questions", "/quizzes/random",
-            "/assignments", "/assignments/deliveries", "/discussions", "/discussions/replies",
-            "/moderation/check", "/announcements", "/internal-documents"
-    })
-    public ApiResponse<Map<String, Object>> adminCreates(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
-        UserAccessContext access = UserAccessContext.from(request);
-        return ok("LMS operation accepted", lmsRuntimeService.acceptAdminOperation(body, access), request);
-    }
-
-    @PutMapping({"/access-management/users/{userId}/access", "/classes/{id}", "/students/{id}", "/quizzes/{id}/publish"})
-    public ApiResponse<Map<String, Object>> adminUpdates(
-            @PathVariable(required = false) String userId,
-            @PathVariable(required = false) String id,
-            @RequestBody(required = false) Map<String, Object> body,
-            HttpServletRequest request
-    ) {
-        UserAccessContext access = UserAccessContext.from(request);
-        return ok("LMS operation updated", lmsRuntimeService.acceptAdminUpdate(id == null ? userId : id, body, access), request);
-    }
-
-    @GetMapping("/reports/export")
-    public ApiResponse<Map<String, Object>> reportExport(@RequestParam Map<String, String> query, HttpServletRequest request) {
-        return ok("Report export prepared", lmsRuntimeService.reportExport(query, UserAccessContext.from(request)), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
@@ -188,5 +177,25 @@ public class LmsController {
     private String requestId(HttpServletRequest request) {
         Object requestId = request.getAttribute("requestId");
         return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+    }
+
+    private String packageETag(QuizPackageResponse data) {
+        String value = data == null || data.contentHash() == null || data.contentHash().isBlank()
+                ? "empty"
+                : data.contentHash();
+        return "\"" + value.replace("\"", "") + "\"";
+    }
+
+    private boolean matchesETag(String ifNoneMatch, String eTag) {
+        if (ifNoneMatch == null || ifNoneMatch.isBlank()) {
+            return false;
+        }
+        for (String candidate : ifNoneMatch.split(",")) {
+            String normalized = candidate.trim();
+            if ("*".equals(normalized) || normalized.equals(eTag)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

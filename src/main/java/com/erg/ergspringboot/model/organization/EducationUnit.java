@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import java.time.OffsetDateTime;
@@ -36,6 +37,9 @@ import lombok.ToString;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class EducationUnit extends BaseEntity {
+
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId = "erg";
 
     private String name;
 
@@ -76,4 +80,8 @@ public class EducationUnit extends BaseEntity {
 
     @Column(name = "activated_at")
     private OffsetDateTime activatedAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 }

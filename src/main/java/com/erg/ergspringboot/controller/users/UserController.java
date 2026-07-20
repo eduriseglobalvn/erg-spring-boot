@@ -9,6 +9,9 @@ import com.erg.ergspringboot.common.request.users.UserRequests.BulkStatusRequest
 import com.erg.ergspringboot.common.request.users.UserRequests.ChangePasswordRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.OnboardingRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.UpdateProfileRequest;
+import com.erg.ergspringboot.common.request.users.UserRequests.RecoveryEmailChallengeRequest;
+import com.erg.ergspringboot.common.request.users.UserRequests.RecoveryEmailVerifyRequest;
+import com.erg.ergspringboot.common.request.users.UserRequests.CredentialDeliveryRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.ActivityListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
@@ -20,10 +23,15 @@ import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResp
 import com.erg.ergspringboot.common.response.users.UserResponses.UserDetailResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailChallengeResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVerificationResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.PasswordChangeResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.CredentialDeliveryResponse;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.service.users.UserService;
+import com.erg.ergspringboot.service.auth.AccountVerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -44,14 +52,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserController {
 
-    private static final String USER_ID_HEADER = "X-User-ID";
-    private static final String TENANT_ID_HEADER = "X-Tenant-ID";
-    private static final String DEFAULT_TENANT = "erg";
-
     private final UserService userService;
+    private final AccountVerificationService accountVerificationService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, AccountVerificationService accountVerificationService) {
         this.userService = userService;
+        this.accountVerificationService = accountVerificationService;
     }
 
     @GetMapping("/me")
@@ -65,7 +71,29 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserResponse data = userService.updateProfile(userId(servletRequest), tenantId(servletRequest), request);
+        UserResponse data = userService.updateProfile(
+                userId(servletRequest), tenantId(servletRequest), request, auditContext(servletRequest));
+        return ok(data, servletRequest);
+    }
+
+    @PostMapping("/me/recovery-email/challenges")
+    public ResponseEntity<ApiResponse<RecoveryEmailChallengeResponse>> requestRecoveryEmailChallenge(
+            @Valid @RequestBody RecoveryEmailChallengeRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        RecoveryEmailChallengeResponse data = accountVerificationService.requestRecoveryEmailChallenge(
+                userId(servletRequest), tenantId(servletRequest), request.recoveryEmail(), auditContext(servletRequest));
+        return ok(data, servletRequest);
+    }
+
+    @PostMapping("/me/recovery-email/verify")
+    public ResponseEntity<ApiResponse<RecoveryEmailVerificationResponse>> verifyRecoveryEmailChallenge(
+            @Valid @RequestBody RecoveryEmailVerifyRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        RecoveryEmailVerificationResponse data = accountVerificationService.verifyRecoveryEmail(
+                userId(servletRequest), tenantId(servletRequest), request.challengeId(), request.otp(),
+                auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -79,12 +107,14 @@ public class UserController {
     }
 
     @PutMapping("/me/password")
-    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> changePassword(
+    public ResponseEntity<ApiResponse<PasswordChangeResponse>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             HttpServletRequest servletRequest
     ) {
-        userService.changePassword(userId(servletRequest), tenantId(servletRequest), request);
-        return ok(java.util.Map.of("message", "Password changed successfully."), servletRequest);
+        PasswordChangeResponse data = userService.changePassword(
+                userId(servletRequest), tenantId(servletRequest), sessionId(servletRequest), request,
+                auditContext(servletRequest));
+        return ok(data, servletRequest);
     }
 
     @GetMapping("/me/sessions")
@@ -115,7 +145,7 @@ public class UserController {
             @RequestParam(required = false) String role,
             HttpServletRequest servletRequest
     ) {
-        UserListResponse data = userService.listUsers(page, limit, search, status, role);
+        UserListResponse data = userService.listUsers(tenantId(servletRequest), page, limit, search, status, role);
         return ok(data, servletRequest);
     }
 
@@ -124,7 +154,7 @@ public class UserController {
             @Valid @RequestBody AdminCreateUserRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserCreatedResponse data = userService.createUser(request);
+        UserCreatedResponse data = userService.createUser(request, auditContext(servletRequest));
         ApiResponse<UserCreatedResponse> response = ApiResponse.success(
                 201,
                 "Created",
@@ -133,8 +163,27 @@ public class UserController {
                 requestId(servletRequest)
         );
         return ResponseEntity.status(201)
-                .header(RequestIdFilter.REQUEST_ID_HEADER, response.request_id())
+                .header(RequestIdFilter.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
+    }
+
+    @PostMapping("/{userId}/resend-invite")
+    public ResponseEntity<ApiResponse<CredentialDeliveryResponse>> resendInvite(
+            @PathVariable String userId,
+            HttpServletRequest servletRequest
+    ) {
+        return ok(userService.resetCredential(
+                userId, tenantId(servletRequest), "EMAIL_INVITE", auditContext(servletRequest)), servletRequest);
+    }
+
+    @PostMapping("/{userId}/reset-credential")
+    public ResponseEntity<ApiResponse<CredentialDeliveryResponse>> resetCredential(
+            @PathVariable String userId,
+            @Valid @RequestBody CredentialDeliveryRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return ok(userService.resetCredential(
+                userId, tenantId(servletRequest), request.credentialDelivery(), auditContext(servletRequest)), servletRequest);
     }
 
     @PutMapping("/bulk/status")
@@ -191,7 +240,8 @@ public class UserController {
             @Valid @RequestBody AdminAssignRolesRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserResponse data = userService.assignRoles(userId, tenantId(servletRequest), request);
+        UserResponse data = userService.assignRoles(
+                userId, tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -201,7 +251,8 @@ public class UserController {
             @Valid @RequestBody AdminAssignPermissionsRequest request,
             HttpServletRequest servletRequest
     ) {
-        PermissionOverrideResponse data = userService.assignPermissions(userId, tenantId(servletRequest), request);
+        PermissionOverrideResponse data = userService.assignPermissions(
+                userId, tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -223,15 +274,11 @@ public class UserController {
                 requestId(servletRequest)
         );
         return ResponseEntity.ok()
-                .header(RequestIdFilter.REQUEST_ID_HEADER, response.request_id())
+                .header(RequestIdFilter.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
     private String userId(HttpServletRequest request) {
-        String userId = request.getHeader(USER_ID_HEADER);
-        if (userId != null && !userId.isBlank()) {
-            return userId.trim();
-        }
         ErgPrincipal principal = principal();
         if (principal != null && principal.userId() != null && !principal.userId().isBlank()) {
             return principal.userId();
@@ -240,8 +287,11 @@ public class UserController {
     }
 
     private String tenantId(HttpServletRequest request) {
-        String tenantId = request.getHeader(TENANT_ID_HEADER);
-        return tenantId == null || tenantId.isBlank() ? DEFAULT_TENANT : tenantId.trim();
+        ErgPrincipal principal = principal();
+        if (principal != null && principal.tenantId() != null && !principal.tenantId().isBlank()) {
+            return principal.tenantId();
+        }
+        throw new UnauthorizedException("missing authenticated tenant");
     }
 
     private String sessionId(HttpServletRequest request) {
@@ -264,5 +314,15 @@ public class UserController {
     private String requestId(HttpServletRequest request) {
         Object requestId = request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
         return requestId == null ? null : requestId.toString();
+    }
+
+    private UserService.AuditContext auditContext(HttpServletRequest request) {
+        ErgPrincipal principal = principal();
+        return new UserService.AuditContext(
+                principal == null ? null : principal.userId(),
+                requestId(request),
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
+        );
     }
 }

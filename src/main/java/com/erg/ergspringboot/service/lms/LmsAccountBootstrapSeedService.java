@@ -24,7 +24,7 @@ public class LmsAccountBootstrapSeedService {
     private static final String ADMIN_EMAIL = "admin@erg.edu.vn";
     private static final String SYSTEM_ROLE = "system.super_admin";
     private static final String SYSTEM_UNIT_ID = "ctr_system";
-    private static final String STUDIO_UNIT_ID = "ctr_hoclieu";
+    private static final String STUDIO_UNIT_ID = "ctr_content";
     private static final String BINH_AN_SCHOOL_ID = "sch_binh_an";
     private static final String CAT_LAI_SCHOOL_ID = "sch_cat_lai";
 
@@ -51,7 +51,7 @@ public class LmsAccountBootstrapSeedService {
     @Transactional("postgresTransactionManager")
     public void seedAccountHierarchy() {
         Permission wildcardPermission = upsertPermission("perm_system_all_001", "*", "system", "Full system access");
-        Permission profileSelfPermission = upsertPermission("perm_profile_self_001", "profile.self", "profile", "Access own session/profile");
+        Permission profileSelfPermission = upsertPermission("perm_profile_self_001", "profile.self", "users", "Access own session/profile");
         Permission lmsScopeReadPermission = upsertPermission("perm_lms_scope_read", "lms.scope.read", "lms", "Read LMS scope");
         Permission lmsUnitReadPermission = upsertPermission("perm_lms_unit_read_1", "lms.unit.read", "lms", "Read education units");
         Permission lmsClassReadPermission = upsertPermission("perm_lms_class_read", "lms.class.read", "lms", "Read classes");
@@ -75,12 +75,12 @@ public class LmsAccountBootstrapSeedService {
         roleRepository.save(systemRole);
 
         upsertEducationUnit(SYSTEM_UNIT_ID, "He thong ERG", "erg-system", "system", null, "System unit for all schools");
-        upsertEducationUnit(STUDIO_UNIT_ID, "Hoc Lieu Studio", "hoc-lieu-studio", "center", SYSTEM_UNIT_ID, "Learning content and school operations unit");
+        upsertEducationUnit(STUDIO_UNIT_ID, "Content Studio", "content-studio", "center", SYSTEM_UNIT_ID, "Curriculum and learning content operations unit");
         upsertEducationUnit(BINH_AN_SCHOOL_ID, "THCS Binh An", "thcs-binh-an", "school", STUDIO_UNIT_ID, "THCS Binh An");
         upsertEducationUnit(CAT_LAI_SCHOOL_ID, "THCS Cat Lai", "thcs-cat-lai", "school", STUDIO_UNIT_ID, "THCS Cat Lai");
 
         setEducationUnitLogo(SYSTEM_UNIT_ID, "/assets/units/erg-system.svg");
-        setEducationUnitLogo(STUDIO_UNIT_ID, "/assets/units/hoc-lieu-studio.svg");
+        setEducationUnitLogo(STUDIO_UNIT_ID, "/assets/units/content-studio.svg");
         setEducationUnitLogo(BINH_AN_SCHOOL_ID, "/assets/units/thcs-binh-an.svg");
         setEducationUnitLogo(CAT_LAI_SCHOOL_ID, "/assets/units/thcs-cat-lai.svg");
 
@@ -93,7 +93,7 @@ public class LmsAccountBootstrapSeedService {
             roles.add(systemRole);
             user.setRoles(roles);
             userRepository.save(user);
-            upsertAccessScope("scope_admin_system_001", user, SYSTEM_UNIT_ID, "lms,hoclieu,cms", SYSTEM_ROLE);
+            upsertAccessScope("scope_admin_system_001", user, SYSTEM_UNIT_ID, "lms,content,cms", SYSTEM_ROLE);
         });
     }
 
@@ -119,6 +119,7 @@ public class LmsAccountBootstrapSeedService {
             return created;
         });
         educationUnit.setName(name);
+        educationUnit.setTenantId("erg");
         educationUnit.setSlug(slug);
         educationUnit.setType(type);
         educationUnit.setParentId(parentId);

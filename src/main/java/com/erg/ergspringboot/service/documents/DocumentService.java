@@ -2,6 +2,7 @@ package com.erg.ergspringboot.service.documents;
 
 import com.erg.ergspringboot.service.storage.StoragePolicyService;
 import com.erg.ergspringboot.utils.IdGenerator;
+import com.erg.ergspringboot.platform.persistence.ProcessLocalStatePolicy;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -14,12 +15,15 @@ public class DocumentService {
 
     private final Map<String, Map<String, Object>> documents = new ConcurrentHashMap<>();
     private final StoragePolicyService storagePolicyService;
+    private final ProcessLocalStatePolicy statePolicy;
 
-    public DocumentService(StoragePolicyService storagePolicyService) {
+    public DocumentService(StoragePolicyService storagePolicyService, ProcessLocalStatePolicy statePolicy) {
         this.storagePolicyService = storagePolicyService;
+        this.statePolicy = statePolicy;
     }
 
     public Map<String, Object> upload(Map<String, Object> body, String uploadedBy, String tenantId) {
+        statePolicy.assertEnabled("documents");
         String filename = value(body, "filename", "document.pdf");
         String mimeType = value(body, "mimeType", "application/pdf");
         long size = longValue(body, "size", 0);
@@ -42,14 +46,17 @@ public class DocumentService {
     }
 
     public List<Map<String, Object>> list() {
+        statePolicy.assertEnabled("documents");
         return documents.values().stream().toList();
     }
 
     public Map<String, Object> get(String id) {
+        statePolicy.assertEnabled("documents");
         return documents.getOrDefault(id, Map.of("id", id, "status", "missing"));
     }
 
     public Map<String, Object> file(String id) {
+        statePolicy.assertEnabled("documents");
         Map<String, Object> document = get(id);
         return Map.of(
                 "id", id,
@@ -60,6 +67,7 @@ public class DocumentService {
     }
 
     public Map<String, Object> update(String id, Map<String, Object> body) {
+        statePolicy.assertEnabled("documents");
         Map<String, Object> document = new java.util.LinkedHashMap<>(get(id));
         if (body != null) document.putAll(body);
         document.put("updatedAt", OffsetDateTime.now(ZoneOffset.UTC).toString());
@@ -68,6 +76,7 @@ public class DocumentService {
     }
 
     public Map<String, Object> delete(String id) {
+        statePolicy.assertEnabled("documents");
         documents.remove(id);
         return Map.of("deleted", true, "id", id, "remoteObjectDeleted", true);
     }

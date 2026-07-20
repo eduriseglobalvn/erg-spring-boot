@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("dev", "build", "push", "up", "deploy", "down", "logs", "config", "redis-migrate", "help")]
+    [ValidateSet("dev", "test", "build", "push", "up", "prod", "deploy", "down", "logs", "config", "redis-migrate", "help")]
     [string]$Action = "help",
 
     [Parameter(Position = 1)]
@@ -65,12 +65,31 @@ switch ($Action) {
         if (-not $Image) { throw "Set -Image to a Registry tag, for example ghcr.io/acme/erg-spring:abc123" }
         Invoke-Docker @("push", $Image)
     }
+    "test" {
+        Ensure-LocalEnv $productionEnv ".env.production.example"
+        if (-not $Image) { $Image = "erg-spring:local-native" }
+        $env:ERG_APP_IMAGE = $Image
+        Invoke-Docker ((Compose-Args $productionEnv $nativeCompose) + @(
+            "up", "-d", "--remove-orphans", "--scale", "backend=$Replicas"
+        ))
+    }
     "up" {
         Ensure-LocalEnv $productionEnv ".env.production.example"
         if (-not $Image) { $Image = "erg-spring:local-native" }
         $env:ERG_APP_IMAGE = $Image
         Invoke-Docker ((Compose-Args $productionEnv $nativeCompose) + @(
             "up", "-d", "--remove-orphans", "--scale", "backend=$Replicas"
+        ))
+    }
+    "prod" {
+        if (-not (Test-Path -LiteralPath $productionEnv)) {
+            throw "Missing production env file: $productionEnv"
+        }
+        if ($Image) { $env:ERG_APP_IMAGE = $Image }
+        $compose = Compose-Args $productionEnv $nativeCompose
+        Invoke-Docker ($compose + @("pull"))
+        Invoke-Docker ($compose + @(
+            "up", "-d", "--no-build", "--remove-orphans", "--scale", "backend=$Replicas"
         ))
     }
     "deploy" {
@@ -116,8 +135,10 @@ Usage: .\scripts\docker.ps1 <action> [replicas] [-Image registry/name:tag] [-Env
   dev       Start PostgreSQL, Redis and Nginx for the IDE-run backend.
   build     Build a Linux amd64 native image locally (default erg-spring:local-native).
   push      Push the image supplied with -Image.
-  up        Run the native image locally behind Nginx with N backend replicas.
-  deploy    Pull and run a prebuilt image on the server. Never builds.
+  test      Run the already-built native image locally behind Nginx with N backend replicas.
+  up        Alias of test.
+  prod      Pull and run a prebuilt image on the server. Never builds.
+  deploy    Alias of prod.
   down      Stop both local development and native stacks.
   logs      Follow Nginx and backend logs.
   config    Validate development and native Compose configurations.

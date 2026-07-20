@@ -2,7 +2,7 @@ package com.erg.ergspringboot.common.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.erg.ergspringboot.common.request.auth.AuthRequests.ResetPasswordRequest;
+import com.erg.ergspringboot.common.dto.PageRequestDto;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StartAttemptRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.UpdateProfileRequest;
 import jakarta.validation.Validation;
@@ -15,15 +15,6 @@ class ApiDtoContractTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-
-    @Test
-    void authRequestKeepsGoJsonFieldNames() throws Exception {
-        String json = objectMapper.writeValueAsString(
-                new ResetPasswordRequest("user@example.com", "123456", "new-password")
-        );
-
-        assertThat(json).contains("\"new_password\":\"new-password\"");
-    }
 
     @Test
     void userProfileRequestKeepsSnakeCaseFieldNames() throws Exception {
@@ -55,5 +46,13 @@ class ApiDtoContractTest {
         StartAttemptRequest request = new StartAttemptRequest("", "", "", "");
 
         assertThat(validator.validate(request)).hasSize(4);
+    }
+
+    @Test
+    void pageRequestNormalizesUnsafePaginationInput() {
+        PageRequestDto request = new PageRequestDto(-1, 250, "updatedAt", "desc");
+
+        assertThat(request.normalizedPage()).isZero();
+        assertThat(request.normalizedSize()).isEqualTo(100);
     }
 }

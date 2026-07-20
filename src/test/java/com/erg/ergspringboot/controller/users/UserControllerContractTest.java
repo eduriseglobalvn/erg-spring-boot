@@ -30,11 +30,51 @@ import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.service.users.UserService;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class UserControllerContractTest {
+
+    @Test
+    void createUserContractSupportsAtomicTeacherProvisioning() {
+        List<String> requestFields = Arrays.stream(
+                        com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRequest.class
+                                .getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
+        List<String> responseFields = Arrays.stream(
+                        com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse.class
+                                .getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
+
+        org.junit.jupiter.api.Assertions.assertTrue(requestFields.containsAll(List.of(
+                "primaryEmail", "recoveryEmail", "roleGroupIds", "policies", "credentialDelivery"
+        )));
+        org.junit.jupiter.api.Assertions.assertTrue(responseFields.containsAll(List.of(
+                "user", "lifecycle", "deliveryStatus", "oneTimePassword"
+        )));
+    }
+
+    @Test
+    void userControllerExposesRecoveryEmailChallengeAndVerificationActions() {
+        List<String> methods = Arrays.stream(UserController.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName)
+                .toList();
+        org.junit.jupiter.api.Assertions.assertTrue(methods.contains("requestRecoveryEmailChallenge"));
+        org.junit.jupiter.api.Assertions.assertTrue(methods.contains("verifyRecoveryEmailChallenge"));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void getMeReturnsCurrentUserEnvelope() throws Exception {
@@ -69,7 +109,9 @@ class UserControllerContractTest {
     @Test
     void patchMeUpdatesProfile() throws Exception {
         UserService userService = mock(UserService.class);
-        when(userService.updateProfile(eq("user-1"), eq("erg"), org.mockito.ArgumentMatchers.any(UpdateProfileRequest.class)))
+        when(userService.updateProfile(eq("user-1"), eq("erg"),
+                org.mockito.ArgumentMatchers.any(UpdateProfileRequest.class),
+                org.mockito.ArgumentMatchers.any(UserService.AuditContext.class)))
                 .thenReturn(userResponse("Updated User"));
         MockMvc mockMvc = mockMvc(userService);
 
@@ -134,6 +176,7 @@ class UserControllerContractTest {
     @Test
     void missingUserHeaderReturnsUnauthorized() throws Exception {
         MockMvc mockMvc = mockMvc(mock(UserService.class));
+        SecurityContextHolder.clearContext();
 
         mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized())
@@ -147,7 +190,9 @@ class UserControllerContractTest {
                 .thenReturn(new BulkOperationResponse(2));
         when(userService.bulkDelete(eq("erg"), org.mockito.ArgumentMatchers.any(BulkDeleteRequest.class)))
                 .thenReturn(new BulkOperationResponse(2));
-        when(userService.assignRoles(eq("user-1"), eq("erg"), org.mockito.ArgumentMatchers.any(AdminAssignRolesRequest.class)))
+        when(userService.assignRoles(eq("user-1"), eq("erg"),
+                org.mockito.ArgumentMatchers.any(AdminAssignRolesRequest.class),
+                org.mockito.ArgumentMatchers.any(UserService.AuditContext.class)))
                 .thenReturn(userResponse("Active User"));
         MockMvc mockMvc = mockMvc(userService);
 
@@ -206,7 +251,9 @@ class UserControllerContractTest {
                         )),
                         new Meta(1, 20, 1, 1)
                 ));
-        when(userService.assignPermissions(eq("user-1"), eq("erg"), org.mockito.ArgumentMatchers.any(AdminAssignPermissionsRequest.class)))
+        when(userService.assignPermissions(eq("user-1"), eq("erg"),
+                org.mockito.ArgumentMatchers.any(AdminAssignPermissionsRequest.class),
+                org.mockito.ArgumentMatchers.any(UserService.AuditContext.class)))
                 .thenReturn(new PermissionOverrideResponse("user-1", List.of("users.read"), "GRANT"));
         MockMvc mockMvc = mockMvc(userService);
 
@@ -234,7 +281,17 @@ class UserControllerContractTest {
     }
 
     private MockMvc mockMvc(UserService userService) {
-        return MockMvcBuilders.standaloneSetup(new UserController(userService))
+        ErgPrincipal principal = new ErgPrincipal(
+                "user-1", "session-1", "erg", List.of("system.super_admin"), List.of("*"),
+                List.of(), List.of("*"), "erg", "super_admin", Map.of()
+        );
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
+        return MockMvcBuilders.standaloneSetup(new UserController(
+                        userService,
+                        mock(com.erg.ergspringboot.service.auth.AccountVerificationService.class)
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilter(new RequestIdFilter())
                 .build();
@@ -258,9 +315,6 @@ class UserControllerContractTest {
                 "ACTIVE",
                 "local",
                 "erg",
-                null,
-                null,
-                false,
                 "local",
                 List.of("user"),
                 Map.of(),
@@ -269,7 +323,11 @@ class UserControllerContractTest {
                 0L,
                 "erg",
                 null,
-                null
+                null,
+                new com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse(
+                        "FIRST_LOGIN_RESTRICTED", false, null, false, true,
+                        List.of("COMPLETE_PROFILE", "VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD")
+                )
         );
     }
 }

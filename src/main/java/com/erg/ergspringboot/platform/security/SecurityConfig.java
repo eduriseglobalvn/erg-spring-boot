@@ -1,8 +1,11 @@
 package com.erg.ergspringboot.platform.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -11,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -20,6 +25,12 @@ public class SecurityConfig {
     private final ErgAuthenticationFilter authenticationFilter;
     private final PermissionAuthorizationManager permissions;
     private final SecurityErrorResponseWriter errorWriter;
+
+    @Value("${erg.auth.bff-enabled:false}")
+    private boolean bffEnabled;
+
+    @Autowired(required = false)
+    private OidcPrincipalBridgeFilter oidcPrincipalBridgeFilter;
 
     public SecurityConfig(
             ErgAuthenticationFilter authenticationFilter,
@@ -33,11 +44,39 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint((request, response, ex) ->
-                                errorWriter.write(request, response, 401, "AUTHENTICATION_REQUIRED", "Authentication is required"))
+        if (bffEnabled) {
+            CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+            csrfRepository.setCookiePath("/");
+            http.csrf(csrf -> csrf.csrfTokenRepository(csrfRepository))
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                    .oauth2Login(oauth -> oauth
+                            .loginPage("/oauth2/authorization/erg-api")
+                            .successHandler((request, response, authentication) -> {
+                                Object stored = request.getSession().getAttribute("erg.auth.returnTo");
+                                String returnTo = stored instanceof String value
+                                        && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+                                request.getSession().removeAttribute("erg.auth.returnTo");
+                                response.sendRedirect(returnTo);
+                            }));
+        } else {
+            http.csrf(AbstractHttpConfigurer::disable)
+                    .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        }
+
+        http.exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, ex) -> {
+                            Object failureCode = request.getAttribute(ErgAuthenticationFilter.AUTH_FAILURE_CODE_ATTRIBUTE);
+                            boolean sessionReplaced = "AUTH_SESSION_REPLACED".equals(failureCode);
+                            errorWriter.write(
+                                    request,
+                                    response,
+                                    401,
+                                    sessionReplaced ? "AUTH_SESSION_REPLACED" : "AUTHENTICATION_REQUIRED",
+                                    sessionReplaced
+                                            ? "This session was replaced by a login on another device"
+                                            : "Authentication is required"
+                            );
+                        })
                         .accessDeniedHandler((request, response, ex) ->
                                 errorWriter.write(request, response, 403, "ACCESS_DENIED", "You do not have permission to access this resource"))
                 )
@@ -51,24 +90,21 @@ public class SecurityConfig {
                                 "/webhooks/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
-                                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
-                                "/api/v1/auth/verify-pin", "/api/v1/auth/resend-pin",
-                                "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password",
-                                "/api/v1/auth/google/login", "/api/v1/auth/oauth/apple"
+                                "/api/v1/auth/login", "/api/v1/auth/refresh"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/login", "/oauth2/**", "/login/oauth2/**").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/pages/**", "/api/v1/menus/structure",
                                 "/api/v1/posts", "/api/v1/posts/**",
                                 "/api/v1/courses", "/api/v1/courses/**",
                                 "/api/v1/elearning/categories/**", "/api/v1/elearning/levels/**",
-                                "/api/v1/hoclieu/home", "/api/v1/hoclieu/community/**",
                                 "/api/v1/recruitment/jobs/**", "/api/v1/reviews", "/api/v1/reviews/stats",
                                 "/api/v1/public-disclosure/**", "/api/v1/trending/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/recruitment/apply", "/api/v1/reviews", "/api/v1/reviews/*/helpful"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/graphql").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/permission-groups/**")
                         .access((auth, context) -> permissions.require("rbac.role.read", auth, context))
                         .requestMatchers(HttpMethod.POST, "/api/v1/roles")
@@ -79,13 +115,27 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.require("rbac.role.update", auth, context))
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/roles/**")
                         .access((auth, context) -> permissions.require("rbac.role.delete", auth, context))
-                        .requestMatchers("/api/v1/users/*/roles/**", "/api/v1/users/*/permissions/**", "/api/v1/users/roles/bulk")
+                        .requestMatchers("/api/v1/users/*/roles/**", "/api/v1/users/*/role-assignments/**", "/api/v1/users/*/permissions/**", "/api/v1/users/roles/bulk")
                         .access((auth, context) -> permissions.require("rbac.role.assign", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/*/effective-permissions", "/api/v1/users/*/permission-overrides")
                         .access((auth, context) -> permissions.require("rbac.permission.read", auth, context))
-                        .requestMatchers("/api/v1/users/me/**", "/api/v1/sessions/**", "/api/v1/session/**")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/users/me")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.update", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/me/recovery-email/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.recovery_email.update", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/me/password")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.password.change", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me/sessions", "/api/v1/sessions/**", "/api/v1/session/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.sessions.read", "account.self.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/sessions/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.sessions.read", "profile.self", "*")))
+                        .requestMatchers("/api/v1/users/me/**")
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
                         .requestMatchers("/api/v1/users/**")
+                        .access((auth, context) -> permissions.require("users.manage", auth, context))
+                        .requestMatchers("/api/v1/admin/users/**")
                         .access((auth, context) -> permissions.require("users.manage", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/crm/seo/*/performance", "/api/v1/crm/analytics/**")
                         .access((auth, context) -> permissions.require("crm.analytics.read", auth, context))
@@ -95,106 +145,143 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.require("crm.deal.manage", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/lms/students/me/**")
                         .access((auth, context) -> permissions.require("lms.assignment.read_self", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/reports/jobs/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.report.read", "lms.grade.read", "lms.manage", "*")))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/reports/jobs/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.report.read", "lms.grade.read", "lms.manage", "*")))
                         .requestMatchers("/api/v1/lms/attempts/**")
                         .access((auth, context) -> permissions.require("lms.assignment.submit", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/lms/quizzes/*/package", "/api/v1/lms/quizzes/*")
                         .access((auth, context) -> permissions.require("lms.quiz.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/quizzes/*/students", "/api/v1/lms/assignments/*/progress")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/quizzes/*/students")
                         .access((auth, context) -> permissions.require("lms.grade.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/access-management/**")
-                        .access((auth, context) -> permissions.require("lms.scope.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/access-management/preview")
-                        .access((auth, context) -> permissions.require("lms.scope.read", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/access-management/**")
-                        .access((auth, context) -> permissions.require("lms.scope.update", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/dashboard/**")
-                        .access((auth, context) -> permissions.require("lms.dashboard.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/centers", "/api/v1/lms/education-units")
-                        .access((auth, context) -> permissions.require("lms.unit.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/centers")
-                        .access((auth, context) -> permissions.require("lms.unit.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/centers/**")
-                        .access((auth, context) -> permissions.require("lms.unit.update", auth, context))
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/lms/centers/**")
-                        .access((auth, context) -> permissions.require("lms.unit.update", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/assignments/*/progress")
+                        .access((auth, context) -> permissions.require("lms.assignment.progress.read", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/education-units")
+                        .access((auth, context) -> permissions.require("lms.class.read", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/lms/classes")
                         .access((auth, context) -> permissions.require("lms.class.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/classes")
-                        .access((auth, context) -> permissions.require("lms.class.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/classes/**")
-                        .access((auth, context) -> permissions.require("lms.class.update", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/students")
-                        .access((auth, context) -> permissions.require("lms.student.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/students", "/api/v1/lms/students/bulk-accounts")
-                        .access((auth, context) -> permissions.require("lms.student.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/students/**")
-                        .access((auth, context) -> permissions.require("lms.student.update", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/subjects", "/api/v1/lms/levels", "/api/v1/lms/topics")
-                        .access((auth, context) -> permissions.require("lms.content.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/questions", "/api/v1/lms/quizzes")
-                        .access((auth, context) -> permissions.require("lms.quiz.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/questions", "/api/v1/lms/questions/**", "/api/v1/lms/quizzes", "/api/v1/lms/quizzes/from-questions", "/api/v1/lms/quizzes/random")
-                        .access((auth, context) -> permissions.require("lms.quiz.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/quizzes/*/publish")
-                        .access((auth, context) -> permissions.require("lms.quiz.publish", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/assignments")
-                        .access((auth, context) -> permissions.require("lms.assignment.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/assignments", "/api/v1/lms/assignments/**")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/assignments")
                         .access((auth, context) -> permissions.require("lms.assignment.create", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/reports/**")
-                        .access((auth, context) -> permissions.require("lms.report.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/discussions")
-                        .access((auth, context) -> permissions.require("lms.discussion.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/discussions", "/api/v1/lms/discussions/**")
-                        .access((auth, context) -> permissions.require("lms.discussion.write", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/announcements")
-                        .access((auth, context) -> permissions.require("lms.announcement.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/announcements")
-                        .access((auth, context) -> permissions.require("lms.announcement.write", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/internal-documents")
-                        .access((auth, context) -> permissions.require("lms.document.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/internal-documents")
-                        .access((auth, context) -> permissions.require("lms.document.write", auth, context))
-                        .requestMatchers("/api/v1/lms/imports/**")
-                        .access((auth, context) -> permissions.require("lms.import.manage", auth, context))
-                        .requestMatchers("/api/v1/lms/scopes/**")
-                        .access((auth, context) -> permissions.require("lms.scope.read", auth, context))
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/lms/assignments/**")
+                        .access((auth, context) -> permissions.require("lms.assignment.update", auth, context))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/assignments/*/recipients")
+                        .access((auth, context) -> permissions.require("lms.assignment.assign", auth, context))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/lms/assignments/**")
+                        .access((auth, context) -> permissions.require("lms.assignment.delete", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/lms/student-groups/**", "/api/v1/lms/student-groups")
+                        .access((auth, context) -> permissions.require("lms.student_group.read", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lms/student-groups")
+                        .access((auth, context) -> permissions.require("lms.student_group.create", auth, context))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/lms/student-groups/**")
+                        .access((auth, context) -> permissions.require("lms.student_group.update", auth, context))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/lms/student-groups/**")
+                        .access((auth, context) -> permissions.require("lms.student_group.delete", auth, context))
+                        // Calendar read — lms.schedule.read or higher
+                        .requestMatchers(HttpMethod.GET, "/api/v1/calendar/workspace", "/api/v1/calendar/my-calendar",
+                                "/api/v1/calendar/events/**", "/api/v1/calendar/batches", "/api/v1/calendar/batches/**",
+                                "/api/v1/calendar/rooms")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.read", "lms.manage", "*")))
+                        // Calendar command — lms.schedule.manage or higher
+                        .requestMatchers(HttpMethod.POST, "/api/v1/calendar/preview", "/api/v1/calendar", "/api/v1/calendar/rooms")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.create", "lms.manage", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/calendar/batches/*/publish")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.publish", "lms.manage", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/calendar/batches/*/cancel", "/api/v1/calendar/teachers/delete-bulk")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.delete", "lms.manage", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/calendar/import-excel")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.import", "lms.manage", "*")))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/calendar/events/**",
+                                "/api/v1/calendar/rooms/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.update", "lms.manage", "*")))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/calendar/events/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.schedule.delete", "lms.manage", "*")))
                         .requestMatchers("/api/v1/lms/**")
                         .access((auth, context) -> permissions.require("lms.admin", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/schools")
+                        .access((auth, context) -> permissions.require("lms.school.create", auth, context))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/lcms/schools/*")
+                        .access((auth, context) -> permissions.require("lms.school.archive", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/schools/*/restore")
+                        .access((auth, context) -> permissions.require("lms.school.archive", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/schools/*/grades/sync-defaults")
+                        .access((auth, context) -> permissions.require("lms.school.update", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/schools/*/grades", "/api/v1/lcms/schools/*/grades/**")
+                        .access((auth, context) -> permissions.require("lms.class.manage", auth, context))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/lcms/schools/**")
+                        .access((auth, context) -> permissions.require("lms.school.update", auth, context))
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/lcms/schools/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.school.update", "lms.class.manage", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/schools/**")
+                        .access((auth, context) -> permissions.require("lms.school.update", auth, context))
+                        // LCMS quiz authoring (spec §4.2/§4.3): media + draft writes gated by quiz permissions
+                        .requestMatchers(HttpMethod.GET, "/api/v1/lcms/quizzes/*/bundle", "/api/v1/lcms/quiz-versions/*/bundle")
+                        .access((auth, context) -> permissions.require("lms.quiz.read", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/media/**")
+                        .access((auth, context) -> permissions.require("lms.quiz.create", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/quizzes")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.exercise.create", "lms.quiz.create", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/questions")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.exercise.create", "lms.quiz.create", "*")))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/lcms/questions/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.exercise.update", "lms.quiz.create", "*")))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/lcms/quizzes/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.exercise.update", "lms.quiz.create", "*")))
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/lcms/quizzes/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.exercise.update", "lms.quiz.create", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/quizzes/*/publish")
+                        .access((auth, context) -> permissions.require("lms.quiz.publish", auth, context))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/lcms/quizzes/**")
+                        .access((auth, context) -> permissions.require("lms.quiz.create", auth, context))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/lcms/questions/**", "/api/v1/lcms/quizzes/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.exercise.delete", "lms.quiz.create", "*")))
                         .requestMatchers("/api/v1/ai-content/keys/**")
                         .access((auth, context) -> permissions.require("api-keys.manage", auth, context))
                         .requestMatchers("/api/v1/ai-content/**")
                         .access((auth, context) -> permissions.require("ai-content.use", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/curriculum/**", "/api/content/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("content.resource.read", "content.manage", "lms.resource.read", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/content/items", "/api/content/assets", "/api/content/lectures/google-slides")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.resource.create", "content.manage", "*")))
+                        .requestMatchers(HttpMethod.PATCH, "/api/content/items/**", "/api/content/assets/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.resource.update", "content.manage", "*")))
+                        .requestMatchers(HttpMethod.DELETE, "/api/content/items/**", "/api/content/assets/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.resource.delete", "content.manage", "*")))
+                        .requestMatchers("/api/curriculum/topics/*/content-items/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.resource.share", "content.manage", "curriculum.manage", "*")))
+                        .requestMatchers("/api/curriculum/**", "/api/content/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("content.manage", "curriculum.manage", "*")))
                         .requestMatchers("/api/v1/operations/**", "/api/v1/audit/**", "/api/v1/operations/firewall/**")
                         .access((auth, context) -> permissions.require("operations.manage", auth, context))
                         .requestMatchers("/api/v1/migration/**", "/api/v1/platform/**")
                         .access((auth, context) -> permissions.require("platform.read", auth, context))
                         .requestMatchers("/api/v1/crawler/**", "/api/crawler/**", "/api/v1/rss/**")
                         .access((auth, context) -> permissions.require("crawler.manage", auth, context))
+                        // Self notification API — requires profile.self only (not notifications.manage)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notifications", "/api/v1/notifications/unread-count")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notifications/{id}")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/notifications/{id}/read", "/api/v1/notifications/read-all")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/notifications/{id}")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notifications/preferences")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/notifications/preferences")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.preferences.update", "profile.self", "*")))
+                        // Self device API
+                        .requestMatchers(HttpMethod.POST, "/api/v1/notification-devices",
+                                "/api/v1/notification-devices/unregister", "/api/v1/notification-devices/heartbeat")
+                        .access((auth, context) -> permissions.require("profile.self", auth, context))
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/notification-devices/{deviceId}")
+                        .access((auth, context) -> permissions.require("profile.self", auth, context))
+                        // Admin notification API — requires notifications.manage
+                        .requestMatchers("/api/v1/admin/notifications/**")
+                        .access((auth, context) -> permissions.require("notifications.manage", auth, context))
+                        // Fallback catch-all for other notification routes
                         .requestMatchers("/api/v1/notifications/**")
                         .access((auth, context) -> permissions.require("notifications.manage", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/hoclieu/community/**")
-                        .access((auth, context) -> permissions.require("community.write", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/hoclieu/community/**")
-                        .access((auth, context) -> permissions.require("community.write", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hoclieu/teacher/**")
-                        .access((auth, context) -> permissions.require("hoclieu.resource.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hoclieu/library/bootstrap", "/api/v1/hoclieu/library/progress")
-                        .access((auth, context) -> permissions.require("hoclieu.resource.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/hoclieu/studio/bootstrap")
-                        .access((auth, context) -> permissions.require("hoclieu.manage", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hoclieu/resources/**", "/api/v1/hoclieu/quizzes")
-                        .access((auth, context) -> permissions.require("hoclieu.resource.read", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hoclieu/assets/*/slides/**")
-                        .access((auth, context) -> permissions.require("hoclieu.asset.launch", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/hoclieu/assets/*/slides/*/annotations")
-                        .access((auth, context) -> permissions.require("hoclieu.progress.write", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hoclieu/assets/*/launch", "/api/v1/hoclieu/assets/*/stream", "/api/v1/hoclieu/assets/*/pages")
-                        .access((auth, context) -> permissions.require("hoclieu.asset.launch", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/hoclieu/assets/*/download")
-                        .access((auth, context) -> permissions.require("hoclieu.asset.download", auth, context))
-                        .requestMatchers("/api/v1/hoclieu/**", "/api/v1/admin/hoclieu/**")
-                        .access((auth, context) -> permissions.require("hoclieu.manage", auth, context))
                         .requestMatchers("/api/v1/admin/elearning/**", "/api/v1/elearning/**")
                         .access((auth, context) -> permissions.require("elearning.manage", auth, context))
                         .requestMatchers("/api/v1/seo/**")
@@ -230,9 +317,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/public-disclosure/**")
                         .access((auth, context) -> permissions.require("public-disclosure.manage", auth, context))
                         .requestMatchers("/api/v1/**").authenticated()
-                        .anyRequest().permitAll()
+                        .anyRequest().denyAll()
                 )
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        if (oidcPrincipalBridgeFilter != null) {
+            http.addFilterAfter(oidcPrincipalBridgeFilter, OAuth2LoginAuthenticationFilter.class);
+        }
         return http.build();
     }
 

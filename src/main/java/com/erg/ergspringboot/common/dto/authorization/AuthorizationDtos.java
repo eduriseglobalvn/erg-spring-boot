@@ -25,11 +25,52 @@ public final class AuthorizationDtos {
             List<String> permissions,
             @JsonProperty("is_default") boolean isDefault,
             OffsetDateTime createdAt,
-            @JsonProperty("updated_at") OffsetDateTime updatedAt
+            @JsonProperty("updated_at") OffsetDateTime updatedAt,
+            int userCount,
+            List<String> scopeTypes,
+            boolean isSystem,
+            String status,
+            String updatedBy
     ) {
     }
 
-    public record PermissionResponse(String id, String name, String group, String label, String description) {
+    public record PermissionResponse(
+            String id,
+            String name,
+            String group,
+            String label,
+            String description,
+            String resource,
+            String action,
+            String portal,
+            String supportedScope,
+            String status,
+            boolean isSystem,
+            OffsetDateTime deprecatedAt,
+            boolean used,
+            int roleCount,
+            int userCount,
+            List<String> roleNames,
+            List<PermissionBindingResponse> bindings
+    ) {
+    }
+
+    public record PermissionBindingResponse(
+            String id,
+            String surfaceType,
+            String surfaceIdentifier,
+            String description,
+            boolean enforced
+    ) {
+    }
+
+    public record PermissionPageResponse(
+            List<PermissionResponse> items,
+            int page,
+            int limit,
+            long total,
+            int totalPages
+    ) {
     }
 
     public record PermissionGroupResponse(
@@ -42,6 +83,34 @@ public final class AuthorizationDtos {
     }
 
     public record AssignRolesRequest(@NotEmpty List<String> roleIds) {
+    }
+
+    public record AssignScopedRoleRequest(
+            @NotBlank String roleId,
+            @NotBlank String scopeType,
+            String scopeId,
+            OffsetDateTime expiresAt
+    ) {
+    }
+
+    public record RevokeScopedRoleRequest(String reason) {
+    }
+
+    public record ScopedRoleAssignmentResponse(
+            String id,
+            String userId,
+            String roleId,
+            String roleName,
+            String tenantId,
+            String scopeType,
+            String scopeId,
+            OffsetDateTime expiresAt,
+            String assignedBy,
+            OffsetDateTime createdAt,
+            OffsetDateTime revokedAt,
+            String revokedBy,
+            String revokeReason
+    ) {
     }
 
     public record BulkAssignRoleRequest(@NotEmpty List<String> userIds, @NotBlank String roleId) {

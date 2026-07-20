@@ -7,6 +7,9 @@ import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBo
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapUnit;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapUser;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionContextResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
+import com.erg.ergspringboot.exception.UnauthorizedException;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.authorization.Permission;
@@ -31,8 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -40,6 +43,9 @@ public class SessionService {
 
     private static final String DEFAULT_TENANT = "erg";
     private static final Set<String> SYSTEM_ADMIN_ROLES = Set.of("system.super_admin", "erg_super_admin", "super_admin", "admin");
+    private static final Set<String> PLATFORM_WIDE_PORTAL_ROLES = Set.of("system.super_admin", "erg_super_admin", "super_admin");
+    private static final int MAX_BOOTSTRAP_UNITS = 500;
+    private static final int MAX_BOOTSTRAP_CLASSES = 500;
 
     private final AuthSessionRepository sessionRepository;
     private final EducationUnitRepository educationUnitRepository;
@@ -62,7 +68,7 @@ public class SessionService {
     public SessionContextResponse currentSession(String sessionId, String tenantId) {
         AuthSession session = sessionRepository.findBySessionIdAndTenantId(sessionId, normalizeTenant(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("session not found"));
-        boolean active = session.getRevokedAt() == null;
+        boolean active = isSessionActive(session);
         List<String> roles = session.getUser() == null || session.getUser().getRoles() == null
                 ? List.of()
                 : session.getUser().getRoles().stream().map(Role::getName).toList();
@@ -80,13 +86,12 @@ public class SessionService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(
-            cacheNames = "sessionBootstrap",
-            key = "{#sessionId, #tenantId, #requestedAccess.currentEducationUnitId()}"
-    )
     public SessionBootstrapResponse currentBootstrap(String sessionId, String tenantId, UserAccessContext requestedAccess) {
         AuthSession session = sessionRepository.findWithUserBySessionIdAndTenantId(sessionId, normalizeTenant(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("session not found"));
+        if (!isSessionActive(session)) {
+            throw new UnauthorizedException("session is not active");
+        }
         User user = session.getUser();
         if (user == null) {
             throw new ResourceNotFoundException("session user not found");
@@ -115,10 +120,33 @@ public class SessionService {
                         permissionEnvelope.grantedPermissions(),
                         permissionEnvelope.deniedPermissions()
                 ),
+                effectivePortals(session, roles, permissionEnvelope.grantedPermissions()),
+                lifecycle(user),
                 currentScope,
                 manageableUnits,
                 manageableClasses
         );
+    }
+
+    private AccountLifecycleResponse lifecycle(User user) {
+        List<String> nextSteps = new java.util.ArrayList<>();
+        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
+        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
+        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        String status = nextSteps.isEmpty() ? "ACTIVE" : "FIRST_LOGIN_RESTRICTED";
+        return new AccountLifecycleResponse(
+                status,
+                Boolean.TRUE.equals(user.getIsProfileCompleted()),
+                maskEmail(user.getRecoveryEmail()),
+                Boolean.TRUE.equals(user.getRecoveryEmailVerified()),
+                Boolean.TRUE.equals(user.getMustChangePassword()),
+                List.copyOf(nextSteps)
+        );
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return null;
+        return email.substring(0, 1) + "***" + email.substring(email.indexOf('@'));
     }
 
     private List<ManagedUnit> resolveManageableUnits(
@@ -128,7 +156,7 @@ public class SessionService {
             String tenantId
     ) {
         List<EducationUnit> educationUnits = canAccessGlobalErg
-                ? educationUnitRepository.findAllByOrderByNameAsc()
+                ? educationUnitRepository.findTop500ByOrderByNameAsc()
                 : scopedEducationUnits(user, roles, tenantId);
         return educationUnits.stream()
                 .filter(Objects::nonNull)
@@ -161,21 +189,26 @@ public class SessionService {
 
         Map<String, EducationUnit> educationUnitsById = new LinkedHashMap<>();
         findEducationUnitsByIds(directIds).forEach(unit -> educationUnitsById.put(unit.getId(), unit));
-        descendantEducationUnits(educationUnitAdminRootIds).forEach(unit -> educationUnitsById.putIfAbsent(unit.getId(), unit));
+        descendantEducationUnits(educationUnitAdminRootIds, tenantId)
+                .forEach(unit -> educationUnitsById.putIfAbsent(unit.getId(), unit));
+        requireWithinLimit(educationUnitsById.size(), MAX_BOOTSTRAP_UNITS, "education units");
         return List.copyOf(educationUnitsById.values());
     }
 
     private List<EducationUnit> findEducationUnitsByIds(Set<String> ids) {
+        requireWithinLimit(ids.size(), MAX_BOOTSTRAP_UNITS, "education units");
         return ids.isEmpty() ? List.of() : educationUnitRepository.findByIdInOrderByNameAsc(ids);
     }
 
-    private List<EducationUnit> descendantEducationUnits(Set<String> rootIds) {
+    private List<EducationUnit> descendantEducationUnits(Set<String> rootIds, String tenantId) {
         Set<String> seenParentIds = new LinkedHashSet<>(rootIds);
         Set<String> frontier = new LinkedHashSet<>(rootIds);
         Map<String, EducationUnit> descendants = new LinkedHashMap<>();
 
         while (!frontier.isEmpty()) {
-            List<EducationUnit> children = educationUnitRepository.findByParentIdInOrderByNameAsc(frontier);
+            List<EducationUnit> children = educationUnitRepository.findByTenantIdAndParentIdInOrderByNameAsc(
+                    tenantId, frontier, PageRequest.of(0, MAX_BOOTSTRAP_UNITS + 1));
+            requireWithinLimit(descendants.size() + children.size(), MAX_BOOTSTRAP_UNITS, "education units");
             frontier = new LinkedHashSet<>();
             for (EducationUnit child : children) {
                 descendants.putIfAbsent(child.getId(), child);
@@ -209,9 +242,19 @@ public class SessionService {
             return List.of();
         }
 
-        return classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(tenantId, schoolIds).stream()
+        List<Classroom> classes = classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
+                tenantId, schoolIds, PageRequest.of(0, MAX_BOOTSTRAP_CLASSES + 1));
+        requireWithinLimit(classes.size(), MAX_BOOTSTRAP_CLASSES, "classes");
+        return classes.stream()
                 .map(this::toBootstrapClass)
                 .toList();
+    }
+
+    private void requireWithinLimit(int actual, int maximum, String section) {
+        if (actual > maximum) {
+            throw new BadRequestException("session bootstrap " + section + " exceeds " + maximum
+                    + " rows; select a narrower scope");
+        }
     }
 
     private SessionBootstrapClass toBootstrapClass(Classroom classroom) {
@@ -227,6 +270,15 @@ public class SessionService {
 
     private String normalizeTenant(String tenantId) {
         return tenantId == null || tenantId.isBlank() ? DEFAULT_TENANT : tenantId.trim();
+    }
+
+    private boolean isSessionActive(AuthSession session) {
+        User user = session.getUser();
+        return session.getRevokedAt() == null
+                && session.getExpiresAt() != null
+                && session.getExpiresAt().isAfter(OffsetDateTime.now())
+                && user != null
+                && "ACTIVE".equalsIgnoreCase(user.getStatus());
     }
 
     private List<String> roleNames(User user) {
@@ -318,6 +370,17 @@ public class SessionService {
                 .filter(Objects::nonNull)
                 .map(role -> role.trim().toLowerCase(Locale.ROOT))
                 .anyMatch(SYSTEM_ADMIN_ROLES::contains);
+    }
+
+    private List<String> effectivePortals(AuthSession session, List<String> roles, List<String> grantedPermissions) {
+        boolean platformWide = grantedPermissions.contains("*") || roles.stream()
+                .filter(Objects::nonNull)
+                .map(role -> role.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(PLATFORM_WIDE_PORTAL_ROLES::contains);
+        if (platformWide) {
+            return List.of("*");
+        }
+        return List.of(session.getPortal() == null || session.getPortal().isBlank() ? "lms" : session.getPortal());
     }
 
     private SessionBootstrapScope resolveCurrentScope(

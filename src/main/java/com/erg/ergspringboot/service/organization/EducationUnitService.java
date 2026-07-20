@@ -4,7 +4,9 @@ import com.erg.ergspringboot.common.response.organization.EducationUnitResponses
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitResponse;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,9 +20,17 @@ public class EducationUnitService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(cacheNames = "organizationEducationUnits", key = "'all'")
-    public EducationUnitListResponse listEducationUnits() {
-        return new EducationUnitListResponse(educationUnitRepository.findAllByOrderByNameAsc().stream()
+    @Cacheable(cacheNames = "organizationEducationUnits", key = "{#access.tenantId(), #access.managedEducationUnitIds()}")
+    public EducationUnitListResponse listEducationUnits(UserAccessContext access) {
+        var managedIds = access.managedEducationUnitIds();
+        var limit = PageRequest.of(0, 500);
+        var units = managedIds.contains("*")
+                ? educationUnitRepository.findByTenantIdOrderByNameAsc(access.tenantId(), limit)
+                : managedIds.isEmpty()
+                        ? java.util.List.<EducationUnit>of()
+                        : educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(
+                                access.tenantId(), managedIds, limit);
+        return new EducationUnitListResponse(units.stream()
                 .map(this::toResponse)
                 .toList());
     }

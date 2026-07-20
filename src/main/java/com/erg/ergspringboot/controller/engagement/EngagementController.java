@@ -25,18 +25,18 @@ public class EngagementController {
         this.workflows = workflows;
     }
 
-    @GetMapping({"/recruitment/jobs", "/reviews", "/reviews/admin", "/reviews/admin/all", "/hoclieu/community/topics", "/hoclieu/community/feed", "/hoclieu/community/posts"})
+    @GetMapping({"/recruitment/jobs", "/reviews", "/reviews/admin", "/reviews/admin/all"})
     public ApiResponse<List<Map<String, Object>>> list(HttpServletRequest request) {
         return okList("Engagement list loaded", workflows.list(module(request), type(request)), request);
     }
 
-    @GetMapping({"/recruitment/jobs/{slug}", "/recruitment/tracking/{code}", "/reviews/stats", "/hoclieu/community/posts/{postId}/comments"})
+    @GetMapping({"/recruitment/jobs/{slug}", "/recruitment/tracking/{code}", "/reviews/stats"})
     public ApiResponse<Map<String, Object>> detail(@PathVariable(required = false) String slug, @PathVariable(required = false) String code, @PathVariable(required = false) String postId, HttpServletRequest request) {
         String id = slug == null ? (code == null ? (postId == null ? "stats" : postId) : code) : slug;
         return ok("Engagement detail loaded", workflows.get(module(request), type(request), id), request);
     }
 
-    @PostMapping({"/recruitment/apply", "/recruitment/jobs", "/reviews", "/reviews/batch/status", "/hoclieu/community/topics", "/hoclieu/community/posts", "/hoclieu/community/media/upload", "/hoclieu/community/posts/{postId}/comments", "/hoclieu/community/reactions", "/hoclieu/community/follows"})
+    @PostMapping({"/recruitment/apply", "/recruitment/jobs", "/reviews", "/reviews/batch/status"})
     public ApiResponse<Map<String, Object>> create(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
         return ok("Engagement item saved", workflows.create(module(request), type(request), body), request);
     }
@@ -61,7 +61,7 @@ public class EngagementController {
         return okList("Candidates loaded", workflows.list("recruitment", "candidates"), request);
     }
 
-    @DeleteMapping({"/recruitment/jobs/{id}", "/hoclieu/community/reactions", "/hoclieu/community/follows"})
+    @DeleteMapping("/recruitment/jobs/{id}")
     public ApiResponse<Map<String, Object>> delete(@PathVariable(required = false) String id, HttpServletRequest request) {
         return ok("Engagement item deleted", workflows.delete(module(request), type(request), id == null ? "current" : id), request);
     }

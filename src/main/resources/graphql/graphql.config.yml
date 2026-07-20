@@ -1,0 +1,2 @@
+# Intentionally no GraphQL IDE overrides; keep this resource non-empty because
+# Hibernate's enhancement scan rejects zero-byte resources in target/classes.

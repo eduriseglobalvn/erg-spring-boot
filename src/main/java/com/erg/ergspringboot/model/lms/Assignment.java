@@ -68,4 +68,21 @@ public class Assignment extends BaseEntity {
 
     @Column(name = "recipient_mode")
     private String recipientMode;
+
+    private String title;
+
+    @Column(name = "attempt_limit")
+    private Integer attemptLimit;
+
+    @Column(name = "max_duration_minutes")
+    private Integer maxDurationMinutes;
+
+    @Column(name = "start_at")
+    private OffsetDateTime startAt;
+
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
+    @Column(name = "recipient_count")
+    private Integer recipientCount;
 }

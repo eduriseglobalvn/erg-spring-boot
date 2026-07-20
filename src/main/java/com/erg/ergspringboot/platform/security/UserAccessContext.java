@@ -17,42 +17,39 @@ public record UserAccessContext(
 
     public static UserAccessContext from(HttpServletRequest request) {
         ErgPrincipal principal = principal();
-        String userId = first(request.getHeader("X-User-ID"), principal == null ? null : principal.userId(), "system");
-        String tenantId = first(request.getHeader("X-Tenant-ID"), principal == null ? null : principal.tenantId(), "erg");
-        List<String> educationUnits = csv(first(
-                request.getHeader("X-Managed-EducationUnit-IDs"),
-                request.getHeader("X-Managed-Education-Unit-IDs"),
-                request.getHeader("X-Managed-Center-IDs"),
-                attribute(principal, "managedEducationUnitIds"),
-                request.getHeader("X-EducationUnit-ID"),
-                request.getHeader("X-Education-Unit-ID"),
-                request.getHeader("X-Center-ID")
-        ));
-        List<String> classes = csv(first(
-                request.getHeader("X-Managed-Class-IDs"),
-                attribute(principal, "managedClassIds"),
-                request.getHeader("X-Class-ID")
-        ));
-        String currentEducationUnitId = first(
+        String userId = first(principal == null ? null : principal.userId(), "system");
+        String tenantId = first(principal == null ? null : principal.tenantId(), "erg");
+        boolean wildcardPrincipal = principal != null && principal.permissions() != null && principal.permissions().contains("*");
+        List<String> educationUnits = wildcardPrincipal ? List.of("*") : csv(attribute(principal, "managedEducationUnitIds"));
+        List<String> classes = wildcardPrincipal ? List.of("*") : csv(attribute(principal, "managedClassIds"));
+        String requestedEducationUnitId = first(
                 request.getHeader("X-Current-EducationUnit-ID"),
                 request.getHeader("X-Current-Education-Unit-ID"),
                 request.getHeader("X-Current-Center-ID"),
                 request.getHeader("X-EducationUnit-ID"),
                 request.getHeader("X-Education-Unit-ID"),
-                request.getHeader("X-Center-ID"),
-                firstOrNull(educationUnits)
+                request.getHeader("X-Center-ID")
         );
-        String currentClassId = first(request.getHeader("X-Current-Class-ID"), request.getHeader("X-Class-ID"), firstOrNull(classes));
+        String currentEducationUnitId = scopedSelection(requestedEducationUnitId, educationUnits);
+        String currentClassId = scopedSelection(first(request.getHeader("X-Current-Class-ID"), request.getHeader("X-Class-ID")), classes);
         return new UserAccessContext(userId, tenantId, educationUnits, classes, currentEducationUnitId, currentClassId);
     }
 
     public boolean canAccessEducationUnit(String educationUnitId) {
-        return educationUnitId == null || educationUnitId.isBlank() || managedEducationUnitIds.isEmpty()
+        return educationUnitId == null || educationUnitId.isBlank()
                 || managedEducationUnitIds.contains("*") || managedEducationUnitIds.contains(educationUnitId);
     }
 
     public boolean canAccessClass(String classId) {
-        return classId == null || classId.isBlank() || managedClassIds.isEmpty() || managedClassIds.contains("*") || managedClassIds.contains(classId);
+        return classId == null || classId.isBlank() || managedClassIds.contains("*") || managedClassIds.contains(classId);
+    }
+
+    public boolean hasManagedEducationUnitScope() {
+        return !managedEducationUnitIds.isEmpty();
+    }
+
+    public boolean hasManagedClassScope() {
+        return !managedClassIds.isEmpty();
     }
 
     private static ErgPrincipal principal() {
@@ -96,5 +93,19 @@ public record UserAccessContext(
 
     private static String firstOrNull(List<String> values) {
         return values == null || values.isEmpty() ? null : values.getFirst();
+    }
+
+    private static String scopedSelection(String requested, List<String> managedIds) {
+        if (managedIds == null || managedIds.isEmpty()) {
+            return null;
+        }
+        if (requested == null || requested.isBlank()) {
+            return firstOrNull(managedIds);
+        }
+        String normalized = requested.trim();
+        if (managedIds.contains("*") || managedIds.contains(normalized)) {
+            return normalized;
+        }
+        return firstOrNull(managedIds);
     }
 }

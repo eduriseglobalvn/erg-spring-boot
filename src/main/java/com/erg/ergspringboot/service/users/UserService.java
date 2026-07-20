@@ -19,12 +19,15 @@ import com.erg.ergspringboot.common.response.users.UserResponses.PermissionOverr
 import com.erg.ergspringboot.common.response.users.UserResponses.RevokeSessionResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.SessionListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.SessionResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.SocialAccountResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserDetailResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserItemResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.ProvisionedUserResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.PasswordChangeResponse;
+import com.erg.ergspringboot.common.response.users.UserResponses.CredentialDeliveryResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -32,27 +35,36 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.model.users.SocialAccount;
+import com.erg.ergspringboot.model.organization.UserAccessScope;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.model.users.UserActivity;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
+import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.repository.auth.user.projection.UserListItemProjection;
+import com.erg.ergspringboot.repository.auth.user.projection.UserRoleNameProjection;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
-import com.erg.ergspringboot.repository.users.SocialAccountRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
+import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.service.auth.PasswordService;
+import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
+import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,8 +79,11 @@ public class UserService {
     private final PermissionRepository permissionRepository;
     private final UserPermissionOverrideRepository permissionOverrideRepository;
     private final UserActivityRepository userActivityRepository;
-    private final SocialAccountRepository socialAccountRepository;
     private final PasswordService passwordService;
+    private final UserAccessScopeRepository userAccessScopeRepository;
+    private final AccountMailSender accountMailSender;
+    private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
+    private AuthorizationMutationAuditService authorizationMutationAuditService;
 
     public UserService(
             UserRepository userRepository,
@@ -77,8 +92,9 @@ public class UserService {
             PermissionRepository permissionRepository,
             UserPermissionOverrideRepository permissionOverrideRepository,
             UserActivityRepository userActivityRepository,
-            SocialAccountRepository socialAccountRepository,
-            PasswordService passwordService
+            PasswordService passwordService,
+            UserAccessScopeRepository userAccessScopeRepository,
+            AccountMailSender accountMailSender
     ) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
@@ -86,8 +102,16 @@ public class UserService {
         this.permissionRepository = permissionRepository;
         this.permissionOverrideRepository = permissionOverrideRepository;
         this.userActivityRepository = userActivityRepository;
-        this.socialAccountRepository = socialAccountRepository;
         this.passwordService = passwordService;
+        this.userAccessScopeRepository = userAccessScopeRepository;
+        this.accountMailSender = accountMailSender;
+    }
+
+    @Autowired(required = false)
+    void setAuthorizationMutationAuditService(
+            AuthorizationMutationAuditService authorizationMutationAuditService
+    ) {
+        this.authorizationMutationAuditService = authorizationMutationAuditService;
     }
 
     @Transactional(readOnly = true)
@@ -97,9 +121,19 @@ public class UserService {
 
     @Transactional
     public UserResponse updateProfile(String userId, String tenantId, UpdateProfileRequest request) {
+        return updateProfile(userId, tenantId, request, null);
+    }
+
+    @Transactional
+    public UserResponse updateProfile(
+            String userId, String tenantId, UpdateProfileRequest request, AuditContext auditContext
+    ) {
         User user = findUser(userId, tenantId);
+        Map<String, Object> before = profileAuditState(user);
         applyProfileUpdate(user, request);
         userRepository.save(user);
+        recordActivity(user, auditContext, "ACCOUNT_PROFILE_UPDATED", "Account profile updated",
+                before, profileAuditState(user));
         return toResponse(user);
     }
 
@@ -138,53 +172,111 @@ public class UserService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public RevokeSessionResponse revokeSession(String userId, String tenantId, String sessionId) {
+        return revokeSession(userId, tenantId, sessionId, null);
+    }
+
+    @Transactional
+    public RevokeSessionResponse revokeSession(
+            String userId, String tenantId, String sessionId, AuditContext auditContext
+    ) {
         AuthSession session = sessionRepository.findBySessionIdAndUserIdAndTenantId(sessionId, userId, normalizeTenant(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("session not found"));
         OffsetDateTime revokedAt = now();
         session.setRevokedAt(revokedAt);
         session.setRevokedReason("user_revoked");
         sessionRepository.save(session);
+        User target = session.getUser();
+        if (target == null) {
+            target = new User();
+            target.setId(userId);
+            target.setTenantId(normalizeTenant(tenantId));
+        }
+        recordActivity(target, auditContext, "EMPLOYEE_SESSION_REVOKED", "Employee session revoked",
+                Map.of("sessionId", sessionId, "revoked", false),
+                Map.of("sessionId", sessionId, "revoked", true, "reason", "user_revoked"));
         return new RevokeSessionResponse(true, toIso(revokedAt));
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
-    public void changePassword(String userId, String tenantId, ChangePasswordRequest request) {
+    public PasswordChangeResponse changePassword(String userId, String tenantId, ChangePasswordRequest request) {
+        return changePassword(userId, tenantId, null, request);
+    }
+
+    @Transactional
+    public PasswordChangeResponse changePassword(
+            String userId, String tenantId, String currentSessionId, ChangePasswordRequest request
+    ) {
+        return changePassword(userId, tenantId, currentSessionId, request, null);
+    }
+
+    @Transactional
+    public PasswordChangeResponse changePassword(
+            String userId, String tenantId, String currentSessionId, ChangePasswordRequest request,
+            AuditContext auditContext
+    ) {
         User user = findUser(userId, tenantId);
+        boolean previousMustChangePassword = Boolean.TRUE.equals(user.getMustChangePassword());
+        String previousStatus = user.getStatus();
         if (!passwordService.matches(request.oldPassword(), user.getPasswordHash())) {
             throw new BadRequestException("invalid old password");
         }
         user.setPasswordHash(passwordService.hash(request.newPassword()));
+        user.setMustChangePassword(false);
+        if (Boolean.TRUE.equals(user.getIsProfileCompleted()) && Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
+            user.setStatus("ACTIVE");
+        }
         userRepository.save(user);
 
         List<AuthSession> sessions = sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(userId, normalizeTenant(tenantId));
+        List<AuthSession> sessionsToRevoke = sessions.stream()
+                .filter(session -> currentSessionId == null || !currentSessionId.equals(session.getSessionId()))
+                .toList();
         OffsetDateTime revokedAt = now();
-        sessions.forEach(session -> {
+        sessionsToRevoke.forEach(session -> {
             session.setRevokedAt(revokedAt);
             session.setRevokedReason("password_changed");
         });
-        sessionRepository.saveAll(sessions);
+        if (!sessionsToRevoke.isEmpty()) sessionRepository.saveAll(sessionsToRevoke);
+        recordActivity(user, auditContext, "ACCOUNT_PASSWORD_CHANGED", "Account password changed",
+                Map.of("mustChangePassword", previousMustChangePassword, "status", safeAuditValue(previousStatus)),
+                Map.of("mustChangePassword", false, "status", safeAuditValue(user.getStatus()),
+                        "revokedSessions", sessionsToRevoke.size()));
+        return new PasswordChangeResponse(lifecycle(user), sessionsToRevoke.size());
     }
 
     @Transactional(readOnly = true)
     public UserListResponse listUsers(Integer page, Integer limit, String search, String status, String role) {
+        return listUsers(DEFAULT_TENANT, page, limit, search, status, role);
+    }
+
+    @Transactional(readOnly = true)
+    public UserListResponse listUsers(
+            String tenantId, Integer page, Integer limit, String search, String status, String role
+    ) {
         int safePage = page == null || page < 1 ? 1 : page;
         int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
-        List<User> filtered = userRepository.findAll().stream()
-                .filter(user -> matchesSearch(user, search))
-                .filter(user -> isBlank(status) || status.equalsIgnoreCase(user.getStatus()))
-                .filter(user -> isBlank(role) || roles(user.getRoles()).stream().anyMatch(role::equalsIgnoreCase))
-                .sorted(Comparator.comparing(User::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+        Page<UserListItemProjection> pageItems = userRepository.findAdminListItems(
+                normalizeTenant(tenantId),
+                trimToNull(search),
+                trimToNull(status),
+                trimToNull(role),
+                PageRequest.of(safePage - 1, safeLimit)
+        );
+        List<String> userIds = pageItems.getContent().stream()
+                .map(UserListItemProjection::id)
                 .toList();
-        int from = Math.min((safePage - 1) * safeLimit, filtered.size());
-        int to = Math.min(from + safeLimit, filtered.size());
-        List<UserItemResponse> users = filtered.subList(from, to).stream()
-                .map(this::toItemResponse)
+        Map<String, List<String>> rolesByUserId = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findRoleNamesByUserIds(userIds).stream()
+                        .collect(Collectors.groupingBy(
+                                UserRoleNameProjection::userId,
+                                Collectors.mapping(UserRoleNameProjection::roleName, Collectors.toList())
+                        ));
+        List<UserItemResponse> users = pageItems.getContent().stream()
+                .map(user -> toItemResponse(user, rolesByUserId.get(user.id())))
                 .toList();
-        long totalPages = filtered.isEmpty() ? 0 : (long) Math.ceil((double) filtered.size() / safeLimit);
-        return new UserListResponse(users, new Meta(safePage, safeLimit, filtered.size(), totalPages));
+        return new UserListResponse(users, new Meta(safePage, safeLimit, pageItems.getTotalElements(), pageItems.getTotalPages()));
     }
 
     public UserListResponse listUsers(ListUsersQuery query) {
@@ -199,11 +291,7 @@ public class UserService {
                 .stream()
                 .map(session -> toSessionResponse(session, null))
                 .toList();
-        List<SocialAccountResponse> socialAccounts = socialAccountRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(this::toSocialAccountResponse)
-                .toList();
-        return new UserDetailResponse(toResponse(user), sessions, socialAccounts);
+        return new UserDetailResponse(toResponse(user), sessions);
     }
 
     @Transactional(readOnly = true)
@@ -211,47 +299,197 @@ public class UserService {
         findUser(userId, tenantId);
         int safePage = page == null || page < 1 ? 1 : page;
         int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
-        List<UserActivity> activities = userActivityRepository
-                .findByTargetUserIdAndTenantIdOrderByCreatedAtDesc(userId, normalizeTenant(tenantId));
-        int from = Math.min((safePage - 1) * safeLimit, activities.size());
-        int to = Math.min(from + safeLimit, activities.size());
-        List<ActivityResponse> items = activities.subList(from, to).stream()
+        Page<UserActivity> activities = userActivityRepository
+                .findByTargetUserIdAndTenantIdOrderByCreatedAtDescIdDesc(
+                        userId, normalizeTenant(tenantId), PageRequest.of(safePage - 1, safeLimit));
+        List<ActivityResponse> items = activities.getContent().stream()
                 .map(this::toActivityResponse)
                 .toList();
-        long totalPages = activities.isEmpty() ? 0 : (long) Math.ceil((double) activities.size() / safeLimit);
-        return new ActivityListResponse(items, new Meta(safePage, safeLimit, activities.size(), totalPages));
+        return new ActivityListResponse(items, new Meta(
+                safePage, safeLimit, activities.getTotalElements(), activities.getTotalPages()));
     }
 
     @Transactional
     public UserCreatedResponse createUser(AdminCreateUserRequest request) {
-        String email = request.email().trim().toLowerCase();
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new ConflictException("email already registered");
-        }
-        User user = new User();
-        user.setId(IdGenerator.newId());
-        user.setEmail(email);
-        user.setPasswordHash(passwordService.hash(request.password()));
-        user.setFullName(trimToNull(request.fullName()));
-        user.setPhone(trimToNull(request.phone()));
-        user.setStatus("ACTIVE");
-        user.setProvider("local");
-        user.setAccountType("erg");
-        user.setTenantId(DEFAULT_TENANT);
-        user.setIsProfileCompleted(isProfileCompleted(user));
-        user.setLoginCount(0L);
-        userRepository.save(user);
-        return new UserCreatedResponse(user.getId(), user.getEmail(), user.getFullName(), user.getStatus());
+        return createUser(request, null);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
+    public UserCreatedResponse createUser(AdminCreateUserRequest request, AuditContext auditContext) {
+        return createUser(request, auditContext, SecurityUtils.principal());
+    }
+
+    @Transactional
+    public UserCreatedResponse createUser(
+            AdminCreateUserRequest request, AuditContext auditContext, ErgPrincipal actor
+    ) {
+        String email = request.primaryEmail().trim().toLowerCase();
+        String username = email;
+        String recoveryEmail = normalizeOptionalEmail(request.recoveryEmail());
+        if (email.equals(recoveryEmail)) {
+            throw new BadRequestException("recovery email must differ from primary email");
+        }
+        String credentialDelivery = request.credentialDelivery().trim().toUpperCase();
+        if (!List.of("EMAIL_INVITE", "ONE_TIME_PASSWORD").contains(credentialDelivery)) {
+            throw new BadRequestException("invalid credential delivery");
+        }
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new ConflictException("username already registered");
+        }
+        if (email != null && userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ConflictException("email already registered");
+        }
+        String temporaryCredential = IdGenerator.newId() + "Aa1!";
+        List<String> requestedRoleGroups = request.roleGroupIds().stream()
+                .map(String::trim).filter(value -> !value.isBlank()).distinct().toList();
+        List<Role> roleGroups = roleRepository.findByNameInIgnoreCase(requestedRoleGroups);
+        if (roleGroups.size() != requestedRoleGroups.size()) {
+            throw new BadRequestException("one or more role groups were not found");
+        }
+        protectedRolePolicy.assertCanGrant(actor, roleGroups);
+        Set<String> requestedRoleSet = new LinkedHashSet<>(requestedRoleGroups);
+        if (request.policies().stream().anyMatch(policy -> !requestedRoleSet.contains(policy.roleGroup()))) {
+            throw new BadRequestException("policy role group must be assigned to the user");
+        }
+        User user = new User();
+        user.setId(IdGenerator.newId());
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPasswordHash(passwordService.hash(temporaryCredential));
+        user.setFullName(trimToNull(request.fullName()));
+        user.setPhone(trimToNull(request.phone()));
+        user.setRecoveryEmail(recoveryEmail);
+        user.setRecoveryEmailVerified(false);
+        user.setMustChangePassword(true);
+        user.setStatus("INVITED");
+        user.setProvider("local");
+        user.setAccountType("erg");
+        user.setTenantId(actor == null ? DEFAULT_TENANT : normalizeTenant(actor.tenantId()));
+        user.setIsProfileCompleted(isProfileCompleted(user));
+        user.setLoginCount(0L);
+        user.setRoles(new LinkedHashSet<>(roleGroups));
+        userRepository.save(user);
+        List<UserAccessScope> scopes = request.policies().stream().map(policy -> {
+            UserAccessScope scope = new UserAccessScope();
+            scope.setId(IdGenerator.newId());
+            scope.setUserId(user.getId());
+            scope.setEducationUnitId(policy.scopeId().trim());
+            scope.setRole(policy.roleGroup().trim());
+            scope.setModules(policy.modules().stream().map(String::trim).filter(value -> !value.isBlank())
+                    .distinct().collect(java.util.stream.Collectors.joining(",")));
+            return scope;
+        }).toList();
+        userAccessScopeRepository.saveAll(scopes);
+
+        if ("EMAIL_INVITE".equals(credentialDelivery)) {
+            accountMailSender.sendTeacherInvite(email, user.getFullName(), temporaryCredential);
+        }
+        recordActivity(user, auditContext, "TEACHER_ACCOUNT_PROVISIONED", "Teacher account provisioned",
+                Map.of(), Map.of(
+                        "status", user.getStatus(),
+                        "credentialDelivery", credentialDelivery,
+                        "roleGroups", requestedRoleGroups,
+                        "scopeCount", scopes.size()
+                ));
+        return new UserCreatedResponse(
+                new ProvisionedUserResponse(user.getId(), user.getEmail(), user.getFullName(), user.getStatus()),
+                lifecycle(user),
+                "EMAIL_INVITE".equals(credentialDelivery) ? "QUEUED_FOR_DELIVERY" : "READY",
+                "ONE_TIME_PASSWORD".equals(credentialDelivery) ? temporaryCredential : null
+        );
+    }
+
+    private AccountLifecycleResponse lifecycle(User user) {
+        List<String> nextSteps = new java.util.ArrayList<>();
+        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
+        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
+        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        String lifecycleStatus = nextSteps.isEmpty()
+                ? "ACTIVE"
+                : ("INVITED".equalsIgnoreCase(user.getStatus()) ? "PROVISIONED" : "FIRST_LOGIN_RESTRICTED");
+        return new AccountLifecycleResponse(
+                lifecycleStatus,
+                Boolean.TRUE.equals(user.getIsProfileCompleted()),
+                maskEmail(user.getRecoveryEmail()),
+                Boolean.TRUE.equals(user.getRecoveryEmailVerified()),
+                Boolean.TRUE.equals(user.getMustChangePassword()),
+                List.copyOf(nextSteps)
+        );
+    }
+
+    @Transactional
+    public CredentialDeliveryResponse resetCredential(
+            String userId, String tenantId, String requestedDelivery
+    ) {
+        return resetCredential(userId, tenantId, requestedDelivery, null);
+    }
+
+    @Transactional
+    public CredentialDeliveryResponse resetCredential(
+            String userId, String tenantId, String requestedDelivery, AuditContext auditContext
+    ) {
+        User user = findUser(userId, tenantId);
+        String delivery = requestedDelivery == null ? "" : requestedDelivery.trim().toUpperCase();
+        if (!List.of("EMAIL_INVITE", "ONE_TIME_PASSWORD").contains(delivery)) {
+            throw new BadRequestException("invalid credential delivery");
+        }
+        boolean previousMustChangePassword = Boolean.TRUE.equals(user.getMustChangePassword());
+        String temporaryCredential = IdGenerator.newId() + "Aa1!";
+        user.setPasswordHash(passwordService.hash(temporaryCredential));
+        user.setMustChangePassword(true);
+        userRepository.save(user);
+
+        List<AuthSession> sessions = sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(
+                userId, normalizeTenant(tenantId));
+        OffsetDateTime revokedAt = now();
+        sessions.forEach(session -> {
+            session.setRevokedAt(revokedAt);
+            session.setRevokedReason("credential_reset");
+        });
+        if (!sessions.isEmpty()) sessionRepository.saveAll(sessions);
+
+        if ("EMAIL_INVITE".equals(delivery)) {
+            accountMailSender.sendTeacherInvite(user.getEmail(), user.getFullName(), temporaryCredential);
+        }
+        recordActivity(user, auditContext,
+                "EMAIL_INVITE".equals(delivery) ? "TEACHER_INVITE_RESENT" : "TEACHER_CREDENTIAL_RESET",
+                "Teacher temporary credential rotated",
+                Map.of("mustChangePassword", previousMustChangePassword),
+                Map.of("mustChangePassword", true, "credentialDelivery", delivery, "revokedSessions", sessions.size()));
+        return new CredentialDeliveryResponse(
+                "EMAIL_INVITE".equals(delivery) ? "QUEUED_FOR_DELIVERY" : "READY",
+                "ONE_TIME_PASSWORD".equals(delivery) ? temporaryCredential : null
+        );
+    }
+
+    private String normalizeOptionalEmail(String email) {
+        String normalized = trimToNull(email);
+        return normalized == null ? null : normalized.toLowerCase();
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return null;
+        int separator = email.indexOf('@');
+        return email.substring(0, 1) + "***" + email.substring(separator);
+    }
+
+    @Transactional
     public UserResponse updateUserStatus(String userId, String tenantId, AdminUpdateUserStatusRequest request) {
+        return updateUserStatus(userId, tenantId, request, null);
+    }
+
+    @Transactional
+    public UserResponse updateUserStatus(
+            String userId, String tenantId, AdminUpdateUserStatusRequest request, AuditContext auditContext
+    ) {
         String status = normalizeStatus(request.status());
         User user = findUser(userId, tenantId);
+        String previousStatus = safeAuditValue(user.getStatus());
         user.setStatus(status);
         userRepository.save(user);
         revokeActiveSessionsIfLocked(user, normalizeTenant(tenantId), status);
+        recordActivity(user, auditContext, "EMPLOYEE_STATUS_CHANGED", "Employee account status changed",
+                Map.of("status", previousStatus), Map.of("status", status));
         return toResponse(user);
     }
 
@@ -263,7 +501,6 @@ public class UserService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public BulkOperationResponse bulkUpdateStatus(String tenantId, BulkStatusRequest request) {
         String status = normalizeStatus(request.status());
         List<User> users = findUsers(request.userIds(), tenantId);
@@ -275,7 +512,6 @@ public class UserService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public BulkOperationResponse bulkDelete(String tenantId, BulkDeleteRequest request) {
         List<User> users = findUsers(request.userIds(), tenantId);
         userRepository.deleteAll(users);
@@ -283,9 +519,27 @@ public class UserService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public UserResponse assignRoles(String userId, String tenantId, AdminAssignRolesRequest request) {
+        return assignRoles(userId, tenantId, request, null);
+    }
+
+    @Transactional
+    public UserResponse assignRoles(
+            String userId, String tenantId, AdminAssignRolesRequest request, AuditContext auditContext
+    ) {
+        return assignRoles(userId, tenantId, request, auditContext, SecurityUtils.principal());
+    }
+
+    @Transactional
+    public UserResponse assignRoles(
+            String userId,
+            String tenantId,
+            AdminAssignRolesRequest request,
+            AuditContext auditContext,
+            ErgPrincipal actor
+    ) {
         User user = findUser(userId, tenantId);
+        List<String> previousRoles = roles(user.getRoles());
         List<String> roleNames = request.roles().stream()
                 .map(this::trimToNull)
                 .filter(name -> name != null)
@@ -294,15 +548,29 @@ public class UserService {
         if (roles.size() != new LinkedHashSet<>(roleNames).size()) {
             throw new BadRequestException("one or more roles were not found");
         }
+        protectedRolePolicy.assertCanGrant(actor, roles);
         user.setRoles(new LinkedHashSet<>(roles));
         userRepository.save(user);
+        recordActivity(user, auditContext, "USER_ROLES_CHANGED", "User role groups changed",
+                Map.of("roles", previousRoles), Map.of("roles", roles(user.getRoles())));
+        authorizationMutationAudit().authorizationChanged(
+                List.of(new UserRef(user.getId(), normalizeTenant(tenantId))),
+                roles.stream().map(Role::getId).sorted().collect(Collectors.joining(",")),
+                "USER_ROLES_CHANGED",
+                mutationContext(user, auditContext));
         return toResponse(user);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"authPrincipal", "sessionBootstrap"}, allEntries = true)
     public PermissionOverrideResponse assignPermissions(String userId, String tenantId, AdminAssignPermissionsRequest request) {
-        findUser(userId, tenantId);
+        return assignPermissions(userId, tenantId, request, null);
+    }
+
+    @Transactional
+    public PermissionOverrideResponse assignPermissions(
+            String userId, String tenantId, AdminAssignPermissionsRequest request, AuditContext auditContext
+    ) {
+        User user = findUser(userId, tenantId);
         String grantType = normalizeGrantType(request.grantType());
         List<String> permissionNames = request.permissions().stream()
                 .map(this::trimToNull)
@@ -327,12 +595,71 @@ public class UserService {
                 })
                 .toList();
         permissionOverrideRepository.saveAll(overrides);
+        recordActivity(user, auditContext, "USER_PERMISSIONS_CHANGED", "User permission overrides changed",
+                Map.of(), Map.of("grantType", grantType, "permissions", permissionNames));
+        authorizationMutationAudit().authorizationChanged(
+                List.of(new UserRef(user.getId(), normalizeTenant(tenantId))),
+                permissions.stream().map(Permission::getId).sorted().collect(Collectors.joining(",")),
+                "USER_PERMISSIONS_CHANGED",
+                mutationContext(user, auditContext));
         return new PermissionOverrideResponse(userId, permissions.stream().map(Permission::getName).toList(), grantType);
+    }
+
+    private AuthorizationMutationAuditService authorizationMutationAudit() {
+        if (authorizationMutationAuditService == null) {
+            throw new IllegalStateException("authorization mutation audit service is not configured");
+        }
+        return authorizationMutationAuditService;
+    }
+
+    private AuditContext mutationContext(User target, AuditContext context) {
+        return context == null ? new AuditContext(target.getId(), null, null, null) : context;
     }
 
     private User findUser(String userId, String tenantId) {
         return userRepository.findByIdAndTenantId(userId, normalizeTenant(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("user not found"));
+    }
+
+    private void recordActivity(
+            User target,
+            AuditContext auditContext,
+            String action,
+            String description,
+            Map<String, Object> before,
+            Map<String, Object> after
+    ) {
+        AuditContext context = auditContext == null
+                ? new AuditContext(target.getId(), null, null, null)
+                : auditContext;
+        UserActivity activity = new UserActivity();
+        activity.setId(IdGenerator.newId());
+        activity.setUserId(isBlank(context.actorUserId()) ? target.getId() : context.actorUserId());
+        activity.setTenantId(normalizeTenant(target.getTenantId()));
+        activity.setAction(action);
+        activity.setTargetUserId(target.getId());
+        activity.setIpAddress(trimToNull(context.ipAddress()));
+        activity.setUserAgent(trimToNull(context.userAgent()));
+        activity.setDescription(description);
+        activity.setRequestId(trimToNull(context.requestId()));
+        activity.setMetadata(Map.of("before", before, "after", after));
+        activity.setCreatedAt(now());
+        userActivityRepository.save(activity);
+    }
+
+    private Map<String, Object> profileAuditState(User user) {
+        return Map.of(
+                "fullName", safeAuditValue(user.getFullName()),
+                "phone", safeAuditValue(user.getPhone()),
+                "isProfileCompleted", Boolean.TRUE.equals(user.getIsProfileCompleted())
+        );
+    }
+
+    private String safeAuditValue(String value) {
+        return value == null ? "" : value;
+    }
+
+    public record AuditContext(String actorUserId, String requestId, String ipAddress, String userAgent) {
     }
 
     private List<User> findUsers(List<String> userIds, String tenantId) {
@@ -432,9 +759,6 @@ public class UserService {
                 user.getStatus(),
                 user.getProvider(),
                 user.getAccountType(),
-                user.getGoogleSub(),
-                user.getGoogleEmail(),
-                user.getGoogleEmailVerified(),
                 user.getLastLoginProvider(),
                 roles(user.getRoles()),
                 user.getSocialLinks() == null ? Map.of() : user.getSocialLinks(),
@@ -443,7 +767,8 @@ public class UserService {
                 user.getLoginCount(),
                 user.getTenantId(),
                 toIso(user.getCreatedAt()),
-                toIso(user.getUpdatedAt())
+                toIso(user.getUpdatedAt()),
+                lifecycle(user)
         );
     }
 
@@ -462,6 +787,24 @@ public class UserService {
                 Boolean.TRUE.equals(user.getIsProfileCompleted()),
                 toIso(user.getLastLoginAt()),
                 toIso(user.getCreatedAt())
+        );
+    }
+
+    private UserItemResponse toItemResponse(UserListItemProjection user, List<String> roles) {
+        return new UserItemResponse(
+                user.id(),
+                user.email(),
+                user.fullName(),
+                user.avatarUrl(),
+                user.phone(),
+                user.status(),
+                user.provider(),
+                user.accountType(),
+                user.lastLoginProvider(),
+                roleNames(roles),
+                Boolean.TRUE.equals(user.isProfileCompleted()),
+                toIso(user.lastLoginAt()),
+                toIso(user.createdAt())
         );
     }
 
@@ -484,16 +827,6 @@ public class UserService {
         );
     }
 
-    private SocialAccountResponse toSocialAccountResponse(SocialAccount socialAccount) {
-        return new SocialAccountResponse(
-                socialAccount.getId(),
-                socialAccount.getProvider(),
-                socialAccount.getProviderId(),
-                socialAccount.getEmail(),
-                toIso(socialAccount.getCreatedAt())
-        );
-    }
-
     private ActivityResponse toActivityResponse(UserActivity activity) {
         return new ActivityResponse(
                 activity.getId(),
@@ -505,18 +838,6 @@ public class UserService {
                 activity.getMetadata() == null ? Map.of() : activity.getMetadata(),
                 toIso(activity.getCreatedAt())
         );
-    }
-
-    private boolean matchesSearch(User user, String search) {
-        if (isBlank(search)) {
-            return true;
-        }
-        String needle = search.toLowerCase();
-        return contains(user.getEmail(), needle) || contains(user.getFullName(), needle) || contains(user.getPhone(), needle);
-    }
-
-    private boolean contains(String value, String needle) {
-        return value != null && value.toLowerCase().contains(needle);
     }
 
     private String deviceType(String userAgent) {
@@ -542,6 +863,15 @@ public class UserService {
         }
         return roles.stream()
                 .map(Role::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .collect(Collectors.toList());
+    }
+
+    private List<String> roleNames(List<String> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return List.of("user");
+        }
+        return roles.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .collect(Collectors.toList());
     }

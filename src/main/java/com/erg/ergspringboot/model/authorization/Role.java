@@ -3,6 +3,7 @@ package com.erg.ergspringboot.model.authorization;
 import com.erg.ergspringboot.model.BaseEntity;
 import com.erg.ergspringboot.model.users.User;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
@@ -42,6 +43,9 @@ public class Role extends BaseEntity {
     private Set<Permission> permissions = new LinkedHashSet<>();
 
     private Boolean isDefault;
+
+    @Column(name = "updated_by", length = 36)
+    private String updatedBy;
 
     @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
     @ToString.Exclude

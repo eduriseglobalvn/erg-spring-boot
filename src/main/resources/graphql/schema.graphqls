@@ -1,0 +1,945 @@
+type Query {
+  lms: LmsQuery!
+  lcms: LcmsQuery!
+  crm: PlatformNamespace!
+  elearning: ElearningQuery!
+}
+
+type LmsQuery {
+  namespace: String!
+  status: String!
+  learningResourceLibrary(input: LearningResourceLibraryInput): LearningResourceLibrary!
+  classWorkspace(input: ClassWorkspaceInput!): ClassWorkspace!
+  teacherHomeworkWorkspace(input: TeacherHomeworkWorkspaceInput): TeacherHomeworkWorkspace!
+  assignmentProgressWorkspace(input: AssignmentProgressWorkspaceInput!): AssignmentProgressWorkspace!
+  studentGroups(input: StudentGroupsInput): StudentGroupWorkspace!
+  myTeachingCalendar(input: MyTeachingCalendarInput!): TeachingCalendarWorkspace!
+  myStudentCalendar(input: MyStudentCalendarInput!): TeachingCalendarWorkspace!
+}
+
+type PlatformNamespace {
+  namespace: String!
+  status: String!
+}
+
+type LcmsQuery {
+  namespace: String!
+  status: String!
+  questionBankWorkspace(input: QuestionBankWorkspaceInput): QuestionBankWorkspace!
+  accessManagementWorkspace(input: AccessManagementWorkspaceInput): AccessManagementWorkspace!
+  teachingCalendarWorkspace(input: TeachingCalendarWorkspaceInput!): TeachingCalendarWorkspace!
+  teachingScheduleBatches(input: TeachingScheduleBatchListInput): TeachingScheduleBatchPage!
+  teachingScheduleBatch(input: TeachingScheduleBatchDetailInput!): TeachingScheduleBatchDetail!
+  quizWorkspace(input: QuizWorkspaceInput): QuizWorkspace!
+  quizDraft(quizId: String!): QuizDraftDocument!
+  quizVersions(quizId: String!): QuizVersionHistory!
+  quizQuestionAnalytics(quizVersionId: String!): QuizQuestionAnalytics!
+  assignmentReport(assignmentId: String!, page: Int, size: Int): AssignmentReport!
+  schoolDirectory(input: SchoolDirectoryInput): SchoolDirectoryWorkspace!
+  schoolOperations(input: SchoolOperationsInput!): SchoolOperationsWorkspace!
+}
+
+input SchoolDirectoryInput { tenantId: String, search: String, status: String, schoolType: String, page: Int, size: Int }
+input SchoolOperationsInput { tenantId: String, schoolId: String! }
+
+type SchoolDirectoryWorkspace {
+  items: [SchoolDirectoryItem!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type SchoolDirectoryItem {
+  id: String!
+  name: String!
+  slug: String
+  schoolType: String!
+  status: String!
+  district: String
+  academicYear: String
+  classCount: Int!
+  studentCount: Int!
+  version: String!
+}
+
+type SchoolOperationsWorkspace {
+  school: SchoolOperationsProfile!
+  summary: SchoolOperationsSummary!
+  academicYears: [SchoolAcademicYear!]!
+  grades: [SchoolGrade!]!
+  classes: [SchoolClass!]!
+  students: [SchoolStudent!]!
+  subjects: [SchoolSubject!]!
+  permissions: SchoolOperationsPermissions!
+}
+
+type SchoolOperationsProfile {
+  id: String!
+  name: String!
+  slug: String
+  schoolType: String!
+  status: String!
+  address: String
+  district: String
+  principalName: String
+  contactPhone: String
+  contactEmail: String
+  currentAcademicYearId: String
+  version: String!
+}
+
+type SchoolOperationsSummary { classCount: Int!, activeClassCount: Int!, studentCount: Int!, gradeCount: Int! }
+type SchoolOperationsPermissions { canCreateSchool: Boolean!, canUpdateSchool: Boolean!, canArchiveSchool: Boolean!, canManageClasses: Boolean! }
+type SchoolAcademicYear { id: String!, startYear: Int!, endYear: Int!, displayName: String!, status: String!, startsOn: String, endsOn: String, version: String! }
+type SchoolGrade { id: String!, academicYearId: String!, gradeCode: String!, label: String!, sortOrder: Int!, status: String!, source: String! }
+type SchoolClass { id: String!, name: String!, grade: String, homeroomTeacher: String, studentCount: Int!, status: String }
+type SchoolStudent { id: String!, code: String, fullName: String!, birthDate: String, grade: String, className: String, guardianPhone: String, subjectIds: [String!]!, status: String!, averageScore: Float }
+type SchoolSubject { id: String!, name: String!, code: String, studentCount: Int!, teacherCount: Int! }
+
+type QuizQuestionAnalytics {
+  quizVersionId: String!
+  questions: [QuestionAnalyticsRow!]!
+}
+
+type QuestionAnalyticsRow {
+  quizVersionQuestionId: String!
+  questionKind: String
+  answeredCount: Int!
+  correctCount: Int!
+  partialCount: Int!
+  correctRate: Float!
+  averageAwardedPoints: Float!
+  maxPoints: Float!
+}
+
+type AssignmentReport {
+  assignmentId: String!
+  totalRecipients: Int!
+  submittedCount: Int!
+  inProgressCount: Int!
+  notStartedCount: Int!
+  needsReviewCount: Int!
+  averagePercent: Float!
+  students: [StudentProgressRow!]!
+  page: Int!
+  size: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+}
+
+type StudentProgressRow {
+  studentUserId: String!
+  studentName: String
+  status: String
+  answeredCount: Int!
+  totalQuestions: Int!
+  percentComplete: Float
+  score: Float
+  passed: Boolean
+  submittedAt: String
+}
+
+type QuizVersionHistory {
+  quizId: String!
+  items: [QuizVersionSummary!]!
+}
+
+type QuizVersionSummary {
+  id: String!
+  versionLabel: String!
+  versionNumber: Int!
+  gradingMode: String
+  contentHash: String
+  publishedBy: String
+  publishedAt: String
+  isActive: Boolean!
+}
+
+input QuizWorkspaceInput {
+  tenantId: String
+  search: String
+  subjectId: String
+  levelId: String
+  categoryId: String
+  status: String
+  kind: String
+  page: Int
+  size: Int
+}
+
+type QuizWorkspace {
+  tenantId: String!
+  quizzes: QuizSummaryPage!
+  subjects: [QuestionBankOption!]!
+  levels: [QuestionBankOption!]!
+  categories: [QuestionBankOption!]!
+}
+
+type QuizSummaryPage {
+  items: [QuizSummary!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type QuizSummary {
+  id: String!
+  title: String!
+  subtitle: String
+  kind: String
+  status: String
+  subjectId: String
+  levelId: String
+  categoryId: String
+  currentVersionLabel: String
+  questionCount: Int!
+  updatedAt: String
+}
+
+type QuizDraftDocument {
+  quizId: String!
+  draftId: String!
+  docVersion: Int!
+  baseVersionLabel: String
+  updatedAt: String
+  settings: String
+  playerTemplate: String
+  tree: String
+}
+
+type ElearningQuery {
+  namespace: String!
+  status: String!
+  studentDashboard(input: StudentDashboardInput): StudentDashboard!
+}
+
+input StudentDashboardInput {
+  tenantId: String
+  studentUserId: String
+}
+
+type StudentDashboard {
+  tenantId: String!
+  viewer: StudentDashboardViewer!
+  profile: StudentDashboardProfile!
+  summary: StudentDashboardSummary!
+  courses: [StudentDashboardCourseCard!]!
+  assignments: [StudentDashboardAssignmentCard!]!
+  nextActions: [StudentDashboardNextAction!]!
+  announcements: [StudentDashboardAnnouncementCard!]!
+}
+
+type StudentDashboardViewer {
+  userId: String!
+  tenantId: String!
+  accountType: String
+  accessLevel: String
+}
+
+type StudentDashboardProfile {
+  userId: String!
+  studentId: String
+  studentCode: String
+  fullName: String
+  email: String
+  schoolId: String
+  academicClassId: String
+  status: String
+  updatedAt: String
+}
+
+type StudentDashboardSummary {
+  enrolledCourseCount: Int!
+  activeAssignmentCount: Int!
+  pendingActionCount: Int!
+  scoreSummary: StudentDashboardScoreSummary!
+  generatedAt: String!
+}
+
+type StudentDashboardScoreSummary {
+  completedAttemptCount: Int!
+  attemptedAssignmentCount: Int!
+  passedAttemptCount: Int!
+  averagePercent: Int!
+  bestPercent: Int!
+}
+
+type StudentDashboardCourseCard {
+  id: String!
+  title: String!
+  status: String
+  progressPercent: Int!
+  updatedAt: String
+}
+
+type StudentDashboardAssignmentCard {
+  id: String!
+  title: String!
+  status: String
+  dueAt: String
+}
+
+type StudentDashboardNextAction {
+  id: String!
+  kind: String!
+  label: String!
+  targetId: String
+  dueAt: String
+}
+
+type StudentDashboardAnnouncementCard {
+  id: String!
+  title: String!
+  content: String
+  pinned: Boolean!
+  publishedAt: String
+  updatedAt: String
+}
+
+input LearningResourceLibraryInput {
+  tenantId: String
+  educationUnitId: String
+  academicYear: String
+  subjectId: String
+  gradeId: String
+  categoryId: String
+  sectionId: String
+  topicId: String
+  status: String
+  visibility: String
+  page: Int
+  size: Int
+}
+
+input ClassWorkspaceInput {
+  tenantId: String
+  classId: String!
+  schoolId: String
+  studentStatus: String
+  page: Int
+  size: Int
+  assignmentStatus: String
+  assignmentPage: Int
+  assignmentSize: Int
+}
+
+input TeacherHomeworkWorkspaceInput {
+  tenantId: String
+  status: String
+  page: Int
+  size: Int
+}
+
+input AssignmentProgressWorkspaceInput {
+  tenantId: String
+  assignmentId: String!
+  attemptStatus: String
+  page: Int
+  size: Int
+}
+
+input StudentGroupsInput {
+  tenantId: String
+  classId: String
+}
+
+input QuestionBankWorkspaceInput {
+  tenantId: String
+  search: String
+  subjectId: String
+  levelId: String
+  topicId: String
+  status: String
+  quizKind: String
+  includeQuestions: Boolean
+  page: Int
+  size: Int
+}
+
+input AccessManagementWorkspaceInput {
+  tenantId: String
+  search: String
+  roleId: String
+  status: String
+  page: Int
+  size: Int
+}
+
+type ClassWorkspace {
+  tenantId: String!
+  classInfo: ClassInfo!
+  scoreSummary: ClassScoreSummary
+  riskSummary: ClassRiskSummary
+  students: StudentRosterPage!
+  assignments: AssignmentSummaryPage!
+}
+
+type ClassScoreSummary {
+  completedAttemptCount: Int!
+  attemptedStudentCount: Int!
+  averagePercent: Int!
+  bestPercent: Int!
+}
+
+type ClassRiskSummary {
+  missingOverdueStudentCount: Int!
+  lowScoreStudentCount: Int!
+  inactiveStudentCount: Int!
+}
+
+type ClassInfo {
+  id: String!
+  schoolId: String!
+  name: String
+  grade: String
+  academicYear: String
+  status: String
+  homeroomTeacherId: String
+  studentCount: Int!
+  assignmentCount: Int!
+  updatedAt: String
+}
+
+type StudentRosterPage {
+  items: [StudentRosterItem!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type StudentRosterItem {
+  id: String!
+  schoolId: String
+  academicClassId: String
+  studentCode: String
+  fullName: String
+  username: String
+  authUserId: String
+  email: String
+  status: String
+  updatedAt: String
+}
+
+type AssignmentSummaryPage {
+  items: [AssignmentSummaryItem!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type AssignmentSummaryItem {
+  id: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  status: String
+  assignedBy: String
+  recipientMode: String
+  resources: [AssignmentResource!]!
+  createdAt: String
+  updatedAt: String
+}
+
+type TeacherHomeworkWorkspace {
+  tenantId: String!
+  teacherId: String!
+  summary: TeacherHomeworkSummary!
+  classOptions: [ClassOption!]!
+  assignments: HomeworkAssignmentCardPage!
+  pendingReviews: PendingReviewPage!
+  overdueStudents: OverdueStudentPage!
+}
+
+type TeacherHomeworkSummary {
+  activeAssignmentCount: Int!
+  overdueAssignmentCount: Int!
+  pendingReviewAssignmentCount: Int!
+}
+
+type HomeworkAssignmentCardPage {
+  items: [HomeworkAssignmentCard!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type HomeworkAssignmentCard {
+  id: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  status: String
+  assignedBy: String
+  recipientMode: String
+  resources: [AssignmentResource!]!
+  createdAt: String
+  updatedAt: String
+}
+
+type ClassOption {
+  id: String!
+  schoolId: String
+  name: String
+  grade: String
+  academicYear: String
+  status: String
+}
+
+type PendingReviewPage {
+  items: [PendingReview!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type PendingReview {
+  attemptId: String!
+  assignmentId: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  studentId: String
+  studentCode: String
+  fullName: String
+  status: String
+  score: Float
+  maxScore: Float
+  percent: Int!
+  submittedAt: String
+  updatedAt: String
+}
+
+type OverdueStudentPage {
+  items: [OverdueStudent!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type OverdueStudent {
+  assignmentId: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  studentId: String!
+  studentCode: String
+  fullName: String
+  status: String
+  updatedAt: String
+}
+
+type AssignmentProgressWorkspace {
+  tenantId: String!
+  assignment: AssignmentDetail!
+  summary: AssignmentProgressSummary!
+  attempts: AssignmentAttemptSummaryPage!
+  recipients: RecipientProgressPage!
+  missingLateStudents: MissingLateStudentPage!
+}
+
+type AssignmentDetail {
+  id: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  status: String
+  assignedBy: String
+  recipientMode: String
+  resources: [AssignmentResource!]!
+  createdAt: String
+  updatedAt: String
+}
+
+type AssignmentResource {
+  quizId: String!
+  quizVersionId: String
+  quizVersionLabel: String
+  orderIndex: Int!
+}
+
+type AssignmentProgressSummary {
+  submittedCount: Int!
+  inProgressCount: Int!
+  needsReviewCount: Int!
+}
+
+type AssignmentAttemptSummaryPage {
+  items: [AssignmentAttemptSummary!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type AssignmentAttemptSummary {
+  id: String!
+  assignmentId: String!
+  quizId: String
+  studentId: String
+  status: String
+  score: Float
+  maxScore: Float
+  percent: Int!
+  passed: Boolean
+  startedAt: String
+  submittedAt: String
+  updatedAt: String
+}
+
+type RecipientProgressPage {
+  items: [RecipientProgress!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type RecipientProgress {
+  studentId: String!
+  schoolId: String
+  academicClassId: String
+  studentCode: String
+  fullName: String
+  username: String
+  authUserId: String
+  email: String
+  status: String
+  missing: Boolean!
+  late: Boolean!
+  latestAttempt: AssignmentAttemptScore
+  bestAttempt: AssignmentAttemptScore
+  updatedAt: String
+}
+
+type MissingLateStudentPage {
+  items: [MissingLateStudent!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type MissingLateStudent {
+  studentId: String!
+  schoolId: String
+  academicClassId: String
+  studentCode: String
+  fullName: String
+  username: String
+  authUserId: String
+  email: String
+  status: String
+  dueAt: String
+  missing: Boolean!
+  late: Boolean!
+  updatedAt: String
+}
+
+type AssignmentAttemptScore {
+  id: String!
+  assignmentId: String!
+  quizId: String
+  studentId: String!
+  status: String
+  score: Float
+  maxScore: Float
+  percent: Int!
+  passed: Boolean
+  startedAt: String
+  submittedAt: String
+  updatedAt: String
+}
+
+type StudentGroupWorkspace {
+  tenantId: String!
+  groups: [StudentGroup!]!
+}
+
+type StudentGroup {
+  id: String!
+  name: String!
+  classId: String
+  note: String
+  color: String
+  ownerUserId: String
+  studentIds: [String!]!
+  studentCount: Int!
+  createdAt: String
+  updatedAt: String
+}
+
+type QuestionBankWorkspace {
+  tenantId: String!
+  questions: QuestionBankQuestionPage!
+  subjects: [QuestionBankOption!]!
+  levels: [QuestionBankOption!]!
+  topics: [QuestionBankOption!]!
+  quizzes: [QuestionBankQuizOption!]!
+}
+
+type QuestionBankQuestionPage {
+  items: [QuestionBankQuestionRow!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type QuestionBankQuestionRow {
+  id: String!
+  scopeType: String
+  scopeId: String
+  scopeLabel: String
+  subjectId: String
+  subjectLabel: String
+  levelId: String
+  levelLabel: String
+  topicId: String
+  categoryLabel: String
+  gradeLabel: String
+  title: String
+  objective: String
+  type: String
+  difficulty: String
+  status: String
+  tags: [String!]!
+  choices: [QuestionBankChoice!]!
+  answer: String
+  masteryRate: Float
+  usageCount: Int!
+  schoolsUsing: Int
+  lastUsedAt: String
+  recommendedCluster: String
+  rationale: String
+  updatedAt: String
+}
+
+type QuestionBankChoice {
+  id: String!
+  label: String!
+  correct: Boolean!
+}
+
+type QuestionBankOption {
+  id: String!
+  label: String!
+  subjectId: String
+  levelId: String
+  description: String
+  scopeLabel: String
+  categoryIds: [String!]!
+}
+
+type QuestionBankQuizOption {
+  id: String!
+  title: String!
+  status: String
+  kind: String
+  subjectId: String
+  levelId: String
+  categoryId: String
+  questionIds: [String!]!
+  questionCount: Int!
+  durationLabel: String
+  scopeLabel: String
+  sourceMode: String
+  ownerLabel: String
+  updatedAt: String
+}
+
+type AccessManagementWorkspace {
+  tenantId: String!
+  users: UserAccessPage!
+  roleOptions: [RoleOption!]!
+  scopeOptions: [ScopeOption!]!
+  effectivePermissionsIncluded: Boolean!
+}
+
+type UserAccessPage {
+  items: [UserAccessRow!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type UserAccessRow {
+  userId: String!
+  fullName: String
+  email: String
+  status: String
+  roleCount: Int!
+  scopeCount: Int!
+  effectivePermissions: [EffectivePermission!]!
+}
+
+type RoleOption {
+  id: String!
+  name: String!
+}
+
+type ScopeOption {
+  id: String!
+  label: String!
+  kind: String!
+}
+
+type EffectivePermission {
+  permission: String!
+  source: String!
+}
+
+type LearningResourceLibrary {
+  tenantId: String!
+  educationUnitId: String
+  taxonomyTree: [LearningResourceTaxonomyNode!]!
+  resources: LearningResourceCardPage!
+  progress: [LearningResourceProgress!]!
+  recentOpened: [LearningRecentResource!]!
+}
+
+type LearningResourceCardPage {
+  items: [LearningResourceCard!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type LearningResourceCard {
+  id: String!
+  subjectId: String
+  gradeId: String
+  categoryId: String
+  sectionId: String
+  topicId: String
+  title: String!
+  slug: String
+  subtitle: String
+  thumbnailUrl: String
+  visibility: String
+  status: String
+  publishedAt: String
+  updatedAt: String
+}
+
+type LearningResourceTaxonomyNode {
+  id: String!
+  kind: String!
+  label: String!
+  slug: String
+  parentId: String
+  subjectId: String
+  categoryId: String
+  sortOrder: Int!
+  status: String
+  description: String
+  childCount: Int!
+  resourceCount: Int!
+}
+
+type LearningResourceProgress {
+  resourceId: String!
+  progressRate: Int!
+  updatedAt: String
+}
+
+type LearningRecentResource {
+  resourceId: String!
+  title: String!
+  openedAt: String
+}
+
+type Mutation {
+  previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
+  createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
+  updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
+  deleteTeachingScheduleEvent(input: TeachingScheduleEventDeleteInput!): TeachingScheduleDeletePayload!
+  deleteTeacherSchedule(input: DeleteTeacherScheduleInput!): TeachingScheduleDeletePayload!
+  publishTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
+  cancelTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
+  createRoom(input: CreateRoomInput!): TeachingScheduleRoomOption!
+  importTeachingScheduleFromExcel(input: TeachingScheduleExcelImportInput!): TeachingSchedulePreviewPayload!
+}
+
+enum TeachingScheduleTeacherRole { MAIN ASSISTANT }
+enum TeachingCalendarViewMode { ALL BY_SCHOOL BY_TEACHER BY_SUBJECT }
+enum TeachingScheduleStatus { DRAFT PUBLISHED CANCELLED }
+
+input TeachingCalendarWorkspaceInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, schoolIds: [String!], teacherIds: [String!], classIds: [String!], subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input MyTeachingCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, schoolIds: [String!], classIds: [String!], subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input MyStudentCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input TeachingScheduleBulkInput { tenantId: String, idempotencyKey: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode, rows: [TeachingScheduleBulkRowInput!]! }
+input TeachingScheduleBulkRowInput { clientRowId: String!, classIds: [String!]!, weekday: Int!, session: String, periodStart: Int!, periodCount: Int!, startTime: String!, endTime: String!, subjectId: String!, levelId: String, roomId: String, roomName: String, mainTeacherIds: [String!]!, assistantTeacherIds: [String!], note: String }
+input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String }
+input TeachingScheduleEventDeleteInput { tenantId: String, eventId: String! }
+input DeleteTeacherScheduleInput { tenantId: String, teacherUserId: String!, schoolIds: [String!], dateFrom: String, dateTo: String }
+input CreateRoomInput { tenantId: String, schoolId: String!, roomName: String! }
+input TeachingScheduleExcelImportInput { tenantId: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode }
+input TeachingScheduleBatchListInput { tenantId: String, schoolId: String, status: TeachingScheduleStatus, page: Int, size: Int }
+input TeachingScheduleBatchDetailInput { tenantId: String, batchId: String! }
+enum TeachingScheduleResolveMode { REJECT DELETE_CONFLICTING }
+
+type TeachingCalendarWorkspace { tenantId: String!, from: String!, to: String!, viewMode: TeachingCalendarViewMode!, events: [TeachingCalendarEvent!]!, filterOptions: TeachingCalendarFilterOptions!, laneSummaries: [TeachingCalendarLaneSummary!]!, catalog: TeachingScheduleCatalog!, permissions: TeachingCalendarPermissions!, generatedAt: String! }
+type TeachingCalendarEvent { id: String!, batchId: String, title: String!, startAt: String!, endAt: String!, date: String!, startTime: String!, endTime: String!, schoolId: String!, schoolName: String!, classId: String!, className: String!, subjectId: String, subjectName: String, levelId: String, levelName: String, roomId: String, roomName: String, periodStart: Int!, periodCount: Int!, teachers: [TeachingScheduleTeacherAssignment!]!, status: TeachingScheduleStatus!, note: String, colorGroup: TeachingCalendarColorGroup! }
+type TeachingScheduleTeacherAssignment { userId: String!, displayName: String!, role: TeachingScheduleTeacherRole!, colorKey: String }
+type TeachingCalendarFilterOptions { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarFilterOption!]!, teachers: [TeachingCalendarFilterOption!]!, subjects: [TeachingCalendarFilterOption!]!, levels: [TeachingCalendarFilterOption!]! }
+type TeachingCalendarFilterOption { id: String!, label: String!, count: Int!, colorKey: String }
+type TeachingCalendarLaneSummary { id: String!, label: String!, count: Int!, colorKey: String }
+type TeachingCalendarColorGroup { key: String!, label: String!, kind: String! }
+type TeachingScheduleCatalog { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarClassOption!]!, teachers: [TeachingCalendarTeacherOption!]!, assistantTeachers: [TeachingCalendarTeacherOption!]!, subjects: [TeachingCalendarSubjectOption!]!, levels: [TeachingCalendarLevelOption!]!, rooms: [TeachingCalendarRoomOption!]! }
+type TeachingCalendarClassOption { id: String!, schoolId: String!, label: String!, grade: String, academicYear: String }
+type TeachingCalendarTeacherOption { id: String!, label: String!, colorKey: String }
+type TeachingCalendarSubjectOption { id: String!, label: String! }
+type TeachingCalendarLevelOption { id: String!, subjectId: String!, label: String!, sortOrder: Int }
+type TeachingCalendarRoomOption { id: String, label: String!, schoolId: String }
+type TeachingScheduleRoomOption { id: String!, label: String!, schoolId: String! }
+type TeachingCalendarPermissions { canCreate: Boolean!, canUpdate: Boolean!, canDelete: Boolean!, canPublish: Boolean!, canViewAggregate: Boolean! }
+type TeachingSchedulePreviewPayload { valid: Boolean!, previewEventCount: Int!, teacherScheduleCount: Int!, totalPeriodCount: Int!, rowResults: [TeachingScheduleRowResult!]!, conflicts: [TeachingScheduleConflict!]! }
+type TeachingScheduleBulkPayload { batchId: String, createdEventCount: Int!, teacherScheduleCount: Int!, totalPeriodCount: Int!, rowResults: [TeachingScheduleRowResult!]!, conflicts: [TeachingScheduleConflict!]! }
+type TeachingScheduleEventPayload { event: TeachingCalendarEvent! }
+type TeachingScheduleDeletePayload { eventId: String!, deleted: Boolean!, affectedEventCount: Int! }
+type TeachingScheduleBatchPayload { batchId: String!, status: TeachingScheduleStatus!, affectedEventCount: Int! }
+type TeachingScheduleBatchPage { items: [TeachingScheduleBatchSummary!]!, page: Int!, size: Int!, totalItems: Int!, totalPages: Int!, hasNext: Boolean!, hasPrevious: Boolean! }
+type TeachingScheduleBatchSummary { id: String!, tenantId: String!, schoolId: String!, academicYear: String, applyFrom: String, repeatWeeks: Int!, status: TeachingScheduleStatus!, source: String, note: String, createdBy: String, publishedBy: String, publishedAt: String, createdAt: String }
+type TeachingScheduleBatchDetail { id: String!, tenantId: String!, schoolId: String!, academicYear: String, applyFrom: String, repeatWeeks: Int!, status: TeachingScheduleStatus!, source: String, note: String, createdBy: String, publishedBy: String, publishedAt: String, createdAt: String, eventCount: Int! }
+type TeachingScheduleRowResult { clientRowId: String!, valid: Boolean!, eventCount: Int!, teacherScheduleCount: Int!, errors: [TeachingScheduleRowMessage!]!, warnings: [TeachingScheduleRowMessage!]! }
+type TeachingScheduleRowMessage { code: String!, field: String, message: String! }
+type TeachingScheduleConflict { code: String!, severity: String!, clientRowId: String, existingEventId: String, message: String! }

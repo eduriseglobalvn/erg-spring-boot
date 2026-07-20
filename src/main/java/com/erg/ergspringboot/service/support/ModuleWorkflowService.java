@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.service.support;
 
 import com.erg.ergspringboot.utils.IdGenerator;
+import com.erg.ergspringboot.platform.persistence.ProcessLocalStatePolicy;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -14,16 +15,24 @@ import org.springframework.stereotype.Service;
 public class ModuleWorkflowService {
 
     private final Map<String, Map<String, Map<String, Object>>> stores = new ConcurrentHashMap<>();
+    private final ProcessLocalStatePolicy statePolicy;
+
+    public ModuleWorkflowService(ProcessLocalStatePolicy statePolicy) {
+        this.statePolicy = statePolicy;
+    }
 
     public List<Map<String, Object>> list(String module, String type) {
+        statePolicy.assertEnabled("module-workflow");
         return new ArrayList<>(store(module, type).values());
     }
 
     public Map<String, Object> get(String module, String type, String id) {
+        statePolicy.assertEnabled("module-workflow");
         return store(module, type).getOrDefault(id, Map.of("id", id, "module", module, "type", type, "status", "missing"));
     }
 
     public Map<String, Object> create(String module, String type, Map<String, Object> body) {
+        statePolicy.assertEnabled("module-workflow");
         Map<String, Object> item = base(module, type, IdGenerator.newId());
         item.put("status", item.getOrDefault("status", "active"));
         if (body != null) {
@@ -34,6 +43,7 @@ public class ModuleWorkflowService {
     }
 
     public Map<String, Object> update(String module, String type, String id, Map<String, Object> body) {
+        statePolicy.assertEnabled("module-workflow");
         Map<String, Object> item = new LinkedHashMap<>(get(module, type, id));
         if (body != null) {
             item.putAll(body);
@@ -44,6 +54,7 @@ public class ModuleWorkflowService {
     }
 
     public Map<String, Object> mark(String module, String type, String id, String status) {
+        statePolicy.assertEnabled("module-workflow");
         Map<String, Object> item = new LinkedHashMap<>(get(module, type, id));
         item.put("status", status);
         item.put("updatedAt", now());
@@ -52,11 +63,13 @@ public class ModuleWorkflowService {
     }
 
     public Map<String, Object> delete(String module, String type, String id) {
+        statePolicy.assertEnabled("module-workflow");
         store(module, type).remove(id);
         return Map.of("deleted", true, "id", id, "module", module, "type", type);
     }
 
     public Map<String, Object> accepted(String module, String operation, Map<String, Object> body) {
+        statePolicy.assertEnabled("module-workflow");
         return Map.of(
                 "module", module,
                 "operation", operation,
@@ -67,6 +80,7 @@ public class ModuleWorkflowService {
     }
 
     public Map<String, Object> status(String module, String operation) {
+        statePolicy.assertEnabled("module-workflow");
         return Map.of(
                 "module", module,
                 "operation", operation,
@@ -77,6 +91,7 @@ public class ModuleWorkflowService {
     }
 
     public Map<String, Object> job(String module, String operation, Map<String, Object> body) {
+        statePolicy.assertEnabled("module-workflow");
         Map<String, Object> job = create(module, "jobs", Map.of(
                 "operation", operation,
                 "payload", body == null ? Map.of() : body,
@@ -88,6 +103,7 @@ public class ModuleWorkflowService {
     }
 
     public Map<String, Object> checklist(String module, List<String> items) {
+        statePolicy.assertEnabled("module-workflow");
         return Map.of(
                 "module", module,
                 "items", items.stream().map(item -> Map.of("name", item, "status", "ready")).toList(),

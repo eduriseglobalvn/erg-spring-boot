@@ -1,10 +1,13 @@
 package com.erg.ergspringboot.config.persistence;
 
+import com.erg.ergspringboot.platform.performance.RequestExecutionStatementInspector;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.hibernate.cfg.AvailableSettings;
 import org.springframework.boot.jpa.autoconfigure.JpaProperties;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.persistenceunit.PersistenceManagedTypes;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 
 final class JpaPersistenceSupport {
@@ -16,7 +19,7 @@ final class JpaPersistenceSupport {
             String persistenceUnit,
             DataSource dataSource,
             JpaProperties jpaProperties,
-            String... packagesToScan
+            PersistenceManagedTypes managedTypes
     ) {
         HibernateJpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
         vendorAdapter.setShowSql(jpaProperties.isShowSql());
@@ -31,7 +34,7 @@ final class JpaPersistenceSupport {
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setPersistenceUnitName(persistenceUnit);
         factory.setDataSource(dataSource);
-        factory.setPackagesToScan(packagesToScan);
+        factory.setManagedTypes(managedTypes);
         factory.setJpaVendorAdapter(vendorAdapter);
         factory.setJpaPropertyMap(jpaProperties(jpaProperties));
         return factory;
@@ -39,6 +42,7 @@ final class JpaPersistenceSupport {
 
     private static Map<String, Object> jpaProperties(JpaProperties jpaProperties) {
         Map<String, Object> properties = new LinkedHashMap<>(jpaProperties.getProperties());
+        properties.put(AvailableSettings.STATEMENT_INSPECTOR, new RequestExecutionStatementInspector());
         properties.putIfAbsent("hibernate.hbm2ddl.auto", "validate");
         properties.putIfAbsent("hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
         properties.putIfAbsent("hibernate.implicit_naming_strategy", "org.springframework.boot.hibernate.SpringImplicitNamingStrategy");

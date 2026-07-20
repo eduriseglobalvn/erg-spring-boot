@@ -53,12 +53,34 @@ public final class UserRequests {
     }
 
     public record AdminCreateUserRequest(
-            @NotBlank @Email String email,
-            @NotBlank @Size(min = 8) String password,
+            @NotBlank @Email String primaryEmail,
             @NotBlank @Size(min = 2, max = 100) String fullName,
-            List<String> roles,
-            String phone
+            @Size(max = 20) String phone,
+            @Email String recoveryEmail,
+            @NotEmpty List<String> roleGroupIds,
+            @NotEmpty List<AccessPolicyRequest> policies,
+            @NotBlank String credentialDelivery
     ) {
+    }
+
+    public record AccessPolicyRequest(
+            @NotBlank String scopeType,
+            @NotBlank String scopeId,
+            @NotBlank String roleGroup,
+            @NotEmpty List<String> modules
+    ) {
+    }
+
+    public record RecoveryEmailChallengeRequest(@NotBlank @Email String recoveryEmail) {
+    }
+
+    public record RecoveryEmailVerifyRequest(
+            @NotBlank String challengeId,
+            @NotBlank @Size(min = 6, max = 6) String otp
+    ) {
+    }
+
+    public record CredentialDeliveryRequest(@NotBlank String credentialDelivery) {
     }
 
     public record BulkStatusRequest(
