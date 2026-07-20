@@ -32,7 +32,8 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.users.UserAuditContext;
-import com.erg.ergspringboot.service.auth.AccountVerificationService;
+import com.erg.ergspringboot.auth.AuthOperations;
+import com.erg.ergspringboot.auth.AuthAuditContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -54,12 +55,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserOperations users;
-    private final AccountVerificationService accountVerificationService;
+    private final AuthOperations auth;
 
-    public UserController(UserOperations users,
-            AccountVerificationService accountVerificationService) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public UserController(UserOperations users, AuthOperations auth) {
         this.users = users;
-        this.accountVerificationService = accountVerificationService;
+        this.auth = auth;
+    }
+
+    /** Compatibility constructor retained for existing focused controller tests. */
+    @Deprecated
+    UserController(UserOperations users,
+            com.erg.ergspringboot.service.auth.AccountVerificationService verification) {
+        this(users, new AuthOperations(null, verification));
     }
 
     @GetMapping("/me")
@@ -83,8 +91,10 @@ public class UserController {
             @Valid @RequestBody RecoveryEmailChallengeRequest request,
             HttpServletRequest servletRequest
     ) {
-        RecoveryEmailChallengeResponse data = accountVerificationService.requestRecoveryEmailChallenge(
-                userId(servletRequest), tenantId(servletRequest), request.recoveryEmail(), auditContext(servletRequest).toLegacy());
+        RecoveryEmailChallengeResponse data = auth.requestRecoveryEmailChallenge(
+                userId(servletRequest), tenantId(servletRequest), request,
+                new AuthAuditContext(auditContext(servletRequest).actorUserId(), auditContext(servletRequest).requestId(),
+                        auditContext(servletRequest).ipAddress(), auditContext(servletRequest).userAgent()));
         return ok(data, servletRequest);
     }
 
@@ -93,9 +103,10 @@ public class UserController {
             @Valid @RequestBody RecoveryEmailVerifyRequest request,
             HttpServletRequest servletRequest
     ) {
-        RecoveryEmailVerificationResponse data = accountVerificationService.verifyRecoveryEmail(
+        RecoveryEmailVerificationResponse data = auth.verifyRecoveryEmail(
                 userId(servletRequest), tenantId(servletRequest), request.challengeId(), request.otp(),
-                auditContext(servletRequest).toLegacy());
+                new AuthAuditContext(auditContext(servletRequest).actorUserId(), auditContext(servletRequest).requestId(),
+                        auditContext(servletRequest).ipAddress(), auditContext(servletRequest).userAgent()));
         return ok(data, servletRequest);
     }
 
