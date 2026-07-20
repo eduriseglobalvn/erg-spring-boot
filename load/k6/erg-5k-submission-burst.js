@@ -12,17 +12,19 @@ export const options = {
   },
   thresholds: {
     http_req_failed: ['rate<0.001'],
-    http_req_duration: ['p(95)<1000'],
+    http_req_duration: ['p(95)<800'],
   },
 };
 
 const base = __ENV.BASE_URL || 'http://localhost:8080';
+export function setup() { return { base, token: __ENV.ACCESS_TOKEN || '' }; }
+export function teardown() { /* metrics are collected by k6 and the benchmark harness */ }
 function pad(value, width) { return String(value).padStart(width, '0'); }
 
-export default function () {
+export default function (data) {
   const studentNumber = ((__VU - 1) % 4500) + 1;
   const tenantNumber = Math.floor((studentNumber - 1) / 450) + 1;
-  const token = __ENV.ACCESS_TOKEN || `erg-load-seed-student-${pad(studentNumber, 5)}`;
+  const token = data.token || `erg-load-seed-student-${pad(studentNumber, 5)}`;
   const attemptId = __ENV.ATTEMPT_ID || `load-attempt-${__VU}-${__ITER}`;
   const response = http.post(`${base}/api/v1/lms/attempts/${attemptId}/submit`,
     JSON.stringify({ answers: {}, clientMutationId: `load-${__VU}-${__ITER}` }),

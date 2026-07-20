@@ -15,4 +15,12 @@ class ModulePublicApiContractTest {
         assertThat(facade).contains("public class CalendarOperations").doesNotContain("@Entity", "Repository");
         assertThat(event).contains("public record CalendarBatchPublished").doesNotContain("@Entity", "Repository");
     }
+
+    @Test
+    void reportingPublicFacadeDoesNotExposePersistenceTypes() throws Exception {
+        String facade = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/reporting/ReportingOperations.java"));
+
+        assertThat(facade).contains("public class ReportingOperations")
+                .doesNotContain("@Entity", "Repository", "public Assignment", "public ReportJob ");
+    }
 }

@@ -20,4 +20,17 @@ class DependencyDirectionArchTest {
                 .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..")
                 .check(classes);
     }
+
+    @Test
+    void migratedReportingRestAdapterDoesNotReachPersistence() {
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.erg.ergspringboot.controller.reporting");
+
+        noClasses()
+                .that().resideInAnyPackage("..controller.reporting..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
+                .check(classes);
+    }
 }
