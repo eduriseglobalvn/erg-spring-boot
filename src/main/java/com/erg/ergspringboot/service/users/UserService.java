@@ -57,6 +57,7 @@ import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditSer
 import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
+import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -87,6 +88,7 @@ public class UserService {
     private final AccountMailSender accountMailSender;
     private final UserQueryUseCase userQueryUseCase;
     private final UserProfileUseCase userProfileUseCase;
+    private final UserPasswordUseCase userPasswordUseCase;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
@@ -112,6 +114,8 @@ public class UserService {
         this.accountMailSender = accountMailSender;
         this.userQueryUseCase = new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository);
         this.userProfileUseCase = new UserProfileUseCase(userRepository, userActivityRepository);
+        this.userPasswordUseCase = new UserPasswordUseCase(
+                userRepository, sessionRepository, userActivityRepository, passwordService);
     }
 
     @Autowired(required = false)
@@ -197,34 +201,7 @@ public class UserService {
             String userId, String tenantId, String currentSessionId, ChangePasswordRequest request,
             AuditContext auditContext
     ) {
-        User user = findUser(userId, tenantId);
-        boolean previousMustChangePassword = Boolean.TRUE.equals(user.getMustChangePassword());
-        String previousStatus = user.getStatus();
-        if (!passwordService.matches(request.oldPassword(), user.getPasswordHash())) {
-            throw new BadRequestException("invalid old password");
-        }
-        user.setPasswordHash(passwordService.hash(request.newPassword()));
-        user.setMustChangePassword(false);
-        if (Boolean.TRUE.equals(user.getIsProfileCompleted()) && Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
-            user.setStatus("ACTIVE");
-        }
-        userRepository.save(user);
-
-        List<AuthSession> sessions = sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(userId, normalizeTenant(tenantId));
-        List<AuthSession> sessionsToRevoke = sessions.stream()
-                .filter(session -> currentSessionId == null || !currentSessionId.equals(session.getSessionId()))
-                .toList();
-        OffsetDateTime revokedAt = now();
-        sessionsToRevoke.forEach(session -> {
-            session.setRevokedAt(revokedAt);
-            session.setRevokedReason("password_changed");
-        });
-        if (!sessionsToRevoke.isEmpty()) sessionRepository.saveAll(sessionsToRevoke);
-        recordActivity(user, auditContext, "ACCOUNT_PASSWORD_CHANGED", "Account password changed",
-                Map.of("mustChangePassword", previousMustChangePassword, "status", safeAuditValue(previousStatus)),
-                Map.of("mustChangePassword", false, "status", safeAuditValue(user.getStatus()),
-                        "revokedSessions", sessionsToRevoke.size()));
-        return new PasswordChangeResponse(lifecycle(user), sessionsToRevoke.size());
+        return userPasswordUseCase.change(userId, tenantId, currentSessionId, request, toPublicAudit(auditContext));
     }
 
     @Transactional(readOnly = true)
