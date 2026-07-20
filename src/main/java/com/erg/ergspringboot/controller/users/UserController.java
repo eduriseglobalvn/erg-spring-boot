@@ -31,6 +31,7 @@ import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.service.users.UserService;
+import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.service.auth.AccountVerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -53,16 +54,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final UserOperations users;
     private final AccountVerificationService accountVerificationService;
 
-    public UserController(UserService userService, AccountVerificationService accountVerificationService) {
+    public UserController(UserService userService, UserOperations users,
+            AccountVerificationService accountVerificationService) {
         this.userService = userService;
+        this.users = users;
         this.accountVerificationService = accountVerificationService;
     }
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(HttpServletRequest servletRequest) {
-        UserResponse data = userService.getCurrentUser(userId(servletRequest), tenantId(servletRequest));
+        UserResponse data = users.current(userId(servletRequest), tenantId(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -71,7 +75,7 @@ public class UserController {
             @Valid @RequestBody UpdateProfileRequest request,
             HttpServletRequest servletRequest
     ) {
-        UserResponse data = userService.updateProfile(
+        UserResponse data = users.updateProfile(
                 userId(servletRequest), tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }

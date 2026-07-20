@@ -28,6 +28,7 @@ import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.GlobalExceptionHandler;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.service.users.UserService;
+import com.erg.ergspringboot.users.UserOperations;
 import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
@@ -288,8 +289,9 @@ class UserControllerContractTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of())
         );
-        return MockMvcBuilders.standaloneSetup(new UserController(
+                return MockMvcBuilders.standaloneSetup(new UserController(
                         userService,
+                        new UserOperations(userService),
                         mock(com.erg.ergspringboot.service.auth.AccountVerificationService.class)
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
