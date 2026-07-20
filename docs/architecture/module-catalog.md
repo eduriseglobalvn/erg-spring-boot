@@ -11,6 +11,7 @@ graph until they have a facade and boundary contract.
 | `authorization` | Identity & Security BE | `AuthorizationOperations` | consumes policy-version/security events; emits none from facade | authorization/role/permission tables owned by legacy adapter | decision p95 50ms; `security-oncall` |
 | `users` | Identity & Security BE | `UserOperations` | consumes account/security events; emits none from first slice | user/account/session tables owned by legacy adapter | profile p95 300ms; `identity-oncall` |
 | `auth` | Identity & Security BE | `AuthOperations` | emits/consumes session and security events through legacy seam | auth session/token history/login attempt tables | login/refresh p95 800ms; `security-oncall` |
+| `lms` | Learning Runtime BE | `LmsOperations` (attempt start/submit slice) | attempt events remain in legacy seam pending registry cutover | assignment/attempt/classroom tables owned by legacy adapter | command p95 800ms; `lms-oncall` |
 
 Every new module must add its public facade, event catalog entry, owner and
 architecture test before changing callers.
