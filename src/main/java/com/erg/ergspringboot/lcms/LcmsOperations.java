@@ -21,8 +21,10 @@ import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaPresignRes
 import com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService;
 import com.erg.ergspringboot.service.quiz.authoring.QuizAuthoringService;
 import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
+import com.erg.ergspringboot.service.quiz.bundle.PortableQuizBundleService;
 import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
 import com.erg.ergspringboot.service.quiz.media.MediaService;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /** Public LCMS facade for the question-authoring vertical slice. */
@@ -33,19 +35,22 @@ public class LcmsOperations {
     private final QuizDraftService quizDrafts;
     private final QuizPublishService quizPublishing;
     private final MediaService media;
+    private final PortableQuizBundleService bundles;
 
     public LcmsOperations(
             QuestionBankAuthoringService legacy,
             QuizAuthoringService quizAuthoring,
             QuizDraftService quizDrafts,
             QuizPublishService quizPublishing,
-            MediaService media
+            MediaService media,
+            PortableQuizBundleService bundles
     ) {
         this.legacy = legacy;
         this.quizAuthoring = quizAuthoring;
         this.quizDrafts = quizDrafts;
         this.quizPublishing = quizPublishing;
         this.media = media;
+        this.bundles = bundles;
     }
 
     public SaveQuestionResponse createQuestion(String tenantId, String userId, SaveQuestionRequest request) {
@@ -104,5 +109,13 @@ public class LcmsOperations {
 
     public MediaCommitResponse commitMedia(String tenantId, MediaCommitRequest request) {
         return media.commit(tenantId, request);
+    }
+
+    public Map<String, Object> exportActiveBundle(String tenantId, String quizId) {
+        return bundles.exportActive(tenantId, quizId);
+    }
+
+    public Map<String, Object> exportVersionBundle(String tenantId, String quizVersionId) {
+        return bundles.exportVersion(tenantId, quizVersionId);
     }
 }
