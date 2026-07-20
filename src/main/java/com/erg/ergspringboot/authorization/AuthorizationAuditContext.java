@@ -9,7 +9,7 @@ public record AuthorizationAuditContext(
         String ipAddress,
         String userAgent
 ) {
-    public UserService.AuditContext toLegacy() {
+    UserService.AuditContext toLegacy() {
         return new UserService.AuditContext(actorUserId, requestId, ipAddress, userAgent);
     }
 }
