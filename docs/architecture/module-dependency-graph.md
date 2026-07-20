@@ -6,9 +6,9 @@ The current explicit graph intentionally has one migrated pilot:
 ErgSpringApplication
         |
         v
-     calendar                 reporting        authorization       users       auth       lms
+     calendar                 reporting        authorization       users       auth       lms       lcms
         |                         |                  |
-        +--> legacy services <----+------------------+----------------+----------+---------+
+        +--> legacy services <----+------------------+----------------+----------+---------+-------+
         +--> platform persistence/security adapters
 ```
 

@@ -10,6 +10,7 @@ import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService;
+import com.erg.ergspringboot.lcms.LcmsOperations;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -32,7 +33,7 @@ class LcmsQuestionBankAuthoringControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new LcmsQuestionBankAuthoringController(questionBankAuthoringService);
+        controller = new LcmsQuestionBankAuthoringController(new LcmsOperations(questionBankAuthoringService));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         new ErgPrincipal(
