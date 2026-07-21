@@ -68,6 +68,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsStudentGroupReadUseCase;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsAssignmentProgressQueryUseCase;
+import com.erg.ergspringboot.lms.internal.readmodel.LmsClassWorkspaceReadUseCase;
 
 @Service
 @Transactional(readOnly = true)
@@ -83,6 +84,7 @@ public class LmsReadModelService {
     private final ErgReadTaskExecutor readTaskExecutor;
     private final LmsStudentGroupReadUseCase studentGroupRead;
     private final LmsAssignmentProgressQueryUseCase assignmentProgressRead;
+    private final LmsClassWorkspaceReadUseCase classWorkspaceRead;
 
     public LmsReadModelService(
             AssignmentRepository assignmentRepository,
@@ -106,6 +108,9 @@ public class LmsReadModelService {
                 studentGroupRepository, studentGroupMemberRepository);
         this.assignmentProgressRead = new LmsAssignmentProgressQueryUseCase(
                 attemptRepository, assignmentRepository, assignmentResourceRepository);
+        this.classWorkspaceRead = new LmsClassWorkspaceReadUseCase(
+                classroomRepository, studentRepository, assignmentRepository,
+                assignmentResourceRepository, attemptRepository);
     }
 
     public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) {
@@ -241,7 +246,7 @@ public class LmsReadModelService {
             String status,
             Pageable pageable
     ) {
-        return classroomRepository.findSchoolClassWorkspaces(tenantId, schoolId, normalizeStatus(status), pageable);
+        return classWorkspaceRead.schoolClasses(tenantId, schoolId, status, pageable);
     }
 
     public ClassWorkspaceResponse classWorkspace(
@@ -315,7 +320,9 @@ public class LmsReadModelService {
             boolean includeScoreSummary,
             boolean includeRiskSummary
     ) {
-        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return classWorkspaceRead.query(tenantId, classId, schoolId, studentStatus, page, size,
+                assignmentStatus, assignmentPage, assignmentSize, includeScoreSummary, includeRiskSummary);
+        /* String normalizedTenantId = requireText(tenantId, "tenantId");
         String normalizedClassId = requireText(classId, "classId");
         String normalizedSchoolId = blankToNull(schoolId);
         ClassWorkspaceProjection classInfo = classroomRepository
@@ -346,7 +353,7 @@ public class LmsReadModelService {
                 riskSummary,
                 toStudentPage(students),
                 toAssignmentPage(assignments, normalizedTenantId)
-        );
+        ); */
     }
 
     @Cacheable(
