@@ -34,6 +34,7 @@ import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.utils.IdGenerator;
+import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
@@ -74,6 +75,7 @@ public class LmsRuntimeService {
     private final com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService attemptGradingService;
     private final com.erg.ergspringboot.service.quiz.runtime.AttemptEventRecorder attemptEventRecorder;
     private final CacheManager cacheManager;
+    private final LmsAttemptUseCase attemptCommands;
 
     public LmsRuntimeService(
             LmsClassroomService classroomService,
@@ -95,6 +97,9 @@ public class LmsRuntimeService {
         this.attemptGradingService = attemptGradingService;
         this.attemptEventRecorder = attemptEventRecorder;
         this.cacheManager = cacheManager;
+        this.attemptCommands = new LmsAttemptUseCase(
+                classroomService, assignmentService, quizService, attemptService, studentService,
+                runtimePackageService, attemptGradingService, attemptEventRecorder, cacheManager);
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access) {
@@ -226,7 +231,7 @@ public class LmsRuntimeService {
 
     @Transactional("postgresTransactionManager")
     public AttemptResponse startAttempt(String studentId, StartAttemptRequest request, UserAccessContext access) {
-        return startAttempt(studentId, request, null, access);
+        return attemptCommands.start(studentId, request, null, access);
     }
 
     @Transactional("postgresTransactionManager")
@@ -236,116 +241,37 @@ public class LmsRuntimeService {
             String idempotencyKey,
             UserAccessContext access
     ) {
-        String tenantId = normalizeTenant(access.tenantId());
-        Assignment assignment = assignment(request.assignmentId(), tenantId);
-        ensureClassAccess(assignment.getAcademicClassId(), access);
-        if (!Objects.equals(assignment.getQuizId(), request.quizId())) {
-            throw new BadRequestException("assignment does not include quiz");
-        }
-        if (!assignedToStudent(assignment, studentId)) {
-            throw new BadRequestException("student is not assigned");
-        }
-        // API callers identify students by auth_user_id, while runtime FKs use lms_students.id.
-        // Resolve once before the idempotency/attempt queries so all writes use the canonical key.
-        String persistedStudentId = studentService
-                .findFirstByTenantIdAndAuthUserId(tenantId, studentId)
-                .map(com.erg.ergspringboot.model.lms.Student::getId)
-                .orElse(studentId);
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        ensureAssignmentOpenForStart(assignment, now);
-        String startIdempotencyKey = blankToNull(idempotencyKey);
-        if (startIdempotencyKey != null) {
-            java.util.Optional<Attempt> idempotentAttempt = attemptService.findByStartIdempotencyKey(
-                    tenantId, request.assignmentId(), request.quizId(), persistedStudentId, startIdempotencyKey);
-            if (idempotentAttempt.isPresent()) {
-                return toAttemptResponse(idempotentAttempt.get());
-            }
-        }
-        Attempt attempt = attemptService
-                .findInProgress(tenantId, request.assignmentId(), request.quizId(), persistedStudentId)
-                .orElseGet(() -> {
-                    ensureAttemptLimitAvailable(assignment, tenantId, request.quizId(), persistedStudentId);
-                    return newAttempt(tenantId, persistedStudentId, request, now, startIdempotencyKey);
-                });
-        // Pin the attempt to the currently active published version so grading/report use a frozen key.
-        runtimePackageService.activePackageEntity(tenantId, request.quizId()).ifPresent(pkg -> {
-            if (attempt.getQuizVersionId() == null) {
-                attempt.setQuizVersionId(pkg.getQuizVersionId());
-            }
-            attempt.setGradingMode(pkg.getGradingMode());
-            attempt.setTotalQuestions(totalQuestions(pkg.getPackageJson()));
-        });
-        quizService.findById(request.quizId()).ifPresent(quiz -> attempt.setMode(runtimeMode(quiz.getKind())));
-        attempt.setLastActiveAt(now);
-        Attempt saved = attemptService.save(attempt);
-        evictAttemptReadCachesAfterCommit();
-        return toAttemptResponse(saved);
+        return attemptCommands.start(studentId, request, idempotencyKey, access);
     }
 
     @Transactional("postgresTransactionManager")
     public AttemptResponse saveDraft(String attemptId, AttemptDraftRequest request, UserAccessContext access) {
-        Attempt attempt = mutableAttempt(attemptId, access);
-        ensureEditable(attempt);
-        Map<String, com.erg.ergspringboot.model.lms.AttemptAnswer> answers = new LinkedHashMap<>(nullToMap(attempt.getAnswers()));
-        if (request != null && request.answers() != null) {
-            request.answers().forEach((questionId, answer) ->
-                    answers.put(questionId, modelAnswer(questionId, answer, Map.of(), OffsetDateTime.now(ZoneOffset.UTC))));
-        }
-        attempt.setAnswers(answers);
-        attempt.setEvents(request == null ? attempt.getEvents() : request.events());
-        attempt.setClient(request == null ? attempt.getClient() : request.client());
-        attempt.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        Attempt saved = attemptService.save(attempt);
-        if (request != null) {
-            attemptEventRecorder.recordClientBatch(
-                    saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.events());
-        }
-        evictAttemptReadCachesAfterCommit();
-        return toAttemptResponse(saved);
+        return attemptCommands.saveDraft(attemptId, request, access);
     }
 
     @Transactional("postgresTransactionManager")
     public AnswerResultResponse saveAnswer(String attemptId, String questionId, SaveAnswerRequest request, UserAccessContext access) {
-        if (questionId.contains(".") || questionId.contains("$")) {
-            throw new BadRequestException("invalid question id");
-        }
-        Attempt attempt = mutableAttempt(attemptId, access);
-        ensureEditable(attempt);
-        Map<String, com.erg.ergspringboot.model.lms.AttemptAnswer> answers = new LinkedHashMap<>(nullToMap(attempt.getAnswers()));
-        answers.put(questionId, modelAnswer(
-                questionId,
-                request == null ? null : request.answer(),
-                request == null ? Map.of() : nullToMap(request.clientResult()),
-                request == null || request.answeredAt() == null ? OffsetDateTime.now(ZoneOffset.UTC) : request.answeredAt()
-        ));
-        attempt.setAnswers(answers);
-        attempt.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        Attempt saved = attemptService.save(attempt);
-        attemptEventRecorder.record(
-                null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(),
-                "answer_saved", questionId,
-                request == null ? null : request.answer(),
-                request == null ? null : request.clientResult(),
-                request == null ? null : request.answeredAt());
-        evictAttemptReadCachesAfterCommit();
-        return new AnswerResultResponse(attemptId, questionId, true);
+        return attemptCommands.saveAnswer(attemptId, questionId, request, access);
     }
 
     @Transactional("postgresTransactionManager")
     public AttemptSyncResponse syncAttempt(String attemptId, AttemptSyncRequest request, UserAccessContext access) {
-        Attempt attempt = mutableAttempt(attemptId, access);
+        return attemptCommands.sync(attemptId, request, access);
+        /* legacy implementation removed; */
+        /* Attempt attempt = mutableAttempt(attemptId, access);
         if (!Objects.equals(attempt.getPackageHash(), request.packageHash())) {
             return new AttemptSyncResponse("conflict", toAttemptResponse(attempt), List.of("package_hash"));
         }
         // Replay the offline client event log idempotently into the append-only audit table (spec §1.7).
         attemptEventRecorder.recordClientBatch(
                 attempt.getTenantId(), attempt.getId(), attempt.getQuizId(), attempt.getPackageId(), request.events());
-        return new AttemptSyncResponse(attempt.getStatus(), toAttemptResponse(attempt), List.of());
+        return new AttemptSyncResponse(attempt.getStatus(), toAttemptResponse(attempt), List.of()); */
     }
 
     @Transactional("postgresTransactionManager")
     public AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access) {
-        Attempt attempt = mutableAttempt(attemptId, access);
+        return attemptCommands.submit(attemptId, request, access);
+        /* Attempt attempt = mutableAttempt(attemptId, access);
         if (request != null && request.packageHash() != null && !Objects.equals(attempt.getPackageHash(), request.packageHash())) {
             throw new BadRequestException("package_hash conflict");
         }
@@ -377,7 +303,7 @@ public class LmsRuntimeService {
         int totalQuestions;
         var graded = attempt.getQuizVersionId() == null
                 ? java.util.Optional.<com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService.GradedAttempt>empty()
-                : attemptGradingService.gradeSubmission(
+                : legacyGradingRemoved(
                         normalizeTenant(access.tenantId()),
                         attempt.getId(),
                         attempt.getQuizVersionId(),
@@ -418,7 +344,7 @@ public class LmsRuntimeService {
         }
         projectSubmitProgress(savedAttempt, answers.size(), totalQuestions, score, passed, access);
         evictAttemptReadCachesAfterCommit();
-        return new AttemptSubmitResponse(score, maxScore, percent, passed);
+        return new AttemptSubmitResponse(score, maxScore, percent, passed); */
     }
 
     public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) {
