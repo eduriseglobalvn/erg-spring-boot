@@ -69,6 +69,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsStudentGroupReadUseCase;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsAssignmentProgressQueryUseCase;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsClassWorkspaceReadUseCase;
+import com.erg.ergspringboot.lms.internal.readmodel.LmsTeacherHomeworkReadUseCase;
 
 @Service
 @Transactional(readOnly = true)
@@ -85,6 +86,7 @@ public class LmsReadModelService {
     private final LmsStudentGroupReadUseCase studentGroupRead;
     private final LmsAssignmentProgressQueryUseCase assignmentProgressRead;
     private final LmsClassWorkspaceReadUseCase classWorkspaceRead;
+    private final LmsTeacherHomeworkReadUseCase teacherHomeworkRead;
 
     public LmsReadModelService(
             AssignmentRepository assignmentRepository,
@@ -111,6 +113,9 @@ public class LmsReadModelService {
         this.classWorkspaceRead = new LmsClassWorkspaceReadUseCase(
                 classroomRepository, studentRepository, assignmentRepository,
                 assignmentResourceRepository, attemptRepository);
+        this.teacherHomeworkRead = new LmsTeacherHomeworkReadUseCase(
+                assignmentRepository, assignmentResourceRepository, classroomRepository,
+                attemptRepository, studentRepository);
     }
 
     public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) {
@@ -368,7 +373,8 @@ public class LmsReadModelService {
             Integer page,
             Integer size
     ) {
-        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return teacherHomeworkRead.query(tenantId, teacherId, status, page, size);
+        /* String normalizedTenantId = requireText(tenantId, "tenantId");
         String normalizedTeacherId = requireText(teacherId, "teacherId");
         String normStatus = normalizeStatus(status);
         Pageable hwPage = assignmentPageable(page, size);
@@ -393,7 +399,7 @@ public class LmsReadModelService {
                 toHomeworkAssignmentPage(assignments, normalizedTenantId),
                 toPendingReviewPage(pendingReviews),
                 toOverdueStudentPage(overdueStudents)
-        );
+        ); */
     }
 
     private String normalizeStatus(String status) {
