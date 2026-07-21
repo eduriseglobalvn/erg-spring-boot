@@ -12,7 +12,7 @@ class LmsClassWorkspaceArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsClassWorkspaceReadUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java"));
-        assertThat(legacy).contains("classWorkspaceRead.query(");
-        assertThat(legacy).contains("classWorkspaceRead.schoolClasses(");
+        assertThat(legacy).contains("classWorkspace.query(");
+        assertThat(legacy).contains("classWorkspace.schoolClasses(");
     }
 }

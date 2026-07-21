@@ -12,6 +12,6 @@ class LmsAssignmentProgressArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsAssignmentProgressQueryUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java"));
-        assertThat(legacy).contains("assignmentProgressRead.summary(");
+        assertThat(legacy).contains("assignmentProgress.summary(");
     }
 }
