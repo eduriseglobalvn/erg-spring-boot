@@ -37,4 +37,24 @@ class AuthorizationUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java"));
         assertThat(legacy).doesNotContain("userRepository.findWithDetailsByIdAndTenantId(");
     }
+
+    @Test
+    void directRoleMutationsHaveAnInternalUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java"));
+        assertThat(legacy).doesNotContain("userRepository.findByIdAndTenantId(");
+    }
+
+    @Test
+    void permissionOverridesHaveAnInternalUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java"));
+        assertThat(legacy).doesNotContain("overrideRepository.findById(");
+    }
 }
