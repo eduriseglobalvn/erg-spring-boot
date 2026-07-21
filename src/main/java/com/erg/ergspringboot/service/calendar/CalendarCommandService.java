@@ -6,23 +6,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
+import com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CreateRoomRequest;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarBatchPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarBulkPayload;
-import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarColorGroupResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarDeletePayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventPayload;
-import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarPreviewPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOption;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRowResultResponse;
-import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarTeacherAssignmentResponse;
 import com.erg.ergspringboot.exception.ConflictException;
-import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.model.calendar.CalendarBatch;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
@@ -51,8 +48,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -71,7 +66,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 public class CalendarCommandService {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarCommandService.class);
-    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String STATUS_DRAFT = "DRAFT";
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_CANCELLED = "CANCELLED";
@@ -96,6 +90,7 @@ public class CalendarCommandService {
     private final EducationUnitRepository educationUnitRepository;
     private final EntityManager entityManager;
     private final CalendarBatchLifecycleUseCase batchLifecycle;
+    private final CalendarEventMutationUseCase eventMutations;
 
     /** Compatibility constructor retained for legacy tests and callers. */
     public CalendarCommandService(
@@ -120,7 +115,8 @@ public class CalendarCommandService {
                 accessSupport, classroomRepository, subjectRepository, levelRepository,
                 userRepository, educationUnitRepository, entityManager,
                 new CalendarBatchLifecycleUseCase(
-                        batchRepository, eventRepository, conflictService, eventPublisher));
+                        batchRepository, eventRepository, conflictService, eventPublisher),
+                new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository));
     }
 
     @Autowired
@@ -140,7 +136,8 @@ public class CalendarCommandService {
             UserRepository userRepository,
             EducationUnitRepository educationUnitRepository,
             EntityManager entityManager,
-            CalendarBatchLifecycleUseCase batchLifecycle) {
+            CalendarBatchLifecycleUseCase batchLifecycle,
+            CalendarEventMutationUseCase eventMutations) {
         this.batchRepository = batchRepository;
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
@@ -157,6 +154,7 @@ public class CalendarCommandService {
         this.educationUnitRepository = educationUnitRepository;
         this.entityManager = entityManager;
         this.batchLifecycle = batchLifecycle;
+        this.eventMutations = eventMutations;
     }
 
     @Transactional("postgresTransactionManager")
@@ -351,56 +349,24 @@ public class CalendarCommandService {
         return batchLifecycle.cancel(tenantId, batchId, userId);
     }
 
-    @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public CalendarEventPayload updateEvent(
             String tenantId, CalendarEventUpdateRequest input, String userId) {
-        CalendarEvent event = eventRepository.findById(input.eventId())
-                .orElseThrow(() -> new IllegalArgumentException("Event not found: " + input.eventId()));
-        assertTenant(event.getTenantId(), tenantId);
-        if (input.roomId() != null) event.setRoomId(input.roomId());
-        if (input.roomName() != null) event.setRoomName(input.roomName());
-        if (input.note() != null) event.setNote(input.note());
-        event.setUpdatedBy(userId);
-        eventRepository.save(event);
-        return new CalendarEventPayload(buildEventResponse(event));
+        return eventMutations.update(tenantId, input, userId);
     }
 
-    @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public CalendarDeletePayload deleteEvent(
             String tenantId, CalendarEventDeleteRequest input, String userId) {
-        CalendarEvent event = eventRepository.findById(input.eventId())
-                .orElseThrow(() -> new IllegalArgumentException("Event not found: " + input.eventId()));
-        assertTenant(event.getTenantId(), tenantId);
-        eventRepository.updateStatusBatch(tenantId, List.of(event.getId()), STATUS_CANCELLED, userId, OffsetDateTime.now());
-        return new CalendarDeletePayload(event.getId(), true, 1);
+        return eventMutations.delete(tenantId, input, userId);
     }
 
-    @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public CalendarDeletePayload deleteTeacherSchedule(
             String tenantId, String teacherUserId, List<String> schoolIds,
             String dateFrom, String dateTo, String cancelledBy) {
-
-        LocalDate fromDt = LocalDate.parse(dateFrom);
-        LocalDate toDt = LocalDate.parse(dateTo);
-        OffsetDateTime from = fromDt.atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
-        OffsetDateTime to = toDt.plusDays(1).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
-
-        Set<String> eventIds = new HashSet<>();
-        eventIds.addAll(eventTeacherRepository.findEventIdsByTeacher(
-                tenantId, teacherUserId, schoolIds, from, to, STATUS_DRAFT));
-        eventIds.addAll(eventTeacherRepository.findEventIdsByTeacher(
-                tenantId, teacherUserId, schoolIds, from, to, STATUS_PUBLISHED));
-
-        if (eventIds.isEmpty()) {
-            return new CalendarDeletePayload(teacherUserId, true, 0);
-        }
-
-        int affected = eventRepository.updateStatusBatch(
-                tenantId, new ArrayList<>(eventIds), STATUS_CANCELLED, cancelledBy, OffsetDateTime.now());
-        return new CalendarDeletePayload(teacherUserId, true, affected);
+        return eventMutations.deleteTeacherSchedule(
+                tenantId, teacherUserId, schoolIds, dateFrom, dateTo, cancelledBy);
     }
 
     @Transactional("postgresTransactionManager")
@@ -546,45 +512,4 @@ public class CalendarCommandService {
         return accessSupport.csv(csv);
     }
 
-    private void assertTenant(String actualTenantId, String expectedTenantId) {
-        if (!Objects.equals(actualTenantId, expectedTenantId)) {
-            throw new ForbiddenException("Tenant scope does not match the target schedule resource.");
-        }
-    }
-
-    private CalendarEventResponse buildEventResponse(CalendarEvent event) {
-        List<CalendarTeacherAssignmentResponse> teachers =
-                eventTeacherRepository.findByTenantIdAndEventIdIn(event.getTenantId(), List.of(event.getId())).stream()
-                .map(teacher -> new CalendarTeacherAssignmentResponse(
-                        teacher.getTeacherUserId(),
-                        teacher.getDisplayNameSnapshot(),
-                        teacher.getRole(),
-                        teacher.getColorKey()))
-                .toList();
-
-        return new CalendarEventResponse(
-                event.getId(), event.getBatchId(), event.getTitle(),
-                event.getStartAt() != null ? event.getStartAt().toString() : null,
-                event.getEndAt() != null ? event.getEndAt().toString() : null,
-                event.getStartAt() != null ? event.getStartAt().toLocalDate().toString() : null,
-                event.getStartAt() != null
-                        ? event.getStartAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
-                event.getEndAt() != null
-                        ? event.getEndAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
-                event.getSchoolId(), null,
-                event.getAcademicClassId(), null,
-                event.getSubjectId(), null,
-                event.getLevelId(), null,
-                event.getRoomId(), event.getRoomName(),
-                event.getPeriodStart() != null ? event.getPeriodStart() : 0,
-                event.getPeriodCount() != null ? event.getPeriodCount() : 0,
-                teachers, event.getStatus(), event.getNote(), computeColorGroup(event.getSubjectId()));
-    }
-
-    private CalendarColorGroupResponse computeColorGroup(String subjectId) {
-        if (subjectId == null) return new CalendarColorGroupResponse("default", null, "subject");
-        List<String> colorKeys = List.of("blue", "green", "orange", "purple", "red", "teal", "pink", "indigo");
-        int index = Math.abs(subjectId.hashCode()) % colorKeys.size();
-        return new CalendarColorGroupResponse(colorKeys.get(index), null, "subject");
-    }
 }
