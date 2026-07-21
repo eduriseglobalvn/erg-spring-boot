@@ -104,7 +104,8 @@ public class LmsReadModelService {
         this.readTaskExecutor = readTaskExecutor;
         this.studentGroupRead = new LmsStudentGroupReadUseCase(
                 studentGroupRepository, studentGroupMemberRepository);
-        this.assignmentProgressRead = new LmsAssignmentProgressQueryUseCase(attemptRepository);
+        this.assignmentProgressRead = new LmsAssignmentProgressQueryUseCase(
+                attemptRepository, assignmentRepository, assignmentResourceRepository);
     }
 
     public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) {
@@ -186,7 +187,8 @@ public class LmsReadModelService {
             Integer page,
             Integer size
     ) {
-        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return assignmentProgressRead.workspace(tenantId, assignmentId, attemptStatus, page, size);
+        /* String normalizedTenantId = requireText(tenantId, "tenantId");
         String normalizedAssignmentId = requireText(assignmentId, "assignmentId");
         AssignmentDetailProjection assignment = assignmentRepository
                 .findAssignmentDetail(normalizedTenantId, normalizedAssignmentId)
@@ -230,7 +232,7 @@ public class LmsReadModelService {
                         missingLateStudentsByStudentId(missingLateStudents)
                 ),
                 toMissingLateStudentPage(missingLateStudents)
-        );
+        ); */
     }
 
     public Page<ClassWorkspaceProjection> schoolClassWorkspaces(
