@@ -12,6 +12,6 @@ class LmsStudentGroupReadArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsStudentGroupReadUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java"));
-        assertThat(legacy).contains("studentGroupRead.query(");
+        assertThat(legacy).contains("studentGroups.query(");
     }
 }

@@ -12,6 +12,6 @@ class LmsTeacherHomeworkArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsTeacherHomeworkReadUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java"));
-        assertThat(legacy).contains("teacherHomeworkRead.query(");
+        assertThat(legacy).contains("teacherHomework.query(");
     }
 }
