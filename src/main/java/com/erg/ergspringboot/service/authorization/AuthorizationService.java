@@ -37,6 +37,7 @@ import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditSer
 import com.erg.ergspringboot.service.users.UserService.AuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
+import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
@@ -65,6 +66,7 @@ public class AuthorizationService {
     private UserRoleAssignmentRepository userRoleAssignmentRepository;
     private AuthorizationMutationAuditService mutationAuditService;
     private final AuthorizationPermissionCatalogUseCase permissionCatalog;
+    private final AuthorizationRoleDefinitionUseCase roleDefinitions;
 
     public AuthorizationService(
             RoleRepository roleRepository,
@@ -78,6 +80,7 @@ public class AuthorizationService {
         this.userRepository = userRepository;
         this.permissionCatalog = new AuthorizationPermissionCatalogUseCase(
                 permissionRepository, roleRepository, overrideRepository);
+        this.roleDefinitions = new AuthorizationRoleDefinitionUseCase(roleRepository, permissionRepository);
     }
 
     @Autowired(required = false)
@@ -95,34 +98,24 @@ public class AuthorizationService {
     @Autowired(required = false)
     void setUserRoleAssignmentRepository(UserRoleAssignmentRepository userRoleAssignmentRepository) {
         this.userRoleAssignmentRepository = userRoleAssignmentRepository;
+        this.roleDefinitions.setUserRoleAssignmentRepository(userRoleAssignmentRepository);
     }
 
     @Autowired(required = false)
     void setMutationAuditService(AuthorizationMutationAuditService mutationAuditService) {
         this.mutationAuditService = mutationAuditService;
+        this.roleDefinitions.setMutationAuditService(mutationAuditService);
     }
 
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = "authorizationRoles", key = "'all'")
     public List<RoleResponse> listRoles() {
-        List<Role> roles = roleRepository.findAllWithPermissionsAndUsers();
-        Map<String, List<com.erg.ergspringboot.model.authorization.UserRoleAssignment>> assignmentsByRole =
-                activeAssignmentsByRole(roles);
-        return roles.stream()
-                .filter(role -> !"system.god_mode".equalsIgnoreCase(role.getName()))
-                .map(role -> toRoleResponse(role, assignmentsByRole.getOrDefault(role.getId(), List.of())))
-                .toList();
+        return roleDefinitions.list();
     }
 
     @Transactional(readOnly = true)
     public RoleResponse getRole(String roleId) {
-        Role role = roleRepository.findById(roleId)
-                .or(() -> roleRepository.findByNameIgnoreCase(roleId))
-                .orElseThrow(() -> new ResourceNotFoundException("role not found"));
-        if ("system.god_mode".equalsIgnoreCase(role.getName())) {
-            throw new ResourceNotFoundException("role not found");
-        }
-        return toRoleResponse(role);
+        return roleDefinitions.get(roleId);
     }
 
     @Transactional
@@ -135,20 +128,7 @@ public class AuthorizationService {
     @Transactional
     @CacheEvict(cacheNames = {"authorizationRoles", "authorizationPermissions"}, allEntries = true)
     public RoleResponse createRole(CreateRoleRequest request, ErgPrincipal actor, AuditContext context) {
-        protectedRolePolicy.assertRoleDefinitionAllowed(request.name());
-        AuditContext requiredContext = requiredContext(actor, context);
-        Role role = new Role();
-        role.setId(IdGenerator.newId());
-        role.setName(request.name().trim());
-        role.setDescription(request.description());
-        role.setIsDefault(false);
-        role.setUpdatedBy(requiredContext.actorUserId());
-        role.setPermissions(resolvePermissions(request.permissions()));
-        role = roleRepository.save(role);
-        mutationAudit().recordRoleMutation(
-                actorTenant(actor), role.getId(), "ROLE_CREATED", requiredContext,
-                Map.of("roleName", role.getName()));
-        return toRoleResponse(role);
+        return roleDefinitions.create(request, actor, context);
     }
 
     @Transactional
@@ -168,25 +148,7 @@ public class AuthorizationService {
     public RoleResponse updateRole(
             String roleId, UpdateRoleRequest request, ErgPrincipal actor, AuditContext context
     ) {
-        Role role = roleRepository.findById(roleId)
-                .or(() -> roleRepository.findByNameIgnoreCase(roleId))
-                .orElseThrow(() -> new ResourceNotFoundException("role not found"));
-        protectedRolePolicy.assertCanManageDefinition(actor, role);
-        if (request.name() != null) {
-            protectedRolePolicy.assertRoleDefinitionAllowed(request.name());
-            role.setName(request.name().trim());
-        }
-        if (request.description() != null) role.setDescription(request.description());
-        if (request.permissions() != null) role.setPermissions(resolvePermissions(request.permissions()));
-        List<UserRef> affectedUsers = affectedUsers(role);
-        AuditContext requiredContext = requiredContext(actor, context);
-        role.setUpdatedBy(requiredContext.actorUserId());
-        role = roleRepository.save(role);
-        mutationAudit().recordRoleMutation(
-                actorTenant(actor), role.getId(), "ROLE_UPDATED", requiredContext,
-                Map.of("roleName", role.getName()));
-        mutationAudit().authorizationChanged(affectedUsers, role.getId(), "ROLE_UPDATED", requiredContext);
-        return toRoleResponse(role);
+        return roleDefinitions.update(roleId, request, actor, context);
     }
 
     @Transactional
@@ -204,18 +166,7 @@ public class AuthorizationService {
     @Transactional
     @CacheEvict(cacheNames = {"authorizationRoles", "authorizationPermissions"}, allEntries = true)
     public void deleteRole(String roleId, ErgPrincipal actor, AuditContext context) {
-        Role role = roleRepository.findById(roleId)
-                .or(() -> roleRepository.findByNameIgnoreCase(roleId))
-                .orElseThrow(() -> new ResourceNotFoundException("role not found"));
-        protectedRolePolicy.assertCanManageDefinition(actor, role);
-        List<UserRef> affectedUsers = affectedUsers(role);
-        String roleName = role.getName();
-        roleRepository.delete(role);
-        AuditContext requiredContext = requiredContext(actor, context);
-        mutationAudit().recordRoleMutation(
-                actorTenant(actor), role.getId(), "ROLE_DELETED", requiredContext,
-                Map.of("roleName", roleName));
-        mutationAudit().authorizationChanged(affectedUsers, role.getId(), "ROLE_DELETED", requiredContext);
+        roleDefinitions.delete(roleId, actor, context);
     }
 
     @Transactional(readOnly = true)
