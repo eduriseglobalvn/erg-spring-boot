@@ -14,7 +14,7 @@ class LmsAttemptUseCaseArchitectureTest {
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java"));
-        assertThat(legacy).contains("attemptCommands.start(");
+        assertThat(legacy).contains("attempts.start(");
         assertThat(legacy).doesNotContain("attemptService.findByStartIdempotencyKey(");
         assertThat(legacy).doesNotContain("attemptGradingService.gradeSubmission(");
     }

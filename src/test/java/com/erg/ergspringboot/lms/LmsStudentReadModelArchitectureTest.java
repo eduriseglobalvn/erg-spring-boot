@@ -12,10 +12,10 @@ class LmsStudentReadModelArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsStudentReadModelUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java"));
-        assertThat(legacy).contains("studentReadModel.listAssignments(");
-        assertThat(legacy).contains("studentReadModel.listScores(");
-        assertThat(legacy).contains("studentReadModel.assignmentProgress(");
-        assertThat(legacy).contains("studentReadModel.quizStudents(");
+        assertThat(legacy).contains("students.listAssignments(");
+        assertThat(legacy).contains("students.listScores(");
+        assertThat(legacy).contains("students.assignmentProgress(");
+        assertThat(legacy).contains("students.quizStudents(");
         assertThat(legacy).doesNotContain("attemptService.findByAssignment(");
         assertThat(legacy).doesNotContain("attemptService.findByQuiz(");
     }
