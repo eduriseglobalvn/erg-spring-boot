@@ -46,6 +46,7 @@ import com.erg.ergspringboot.calendar.internal.readmodel.CalendarCatalogQueryUse
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarScheduleBatchQueryUseCase;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarPermissionsQueryUseCase;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarEventResponseAssembler;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarWorkspaceAssembler;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -79,6 +80,7 @@ public class CalendarReadService {
     private final CalendarScheduleBatchQueryUseCase scheduleBatchQueries;
     private final CalendarPermissionsQueryUseCase permissionQueries;
     private final CalendarEventResponseAssembler eventResponses;
+    private final CalendarWorkspaceAssembler workspaceAssembler;
 
     public CalendarReadService(
             CalendarEventRepository eventRepository,
@@ -107,6 +109,7 @@ public class CalendarReadService {
         this.scheduleBatchQueries = new CalendarScheduleBatchQueryUseCase(batchRepository, eventRepository);
         this.permissionQueries = new CalendarPermissionsQueryUseCase();
         this.eventResponses = new CalendarEventResponseAssembler();
+        this.workspaceAssembler = new CalendarWorkspaceAssembler();
     }
 
     // -------------------------------------------------------------------------
@@ -365,41 +368,7 @@ public class CalendarReadService {
             Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
             ReferenceMaps refMaps,
             String viewMode) {
-
-        Map<String, Long> schoolCounts = events.stream()
-                .collect(Collectors.groupingBy(CalendarEvent::getSchoolId, LinkedHashMap::new, Collectors.counting()));
-        Map<String, Long> classCounts = events.stream()
-                .collect(Collectors.groupingBy(CalendarEvent::getAcademicClassId, LinkedHashMap::new, Collectors.counting()));
-        Map<String, Long> subjectCounts = events.stream()
-                .filter(e -> e.getSubjectId() != null)
-                .collect(Collectors.groupingBy(CalendarEvent::getSubjectId, LinkedHashMap::new, Collectors.counting()));
-        Map<String, Long> levelCounts = events.stream()
-                .filter(e -> e.getLevelId() != null)
-                .collect(Collectors.groupingBy(CalendarEvent::getLevelId, LinkedHashMap::new, Collectors.counting()));
-
-        Set<String> eventIdSet = events.stream()
-                .map(CalendarEvent::getId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<String, Long> teacherCounts = new LinkedHashMap<>();
-        for (var entry : assignmentsByEvent.entrySet()) {
-            if (!eventIdSet.contains(entry.getKey())) continue;
-            for (CalendarEventTeacher t : entry.getValue()) {
-                teacherCounts.merge(t.getTeacherUserId(), 1L, Long::sum);
-            }
-        }
-
-        return new CalendarFilterOptionsResponse(
-                schoolCounts.entrySet().stream().map(e ->
-                        new CalendarFilterOptionResponse(e.getKey(), resolveSchoolName(e.getKey(), refMaps), e.getValue().intValue(), null)).toList(),
-                classCounts.entrySet().stream().map(e ->
-                        new CalendarFilterOptionResponse(e.getKey(), resolveClassName(e.getKey(), refMaps), e.getValue().intValue(), null)).toList(),
-                teacherCounts.entrySet().stream().map(e ->
-                        new CalendarFilterOptionResponse(e.getKey(), resolveTeacherName(e.getKey(), refMaps), e.getValue().intValue(), resolveTeacherColorKey(e.getKey(), refMaps))).toList(),
-                subjectCounts.entrySet().stream().map(e ->
-                        new CalendarFilterOptionResponse(e.getKey(), resolveSubjectName(e.getKey(), refMaps), e.getValue().intValue(), null)).toList(),
-                levelCounts.entrySet().stream().map(e ->
-                        new CalendarFilterOptionResponse(e.getKey(), resolveLevelName(e.getKey(), refMaps), e.getValue().intValue(), null)).toList());
+        return workspaceAssembler.filterOptions(events, assignmentsByEvent, refMaps, viewMode);
     }
 
     List<CalendarLaneSummaryResponse> buildLaneSummaries(
@@ -407,21 +376,7 @@ public class CalendarReadService {
             Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
             ReferenceMaps refMaps,
             String viewMode) {
-        if (events == null || events.isEmpty()) return List.of();
-
-        String mode = viewMode != null ? viewMode.toUpperCase() : "BY_SCHOOL";
-
-        return switch (mode) {
-            case "CLASS", "BY_CLASS" -> buildLaneSummariesByKey(events, CalendarEvent::getAcademicClassId,
-                    id -> resolveClassName(id, refMaps), null);
-            case "SUBJECT", "BY_SUBJECT" -> buildLaneSummariesByKey(events, CalendarEvent::getSubjectId,
-                    id -> resolveSubjectName(id, refMaps), null);
-            case "TEACHER", "BY_TEACHER" -> buildTeacherLaneSummaries(events, assignmentsByEvent, refMaps);
-            case "ALL" -> buildLaneSummariesByKey(events, CalendarEvent::getSchoolId,
-                    id -> resolveSchoolName(id, refMaps), null);
-            default -> buildLaneSummariesByKey(events, CalendarEvent::getSchoolId,
-                    id -> resolveSchoolName(id, refMaps), null);
-        };
+        return workspaceAssembler.laneSummaries(events, assignmentsByEvent, refMaps, viewMode);
     }
 
     CalendarCatalogResponse buildCatalog(
@@ -603,50 +558,6 @@ public class CalendarReadService {
         return result;
     }
 
-    private List<CalendarLaneSummaryResponse> buildLaneSummariesByKey(
-            List<CalendarEvent> events,
-            java.util.function.Function<CalendarEvent, String> keyExtractor,
-            java.util.function.Function<String, String> labelResolver,
-            java.util.function.Function<String, String> colorKeyResolver) {
-        Map<String, Long> counts = events.stream()
-                .filter(e -> keyExtractor.apply(e) != null)
-                .collect(Collectors.groupingBy(e -> keyExtractor.apply(e), LinkedHashMap::new, Collectors.counting()));
-        return counts.entrySet().stream()
-                .map(entry -> {
-                    String id = entry.getKey();
-                    String label = labelResolver.apply(id);
-                    String colorKey = colorKeyResolver != null ? colorKeyResolver.apply(id) : null;
-                    return new CalendarLaneSummaryResponse(id, label != null ? label : id, entry.getValue().intValue(), colorKey);
-                })
-                .toList();
-    }
-
-    private List<CalendarLaneSummaryResponse> buildTeacherLaneSummaries(
-            List<CalendarEvent> events,
-            Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
-            ReferenceMaps refMaps) {
-        Map<String, Long> teacherCounts = new LinkedHashMap<>();
-        for (CalendarEvent event : events) {
-            for (CalendarEventTeacher t : assignmentsByEvent.getOrDefault(event.getId(), List.of())) {
-                teacherCounts.merge(t.getTeacherUserId(), 1L, Long::sum);
-            }
-        }
-        return teacherCounts.entrySet().stream()
-                .map(entry -> {
-                    String id = entry.getKey();
-                    String label = resolveTeacherName(id, refMaps);
-                    String colorKey = resolveTeacherColorKey(id, refMaps);
-                    return new CalendarLaneSummaryResponse(id, label != null ? label : id, entry.getValue().intValue(), colorKey);
-                })
-                .toList();
-    }
-
-    private CalendarColorGroupResponse computeColorGroup(String subjectId) {
-        if (subjectId == null) return new CalendarColorGroupResponse("default", null, "subject");
-        int index = Math.abs(subjectId.hashCode()) % COLOR_KEYS.size();
-        return new CalendarColorGroupResponse(COLOR_KEYS.get(index), null, "subject");
-    }
-
     private CalendarBatchSummaryResponse toBatchSummary(CalendarBatch batch) {
         return new CalendarBatchSummaryResponse(
                 batch.getId(),
@@ -773,40 +684,4 @@ public class CalendarReadService {
         }
     }
 
-    // ---- Name resolution helpers ----
-
-    private String resolveSchoolName(String schoolId, ReferenceMaps refMaps) {
-        if (schoolId == null) return null;
-        EducationUnit unit = refMaps.schoolMap().get(schoolId);
-        return unit != null ? unit.getName() : null;
-    }
-
-    private String resolveClassName(String classId, ReferenceMaps refMaps) {
-        if (classId == null) return null;
-        Classroom classroom = refMaps.classMap().get(classId);
-        return classroom != null ? classroom.getName() : null;
-    }
-
-    private String resolveSubjectName(String subjectId, ReferenceMaps refMaps) {
-        if (subjectId == null) return null;
-        Subject subject = refMaps.subjectMap().get(subjectId);
-        return subject != null ? subject.getName() : null;
-    }
-
-    private String resolveLevelName(String levelId, ReferenceMaps refMaps) {
-        if (levelId == null) return null;
-        Level level = refMaps.levelMap().get(levelId);
-        return level != null ? level.getName() : null;
-    }
-
-    private String resolveTeacherName(String teacherUserId, ReferenceMaps refMaps) {
-        if (teacherUserId == null) return null;
-        User user = refMaps.userMap().get(teacherUserId);
-        return user != null ? user.getFullName() : null;
-    }
-
-    private String resolveTeacherColorKey(String teacherUserId, ReferenceMaps refMaps) {
-        if (teacherUserId == null) return null;
-        return refMaps.teacherColorKeyMap().get(teacherUserId);
-    }
 }
