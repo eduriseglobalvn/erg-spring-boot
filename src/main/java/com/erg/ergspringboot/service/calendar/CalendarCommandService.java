@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
+import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkReferenceDataUseCase;
 import com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase;
 import com.erg.ergspringboot.calendar.internal.room.CalendarRoomCommandUseCase;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
@@ -93,6 +94,7 @@ public class CalendarCommandService {
     private final CalendarBatchLifecycleUseCase batchLifecycle;
     private final CalendarEventMutationUseCase eventMutations;
     private final CalendarRoomCommandUseCase roomCommands;
+    private final CalendarBulkReferenceDataUseCase bulkReferenceData;
 
     /** Compatibility constructor retained for legacy tests and callers. */
     public CalendarCommandService(
@@ -119,7 +121,10 @@ public class CalendarCommandService {
                 new CalendarBatchLifecycleUseCase(
                         batchRepository, eventRepository, conflictService, eventPublisher),
                 new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository),
-                new CalendarRoomCommandUseCase(roomRepository));
+                new CalendarRoomCommandUseCase(roomRepository),
+                new CalendarBulkReferenceDataUseCase(
+                        classroomRepository, subjectRepository, levelRepository,
+                        userRepository, roomRepository, educationUnitRepository));
     }
 
     @Autowired
@@ -141,7 +146,8 @@ public class CalendarCommandService {
             EntityManager entityManager,
             CalendarBatchLifecycleUseCase batchLifecycle,
             CalendarEventMutationUseCase eventMutations,
-            CalendarRoomCommandUseCase roomCommands) {
+            CalendarRoomCommandUseCase roomCommands,
+            CalendarBulkReferenceDataUseCase bulkReferenceData) {
         this.batchRepository = batchRepository;
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
@@ -160,13 +166,14 @@ public class CalendarCommandService {
         this.batchLifecycle = batchLifecycle;
         this.eventMutations = eventMutations;
         this.roomCommands = roomCommands;
+        this.bulkReferenceData = bulkReferenceData;
     }
 
     @Transactional("postgresTransactionManager")
     public CalendarPreviewPayload preview(
             String tenantId, CalendarBulkCreateRequest input, String userId) {
         input = inputNormalizer.normalize(input);
-        ReferenceData refData = loadReferenceData(tenantId, input.schoolId(), input);
+        ReferenceData refData = bulkReferenceData.load(tenantId, input.schoolId(), input);
         List<RowValidationResult> validationResults = validationService.validateRows(input, refData);
         boolean allValid = validationResults.stream().allMatch(RowValidationResult::valid);
 
@@ -246,7 +253,7 @@ public class CalendarCommandService {
             throw new ConflictException("Another bulk schedule operation is in progress for this school.");
         }
 
-        ReferenceData refData = loadReferenceData(tenantId, input.schoolId(), input);
+        ReferenceData refData = bulkReferenceData.load(tenantId, input.schoolId(), input);
         List<RowValidationResult> validationResults = validationService.validateRows(input, refData);
         boolean allValid = validationResults.stream().allMatch(RowValidationResult::valid);
         if (!allValid) {
@@ -383,64 +390,6 @@ public class CalendarCommandService {
     // =========================================================================
     // Private helpers
     // =========================================================================
-
-    private ReferenceData loadReferenceData(String tenantId, String schoolId, CalendarBulkCreateRequest input) {
-        List<Classroom> classrooms = classroomRepository.findByTenantIdAndSchoolIdOrderByNameAsc(tenantId, schoolId);
-        Map<String, Classroom> classMap = classrooms.stream()
-                .collect(Collectors.toMap(Classroom::getId, Function.identity()));
-
-        List<Subject> subjects = subjectRepository.findTop500ByTenantIdAndStatusIgnoreCaseOrderByNameAsc(tenantId, STATUS_ACTIVE);
-        Map<String, Subject> subjectMap = subjects.stream()
-                .collect(Collectors.toMap(Subject::getId, Function.identity()));
-
-        Set<String> subjectIds = input.rows().stream()
-                .map(CalendarBulkRowRequest::subjectId).filter(s -> s != null && !s.isBlank()).collect(Collectors.toSet());
-        Map<String, Level> levelMap = new HashMap<>();
-        if (!subjectIds.isEmpty()) {
-            levelMap = levelRepository
-                    .findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
-                            tenantId, subjectIds, STATUS_ACTIVE)
-                    .stream()
-                    .collect(Collectors.toMap(Level::getId, Function.identity()));
-        }
-
-        Set<String> userIds = new HashSet<>();
-        for (CalendarBulkRowRequest row : input.rows()) {
-            if (row.mainTeacherIds() != null) userIds.addAll(row.mainTeacherIds());
-            if (row.assistantTeacherIds() != null) userIds.addAll(row.assistantTeacherIds());
-        }
-        Map<String, User> userMap = new HashMap<>();
-        if (!userIds.isEmpty()) {
-            userMap = userRepository.findByTenantIdAndIdIn(tenantId, userIds).stream()
-                    .collect(Collectors.toMap(User::getId, Function.identity()));
-        }
-
-        Set<String> requestedRoomIds = input.rows().stream()
-                .map(CalendarBulkRowRequest::roomId)
-                .filter(roomId -> roomId != null && !roomId.isBlank())
-                .collect(Collectors.toSet());
-        if (!requestedRoomIds.isEmpty()) {
-            Set<String> availableRoomIds = roomRepository
-                    .findByTenantIdAndSchoolIdAndStatus(tenantId, schoolId, STATUS_ACTIVE)
-                    .stream()
-                    .map(CalendarRoom::getId)
-                    .collect(Collectors.toSet());
-            Set<String> unavailableRoomIds = new LinkedHashSet<>(requestedRoomIds);
-            unavailableRoomIds.removeAll(availableRoomIds);
-            if (!unavailableRoomIds.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "Room is not active in the selected tenant/school: " + unavailableRoomIds);
-            }
-        }
-
-        Map<String, EducationUnit> schoolMap = new HashMap<>();
-        if (schoolId != null && !schoolId.isBlank()) {
-            schoolMap = educationUnitRepository.findByIdInOrderByNameAsc(List.of(schoolId)).stream()
-                    .collect(Collectors.toMap(EducationUnit::getId, Function.identity()));
-        }
-
-        return new ReferenceData(classMap, subjectMap, levelMap, userMap, schoolMap);
-    }
 
     private List<CalendarRowResultResponse> buildRowResults(
             List<RowValidationResult> validationResults, CalendarBulkCreateRequest input, ReferenceData refData) {
