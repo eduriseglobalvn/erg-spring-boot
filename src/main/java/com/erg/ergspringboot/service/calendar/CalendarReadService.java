@@ -43,6 +43,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarCatalogQueryUseCase;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarScheduleBatchQueryUseCase;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -73,6 +74,7 @@ public class CalendarReadService {
     private final CalendarBatchRepository batchRepository;
     private final ErgReadTaskExecutor readTaskExecutor;
     private final CalendarCatalogQueryUseCase catalogQueries;
+    private final CalendarScheduleBatchQueryUseCase scheduleBatchQueries;
 
     public CalendarReadService(
             CalendarEventRepository eventRepository,
@@ -98,6 +100,7 @@ public class CalendarReadService {
         this.batchRepository = batchRepository;
         this.readTaskExecutor = readTaskExecutor;
         this.catalogQueries = new CalendarCatalogQueryUseCase(roomRepository);
+        this.scheduleBatchQueries = new CalendarScheduleBatchQueryUseCase(batchRepository, eventRepository);
     }
 
     // -------------------------------------------------------------------------
@@ -333,34 +336,11 @@ public class CalendarReadService {
             String status,
             Integer page,
             Integer size) {
-        int safePage = Math.max(0, page == null ? 0 : page);
-        int safeSize = Math.max(1, Math.min(100, size == null ? 20 : size));
-
-        Page<CalendarBatch> batchPage = batchRepository.findTeachingScheduleBatchPage(
-                tenantId,
-                blankToNull(schoolId),
-                normalizeStatus(status),
-                PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt")));
-
-        List<CalendarBatchSummaryResponse> items = batchPage.getContent().stream()
-                .map(this::toBatchSummary)
-                .toList();
-
-        return new CalendarBatchPageResponse(
-                items, safePage, safeSize, (int) batchPage.getTotalElements(), batchPage.getTotalPages(),
-                batchPage.hasNext(), batchPage.hasPrevious());
+        return scheduleBatchQueries.list(tenantId, schoolId, status, page, size);
     }
 
     public CalendarBatchDetailResponse teachingScheduleBatch(String tenantId, String batchId) {
-        CalendarBatch batch = batchRepository.findByTenantIdAndId(tenantId, batchId)
-                .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
-        int eventCount = (int) eventRepository.countByTenantIdAndBatchId(tenantId, batchId);
-        CalendarBatchSummaryResponse summary = toBatchSummary(batch);
-        return new CalendarBatchDetailResponse(
-                summary.id(), summary.tenantId(), summary.schoolId(), summary.academicYear(),
-                summary.applyFrom(), summary.repeatWeeks(), summary.status(), summary.source(),
-                summary.note(), summary.createdBy(), summary.publishedBy(), summary.publishedAt(),
-                summary.createdAt(), eventCount);
+        return scheduleBatchQueries.detail(tenantId, batchId);
     }
 
     // =========================================================================
