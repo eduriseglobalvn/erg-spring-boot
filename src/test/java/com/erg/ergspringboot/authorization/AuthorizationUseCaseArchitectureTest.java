@@ -27,4 +27,14 @@ class AuthorizationUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java"));
         assertThat(legacy).doesNotContain("protectedRolePolicy.assertRoleDefinitionAllowed(");
     }
+
+    @Test
+    void authorizationAccessQueriesHaveAnInternalUseCase() throws Exception {
+        assertThatCode(() -> Class.forName(
+                "com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase"))
+                .doesNotThrowAnyException();
+        String legacy = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java"));
+        assertThat(legacy).doesNotContain("userRepository.findWithDetailsByIdAndTenantId(");
+    }
 }
