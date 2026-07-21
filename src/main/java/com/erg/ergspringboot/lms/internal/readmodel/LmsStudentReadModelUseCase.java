@@ -16,10 +16,12 @@ public class LmsStudentReadModelUseCase {
     private final LmsAssignmentService assignments;
     private final LmsAttemptService attempts;
     private final LmsStudentService students;
+    private final LmsQuizService quizzes;
 
     public LmsStudentReadModelUseCase(LmsClassroomService classrooms, LmsAssignmentService assignments,
-            LmsAttemptService attempts, LmsStudentService students) {
-        this.classrooms = classrooms; this.assignments = assignments; this.attempts = attempts; this.students = students;
+            LmsAttemptService attempts, LmsStudentService students, LmsQuizService quizzes) {
+        this.classrooms = classrooms; this.assignments = assignments; this.attempts = attempts;
+        this.students = students; this.quizzes = quizzes;
     }
 
     public StudentAssignmentListResponse listAssignments(String studentId, UserAccessContext access) {
@@ -62,6 +64,44 @@ public class LmsStudentReadModelUseCase {
         Map<String, List<AttemptResponse>> recent = attempts.findTop3ByAssignmentsAndStudent(tenant, filtered.stream().map(Assignment::getId).toList(), studentId).stream().map(this::attempt).collect(java.util.stream.Collectors.groupingBy(AttemptResponse::assignmentId));
         List<StudentScoreItem> result = filtered.stream().map(a -> { List<AttemptResponse> items = recent.getOrDefault(a.getId(), List.of()); double best = items.stream().mapToDouble(AttemptResponse::score).max().orElse(0); return new StudentScoreItem(assignment(a), best, items); }).toList();
         return new StudentScoreListResponse(result, source.getNumber(), source.getSize(), source.getTotalElements(), source.getTotalPages(), source.hasNext());
+    }
+
+    public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) {
+        Assignment assignment = assignments.findById(assignmentId)
+                .filter(item -> tenant(access.tenantId()).equals(tenant(item.getTenantId())))
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("assignment not found"));
+        ensureClassAccess(assignment.getAcademicClassId(), access);
+        List<Attempt> source = attempts.findByAssignment(tenant(access.tenantId()), assignmentId);
+        long submitted = source.stream().filter(item -> "submitted".equalsIgnoreCase(item.getStatus())).count();
+        long inProgress = source.stream().filter(item -> "in_progress".equalsIgnoreCase(item.getStatus())).count();
+        int recipients = assignment.getStudentIds() == null ? 0 : assignment.getStudentIds().size();
+        return new AssignmentProgressResponse((int) submitted, (int) inProgress,
+                Math.max(0, recipients - (int) submitted - (int) inProgress), 0);
+    }
+
+    public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) {
+        quizzes.findById(quizId).filter(item -> tenant(access.tenantId()).equals(tenant(item.getTenantId())))
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
+        String tenant = tenant(access.tenantId());
+        List<Attempt> source = attempts.findByQuiz(tenant, quizId);
+        Map<String, Assignment> byId = assignments.findByTenantIdAndIdIn(tenant,
+                        source.stream().map(Attempt::getAssignmentId).filter(Objects::nonNull).distinct().toList())
+                .stream().collect(java.util.stream.Collectors.toMap(Assignment::getId, item -> item, (a,b) -> a));
+        Map<String, Classroom> classes = classrooms(tenant, new ArrayList<>(byId.values()));
+        return source.stream().filter(item -> {
+            Assignment assignment = byId.get(item.getAssignmentId());
+            return assignment != null && allowed(assignment.getAcademicClassId(), access, classes);
+        }).map(this::attempt).toList();
+    }
+
+    private void ensureClassAccess(String classId, UserAccessContext access) {
+        if (classId == null || classId.isBlank()) return;
+        Classroom classroom = classrooms.findById(classId)
+                .filter(item -> tenant(access.tenantId()).equals(tenant(item.getTenantId())))
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("class not found"));
+        if (!access.canAccessClass(classId) || !access.canAccessEducationUnit(classroom.getSchoolId()))
+            throw new com.erg.ergspringboot.exception.ForbiddenException(
+                    "You can only access LMS data in managed centers/classes");
     }
 
     private boolean assigned(Assignment a, String student, Optional<String> classId) { if (a.getStudentIds() != null && !a.getStudentIds().isEmpty()) return a.getStudentIds().contains(student); return classId.map(id -> Objects.equals(id, a.getAcademicClassId())).orElse(true); }

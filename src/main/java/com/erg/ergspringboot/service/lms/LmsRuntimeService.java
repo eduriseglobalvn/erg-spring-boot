@@ -108,7 +108,8 @@ public class LmsRuntimeService {
                 runtimePackageService, attemptGradingService, attemptEventRecorder, cacheManager);
         this.classroomQueries = new LmsClassroomQueryUseCase(classroomService);
         this.resourceQueries = new LmsResourceQueryUseCase(quizService, runtimePackageService);
-        this.studentReadModel = new LmsStudentReadModelUseCase(classroomService, assignmentService, attemptService, studentService);
+        this.studentReadModel = new LmsStudentReadModelUseCase(
+                classroomService, assignmentService, attemptService, studentService, quizService);
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access) {
@@ -362,33 +363,11 @@ public class LmsRuntimeService {
     }
 
     public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) {
-        Assignment assignment = assignment(assignmentId, normalizeTenant(access.tenantId()));
-        ensureClassAccess(assignment.getAcademicClassId(), access);
-        List<Attempt> attempts = attemptService.findByAssignment(normalizeTenant(access.tenantId()), assignmentId);
-        long submitted = attempts.stream().filter(attempt -> "submitted".equalsIgnoreCase(attempt.getStatus())).count();
-        long inProgress = attempts.stream().filter(attempt -> "in_progress".equalsIgnoreCase(attempt.getStatus())).count();
-        int recipientCount = assignment.getStudentIds() == null ? 0 : assignment.getStudentIds().size();
-        return new AssignmentProgressResponse((int) submitted, (int) inProgress, Math.max(0, recipientCount - (int) submitted - (int) inProgress), 0);
+        return studentReadModel.assignmentProgress(assignmentId, access);
     }
 
     public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) {
-        quiz(quizId, access);
-        String tenantId = normalizeTenant(access.tenantId());
-        List<Attempt> attempts = attemptService.findByQuiz(tenantId, quizId);
-        Map<String, Assignment> assignmentsById = assignmentService.findByTenantIdAndIdIn(
-                        tenantId,
-                        attempts.stream().map(Attempt::getAssignmentId).filter(Objects::nonNull).distinct().toList())
-                .stream()
-                .collect(java.util.stream.Collectors.toMap(Assignment::getId, item -> item, (left, right) -> left));
-        Map<String, Classroom> classroomsById = classroomsById(tenantId, new java.util.ArrayList<>(assignmentsById.values()));
-        return attempts.stream()
-                .filter(attempt -> {
-                    Assignment assignment = assignmentsById.get(attempt.getAssignmentId());
-                    return assignment != null
-                            && classAllowed(assignment.getAcademicClassId(), access, classroomsById);
-                })
-                .map(this::toAttemptResponse)
-                .toList();
+        return studentReadModel.quizStudents(quizId, access);
     }
 
     public EducationUnitListResponse listEducationUnits(UserAccessContext access) {
