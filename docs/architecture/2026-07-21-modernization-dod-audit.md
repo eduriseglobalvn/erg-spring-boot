@@ -17,6 +17,7 @@
 - Calendar read-model permission mapping and event DTO assembly now have internal owners (`CalendarPermissionsQueryUseCase` and `CalendarEventResponseAssembler`). Existing package-private compatibility methods delegate to them so the established characterization suite remains unchanged. Focused read-model/Scenario tests and full `mvn verify` pass after the extraction.
 - Calendar workspace filter-option and lane-summary projection is now owned by `CalendarWorkspaceAssembler`, shared by LCMS, teacher and student workspaces. Compatibility methods delegate to the assembler, reducing `CalendarReadService` to 687 lines while preserving the direct helper characterization tests. Full verification remains green.
 - LCMS, teacher and student workspace orchestration is now owned by `CalendarWorkspaceQueryUseCase`, including bounds validation, repository filtering, assignment batching and composition through transaction-bound callbacks. Public cache annotations remain on `CalendarReadService`; its method bodies are compatibility delegations and the service is reduced to 444 lines. Focused read/cache/Scenario tests and full verification remain green.
+- Calendar event-detail orchestration and batch reference loading now have internal owners (`CalendarEventDetailQueryUseCase` and `CalendarReferenceMapsQueryUseCase`). Workspace callbacks and event detail share the same reference loader; the compatibility service is reduced to 413 lines. Focused read/Scenario tests and full verification remain green.
 
 ## Evidence that remains open
 

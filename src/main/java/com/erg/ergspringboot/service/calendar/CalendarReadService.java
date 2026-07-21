@@ -48,6 +48,8 @@ import com.erg.ergspringboot.calendar.internal.readmodel.CalendarPermissionsQuer
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarEventResponseAssembler;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarWorkspaceAssembler;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarWorkspaceQueryUseCase;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarReferenceMapsQueryUseCase;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarEventDetailQueryUseCase;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -83,6 +85,8 @@ public class CalendarReadService {
     private final CalendarEventResponseAssembler eventResponses;
     private final CalendarWorkspaceAssembler workspaceAssembler;
     private final CalendarWorkspaceQueryUseCase workspaceQueries;
+    private final CalendarReferenceMapsQueryUseCase referenceQueries;
+    private final CalendarEventDetailQueryUseCase eventDetails;
 
     public CalendarReadService(
             CalendarEventRepository eventRepository,
@@ -112,6 +116,11 @@ public class CalendarReadService {
         this.permissionQueries = new CalendarPermissionsQueryUseCase();
         this.eventResponses = new CalendarEventResponseAssembler();
         this.workspaceAssembler = new CalendarWorkspaceAssembler();
+        this.referenceQueries = new CalendarReferenceMapsQueryUseCase(
+                educationUnitRepository, classroomRepository, subjectRepository,
+                levelRepository, userRepository);
+        this.eventDetails = new CalendarEventDetailQueryUseCase(
+                eventRepository, eventTeacherRepository, referenceQueries, eventResponses);
         this.workspaceQueries = new CalendarWorkspaceQueryUseCase(
                 eventRepository, eventTeacherRepository, studentRepository,
                 this::buildReferenceMaps,
@@ -127,13 +136,7 @@ public class CalendarReadService {
     // -------------------------------------------------------------------------
 
     public CalendarEventResponse eventDetail(String tenantId, String eventId) {
-        CalendarEvent event = eventRepository.findByTenantIdAndId(tenantId, eventId)
-                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("Calendar event not found."));
-        List<CalendarEventTeacher> teachers = eventTeacherRepository
-                .findByTenantIdAndEventIdIn(tenantId, List.of(eventId));
-        ReferenceMaps references = buildReferenceMaps(
-                tenantId, List.of(event.getSchoolId()), List.of(event), teachers);
-        return buildEventResponse(event, teachers, references);
+        return eventDetails.detail(tenantId, eventId);
     }
 
     public List<CalendarRoomOptionResponse> activeRooms(String tenantId, String schoolId) {
@@ -353,41 +356,7 @@ public class CalendarReadService {
             List<String> schoolIds,
             List<CalendarEvent> events,
             List<CalendarEventTeacher> teacherAssignments) {
-        Set<String> schoolIdSet = new HashSet<>();
-        Set<String> classIdSet = new HashSet<>();
-        Set<String> subjectIdSet = new HashSet<>();
-        Set<String> levelIdSet = new HashSet<>();
-        Set<String> userIdSet = new HashSet<>();
-
-        for (CalendarEvent event : events) {
-            if (event.getSchoolId() != null) schoolIdSet.add(event.getSchoolId());
-            if (event.getAcademicClassId() != null) classIdSet.add(event.getAcademicClassId());
-            if (event.getSubjectId() != null) subjectIdSet.add(event.getSubjectId());
-            if (event.getLevelId() != null) levelIdSet.add(event.getLevelId());
-        }
-        for (CalendarEventTeacher assignment : teacherAssignments == null ? List.<CalendarEventTeacher>of() : teacherAssignments) {
-            if (assignment.getTeacherUserId() != null) userIdSet.add(assignment.getTeacherUserId());
-        }
-
-        List<String> allSchoolIds = new ArrayList<>(schoolIdSet);
-        if (schoolIds != null) {
-            for (String sid : schoolIds) {
-                if (!schoolIdSet.contains(sid)) allSchoolIds.add(sid);
-            }
-        }
-
-        return new ReferenceMaps(
-                allSchoolIds.isEmpty() ? Map.of() : educationUnitRepository.findByIdInOrderByNameAsc(allSchoolIds).stream()
-                        .collect(Collectors.toMap(EducationUnit::getId, Function.identity())),
-                classIdSet.isEmpty() ? Map.of() : classroomRepository.findAllById(classIdSet).stream()
-                        .collect(Collectors.toMap(Classroom::getId, Function.identity())),
-                subjectIdSet.isEmpty() ? Map.of() : subjectRepository.findAllById(subjectIdSet).stream()
-                        .collect(Collectors.toMap(Subject::getId, Function.identity())),
-                levelIdSet.isEmpty() ? Map.of() : levelRepository.findAllById(levelIdSet).stream()
-                        .collect(Collectors.toMap(Level::getId, Function.identity())),
-                userIdSet.isEmpty() ? Map.of() : userRepository.findAllById(userIdSet).stream()
-                        .collect(Collectors.toMap(User::getId, Function.identity())),
-                Map.of());
+        return referenceQueries.load(tenantId, schoolIds, events, teacherAssignments);
     }
 
     private List<User> findTeachersForCatalog(String tenantId, List<String> schoolIds) {
