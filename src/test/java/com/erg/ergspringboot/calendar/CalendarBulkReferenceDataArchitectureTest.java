@@ -15,10 +15,13 @@ class CalendarBulkReferenceDataArchitectureTest {
                 "com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkReferenceDataUseCase"))
                 .doesNotThrowAnyException();
 
-        String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarCommandService.java"));
-        assertThat(facade)
-                .contains("bulkReferenceData.load(")
+        String preview = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/calendar/internal/bulk/CalendarBulkPreviewUseCase.java"));
+        String create = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/calendar/internal/bulk/CalendarBulkCreateUseCase.java"));
+        assertThat(preview).contains("references.load(");
+        assertThat(create).contains("referenceData.load(");
+        assertThat(preview + create)
                 .doesNotContain("findByTenantIdAndSchoolIdOrderByNameAsc(tenantId, schoolId)")
                 .doesNotContain("findTop500ByTenantIdAndStatusIgnoreCaseOrderByNameAsc(tenantId");
     }
