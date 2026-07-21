@@ -5,6 +5,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
+import org.springframework.context.event.ApplicationListenerMethodAdapter;
 
 class ModuleNativeRuntimeHintsTest {
     @Test
@@ -30,5 +33,14 @@ class ModuleNativeRuntimeHintsTest {
         assertThat(hints)
                 .contains("com.tngtech.archunit.core.importer.ModuleImportPlugin")
                 .contains("INVOKE_PUBLIC_CONSTRUCTORS");
+    }
+
+    @Test
+    void modulithEventMulticasterCanInspectTransactionalListenerMethodsInNativeImage() throws Exception {
+        RuntimeHints hints = new RuntimeHints();
+        new ModulithNativeRuntimeHints().registerHints(hints, getClass().getClassLoader());
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                ApplicationListenerMethodAdapter.class.getMethod("getTargetMethod")).test(hints)).isTrue();
     }
 }

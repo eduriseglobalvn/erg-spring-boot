@@ -518,6 +518,30 @@ SELECT format('seed-activity-%s', lpad(n::text, 7, '0')),
 FROM generate_series(1, 1000000) AS g(n)
 ON CONFLICT (id) DO NOTHING;
 
+-- Durable Modulith event benchmark commands. Each publish must hit a fresh DRAFT
+-- batch; reusing one batch would measure only the idempotent 409 path.
+INSERT INTO teaching_schedule_batches
+    (id, tenant_id, school_id, academic_year, apply_from, repeat_weeks, status,
+     source, note, created_by, created_at, updated_at)
+SELECT format('load-batch-%s', lpad(n::text, 6, '0')), 'seed-tenant-01',
+       'seed-school-01', '2026', DATE '2026-08-15', 1, 'DRAFT',
+       'LOAD_BENCHMARK', 'modulith event benchmark', 'seed-admin-00001', now(), now()
+FROM generate_series(1, 20000) AS g(n)
+ON CONFLICT (id) DO UPDATE SET status = 'DRAFT', published_by = NULL,
+    published_at = NULL, updated_at = now();
+
+INSERT INTO teaching_schedule_events
+    (id, tenant_id, batch_id, school_id, academic_class_id, subject_id,
+     title, start_at, end_at, weekday, session, period_start, period_count,
+     status, created_by, updated_by, created_at, updated_at)
+SELECT format('load-batch-event-%s', lpad(n::text, 6, '0')), 'seed-tenant-01',
+       format('load-batch-%s', lpad(n::text, 6, '0')), 'seed-school-01',
+       'seed-class-0001', 'seed-lsub-01-1', 'load event',
+       timestamptz '2026-08-17 08:00:00+07', timestamptz '2026-08-17 09:00:00+07',
+       1, 'MORNING', 1, 1, 'DRAFT', 'seed-admin-00001', 'seed-admin-00001', now(), now()
+FROM generate_series(1, 20000) AS g(n)
+ON CONFLICT (id) DO UPDATE SET status = 'DRAFT', updated_by = 'seed-admin-00001', updated_at = now();
+
 COMMIT;
 
 \echo 'Local benchmark fixture counts:'
@@ -536,5 +560,6 @@ UNION ALL SELECT 'load_sessions', count(*) FROM user_sessions WHERE id LIKE 'loa
 UNION ALL SELECT 'burst_attempts', count(*) FROM lms_attempts WHERE id LIKE 'load-attempt-%'
 UNION ALL SELECT 'learning_resources', count(*) FROM content_items WHERE id LIKE 'seed-content-%'
 UNION ALL SELECT 'calendar_events', count(*) FROM teaching_schedule_events WHERE id LIKE 'seed-cal-%'
+UNION ALL SELECT 'event_benchmark_batches', count(*) FROM teaching_schedule_batches WHERE id LIKE 'load-batch-%'
 UNION ALL SELECT 'activities', count(*) FROM user_activities WHERE id LIKE 'seed-activity-%'
 ORDER BY entity;
