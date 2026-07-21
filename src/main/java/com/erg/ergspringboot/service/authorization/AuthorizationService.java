@@ -36,6 +36,7 @@ import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentReposito
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
 import com.erg.ergspringboot.service.users.UserService.AuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
+import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
@@ -63,6 +64,7 @@ public class AuthorizationService {
     private PermissionBindingRepository permissionBindingRepository;
     private UserRoleAssignmentRepository userRoleAssignmentRepository;
     private AuthorizationMutationAuditService mutationAuditService;
+    private final AuthorizationPermissionCatalogUseCase permissionCatalog;
 
     public AuthorizationService(
             RoleRepository roleRepository,
@@ -74,16 +76,20 @@ public class AuthorizationService {
         this.permissionRepository = permissionRepository;
         this.overrideRepository = overrideRepository;
         this.userRepository = userRepository;
+        this.permissionCatalog = new AuthorizationPermissionCatalogUseCase(
+                permissionRepository, roleRepository, overrideRepository);
     }
 
     @Autowired(required = false)
     void setPermissionGroupRepository(PermissionGroupRepository permissionGroupRepository) {
         this.permissionGroupRepository = permissionGroupRepository;
+        this.permissionCatalog.setPermissionGroupRepository(permissionGroupRepository);
     }
 
     @Autowired(required = false)
     void setPermissionBindingRepository(PermissionBindingRepository permissionBindingRepository) {
         this.permissionBindingRepository = permissionBindingRepository;
+        this.permissionCatalog.setPermissionBindingRepository(permissionBindingRepository);
     }
 
     @Autowired(required = false)
@@ -215,7 +221,7 @@ public class AuthorizationService {
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = "authorizationPermissions", key = "'all'")
     public List<PermissionResponse> listPermissions() {
-        return permissionResponses(permissionRepository.findTop500ByOrderByNameAsc());
+        return permissionCatalog.list();
     }
 
     @Transactional(readOnly = true)
@@ -228,68 +234,18 @@ public class AuthorizationService {
             String status,
             Boolean used
     ) {
-        int safePage = page == null ? 0 : Math.max(0, page);
-        int safeLimit = limit == null ? 25 : Math.max(1, Math.min(100, limit));
-        Page<Permission> result = permissionRepository.searchCatalog(
-                trimToNull(search),
-                trimToNull(group),
-                trimToNull(portal),
-                trimToNull(status),
-                used,
-                PageRequest.of(safePage, safeLimit, Sort.by(Sort.Direction.ASC, "name"))
-        );
-        return new PermissionPageResponse(
-                permissionResponses(result.getContent()),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements(),
-                result.getTotalPages()
-        );
+        return permissionCatalog.search(page, limit, search, group, portal, status, used);
     }
 
     @Transactional(readOnly = true)
     public PermissionResponse getPermission(String permissionId) {
-        Permission permission = permissionRepository.findById(permissionId)
-                .orElseGet(() -> permissionRepository.findByNameInIgnoreCase(List.of(permissionId)).stream()
-                        .findFirst()
-                        .orElseThrow(() -> new ResourceNotFoundException("permission not found")));
-        return permissionResponses(List.of(permission)).getFirst();
+        return permissionCatalog.get(permissionId);
     }
 
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = "authorizationPermissions", key = "'groups'")
     public List<PermissionGroupResponse> listPermissionGroups() {
-        if (permissionGroupRepository == null) {
-            throw new IllegalStateException("permission group repository is not configured");
-        }
-        List<PermissionGroup> groups = permissionGroupRepository.findAllByOrderByOrderAscNameAsc();
-        Map<String, List<Permission>> permissionsByGroup = permissionRepository
-                .findByGroupNameInOrderByGroupNameAscNameAsc(groups.stream().map(PermissionGroup::getName).toList())
-                .stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        Permission::getGroupName,
-                        java.util.LinkedHashMap::new,
-                        java.util.stream.Collectors.toList()));
-        Map<String, PermissionResponse> responsesByPermissionId = permissionResponses(
-                        permissionsByGroup.values().stream().flatMap(List::stream).toList())
-                .stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        PermissionResponse::id,
-                        response -> response,
-                        (left, right) -> left,
-                        java.util.LinkedHashMap::new));
-        return groups.stream()
-                .map(group -> new PermissionGroupResponse(
-                        group.getId(),
-                        group.getName(),
-                        group.getLabel(),
-                        group.getOrder() == null ? 0 : group.getOrder(),
-                        permissionsByGroup.getOrDefault(group.getName(), List.of()).stream()
-                                .map(permission -> responsesByPermissionId.get(permission.getId()))
-                                .filter(java.util.Objects::nonNull)
-                                .toList()
-                ))
-                .toList();
+        return permissionCatalog.groups();
     }
 
     @Transactional
