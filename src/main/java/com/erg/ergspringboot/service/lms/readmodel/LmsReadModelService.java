@@ -66,6 +66,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.erg.ergspringboot.lms.internal.readmodel.LmsStudentGroupReadUseCase;
 
 @Service
 @Transactional(readOnly = true)
@@ -79,6 +80,7 @@ public class LmsReadModelService {
     private final StudentGroupRepository studentGroupRepository;
     private final StudentGroupMemberRepository studentGroupMemberRepository;
     private final ErgReadTaskExecutor readTaskExecutor;
+    private final LmsStudentGroupReadUseCase studentGroupRead;
 
     public LmsReadModelService(
             AssignmentRepository assignmentRepository,
@@ -98,6 +100,8 @@ public class LmsReadModelService {
         this.studentGroupRepository = studentGroupRepository;
         this.studentGroupMemberRepository = studentGroupMemberRepository;
         this.readTaskExecutor = readTaskExecutor;
+        this.studentGroupRead = new LmsStudentGroupReadUseCase(
+                studentGroupRepository, studentGroupMemberRepository);
     }
 
     public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) {
@@ -115,7 +119,8 @@ public class LmsReadModelService {
             Collection<String> allowedClassIds,
             String ownerUserId
     ) {
-        String normalizedTenantId = requireText(tenantId, "tenantId");
+        return studentGroupRead.query(tenantId, classId, allowedClassIds, ownerUserId);
+        /* String normalizedTenantId = requireText(tenantId, "tenantId");
         String normalizedClassId = blankToNull(classId);
         Set<String> normalizedAllowedClassIds = normalizeIds(allowedClassIds);
         String normalizedOwnerUserId = blankToNull(ownerUserId);
@@ -163,7 +168,7 @@ public class LmsReadModelService {
                 groups.stream()
                         .map(group -> toStudentGroup(group, studentIdsByGroupId.getOrDefault(group.getId(), List.of())))
                         .toList()
-        );
+        ); */
     }
 
     @Cacheable(
