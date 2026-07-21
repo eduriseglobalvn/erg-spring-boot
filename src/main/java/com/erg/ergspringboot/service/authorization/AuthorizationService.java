@@ -38,6 +38,7 @@ import com.erg.ergspringboot.service.users.UserService.AuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
 import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
+import com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
@@ -67,6 +68,7 @@ public class AuthorizationService {
     private AuthorizationMutationAuditService mutationAuditService;
     private final AuthorizationPermissionCatalogUseCase permissionCatalog;
     private final AuthorizationRoleDefinitionUseCase roleDefinitions;
+    private final AuthorizationAccessQueryUseCase accessQueries;
 
     public AuthorizationService(
             RoleRepository roleRepository,
@@ -81,6 +83,7 @@ public class AuthorizationService {
         this.permissionCatalog = new AuthorizationPermissionCatalogUseCase(
                 permissionRepository, roleRepository, overrideRepository);
         this.roleDefinitions = new AuthorizationRoleDefinitionUseCase(roleRepository, permissionRepository);
+        this.accessQueries = new AuthorizationAccessQueryUseCase(userRepository, overrideRepository);
     }
 
     @Autowired(required = false)
@@ -378,8 +381,7 @@ public class AuthorizationService {
 
     @Transactional(readOnly = true)
     public List<PermissionOverrideResponse> listPermissionOverrides(String userId, String tenantId) {
-        scopedUser(userId, tenantId);
-        return overrideRepository.findByUserId(userId).stream().map(this::toOverrideResponse).toList();
+        return accessQueries.listOverrides(userId, tenantId);
     }
 
     @Transactional(readOnly = true)
@@ -389,27 +391,7 @@ public class AuthorizationService {
 
     @Transactional(readOnly = true)
     public EffectivePermissionsResponse effectivePermissions(String userId, String tenantId) {
-        User user = userRepository.findWithDetailsByIdAndTenantId(userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
-        List<String> rolePermissions = user.getRoles() == null ? List.of() : user.getRoles().stream()
-                .flatMap(role -> role.getPermissions().stream())
-                .map(Permission::getName)
-                .distinct()
-                .toList();
-        List<UserPermissionOverride> overrides = overrideRepository.findByUserId(userId);
-        List<String> grants = overrides.stream()
-                .filter(item -> "GRANT".equalsIgnoreCase(item.getGrantType()))
-                .map(UserPermissionOverride::getPermission)
-                .toList();
-        List<String> denies = overrides.stream()
-                .filter(item -> "DENY".equalsIgnoreCase(item.getGrantType()))
-                .map(UserPermissionOverride::getPermission)
-                .toList();
-        List<String> effective = java.util.stream.Stream.concat(rolePermissions.stream(), grants.stream())
-                .filter(permission -> denies.stream().noneMatch(permission::equalsIgnoreCase))
-                .distinct()
-                .toList();
-        return new EffectivePermissionsResponse(userId, rolePermissions, grants, denies, effective);
+        return accessQueries.effective(userId, tenantId);
     }
 
     @Transactional(readOnly = true)
@@ -419,18 +401,7 @@ public class AuthorizationService {
 
     @Transactional(readOnly = true)
     public FeatureConfigResponse featureConfig(String userId, String tenantId) {
-        EffectivePermissionsResponse permissions = effectivePermissions(userId, tenantId);
-        User user = userRepository.findWithDetailsByIdAndTenantId(userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
-        List<String> roles = user.getRoles() == null ? List.of() : user.getRoles().stream().map(Role::getName).toList();
-        FeatureAccessResponse access = new FeatureAccessResponse(
-                permissions.effectivePermissions(),
-                permissions.effectivePermissions(),
-                permissions.effectivePermissions()
-        );
-        Map<String, Boolean> features = permissions.effectivePermissions().stream()
-                .collect(java.util.stream.Collectors.toMap(item -> item, item -> true, (a, b) -> a));
-        return new FeatureConfigResponse(userId, permissions.effectivePermissions(), features, access, roles);
+        return accessQueries.feature(userId, tenantId);
     }
 
     @Transactional(readOnly = true)
@@ -440,21 +411,7 @@ public class AuthorizationService {
 
     @Transactional(readOnly = true)
     public PreviewChangesResponse previewChanges(String userId, PreviewChangesRequest request, String tenantId) {
-        EffectivePermissionsResponse current = effectivePermissions(userId, tenantId);
-        List<String> simulated = new java.util.ArrayList<>(current.effectivePermissions());
-        Object grant = request.changes() == null ? null : request.changes().get("grant");
-        if (grant instanceof String permission && !permission.isBlank()) {
-            simulated.add(permission);
-        }
-        Object deny = request.changes() == null ? null : request.changes().get("deny");
-        if (deny instanceof String permission && !permission.isBlank()) {
-            simulated.removeIf(item -> item.equalsIgnoreCase(permission));
-        }
-        return new PreviewChangesResponse(
-                current.effectivePermissions(),
-                request.changes() == null ? Map.of() : request.changes(),
-                simulated.stream().distinct().toList()
-        );
+        return accessQueries.preview(userId, request, tenantId);
     }
 
     private LinkedHashSet<Permission> resolvePermissions(List<String> names) {
