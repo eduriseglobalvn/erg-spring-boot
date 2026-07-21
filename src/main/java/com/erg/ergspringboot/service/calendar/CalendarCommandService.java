@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
 import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkReferenceDataUseCase;
+import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkPreviewUseCase;
 import com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase;
 import com.erg.ergspringboot.calendar.internal.room.CalendarRoomCommandUseCase;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
@@ -95,6 +96,7 @@ public class CalendarCommandService {
     private final CalendarEventMutationUseCase eventMutations;
     private final CalendarRoomCommandUseCase roomCommands;
     private final CalendarBulkReferenceDataUseCase bulkReferenceData;
+    private final CalendarBulkPreviewUseCase bulkPreview;
 
     /** Compatibility constructor retained for legacy tests and callers. */
     public CalendarCommandService(
@@ -124,7 +126,13 @@ public class CalendarCommandService {
                 new CalendarRoomCommandUseCase(roomRepository),
                 new CalendarBulkReferenceDataUseCase(
                         classroomRepository, subjectRepository, levelRepository,
-                        userRepository, roomRepository, educationUnitRepository));
+                        userRepository, roomRepository, educationUnitRepository),
+                new CalendarBulkPreviewUseCase(
+                        inputNormalizer,
+                        new CalendarBulkReferenceDataUseCase(
+                                classroomRepository, subjectRepository, levelRepository,
+                                userRepository, roomRepository, educationUnitRepository),
+                        validationService, expansionService, conflictService));
     }
 
     @Autowired
@@ -147,7 +155,8 @@ public class CalendarCommandService {
             CalendarBatchLifecycleUseCase batchLifecycle,
             CalendarEventMutationUseCase eventMutations,
             CalendarRoomCommandUseCase roomCommands,
-            CalendarBulkReferenceDataUseCase bulkReferenceData) {
+            CalendarBulkReferenceDataUseCase bulkReferenceData,
+            CalendarBulkPreviewUseCase bulkPreview) {
         this.batchRepository = batchRepository;
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
@@ -167,64 +176,12 @@ public class CalendarCommandService {
         this.eventMutations = eventMutations;
         this.roomCommands = roomCommands;
         this.bulkReferenceData = bulkReferenceData;
+        this.bulkPreview = bulkPreview;
     }
 
-    @Transactional("postgresTransactionManager")
     public CalendarPreviewPayload preview(
             String tenantId, CalendarBulkCreateRequest input, String userId) {
-        input = inputNormalizer.normalize(input);
-        ReferenceData refData = bulkReferenceData.load(tenantId, input.schoolId(), input);
-        List<RowValidationResult> validationResults = validationService.validateRows(input, refData);
-        boolean allValid = validationResults.stream().allMatch(RowValidationResult::valid);
-
-        LocalDate applyFrom = LocalDate.parse(input.applyFrom());
-        String previewBatchId = "preview_" + IdGenerator.newId();
-
-        int totalPreviewEventCount = 0;
-        int totalTeacherScheduleCount = 0;
-        int totalPeriodCount = 0;
-        List<CalendarRowResultResponse> rowResults = new ArrayList<>();
-        List<CalendarEvent> allEvents = new ArrayList<>();
-        List<CalendarEventTeacher> allAssignments = new ArrayList<>();
-        Map<String, String> clientRowIdByEventId = new HashMap<>();
-
-        for (int i = 0; i < input.rows().size(); i++) {
-            CalendarBulkRowRequest row = input.rows().get(i);
-            RowValidationResult rowValidation = validationResults.get(i);
-
-            if (!rowValidation.valid()) {
-                rowResults.add(new CalendarRowResultResponse(
-                        row.clientRowId(), false, 0, 0, rowValidation.errors(), rowValidation.warnings()));
-                continue;
-            }
-
-            ExpansionResult expansion = expansionService.expand(
-                    row, previewBatchId, tenantId, input.schoolId(), userId,
-                    applyFrom, input.repeatWeeks(), refData);
-
-            allEvents.addAll(expansion.events());
-            allAssignments.addAll(expansion.assignments());
-            clientRowIdByEventId.putAll(expansion.clientRowIdByEventId());
-
-            totalPreviewEventCount += expansion.events().size();
-            totalTeacherScheduleCount += expansion.assignments().size();
-            totalPeriodCount += expansion.events().size() * row.periodCount();
-
-            rowResults.add(new CalendarRowResultResponse(
-                    row.clientRowId(), true, expansion.events().size(), expansion.assignments().size(),
-                    List.of(), rowValidation.warnings()));
-        }
-
-        List<CalendarConflictResponse> conflicts = Collections.emptyList();
-        if (allValid && !allEvents.isEmpty()) {
-            conflicts = conflictService.detectConflicts(
-                    tenantId, allEvents, allAssignments, clientRowIdByEventId);
-        }
-
-        boolean previewValid = allValid && conflicts.stream().noneMatch(c -> "ERROR".equals(c.severity()));
-
-        return new CalendarPreviewPayload(previewValid, totalPreviewEventCount,
-                totalTeacherScheduleCount, totalPeriodCount, rowResults, conflicts);
+        return bulkPreview.preview(tenantId, input, userId);
     }
 
     @Transactional("postgresTransactionManager")
