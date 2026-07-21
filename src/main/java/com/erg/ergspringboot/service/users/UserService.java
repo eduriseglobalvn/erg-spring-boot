@@ -1,618 +1,87 @@
 package com.erg.ergspringboot.service.users;
 
-import com.erg.ergspringboot.common.request.users.UserRequests.OnboardingRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.AdminAssignPermissionsRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.AdminAssignRolesRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.AdminUpdateUserStatusRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.BulkDeleteRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.BulkStatusRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.ChangePasswordRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.ListUsersQuery;
-import com.erg.ergspringboot.common.request.users.UserRequests.UpdateProfileRequest;
-import com.erg.ergspringboot.common.response.users.UserResponses.OnboardingResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.ActivityListResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.ActivityResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.Meta;
-import com.erg.ergspringboot.common.response.users.UserResponses.PermissionOverrideResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.RevokeSessionResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.SessionListResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.SessionResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.UserDetailResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.UserItemResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.UserListResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.ProvisionedUserResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.PasswordChangeResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.CredentialDeliveryResponse;
-import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.exception.ConflictException;
-import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
-import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.model.organization.UserAccessScope;
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.model.users.UserActivity;
+import com.erg.ergspringboot.common.request.users.UserRequests.*;
+import com.erg.ergspringboot.common.response.users.UserResponses.*;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.auth.user.projection.UserListItemProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserRoleNameProjection;
-import com.erg.ergspringboot.repository.authorization.PermissionRepository;
-import com.erg.ergspringboot.repository.authorization.RoleRepository;
-import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
-import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.repository.authorization.*;
 import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
+import com.erg.ergspringboot.repository.users.UserActivityRepository;
 import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
-import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
 import com.erg.ergspringboot.users.UserAuditContext;
-import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
-import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
-import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
 import com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase;
+import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
+import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
+import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
 import com.erg.ergspringboot.users.internal.roleassignment.UserRoleAssignmentUseCase;
-import com.erg.ergspringboot.utils.IdGenerator;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+/** Compatibility facade; user behavior is owned by internal use cases. */
 @Service
 public class UserService {
+    private static final String DEFAULT_TENANT="erg";
+    private final UserQueryUseCase queries; private final UserProfileUseCase profiles;
+    private final UserPasswordUseCase passwords; private final UserSessionUseCase sessions;
+    private final UserProvisioningUseCase provisioning; private final UserLifecycleUseCase lifecycle;
+    private final UserRoleAssignmentUseCase roles;
 
-    private static final String DEFAULT_TENANT = "erg";
+    @Autowired
+    public UserService(UserQueryUseCase queries,UserProfileUseCase profiles,UserPasswordUseCase passwords,
+            UserSessionUseCase sessions,UserProvisioningUseCase provisioning,UserLifecycleUseCase lifecycle,
+            UserRoleAssignmentUseCase roles){this.queries=queries;this.profiles=profiles;this.passwords=passwords;this.sessions=sessions;this.provisioning=provisioning;this.lifecycle=lifecycle;this.roles=roles;}
 
-    private final UserRepository userRepository;
-    private final AuthSessionRepository sessionRepository;
-    private final RoleRepository roleRepository;
-    private final PermissionRepository permissionRepository;
-    private final UserPermissionOverrideRepository permissionOverrideRepository;
-    private final UserActivityRepository userActivityRepository;
-    private final PasswordService passwordService;
-    private final UserAccessScopeRepository userAccessScopeRepository;
-    private final AccountMailSender accountMailSender;
-    private final UserQueryUseCase userQueryUseCase;
-    private final UserProfileUseCase userProfileUseCase;
-    private final UserPasswordUseCase userPasswordUseCase;
-    private final UserSessionUseCase userSessionUseCase;
-    private final UserProvisioningUseCase userProvisioningUseCase;
-    private final UserLifecycleUseCase userLifecycleUseCase;
-    private final UserRoleAssignmentUseCase userRoleAssignmentUseCase;
-    private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
-    private AuthorizationMutationAuditService authorizationMutationAuditService;
-
-    public UserService(
-            UserRepository userRepository,
-            AuthSessionRepository sessionRepository,
-            RoleRepository roleRepository,
-            PermissionRepository permissionRepository,
-            UserPermissionOverrideRepository permissionOverrideRepository,
-            UserActivityRepository userActivityRepository,
-            PasswordService passwordService,
-            UserAccessScopeRepository userAccessScopeRepository,
-            AccountMailSender accountMailSender
-    ) {
-        this.userRepository = userRepository;
-        this.sessionRepository = sessionRepository;
-        this.roleRepository = roleRepository;
-        this.permissionRepository = permissionRepository;
-        this.permissionOverrideRepository = permissionOverrideRepository;
-        this.userActivityRepository = userActivityRepository;
-        this.passwordService = passwordService;
-        this.userAccessScopeRepository = userAccessScopeRepository;
-        this.accountMailSender = accountMailSender;
-        this.userQueryUseCase = new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository);
-        this.userProfileUseCase = new UserProfileUseCase(userRepository, userActivityRepository);
-        this.userPasswordUseCase = new UserPasswordUseCase(
-                userRepository, sessionRepository, userActivityRepository, passwordService);
-        this.userSessionUseCase = new UserSessionUseCase(sessionRepository, userActivityRepository);
-        this.userProvisioningUseCase = new UserProvisioningUseCase(userRepository, sessionRepository,
-                roleRepository, userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender);
-        this.userLifecycleUseCase = new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository);
-        this.userRoleAssignmentUseCase = new UserRoleAssignmentUseCase(userRepository, roleRepository,
-                permissionRepository, permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService);
+    /** Compatibility constructor retained for legacy tests/callers. */
+    public UserService(UserRepository users,AuthSessionRepository sessions,RoleRepository roles,
+            PermissionRepository permissions,UserPermissionOverrideRepository overrides,
+            UserActivityRepository activities,PasswordService passwordService,
+            UserAccessScopeRepository scopes,AccountMailSender mail){
+        this(new UserQueryUseCase(users,sessions,activities),new UserProfileUseCase(users,activities),
+                new UserPasswordUseCase(users,sessions,activities,passwordService),new UserSessionUseCase(sessions,activities),
+                new UserProvisioningUseCase(users,sessions,roles,scopes,activities,passwordService,mail),
+                new UserLifecycleUseCase(users,sessions,activities),
+                new UserRoleAssignmentUseCase(users,roles,permissions,overrides,activities,null));
     }
 
-    @Autowired(required = false)
-    void setAuthorizationMutationAuditService(
-            AuthorizationMutationAuditService authorizationMutationAuditService
-    ) {
-        this.authorizationMutationAuditService = authorizationMutationAuditService;
-        this.userRoleAssignmentUseCase.setAuthorizationMutationAuditService(authorizationMutationAuditService);
-    }
+    @Autowired(required=false) void setAuthorizationMutationAuditService(AuthorizationMutationAuditService value){roles.setAuthorizationMutationAuditService(value);}
 
-    @Transactional(readOnly = true)
-    public UserResponse getCurrentUser(String userId, String tenantId) {
-        return userQueryUseCase.current(userId, tenantId);
-    }
+    public UserResponse getCurrentUser(String id,String tenant){return queries.current(id,tenant);}
+    public UserResponse updateProfile(String id,String tenant,UpdateProfileRequest request){return updateProfile(id,tenant,request,null);}
+    public UserResponse updateProfile(String id,String tenant,UpdateProfileRequest request,AuditContext audit){return profiles.update(id,tenant,request,publicAudit(audit));}
+    public OnboardingResponse completeOnboarding(String id,String tenant,OnboardingRequest request){return profiles.completeOnboarding(id,tenant,request);}
+    public SessionListResponse listSessions(String id,String tenant,String current){return sessions.list(id,tenant,current);}
+    public RevokeSessionResponse revokeSession(String id,String tenant,String session){return revokeSession(id,tenant,session,null);}
+    public RevokeSessionResponse revokeSession(String id,String tenant,String session,AuditContext audit){return sessions.revoke(id,tenant,session,publicAudit(audit));}
+    public PasswordChangeResponse changePassword(String id,String tenant,ChangePasswordRequest request){return changePassword(id,tenant,null,request);}
+    public PasswordChangeResponse changePassword(String id,String tenant,String session,ChangePasswordRequest request){return changePassword(id,tenant,session,request,null);}
+    public PasswordChangeResponse changePassword(String id,String tenant,String session,ChangePasswordRequest request,AuditContext audit){return passwords.change(id,tenant,session,request,publicAudit(audit));}
+    public UserListResponse listUsers(Integer page,Integer limit,String search,String status,String role){return listUsers(DEFAULT_TENANT,page,limit,search,status,role);}
+    public UserListResponse listUsers(String tenant,Integer page,Integer limit,String search,String status,String role){return queries.list(tenant,page,limit,search,status,role);}
+    public UserListResponse listUsers(ListUsersQuery query){return listUsers(query.page(),query.limit(),query.search(),query.status(),query.role());}
+    public UserDetailResponse getUserDetail(String id,String tenant){return queries.detail(id,tenant);}
+    public ActivityListResponse listActivity(String id,String tenant,Integer page,Integer limit){return queries.activity(id,tenant,page,limit);}
+    public UserCreatedResponse createUser(AdminCreateUserRequest request){return createUser(request,null);}
+    public UserCreatedResponse createUser(AdminCreateUserRequest request,AuditContext audit){return createUser(request,audit,SecurityUtils.principal());}
+    public UserCreatedResponse createUser(AdminCreateUserRequest request,AuditContext audit,ErgPrincipal actor){return provisioning.create(request,publicAudit(audit),actor);}
+    public CredentialDeliveryResponse resetCredential(String id,String tenant,String delivery){return resetCredential(id,tenant,delivery,null);}
+    public CredentialDeliveryResponse resetCredential(String id,String tenant,String delivery,AuditContext audit){return provisioning.reset(id,tenant,delivery,publicAudit(audit));}
+    public UserResponse updateUserStatus(String id,String tenant,AdminUpdateUserStatusRequest request){return updateUserStatus(id,tenant,request,null);}
+    public UserResponse updateUserStatus(String id,String tenant,AdminUpdateUserStatusRequest request,AuditContext audit){return lifecycle.updateStatus(id,tenant,request,publicAudit(audit));}
+    public BulkOperationResponse deleteUser(String id,String tenant){return lifecycle.delete(id,tenant);}
+    public BulkOperationResponse bulkUpdateStatus(String tenant,BulkStatusRequest request){return lifecycle.bulkStatus(tenant,request);}
+    public BulkOperationResponse bulkDelete(String tenant,BulkDeleteRequest request){return lifecycle.bulkDelete(tenant,request);}
+    public UserResponse assignRoles(String id,String tenant,AdminAssignRolesRequest request){return assignRoles(id,tenant,request,null);}
+    public UserResponse assignRoles(String id,String tenant,AdminAssignRolesRequest request,AuditContext audit){return assignRoles(id,tenant,request,audit,SecurityUtils.principal());}
+    public UserResponse assignRoles(String id,String tenant,AdminAssignRolesRequest request,AuditContext audit,ErgPrincipal actor){return roles.assignRoles(id,tenant,request,publicAudit(audit),actor);}
+    public PermissionOverrideResponse assignPermissions(String id,String tenant,AdminAssignPermissionsRequest request){return assignPermissions(id,tenant,request,null);}
+    public PermissionOverrideResponse assignPermissions(String id,String tenant,AdminAssignPermissionsRequest request,AuditContext audit){return roles.assignPermissions(id,tenant,request,publicAudit(audit));}
 
-    @Transactional
-    public UserResponse updateProfile(String userId, String tenantId, UpdateProfileRequest request) {
-        return updateProfile(userId, tenantId, request, null);
-    }
-
-    @Transactional
-    public UserResponse updateProfile(
-            String userId, String tenantId, UpdateProfileRequest request, AuditContext auditContext
-    ) {
-        return userProfileUseCase.update(userId, tenantId, request, toPublicAudit(auditContext));
-    }
-
-    @Transactional
-    public OnboardingResponse completeOnboarding(String userId, String tenantId, OnboardingRequest request) {
-        return userProfileUseCase.completeOnboarding(userId, tenantId, request);
-    }
-
-    @Transactional(readOnly = true)
-    public SessionListResponse listSessions(String userId, String tenantId, String currentSessionId) {
-        return userSessionUseCase.list(userId, tenantId, currentSessionId);
-    }
-
-    @Transactional
-    public RevokeSessionResponse revokeSession(String userId, String tenantId, String sessionId) {
-        return revokeSession(userId, tenantId, sessionId, null);
-    }
-
-    @Transactional
-    public RevokeSessionResponse revokeSession(
-            String userId, String tenantId, String sessionId, AuditContext auditContext
-    ) {
-        return userSessionUseCase.revoke(userId, tenantId, sessionId, toPublicAudit(auditContext));
-    }
-
-    @Transactional
-    public PasswordChangeResponse changePassword(String userId, String tenantId, ChangePasswordRequest request) {
-        return changePassword(userId, tenantId, null, request);
-    }
-
-    @Transactional
-    public PasswordChangeResponse changePassword(
-            String userId, String tenantId, String currentSessionId, ChangePasswordRequest request
-    ) {
-        return changePassword(userId, tenantId, currentSessionId, request, null);
-    }
-
-    @Transactional
-    public PasswordChangeResponse changePassword(
-            String userId, String tenantId, String currentSessionId, ChangePasswordRequest request,
-            AuditContext auditContext
-    ) {
-        return userPasswordUseCase.change(userId, tenantId, currentSessionId, request, toPublicAudit(auditContext));
-    }
-
-    @Transactional(readOnly = true)
-    public UserListResponse listUsers(Integer page, Integer limit, String search, String status, String role) {
-        return listUsers(DEFAULT_TENANT, page, limit, search, status, role);
-    }
-
-    @Transactional(readOnly = true)
-    public UserListResponse listUsers(
-            String tenantId, Integer page, Integer limit, String search, String status, String role
-    ) {
-        return userQueryUseCase.list(tenantId, page, limit, search, status, role);
-    }
-
-    public UserListResponse listUsers(ListUsersQuery query) {
-        return listUsers(query.page(), query.limit(), query.search(), query.status(), query.role());
-    }
-
-    @Transactional(readOnly = true)
-    public UserDetailResponse getUserDetail(String userId, String tenantId) {
-        return userQueryUseCase.detail(userId, tenantId);
-    }
-
-    @Transactional(readOnly = true)
-    public ActivityListResponse listActivity(String userId, String tenantId, Integer page, Integer limit) {
-        return userQueryUseCase.activity(userId, tenantId, page, limit);
-    }
-
-    @Transactional
-    public UserCreatedResponse createUser(AdminCreateUserRequest request) {
-        return createUser(request, null);
-    }
-
-    @Transactional
-    public UserCreatedResponse createUser(AdminCreateUserRequest request, AuditContext auditContext) {
-        return createUser(request, auditContext, SecurityUtils.principal());
-    }
-
-    @Transactional
-    public UserCreatedResponse createUser(
-            AdminCreateUserRequest request, AuditContext auditContext, ErgPrincipal actor
-    ) {
-        return userProvisioningUseCase.create(request, toPublicAudit(auditContext), actor);
-    }
-
-    private AccountLifecycleResponse lifecycle(User user) {
-        List<String> nextSteps = new java.util.ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
-        String lifecycleStatus = nextSteps.isEmpty()
-                ? "ACTIVE"
-                : ("INVITED".equalsIgnoreCase(user.getStatus()) ? "PROVISIONED" : "FIRST_LOGIN_RESTRICTED");
-        return new AccountLifecycleResponse(
-                lifecycleStatus,
-                Boolean.TRUE.equals(user.getIsProfileCompleted()),
-                maskEmail(user.getRecoveryEmail()),
-                Boolean.TRUE.equals(user.getRecoveryEmailVerified()),
-                Boolean.TRUE.equals(user.getMustChangePassword()),
-                List.copyOf(nextSteps)
-        );
-    }
-
-    @Transactional
-    public CredentialDeliveryResponse resetCredential(
-            String userId, String tenantId, String requestedDelivery
-    ) {
-        return resetCredential(userId, tenantId, requestedDelivery, null);
-    }
-
-    @Transactional
-    public CredentialDeliveryResponse resetCredential(
-            String userId, String tenantId, String requestedDelivery, AuditContext auditContext
-    ) {
-        return userProvisioningUseCase.reset(userId, tenantId, requestedDelivery, toPublicAudit(auditContext));
-    }
-
-    private String normalizeOptionalEmail(String email) {
-        String normalized = trimToNull(email);
-        return normalized == null ? null : normalized.toLowerCase();
-    }
-
-    private String maskEmail(String email) {
-        if (email == null || !email.contains("@")) return null;
-        int separator = email.indexOf('@');
-        return email.substring(0, 1) + "***" + email.substring(separator);
-    }
-
-    @Transactional
-    public UserResponse updateUserStatus(String userId, String tenantId, AdminUpdateUserStatusRequest request) {
-        return updateUserStatus(userId, tenantId, request, null);
-    }
-
-    @Transactional
-    public UserResponse updateUserStatus(
-            String userId, String tenantId, AdminUpdateUserStatusRequest request, AuditContext auditContext
-    ) {
-        return userLifecycleUseCase.updateStatus(userId, tenantId, request, toPublicAudit(auditContext));
-    }
-
-    @Transactional
-    public BulkOperationResponse deleteUser(String userId, String tenantId) {
-        return userLifecycleUseCase.delete(userId, tenantId);
-    }
-
-    @Transactional
-    public BulkOperationResponse bulkUpdateStatus(String tenantId, BulkStatusRequest request) {
-        return userLifecycleUseCase.bulkStatus(tenantId, request);
-    }
-
-    @Transactional
-    public BulkOperationResponse bulkDelete(String tenantId, BulkDeleteRequest request) {
-        return userLifecycleUseCase.bulkDelete(tenantId, request);
-    }
-
-    @Transactional
-    public UserResponse assignRoles(String userId, String tenantId, AdminAssignRolesRequest request) {
-        return assignRoles(userId, tenantId, request, null);
-    }
-
-    @Transactional
-    public UserResponse assignRoles(
-            String userId, String tenantId, AdminAssignRolesRequest request, AuditContext auditContext
-    ) {
-        return assignRoles(userId, tenantId, request, auditContext, SecurityUtils.principal());
-    }
-
-    @Transactional
-    public UserResponse assignRoles(
-            String userId,
-            String tenantId,
-            AdminAssignRolesRequest request,
-            AuditContext auditContext,
-            ErgPrincipal actor
-    ) {
-        return userRoleAssignmentUseCase.assignRoles(userId, tenantId, request,
-                toPublicAudit(auditContext), actor);
-    }
-
-    @Transactional
-    public PermissionOverrideResponse assignPermissions(String userId, String tenantId, AdminAssignPermissionsRequest request) {
-        return assignPermissions(userId, tenantId, request, null);
-    }
-
-    @Transactional
-    public PermissionOverrideResponse assignPermissions(
-            String userId, String tenantId, AdminAssignPermissionsRequest request, AuditContext auditContext
-    ) {
-        return userRoleAssignmentUseCase.assignPermissions(userId, tenantId, request, toPublicAudit(auditContext));
-    }
-
-    private AuthorizationMutationAuditService authorizationMutationAudit() {
-        if (authorizationMutationAuditService == null) {
-            throw new IllegalStateException("authorization mutation audit service is not configured");
-        }
-        return authorizationMutationAuditService;
-    }
-
-    private AuditContext mutationContext(User target, AuditContext context) {
-        return context == null ? new AuditContext(target.getId(), null, null, null) : context;
-    }
-
-    private User findUser(String userId, String tenantId) {
-        return userRepository.findByIdAndTenantId(userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
-    }
-
-    private void recordActivity(
-            User target,
-            AuditContext auditContext,
-            String action,
-            String description,
-            Map<String, Object> before,
-            Map<String, Object> after
-    ) {
-        AuditContext context = auditContext == null
-                ? new AuditContext(target.getId(), null, null, null)
-                : auditContext;
-        UserActivity activity = new UserActivity();
-        activity.setId(IdGenerator.newId());
-        activity.setUserId(isBlank(context.actorUserId()) ? target.getId() : context.actorUserId());
-        activity.setTenantId(normalizeTenant(target.getTenantId()));
-        activity.setAction(action);
-        activity.setTargetUserId(target.getId());
-        activity.setIpAddress(trimToNull(context.ipAddress()));
-        activity.setUserAgent(trimToNull(context.userAgent()));
-        activity.setDescription(description);
-        activity.setRequestId(trimToNull(context.requestId()));
-        activity.setMetadata(Map.of("before", before, "after", after));
-        activity.setCreatedAt(now());
-        userActivityRepository.save(activity);
-    }
-
-    private Map<String, Object> profileAuditState(User user) {
-        return Map.of(
-                "fullName", safeAuditValue(user.getFullName()),
-                "phone", safeAuditValue(user.getPhone()),
-                "isProfileCompleted", Boolean.TRUE.equals(user.getIsProfileCompleted())
-        );
-    }
-
-    private String safeAuditValue(String value) {
-        return value == null ? "" : value;
-    }
-
-    public record AuditContext(String actorUserId, String requestId, String ipAddress, String userAgent) {
-    }
-
-    private List<User> findUsers(List<String> userIds, String tenantId) {
-        return userIds.stream()
-                .map(userId -> findUser(userId, tenantId))
-                .toList();
-    }
-
-    private String normalizeStatus(String status) {
-        String normalized = status.trim().toUpperCase();
-        if (!List.of("ACTIVE", "PENDING", "BLOCKED", "BANNED", "INACTIVE").contains(normalized)) {
-            throw new BadRequestException("invalid user status");
-        }
-        return normalized;
-    }
-
-    private void revokeActiveSessionsIfLocked(User user, String tenantId, String status) {
-        if (!List.of("BLOCKED", "BANNED", "INACTIVE").contains(status)) {
-            return;
-        }
-        List<AuthSession> sessions = sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(), tenantId);
-        if (sessions.isEmpty()) {
-            return;
-        }
-        OffsetDateTime revokedAt = now();
-        String reason = "status_changed_" + status.toLowerCase();
-        sessions.forEach(session -> {
-            session.setRevokedAt(revokedAt);
-            session.setRevokedReason(reason);
-        });
-        sessionRepository.saveAll(sessions);
-    }
-
-    private String normalizeGrantType(String grantType) {
-        String normalized = grantType.trim().toUpperCase();
-        if (!List.of("GRANT", "DENY").contains(normalized)) {
-            throw new BadRequestException("invalid permission grant type");
-        }
-        return normalized;
-    }
-
-    private UserAuditContext toPublicAudit(AuditContext audit) {
-        return audit == null ? null
-                : new UserAuditContext(audit.actorUserId(), audit.requestId(), audit.ipAddress(), audit.userAgent());
-    }
-
-    private UserResponse toResponse(User user) {
-        return new UserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getPhone(),
-                user.getAvatarUrl(),
-                user.getBio(),
-                user.getGender(),
-                user.getDateOfBirth(),
-                user.getAddress(),
-                user.getCity(),
-                user.getDistrict(),
-                user.getJobTitle(),
-                user.getRegion(),
-                user.getStatus(),
-                user.getProvider(),
-                user.getAccountType(),
-                user.getLastLoginProvider(),
-                roles(user.getRoles()),
-                user.getSocialLinks() == null ? Map.of() : user.getSocialLinks(),
-                Boolean.TRUE.equals(user.getIsProfileCompleted()),
-                toIso(user.getLastLoginAt()),
-                user.getLoginCount(),
-                user.getTenantId(),
-                toIso(user.getCreatedAt()),
-                toIso(user.getUpdatedAt()),
-                lifecycle(user)
-        );
-    }
-
-    private UserItemResponse toItemResponse(User user) {
-        return new UserItemResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getAvatarUrl(),
-                user.getPhone(),
-                user.getStatus(),
-                user.getProvider(),
-                user.getAccountType(),
-                user.getLastLoginProvider(),
-                roles(user.getRoles()),
-                Boolean.TRUE.equals(user.getIsProfileCompleted()),
-                toIso(user.getLastLoginAt()),
-                toIso(user.getCreatedAt())
-        );
-    }
-
-    private UserItemResponse toItemResponse(UserListItemProjection user, List<String> roles) {
-        return new UserItemResponse(
-                user.id(),
-                user.email(),
-                user.fullName(),
-                user.avatarUrl(),
-                user.phone(),
-                user.status(),
-                user.provider(),
-                user.accountType(),
-                user.lastLoginProvider(),
-                roleNames(roles),
-                Boolean.TRUE.equals(user.isProfileCompleted()),
-                toIso(user.lastLoginAt()),
-                toIso(user.createdAt())
-        );
-    }
-
-    private SessionResponse toSessionResponse(AuthSession session, String currentSessionId) {
-        OffsetDateTime lastSeenAt = session.getLastActiveAt() == null ? session.getCreatedAt() : session.getLastActiveAt();
-        return new SessionResponse(
-                session.getSessionId(),
-                session.getDeviceId(),
-                session.getDeviceName(),
-                session.getPortal(),
-                session.getIpAddress(),
-                session.getUserAgent(),
-                deviceType(session.getUserAgent()),
-                session.getSessionId() != null && session.getSessionId().equals(currentSessionId),
-                session.getRevokedAt() != null,
-                session.getRevokedReason(),
-                toIso(session.getExpiresAt()),
-                toIso(session.getCreatedAt()),
-                toIso(lastSeenAt)
-        );
-    }
-
-    private ActivityResponse toActivityResponse(UserActivity activity) {
-        return new ActivityResponse(
-                activity.getId(),
-                activity.getUserId(),
-                activity.getAction(),
-                activity.getTargetUserId(),
-                activity.getIpAddress(),
-                activity.getDescription(),
-                activity.getMetadata() == null ? Map.of() : activity.getMetadata(),
-                toIso(activity.getCreatedAt())
-        );
-    }
-
-    private String deviceType(String userAgent) {
-        if (userAgent == null) {
-            return "unknown";
-        }
-        String ua = userAgent.toLowerCase();
-        if (ua.contains("mobile") || ua.contains("android") || ua.contains("iphone")) {
-            return "mobile";
-        }
-        if (ua.contains("ipad")) {
-            return "tablet";
-        }
-        if (ua.contains("curl") || ua.contains("http")) {
-            return "api";
-        }
-        return "desktop";
-    }
-
-    private List<String> roles(Set<Role> roles) {
-        if (roles == null || roles.isEmpty()) {
-            return List.of("user");
-        }
-        return roles.stream()
-                .map(Role::getName)
-                .filter(name -> name != null && !name.isBlank())
-                .collect(Collectors.toList());
-    }
-
-    private List<String> roleNames(List<String> roles) {
-        if (roles == null || roles.isEmpty()) {
-            return List.of("user");
-        }
-        return roles.stream()
-                .filter(name -> name != null && !name.isBlank())
-                .collect(Collectors.toList());
-    }
-
-    private boolean isProfileCompleted(User user) {
-        return !isBlank(user.getFullName()) && !isBlank(user.getPhone());
-    }
-
-    private String normalizeTenant(String tenantId) {
-        return isBlank(tenantId) ? DEFAULT_TENANT : tenantId.trim();
-    }
-
-    private String trimToNull(String value) {
-        if (isBlank(value)) {
-            return null;
-        }
-        return value.trim();
-    }
-
-    private String toIso(OffsetDateTime value) {
-        return value == null ? null : value.toString();
-    }
-
-    private OffsetDateTime now() {
-        return OffsetDateTime.now(ZoneOffset.UTC);
-    }
-
-    private OffsetDateTime parseOptionalTimestamp(String value) {
-        return isBlank(value) ? null : OffsetDateTime.parse(value);
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
+    public record AuditContext(String actorUserId,String requestId,String ipAddress,String userAgent){}
+    private UserAuditContext publicAudit(AuditContext audit){return audit==null?null:new UserAuditContext(audit.actorUserId(),audit.requestId(),audit.ipAddress(),audit.userAgent());}
 }
-
