@@ -37,6 +37,7 @@ import com.erg.ergspringboot.utils.IdGenerator;
 import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
 import com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase;
 import com.erg.ergspringboot.lms.internal.resource.LmsResourceQueryUseCase;
+import com.erg.ergspringboot.lms.internal.readmodel.LmsStudentReadModelUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
@@ -80,6 +81,7 @@ public class LmsRuntimeService {
     private final LmsAttemptUseCase attemptCommands;
     private final LmsClassroomQueryUseCase classroomQueries;
     private final LmsResourceQueryUseCase resourceQueries;
+    private final LmsStudentReadModelUseCase studentReadModel;
 
     public LmsRuntimeService(
             LmsClassroomService classroomService,
@@ -106,10 +108,12 @@ public class LmsRuntimeService {
                 runtimePackageService, attemptGradingService, attemptEventRecorder, cacheManager);
         this.classroomQueries = new LmsClassroomQueryUseCase(classroomService);
         this.resourceQueries = new LmsResourceQueryUseCase(quizService, runtimePackageService);
+        this.studentReadModel = new LmsStudentReadModelUseCase(classroomService, assignmentService, attemptService, studentService);
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access) {
-        String tenantId = normalizeTenant(access.tenantId());
+        return studentReadModel.listAssignments(studentId, access);
+        /* String tenantId = normalizeTenant(access.tenantId());
         java.util.Optional<String> studentAcademicClassId = studentService
                 .findFirstByTenantIdAndAuthUserId(tenantId, studentId)
                 .map(student -> student.getAcademicClassId());
@@ -121,13 +125,14 @@ public class LmsRuntimeService {
                 .sorted(Comparator.comparing(Assignment::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toAssignmentResponse)
                 .toList();
-        return new StudentAssignmentListResponse(items);
+        return new StudentAssignmentListResponse(items); */
     }
 
     public StudentAssignmentListResponse listStudentAssignments(
             String studentId, UserAccessContext access, int page, int size
     ) {
-        int safePage = Math.max(0, page);
+        return studentReadModel.listAssignments(studentId, access, page, size);
+        /* int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, 100));
         String tenantId = normalizeTenant(access.tenantId());
         Student student = studentService.findFirstByTenantIdAndAuthUserId(tenantId, studentId)
@@ -145,11 +150,12 @@ public class LmsRuntimeService {
                 .toList();
         return new StudentAssignmentListResponse(
                 items, assignmentPage.getNumber(), assignmentPage.getSize(), assignmentPage.getTotalElements(),
-                assignmentPage.getTotalPages(), assignmentPage.hasNext());
+                assignmentPage.getTotalPages(), assignmentPage.hasNext()); */
     }
 
     public StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access) {
-        String tenantId = normalizeTenant(access.tenantId());
+        return studentReadModel.listScores(studentId, access);
+        /* String tenantId = normalizeTenant(access.tenantId());
         java.util.Optional<String> studentAcademicClassId = studentService
                 .findFirstByTenantIdAndAuthUserId(tenantId, studentId)
                 .map(student -> student.getAcademicClassId());
@@ -177,13 +183,14 @@ public class LmsRuntimeService {
                     return new StudentScoreItem(toAssignmentResponse(assignment), bestScore, recent);
                 })
                 .toList();
-        return new StudentScoreListResponse(items);
+        return new StudentScoreListResponse(items); */
     }
 
     public StudentScoreListResponse listStudentScores(
             String studentId, UserAccessContext access, int page, int size
     ) {
-        int safePage = Math.max(0, page);
+        return studentReadModel.listScores(studentId, access, page, size);
+        /* int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, 100));
         String tenantId = normalizeTenant(access.tenantId());
         String academicClassId = studentService.findFirstByTenantIdAndAuthUserId(tenantId, studentId)
@@ -206,7 +213,7 @@ public class LmsRuntimeService {
         }).toList();
         return new StudentScoreListResponse(
                 items, assignmentPage.getNumber(), assignmentPage.getSize(), assignmentPage.getTotalElements(),
-                assignmentPage.getTotalPages(), assignmentPage.hasNext());
+                assignmentPage.getTotalPages(), assignmentPage.hasNext()); */
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
