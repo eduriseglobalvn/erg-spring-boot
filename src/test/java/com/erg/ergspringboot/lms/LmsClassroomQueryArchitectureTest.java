@@ -12,7 +12,7 @@ class LmsClassroomQueryArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java"));
-        assertThat(legacy).contains("classroomQueries.listClassesBySchool(");
+        assertThat(legacy).contains("classrooms.listClassesBySchool(");
         assertThat(legacy).doesNotContain("findByTenantIdAndSchoolIdOrderByNameAsc(");
     }
 }

@@ -12,6 +12,6 @@ class LmsResourceQueryArchitectureTest {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.resource.LmsResourceQueryUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java"));
-        assertThat(legacy).contains("resourceQueries.getQuizPackage(");
+        assertThat(legacy).contains("resources.getQuizPackage(");
     }
 }
