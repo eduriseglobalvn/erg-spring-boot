@@ -35,6 +35,7 @@ import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
+import com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
@@ -76,6 +77,7 @@ public class LmsRuntimeService {
     private final com.erg.ergspringboot.service.quiz.runtime.AttemptEventRecorder attemptEventRecorder;
     private final CacheManager cacheManager;
     private final LmsAttemptUseCase attemptCommands;
+    private final LmsClassroomQueryUseCase classroomQueries;
 
     public LmsRuntimeService(
             LmsClassroomService classroomService,
@@ -100,6 +102,7 @@ public class LmsRuntimeService {
         this.attemptCommands = new LmsAttemptUseCase(
                 classroomService, assignmentService, quizService, attemptService, studentService,
                 runtimePackageService, attemptGradingService, attemptEventRecorder, cacheManager);
+        this.classroomQueries = new LmsClassroomQueryUseCase(classroomService);
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access) {
@@ -378,7 +381,7 @@ public class LmsRuntimeService {
     }
 
     public EducationUnitListResponse listEducationUnits(UserAccessContext access) {
-        return new EducationUnitListResponse(educationUnitItems(access));
+        return classroomQueries.listEducationUnits(access);
     }
 
     @Cacheable(
@@ -386,18 +389,7 @@ public class LmsRuntimeService {
             key = "{#access.tenantId(), #schoolId, #access.currentEducationUnitId(), #access.managedEducationUnitIds().toString()}"
     )
     public ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access) {
-        String resolvedSchoolId = schoolId == null || schoolId.isBlank() ? access.currentEducationUnitId() : schoolId.trim();
-        if (resolvedSchoolId == null || resolvedSchoolId.isBlank()) {
-            throw new BadRequestException("schoolId is required");
-        }
-        ensureEducationUnitAccess(resolvedSchoolId, access);
-        List<ClassItem> items = classroomService
-                .findByTenantIdAndSchoolIdOrderByNameAsc(normalizeTenant(access.tenantId()), resolvedSchoolId)
-                .stream()
-                .filter(item -> access.canAccessClass(item.getId()))
-                .map(this::classPayload)
-                .toList();
-        return new ClassesBySchoolResponse(resolvedSchoolId, items, scopePayload(access));
+        return classroomQueries.listClassesBySchool(schoolId, access);
     }
 
     private Quiz quiz(String quizId, UserAccessContext access) {
