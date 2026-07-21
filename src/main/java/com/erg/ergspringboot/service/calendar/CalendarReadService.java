@@ -44,6 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarCatalogQueryUseCase;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarScheduleBatchQueryUseCase;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarPermissionsQueryUseCase;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarEventResponseAssembler;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -75,6 +77,8 @@ public class CalendarReadService {
     private final ErgReadTaskExecutor readTaskExecutor;
     private final CalendarCatalogQueryUseCase catalogQueries;
     private final CalendarScheduleBatchQueryUseCase scheduleBatchQueries;
+    private final CalendarPermissionsQueryUseCase permissionQueries;
+    private final CalendarEventResponseAssembler eventResponses;
 
     public CalendarReadService(
             CalendarEventRepository eventRepository,
@@ -101,6 +105,8 @@ public class CalendarReadService {
         this.readTaskExecutor = readTaskExecutor;
         this.catalogQueries = new CalendarCatalogQueryUseCase(roomRepository);
         this.scheduleBatchQueries = new CalendarScheduleBatchQueryUseCase(batchRepository, eventRepository);
+        this.permissionQueries = new CalendarPermissionsQueryUseCase();
+        this.eventResponses = new CalendarEventResponseAssembler();
     }
 
     // -------------------------------------------------------------------------
@@ -351,40 +357,7 @@ public class CalendarReadService {
             CalendarEvent event,
             List<CalendarEventTeacher> teachers,
             ReferenceMaps refMaps) {
-
-        List<CalendarTeacherAssignmentResponse> teacherResponses = teachers.stream()
-                .map(t -> new CalendarTeacherAssignmentResponse(
-                        t.getTeacherUserId(),
-                        t.getDisplayNameSnapshot() != null
-                                ? t.getDisplayNameSnapshot()
-                                : resolveTeacherName(t.getTeacherUserId(), refMaps),
-                        t.getRole(),
-                        t.getColorKey()))
-                .toList();
-
-        String schoolName = resolveSchoolName(event.getSchoolId(), refMaps);
-        String className = resolveClassName(event.getAcademicClassId(), refMaps);
-        String subjectName = resolveSubjectName(event.getSubjectId(), refMaps);
-        String levelName = resolveLevelName(event.getLevelId(), refMaps);
-        CalendarColorGroupResponse colorGroup = computeColorGroup(event.getSubjectId());
-
-        return new CalendarEventResponse(
-                event.getId(), event.getBatchId(), event.getTitle(),
-                event.getStartAt() != null ? event.getStartAt().toString() : null,
-                event.getEndAt() != null ? event.getEndAt().toString() : null,
-                event.getStartAt() != null ? event.getStartAt().toLocalDate().toString() : null,
-                event.getStartAt() != null
-                        ? event.getStartAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
-                event.getEndAt() != null
-                        ? event.getEndAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
-                event.getSchoolId(), schoolName,
-                event.getAcademicClassId(), className,
-                event.getSubjectId(), subjectName,
-                event.getLevelId(), levelName,
-                event.getRoomId(), event.getRoomName(),
-                event.getPeriodStart() != null ? event.getPeriodStart() : 0,
-                event.getPeriodCount() != null ? event.getPeriodCount() : 0,
-                teacherResponses, event.getStatus(), event.getNote(), colorGroup);
+        return eventResponses.response(event, teachers, refMaps);
     }
 
     CalendarFilterOptionsResponse buildFilterOptions(
@@ -536,28 +509,14 @@ public class CalendarReadService {
     }
 
     CalendarPermissionsResponse buildPermissions(ErgPrincipal principal) {
-        if (principal == null) {
-            return new CalendarPermissionsResponse(false, false, false, false, false);
-        }
-        Set<String> permissions = principal.permissions() != null
-                ? new HashSet<>(principal.permissions()) : Set.of();
-        Set<String> denied = principal.deniedPermissions() != null
-                ? new HashSet<>(principal.deniedPermissions()) : Set.of();
-        boolean wildcard = permissions.contains("*");
-
-        return new CalendarPermissionsResponse(
-                wildcard || (permissions.contains("lms.schedule.manage") && !denied.contains("lms.schedule.manage") && !denied.contains("*")),
-                wildcard || (permissions.contains("lms.schedule.manage") && !denied.contains("lms.schedule.manage") && !denied.contains("*")),
-                wildcard || (permissions.contains("lms.schedule.manage") && !denied.contains("lms.schedule.manage") && !denied.contains("*")),
-                wildcard || (permissions.contains("lms.schedule.manage") && !denied.contains("lms.schedule.manage") && !denied.contains("*")),
-                wildcard || (permissions.contains("lms.schedule.read") && !denied.contains("lms.schedule.read") && !denied.contains("*")));
+        return permissionQueries.permissions(principal);
     }
 
     // =========================================================================
     // Private helpers
     // =========================================================================
 
-    record ReferenceMaps(
+    public static record ReferenceMaps(
             Map<String, EducationUnit> schoolMap,
             Map<String, Classroom> classMap,
             Map<String, Subject> subjectMap,
