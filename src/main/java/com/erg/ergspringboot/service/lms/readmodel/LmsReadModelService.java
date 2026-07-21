@@ -67,6 +67,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsStudentGroupReadUseCase;
+import com.erg.ergspringboot.lms.internal.readmodel.LmsAssignmentProgressQueryUseCase;
 
 @Service
 @Transactional(readOnly = true)
@@ -81,6 +82,7 @@ public class LmsReadModelService {
     private final StudentGroupMemberRepository studentGroupMemberRepository;
     private final ErgReadTaskExecutor readTaskExecutor;
     private final LmsStudentGroupReadUseCase studentGroupRead;
+    private final LmsAssignmentProgressQueryUseCase assignmentProgressRead;
 
     public LmsReadModelService(
             AssignmentRepository assignmentRepository,
@@ -102,10 +104,11 @@ public class LmsReadModelService {
         this.readTaskExecutor = readTaskExecutor;
         this.studentGroupRead = new LmsStudentGroupReadUseCase(
                 studentGroupRepository, studentGroupMemberRepository);
+        this.assignmentProgressRead = new LmsAssignmentProgressQueryUseCase(attemptRepository);
     }
 
     public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) {
-        return attemptRepository.summarizeAssignmentProgress(tenantId, assignmentId);
+        return assignmentProgressRead.summary(tenantId, assignmentId);
     }
 
     @Cacheable(
