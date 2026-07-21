@@ -35,10 +35,11 @@ import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepo
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
 import com.erg.ergspringboot.service.users.UserService.AuditContext;
-import com.erg.ergspringboot.utils.IdGenerator;
 import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
 import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase;
+import com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase;
+import com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
@@ -69,6 +70,8 @@ public class AuthorizationService {
     private final AuthorizationPermissionCatalogUseCase permissionCatalog;
     private final AuthorizationRoleDefinitionUseCase roleDefinitions;
     private final AuthorizationAccessQueryUseCase accessQueries;
+    private final AuthorizationDirectRoleUseCase directRoles;
+    private final AuthorizationPermissionOverrideUseCase permissionOverrides;
 
     public AuthorizationService(
             RoleRepository roleRepository,
@@ -84,6 +87,9 @@ public class AuthorizationService {
                 permissionRepository, roleRepository, overrideRepository);
         this.roleDefinitions = new AuthorizationRoleDefinitionUseCase(roleRepository, permissionRepository);
         this.accessQueries = new AuthorizationAccessQueryUseCase(userRepository, overrideRepository);
+        this.directRoles = new AuthorizationDirectRoleUseCase(userRepository, roleRepository, mutationAuditService);
+        this.permissionOverrides = new AuthorizationPermissionOverrideUseCase(
+                userRepository, permissionRepository, overrideRepository, mutationAuditService);
     }
 
     @Autowired(required = false)
@@ -108,6 +114,8 @@ public class AuthorizationService {
     void setMutationAuditService(AuthorizationMutationAuditService mutationAuditService) {
         this.mutationAuditService = mutationAuditService;
         this.roleDefinitions.setMutationAuditService(mutationAuditService);
+        this.directRoles.setMutationAuditService(mutationAuditService);
+        this.permissionOverrides.setMutationAuditService(mutationAuditService);
     }
 
     @Transactional(readOnly = true)
@@ -216,22 +224,7 @@ public class AuthorizationService {
     public RoleResponse assignRoles(
             String userId, String tenantId, List<String> roleIds, ErgPrincipal actor, AuditContext context
     ) {
-        User user = userRepository.findByIdAndTenantId(userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
-        List<Role> roles = resolveRoles(roleIds);
-        if (roles.size() != new LinkedHashSet<>(roleIds).size()) {
-            throw new BadRequestException("one or more roles were not found");
-        }
-        protectedRolePolicy.assertCanGrant(actor, roles);
-        user.setRoles(new LinkedHashSet<>(roles));
-        userRepository.save(user);
-        mutationAudit().authorizationChanged(
-                List.of(new UserRef(user.getId(), normalizeTenant(tenantId))),
-                roles.stream().map(Role::getId).sorted().collect(java.util.stream.Collectors.joining(",")),
-                "DIRECT_ROLE_ASSIGNMENT_REPLACED",
-                requiredContext(actor, context));
-        return roles.stream().findFirst().map(this::toRoleResponse)
-                .orElseThrow(() -> new BadRequestException("at least one role is required"));
+        return directRoles.assign(userId, tenantId, roleIds, actor, context);
     }
 
     @Transactional
@@ -248,21 +241,7 @@ public class AuthorizationService {
     public void removeRole(
             String userId, String roleId, String tenantId, ErgPrincipal actor, AuditContext context
     ) {
-        User user = userRepository.findByIdAndTenantId(userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
-        Role role = roleRepository.findById(roleId)
-                .or(() -> roleRepository.findByNameIgnoreCase(roleId))
-                .orElseThrow(() -> new ResourceNotFoundException("role not found"));
-        protectedRolePolicy.assertCanGrant(actor, List.of(role));
-        Set<Role> roles = user.getRoles() == null ? new LinkedHashSet<>() : new LinkedHashSet<>(user.getRoles());
-        roles.removeIf(item -> item.getId().equals(role.getId()) || item.getName().equalsIgnoreCase(role.getName()));
-        user.setRoles(roles);
-        userRepository.save(user);
-        mutationAudit().authorizationChanged(
-                List.of(new UserRef(user.getId(), normalizeTenant(tenantId))),
-                role.getId(),
-                "DIRECT_ROLE_REMOVED",
-                requiredContext(actor, context));
+        directRoles.remove(userId, roleId, tenantId, actor, context);
     }
 
     @Transactional
@@ -279,26 +258,7 @@ public class AuthorizationService {
     public long bulkAssignRole(
             BulkAssignRoleRequest request, String tenantId, ErgPrincipal actor, AuditContext context
     ) {
-        Role role = roleRepository.findById(request.roleId())
-                .orElseThrow(() -> new ResourceNotFoundException("role not found"));
-        protectedRolePolicy.assertCanGrant(actor, List.of(role));
-        List<User> users = userRepository.findByTenantIdAndIdInAnyStatus(
-                normalizeTenant(tenantId), request.userIds());
-        if (users.size() != new LinkedHashSet<>(request.userIds()).size()) {
-            throw new ResourceNotFoundException("one or more users were not found in the authenticated tenant");
-        }
-        users.forEach(user -> {
-            Set<Role> roles = user.getRoles() == null ? new LinkedHashSet<>() : new LinkedHashSet<>(user.getRoles());
-            roles.add(role);
-            user.setRoles(roles);
-        });
-        userRepository.saveAll(users);
-        mutationAudit().authorizationChanged(
-                users.stream().map(user -> new UserRef(user.getId(), normalizeTenant(tenantId))).toList(),
-                role.getId(),
-                "DIRECT_ROLE_ASSIGNED",
-                requiredContext(actor, context));
-        return users.size();
+        return directRoles.bulk(request, tenantId, actor, context);
     }
 
     @Transactional
@@ -322,27 +282,7 @@ public class AuthorizationService {
             String tenantId,
             AuditContext context
     ) {
-        scopedUser(userId, tenantId);
-        Permission permission = permissionRepository.findByNameInIgnoreCase(List.of(request.permission()))
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("permission not found"));
-        UserPermissionOverride override = new UserPermissionOverride();
-        override.setId(IdGenerator.newId());
-        override.setUserId(userId);
-        override.setPermission(permission.getName());
-        override.setGrantType(normalizeGrantType(request.grantType()));
-        override.setReason(request.reason());
-        override.setExpiresAt(request.expiresAt());
-        override.setCreatedBy(actorId);
-        override.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        PermissionOverrideResponse response = toOverrideResponse(overrideRepository.save(override));
-        mutationAudit().authorizationChanged(
-                List.of(new UserRef(userId, normalizeTenant(tenantId))),
-                permission.getId(),
-                "PERMISSION_OVERRIDE_ADDED",
-                requiredContext(null, context));
-        return response;
+        return permissionOverrides.add(userId, request, actorId, tenantId, context);
     }
 
     @Transactional
@@ -360,18 +300,7 @@ public class AuthorizationService {
     public void deletePermissionOverride(
             String userId, String overrideId, String tenantId, AuditContext context
     ) {
-        scopedUser(userId, tenantId);
-        UserPermissionOverride override = overrideRepository.findById(overrideId)
-                .filter(item -> item.getUserId().equals(userId))
-                .orElseThrow(() -> new ResourceNotFoundException("permission override not found"));
-        String permissionId = permissionRepository.findByNameInIgnoreCase(List.of(override.getPermission())).stream()
-                .findFirst().map(Permission::getId).orElse(override.getPermission());
-        overrideRepository.delete(override);
-        mutationAudit().authorizationChanged(
-                List.of(new UserRef(userId, normalizeTenant(tenantId))),
-                permissionId,
-                "PERMISSION_OVERRIDE_DELETED",
-                requiredContext(null, context));
+        permissionOverrides.delete(userId, overrideId, tenantId, context);
     }
 
     @Transactional(readOnly = true)
@@ -640,31 +569,6 @@ public class AuthorizationService {
         );
     }
 
-    private PermissionOverrideResponse toOverrideResponse(UserPermissionOverride override) {
-        return new PermissionOverrideResponse(
-                override.getId(),
-                override.getUserId(),
-                override.getPermission(),
-                override.getGrantType(),
-                override.getReason(),
-                override.getExpiresAt(),
-                override.getCreatedBy(),
-                override.getCreatedAt()
-        );
-    }
-
-    private String normalizeGrantType(String grantType) {
-        String normalized = grantType.trim().toUpperCase();
-        if (!List.of("GRANT", "DENY").contains(normalized)) {
-            throw new BadRequestException("invalid permission grant type");
-        }
-        return normalized;
-    }
-
-    private User scopedUser(String userId, String tenantId) {
-        return userRepository.findByIdAndTenantId(userId, normalizeTenant(tenantId))
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
-    }
 
     private String currentTenant() {
         ErgPrincipal principal = SecurityUtils.principal();
