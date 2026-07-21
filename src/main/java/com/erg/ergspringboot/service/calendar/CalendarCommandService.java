@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
 import com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase;
+import com.erg.ergspringboot.calendar.internal.room.CalendarRoomCommandUseCase;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
@@ -91,6 +92,7 @@ public class CalendarCommandService {
     private final EntityManager entityManager;
     private final CalendarBatchLifecycleUseCase batchLifecycle;
     private final CalendarEventMutationUseCase eventMutations;
+    private final CalendarRoomCommandUseCase roomCommands;
 
     /** Compatibility constructor retained for legacy tests and callers. */
     public CalendarCommandService(
@@ -116,7 +118,8 @@ public class CalendarCommandService {
                 userRepository, educationUnitRepository, entityManager,
                 new CalendarBatchLifecycleUseCase(
                         batchRepository, eventRepository, conflictService, eventPublisher),
-                new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository));
+                new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository),
+                new CalendarRoomCommandUseCase(roomRepository));
     }
 
     @Autowired
@@ -137,7 +140,8 @@ public class CalendarCommandService {
             EducationUnitRepository educationUnitRepository,
             EntityManager entityManager,
             CalendarBatchLifecycleUseCase batchLifecycle,
-            CalendarEventMutationUseCase eventMutations) {
+            CalendarEventMutationUseCase eventMutations,
+            CalendarRoomCommandUseCase roomCommands) {
         this.batchRepository = batchRepository;
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
@@ -155,6 +159,7 @@ public class CalendarCommandService {
         this.entityManager = entityManager;
         this.batchLifecycle = batchLifecycle;
         this.eventMutations = eventMutations;
+        this.roomCommands = roomCommands;
     }
 
     @Transactional("postgresTransactionManager")
@@ -369,29 +374,10 @@ public class CalendarCommandService {
                 tenantId, teacherUserId, schoolIds, dateFrom, dateTo, cancelledBy);
     }
 
-    @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public CalendarRoomOption createRoom(
             String tenantId, String schoolId, String roomName, String createdBy) {
-        String trimmedName = roomName == null ? null : roomName.trim();
-        if (trimmedName == null || trimmedName.isBlank()) {
-            throw new IllegalArgumentException("Room name must not be blank");
-        }
-
-        Optional<CalendarRoom> existing = roomRepository.findBySchoolIdAndNameIgnoreCase(schoolId, trimmedName);
-        if (existing.isPresent()) {
-            CalendarRoom room = existing.get();
-            return new CalendarRoomOption(room.getId(), room.getName(), room.getSchoolId());
-        }
-
-        CalendarRoom room = new CalendarRoom();
-        room.setTenantId(tenantId);
-        room.setSchoolId(schoolId);
-        room.setName(trimmedName);
-        room.setStatus(STATUS_ACTIVE);
-        room.setCreatedBy(createdBy);
-        CalendarRoom saved = roomRepository.save(room);
-        return new CalendarRoomOption(saved.getId(), saved.getName(), saved.getSchoolId());
+        return roomCommands.create(tenantId, schoolId, roomName, createdBy);
     }
 
     // =========================================================================
