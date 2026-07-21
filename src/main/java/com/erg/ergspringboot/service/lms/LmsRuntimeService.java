@@ -36,6 +36,7 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
 import com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase;
+import com.erg.ergspringboot.lms.internal.resource.LmsResourceQueryUseCase;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Comparator;
@@ -78,6 +79,7 @@ public class LmsRuntimeService {
     private final CacheManager cacheManager;
     private final LmsAttemptUseCase attemptCommands;
     private final LmsClassroomQueryUseCase classroomQueries;
+    private final LmsResourceQueryUseCase resourceQueries;
 
     public LmsRuntimeService(
             LmsClassroomService classroomService,
@@ -103,6 +105,7 @@ public class LmsRuntimeService {
                 classroomService, assignmentService, quizService, attemptService, studentService,
                 runtimePackageService, attemptGradingService, attemptEventRecorder, cacheManager);
         this.classroomQueries = new LmsClassroomQueryUseCase(classroomService);
+        this.resourceQueries = new LmsResourceQueryUseCase(quizService, runtimePackageService);
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access) {
@@ -207,7 +210,8 @@ public class LmsRuntimeService {
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
-        Quiz quiz = quiz(quizId, access);
+        return resourceQueries.getQuizPackage(quizId, access);
+        /* Quiz quiz = quiz(quizId, access);
         // Prefer the published, signed package from the version lineage (spec §3, Phase 2/3). Legacy
         // monolithic quizzes with no published version fall back to the embedded authoring blob until
         // they are (re)published — keeps existing runtime callers working during the transition.
@@ -225,11 +229,11 @@ public class LmsRuntimeService {
                 nullToMap(quiz.getResult()),
                 nullToMap(quiz.getTheme())
         );
-        return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail, Map.of());
+        return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail, Map.of()); */
     }
 
     public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) {
-        return getQuizPackage(quizId, access).quiz();
+        return resourceQueries.getQuiz(quizId, access);
     }
 
     @Transactional("postgresTransactionManager")
