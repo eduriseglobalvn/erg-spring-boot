@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
-import com.erg.ergspringboot.calendar.CalendarBatchPublished;
+import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
@@ -65,6 +65,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class CalendarCommandService {
@@ -94,8 +95,9 @@ public class CalendarCommandService {
     private final UserRepository userRepository;
     private final EducationUnitRepository educationUnitRepository;
     private final EntityManager entityManager;
-    private final ApplicationEventPublisher eventPublisher;
+    private final CalendarBatchLifecycleUseCase batchLifecycle;
 
+    /** Compatibility constructor retained for legacy tests and callers. */
     public CalendarCommandService(
             CalendarBatchRepository batchRepository,
             CalendarEventRepository eventRepository,
@@ -113,6 +115,32 @@ public class CalendarCommandService {
             EducationUnitRepository educationUnitRepository,
             EntityManager entityManager,
             ApplicationEventPublisher eventPublisher) {
+        this(batchRepository, eventRepository, eventTeacherRepository, roomRepository,
+                expansionService, validationService, inputNormalizer, conflictService,
+                accessSupport, classroomRepository, subjectRepository, levelRepository,
+                userRepository, educationUnitRepository, entityManager,
+                new CalendarBatchLifecycleUseCase(
+                        batchRepository, eventRepository, conflictService, eventPublisher));
+    }
+
+    @Autowired
+    public CalendarCommandService(
+            CalendarBatchRepository batchRepository,
+            CalendarEventRepository eventRepository,
+            CalendarEventTeacherRepository eventTeacherRepository,
+            CalendarRoomRepository roomRepository,
+            CalendarExpansionService expansionService,
+            CalendarValidationService validationService,
+            CalendarBulkInputNormalizer inputNormalizer,
+            CalendarConflictService conflictService,
+            GraphQlAccessSupport accessSupport,
+            ClassroomRepository classroomRepository,
+            SubjectRepository subjectRepository,
+            LevelRepository levelRepository,
+            UserRepository userRepository,
+            EducationUnitRepository educationUnitRepository,
+            EntityManager entityManager,
+            CalendarBatchLifecycleUseCase batchLifecycle) {
         this.batchRepository = batchRepository;
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
@@ -128,7 +156,7 @@ public class CalendarCommandService {
         this.userRepository = userRepository;
         this.educationUnitRepository = educationUnitRepository;
         this.entityManager = entityManager;
-        this.eventPublisher = eventPublisher;
+        this.batchLifecycle = batchLifecycle;
     }
 
     @Transactional("postgresTransactionManager")
@@ -313,52 +341,14 @@ public class CalendarCommandService {
         }
     }
 
-    @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public CalendarBatchPayload publishBatch(String tenantId, String batchId, String userId) {
-        CalendarBatch batch = batchRepository.findByTenantIdAndId(tenantId, batchId)
-                .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
-        if (!STATUS_DRAFT.equals(batch.getStatus())) {
-            throw new IllegalStateException("Cannot publish batch " + batchId + " with status: " + batch.getStatus());
-        }
-
-        List<CalendarEvent> events = findEventsByBatchId(tenantId, batchId);
-        if (events.isEmpty()) {
-            throw new IllegalStateException("Cannot publish an empty batch: " + batchId);
-        }
-
-        OffsetDateTime now = OffsetDateTime.now();
-        batch.setStatus(STATUS_PUBLISHED);
-        batch.setPublishedBy(userId);
-        batch.setPublishedAt(now);
-        batchRepository.save(batch);
-
-        List<String> eventIds = events.stream().map(CalendarEvent::getId).toList();
-        int affected = eventRepository.updateStatusBatch(tenantId, eventIds, STATUS_PUBLISHED, userId, now);
-
-        conflictService.markConflictsResolved(batch.getTenantId(), batchId, userId);
-
-        eventPublisher.publishEvent(new CalendarBatchPublished(
-                "schedule-published:" + batchId, tenantId, batchId, userId, now, 1));
-
-        return new CalendarBatchPayload(batchId, STATUS_PUBLISHED, affected);
+        return batchLifecycle.publish(tenantId, batchId, userId);
     }
 
-    @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public CalendarBatchPayload cancelBatch(String tenantId, String batchId, String userId) {
-        CalendarBatch batch = batchRepository.findByTenantIdAndId(tenantId, batchId)
-                .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
-        if (STATUS_CANCELLED.equals(batch.getStatus())) {
-            throw new IllegalStateException("Batch is already cancelled: " + batchId);
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        batch.setStatus(STATUS_CANCELLED);
-        batchRepository.save(batch);
-        conflictService.markConflictsResolved(batch.getTenantId(), batchId, userId);
-        List<String> eventIds = findEventIdsByBatchId(tenantId, batchId);
-        int affected = eventRepository.updateStatusBatch(tenantId, eventIds, STATUS_CANCELLED, userId, now);
-        return new CalendarBatchPayload(batchId, STATUS_CANCELLED, affected);
+        return batchLifecycle.cancel(tenantId, batchId, userId);
     }
 
     @Transactional("postgresTransactionManager")
@@ -534,10 +524,6 @@ public class CalendarCommandService {
 
     private List<CalendarEvent> findEventsByBatchId(String tenantId, String batchId) {
         return eventRepository.findByTenantIdAndBatchId(tenantId, batchId);
-    }
-
-    private List<String> findEventIdsByBatchId(String tenantId, String batchId) {
-        return findEventsByBatchId(tenantId, batchId).stream().map(CalendarEvent::getId).toList();
     }
 
     private boolean attemptAdvisoryLock(String tenantId, String schoolId) {
