@@ -32,6 +32,9 @@ public final class BusinessCacheRuntimeHints implements RuntimeHintsRegistrar {
     private static final Class<?>[] SPEL_TYPES = {
             StudentDashboardReadScope.class, ErgPrincipal.class, UserAccessContext.class
     };
+    private static final Class<?>[] EVENT_TYPES = {
+            CacheInvalidationMessage.class
+    };
 
     @Override
     public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
@@ -40,6 +43,7 @@ public final class BusinessCacheRuntimeHints implements RuntimeHintsRegistrar {
             for (Class<?> nested : container.getDeclaredClasses()) register(hints, nested, visited);
         }
         for (Class<?> type : SPEL_TYPES) register(hints, type, visited);
+        for (Class<?> type : EVENT_TYPES) register(hints, type, visited);
     }
 
     private void register(RuntimeHints hints, Class<?> type, Set<Class<?>> visited) {

@@ -24,4 +24,13 @@ class CacheNativeImageContractTest {
         assertThat(RuntimeHintsPredicates.reflection().onType(ErgPrincipal.class).test(hints)).isTrue();
         assertThat(RuntimeHintsPredicates.reflection().onType(UserAccessContext.class).test(hints)).isTrue();
     }
+
+    @Test
+    void registersCacheInvalidationRecordAccessorsForNativeJacksonSerialization() throws Exception {
+        RuntimeHints hints = new RuntimeHints();
+        new BusinessCacheRuntimeHints().registerHints(hints, getClass().getClassLoader());
+
+        assertThat(RuntimeHintsPredicates.reflection().onMethodInvocation(
+                CacheInvalidationMessage.class.getMethod("schemaVersion")).test(hints)).isTrue();
+    }
 }

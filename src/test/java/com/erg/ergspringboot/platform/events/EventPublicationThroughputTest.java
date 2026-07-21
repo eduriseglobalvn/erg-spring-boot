@@ -26,6 +26,7 @@ class EventPublicationThroughputTest {
                 .contains("publication lag")
                 .contains("PostgreSQL WAL/IO")
                 .contains("connection-pool wait")
-                .contains("not present in this checkout");
+                .contains("20,000 independent DRAFT batches")
+                .contains("remains explicitly open");
     }
 }

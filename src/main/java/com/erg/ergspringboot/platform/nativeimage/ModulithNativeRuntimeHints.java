@@ -13,5 +13,11 @@ public final class ModulithNativeRuntimeHints implements RuntimeHintsRegistrar {
         hints.reflection().registerType(
                 TypeReference.of("com.tngtech.archunit.core.importer.ModuleImportPlugin"),
                 MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
+        // Spring Modulith's persistent multicaster introspects listener methods
+        // when it records a durable publication. Native image otherwise fails
+        // on ApplicationListenerMethodAdapter#getTargetMethod at first event.
+        hints.reflection().registerType(
+                TypeReference.of("org.springframework.context.event.ApplicationListenerMethodAdapter"),
+                MemberCategory.INVOKE_PUBLIC_METHODS);
     }
 }
