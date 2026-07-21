@@ -47,6 +47,7 @@ import com.erg.ergspringboot.calendar.internal.readmodel.CalendarScheduleBatchQu
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarPermissionsQueryUseCase;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarEventResponseAssembler;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarWorkspaceAssembler;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarWorkspaceQueryUseCase;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -81,6 +82,7 @@ public class CalendarReadService {
     private final CalendarPermissionsQueryUseCase permissionQueries;
     private final CalendarEventResponseAssembler eventResponses;
     private final CalendarWorkspaceAssembler workspaceAssembler;
+    private final CalendarWorkspaceQueryUseCase workspaceQueries;
 
     public CalendarReadService(
             CalendarEventRepository eventRepository,
@@ -110,6 +112,14 @@ public class CalendarReadService {
         this.permissionQueries = new CalendarPermissionsQueryUseCase();
         this.eventResponses = new CalendarEventResponseAssembler();
         this.workspaceAssembler = new CalendarWorkspaceAssembler();
+        this.workspaceQueries = new CalendarWorkspaceQueryUseCase(
+                eventRepository, eventTeacherRepository, studentRepository,
+                this::buildReferenceMaps,
+                this::buildCatalog,
+                this::buildEventResponse,
+                this::buildFilterOptions,
+                this::buildLaneSummaries,
+                this::buildPermissions);
     }
 
     // -------------------------------------------------------------------------
@@ -144,51 +154,9 @@ public class CalendarReadService {
             List<String> levelIds,
             List<String> statuses,
             ErgPrincipal principal) {
-
-        OffsetDateTime fromDateTime = parseDayStart(from);
-        OffsetDateTime toDateTime = parseDayAfter(to);
-        validateWorkspaceBounds(from, to, schoolIds, teacherIds, classIds, subjectIds, levelIds);
-        List<String> effectiveStatuses = statuses != null && !statuses.isEmpty() ? statuses : DEFAULT_STATUSES;
-
-        List<CalendarEvent> filteredEvents = eventRepository.findLcmsWorkspaceEvents(
-                tenantId,
-                schoolIds,
-                toDateTime,
-                fromDateTime,
-                effectiveStatuses,
-                hasValues(teacherIds),
-                queryValues(teacherIds),
-                hasValues(classIds),
-                queryValues(classIds),
-                hasValues(subjectIds),
-                queryValues(subjectIds),
-                hasValues(levelIds),
-                queryValues(levelIds));
-
-        List<CalendarEventTeacher> allAssignments = batchLoadTeacherAssignments(tenantId, filteredEvents);
-        Map<String, List<CalendarEventTeacher>> assignmentsByEvent = allAssignments.stream()
-                .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
-
-        ReferenceMaps refMaps = buildReferenceMaps(tenantId, schoolIds, filteredEvents, allAssignments);
-
-        List<CalendarEventResponse> eventResponses = filteredEvents.stream()
-                .map(event -> buildEventResponse(event,
-                        assignmentsByEvent.getOrDefault(event.getId(), List.of()), refMaps))
-                .toList();
-
-        CalendarFilterOptionsResponse filterOptions = buildFilterOptions(
-                filteredEvents, assignmentsByEvent, refMaps, viewMode);
-
-        List<CalendarLaneSummaryResponse> laneSummaries = buildLaneSummaries(
-                filteredEvents, assignmentsByEvent, refMaps, viewMode);
-
-        CalendarCatalogResponse catalog = buildCatalog(tenantId, schoolIds, fromDateTime, toDateTime);
-        CalendarPermissionsResponse permissions = buildPermissions(principal);
-
-        return new CalendarWorkspaceResponse(
-                tenantId, from, to, viewMode, eventResponses,
-                filterOptions, laneSummaries, catalog, permissions,
-                OffsetDateTime.now().toString());
+        return workspaceQueries.lcms(
+                tenantId, schoolIds, from, to, viewMode,
+                teacherIds, classIds, subjectIds, levelIds, statuses, principal);
     }
 
     // -------------------------------------------------------------------------
@@ -209,55 +177,9 @@ public class CalendarReadService {
             List<String> levelIds,
             List<String> statuses,
             ErgPrincipal principal) {
-
-        OffsetDateTime fromDateTime = parseDayStart(from);
-        OffsetDateTime toDateTime = parseDayAfter(to);
-        validateWorkspaceBounds(from, to, null, null, classIds, subjectIds, levelIds);
-        List<String> effectiveStatuses = List.of("PUBLISHED");
-
-        List<CalendarEvent> filteredEvents = eventRepository.findTeacherCalendarEventsFiltered(
-                tenantId,
-                teacherUserId,
-                toDateTime,
-                fromDateTime,
-                effectiveStatuses,
-                hasValues(schoolIds),
-                queryValues(schoolIds),
-                hasValues(classIds),
-                queryValues(classIds),
-                hasValues(subjectIds),
-                queryValues(subjectIds),
-                hasValues(levelIds),
-                queryValues(levelIds));
-
-        List<CalendarEventTeacher> allAssignments = batchLoadTeacherAssignments(tenantId, filteredEvents);
-        Map<String, List<CalendarEventTeacher>> assignmentsByEvent = allAssignments.stream()
-                .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
-
-        Set<String> effectiveSchoolIds = schoolIds != null && !schoolIds.isEmpty()
-                ? new HashSet<>(schoolIds)
-                : filteredEvents.stream().map(CalendarEvent::getSchoolId).collect(Collectors.toSet());
-        ReferenceMaps refMaps = buildReferenceMaps(
-                tenantId, new ArrayList<>(effectiveSchoolIds), filteredEvents, allAssignments);
-
-        List<CalendarEventResponse> eventResponses = filteredEvents.stream()
-                .map(event -> buildEventResponse(event,
-                        assignmentsByEvent.getOrDefault(event.getId(), List.of()), refMaps))
-                .toList();
-
-        CalendarFilterOptionsResponse filterOptions = buildFilterOptions(
-                filteredEvents, assignmentsByEvent, refMaps, viewMode);
-
-        List<CalendarLaneSummaryResponse> laneSummaries = buildLaneSummaries(
-                filteredEvents, assignmentsByEvent, refMaps, viewMode);
-
-        CalendarCatalogResponse catalog = buildCatalog(tenantId, new ArrayList<>(effectiveSchoolIds), fromDateTime, toDateTime);
-        CalendarPermissionsResponse permissions = buildPermissions(principal);
-
-        return new CalendarWorkspaceResponse(
-                tenantId, from, to, viewMode, eventResponses,
-                filterOptions, laneSummaries, catalog, permissions,
-                OffsetDateTime.now().toString());
+        return workspaceQueries.teacher(
+                tenantId, teacherUserId, from, to, viewMode,
+                schoolIds, classIds, subjectIds, levelIds, statuses, principal);
     }
 
     // -------------------------------------------------------------------------
@@ -276,63 +198,9 @@ public class CalendarReadService {
             List<String> levelIds,
             List<String> statuses,
             ErgPrincipal principal) {
-
-        // Look up student record to determine academicClassId
-        Student student = studentRepository
-                .findFirstByTenantIdAndAuthUserId(tenantId, studentUserId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Student record not found for userId: " + studentUserId));
-
-        String academicClassId = student.getAcademicClassId();
-        if (academicClassId == null) {
-            throw new IllegalArgumentException(
-                    "Student " + studentUserId + " has no academic class assignment.");
-        }
-
-        OffsetDateTime fromDateTime = parseDayStart(from);
-        OffsetDateTime toDateTime = parseDayAfter(to);
-        validateWorkspaceBounds(from, to, null, null, null, subjectIds, levelIds);
-        List<String> effectiveStatuses = List.of("PUBLISHED");
-
-        List<CalendarEvent> filteredEvents = eventRepository.findStudentCalendarEventsFiltered(
-                tenantId,
-                academicClassId,
-                toDateTime,
-                fromDateTime,
-                effectiveStatuses,
-                hasValues(subjectIds),
-                queryValues(subjectIds),
-                hasValues(levelIds),
-                queryValues(levelIds));
-
-        List<CalendarEventTeacher> allAssignments = batchLoadTeacherAssignments(tenantId, filteredEvents);
-        Map<String, List<CalendarEventTeacher>> assignmentsByEvent = allAssignments.stream()
-                .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
-
-        Set<String> effectiveSchoolIds = filteredEvents.stream()
-                .map(CalendarEvent::getSchoolId)
-                .collect(Collectors.toSet());
-        ReferenceMaps refMaps = buildReferenceMaps(
-                tenantId, new ArrayList<>(effectiveSchoolIds), filteredEvents, allAssignments);
-
-        List<CalendarEventResponse> eventResponses = filteredEvents.stream()
-                .map(event -> buildEventResponse(event,
-                        assignmentsByEvent.getOrDefault(event.getId(), List.of()), refMaps))
-                .toList();
-
-        CalendarFilterOptionsResponse filterOptions = buildFilterOptions(
-                filteredEvents, assignmentsByEvent, refMaps, viewMode);
-
-        List<CalendarLaneSummaryResponse> laneSummaries = buildLaneSummaries(
-                filteredEvents, assignmentsByEvent, refMaps, viewMode);
-
-        CalendarCatalogResponse catalog = buildCatalog(tenantId, new ArrayList<>(effectiveSchoolIds), fromDateTime, toDateTime);
-        CalendarPermissionsResponse permissions = buildPermissions(principal);
-
-        return new CalendarWorkspaceResponse(
-                tenantId, from, to, viewMode, eventResponses,
-                filterOptions, laneSummaries, catalog, permissions,
-                OffsetDateTime.now().toString());
+        return workspaceQueries.student(
+                tenantId, studentUserId, from, to, viewMode,
+                subjectIds, levelIds, statuses, principal);
     }
 
     // -------------------------------------------------------------------------
@@ -522,59 +390,6 @@ public class CalendarReadService {
                 Map.of());
     }
 
-    private List<CalendarEventTeacher> batchLoadTeacherAssignments(String tenantId, List<CalendarEvent> events) {
-        if (events == null || events.isEmpty()) return List.of();
-        List<String> eventIds = events.stream().map(CalendarEvent::getId).filter(Objects::nonNull).toList();
-        if (eventIds.isEmpty()) return List.of();
-        return eventTeacherRepository.findByTenantIdAndEventIdIn(tenantId, eventIds);
-    }
-
-    private List<CalendarEvent> applyFilters(
-            List<CalendarEvent> events,
-            Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
-            List<String> teacherIds, List<String> classIds,
-            List<String> subjectIds, List<String> levelIds) {
-
-        List<CalendarEvent> result = events;
-        if (teacherIds != null && !teacherIds.isEmpty()) {
-            Set<String> teacherIdSet = new HashSet<>(teacherIds);
-            result = result.stream()
-                    .filter(event -> assignmentsByEvent.getOrDefault(event.getId(), List.of()).stream()
-                            .anyMatch(t -> teacherIdSet.contains(t.getTeacherUserId())))
-                    .toList();
-        }
-        if (classIds != null && !classIds.isEmpty()) {
-            Set<String> classIdSet = new HashSet<>(classIds);
-            result = result.stream().filter(e -> classIdSet.contains(e.getAcademicClassId())).toList();
-        }
-        if (subjectIds != null && !subjectIds.isEmpty()) {
-            Set<String> subjectIdSet = new HashSet<>(subjectIds);
-            result = result.stream().filter(e -> subjectIdSet.contains(e.getSubjectId())).toList();
-        }
-        if (levelIds != null && !levelIds.isEmpty()) {
-            Set<String> levelIdSet = new HashSet<>(levelIds);
-            result = result.stream().filter(e -> levelIdSet.contains(e.getLevelId())).toList();
-        }
-        return result;
-    }
-
-    private CalendarBatchSummaryResponse toBatchSummary(CalendarBatch batch) {
-        return new CalendarBatchSummaryResponse(
-                batch.getId(),
-                batch.getTenantId(),
-                batch.getSchoolId(),
-                batch.getAcademicYear(),
-                batch.getApplyFrom() != null ? batch.getApplyFrom().toString() : null,
-                batch.getRepeatWeeks(),
-                batch.getStatus(),
-                batch.getSource(),
-                batch.getNote(),
-                batch.getCreatedBy(),
-                batch.getPublishedBy(),
-                batch.getPublishedAt() != null ? batch.getPublishedAt().toString() : null,
-                batch.getCreatedAt() != null ? batch.getCreatedAt().toString() : null);
-    }
-
     private List<User> findTeachersForCatalog(String tenantId, List<String> schoolIds) {
         if (schoolIds == null || schoolIds.isEmpty()) {
             return sortUsersForCatalog(nonNull(userRepository.findCalendarTeachersByTenant(
@@ -624,64 +439,6 @@ public class CalendarReadService {
         if (user.getFullName() != null && !user.getFullName().isBlank()) return user.getFullName();
         if (user.getEmail() != null && !user.getEmail().isBlank()) return user.getEmail();
         return user.getId();
-    }
-
-    private static boolean hasValues(List<String> values) {
-        return values != null && values.stream().anyMatch(value -> value != null && !value.isBlank());
-    }
-
-    private static List<String> queryValues(List<String> values) {
-        if (!hasValues(values)) return List.of(FILTER_SENTINEL);
-        return values.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .distinct()
-                .toList();
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value;
-    }
-
-    private static String normalizeStatus(String status) {
-        return status == null || status.isBlank() ? null : status.trim().toUpperCase(Locale.ROOT);
-    }
-
-    private static OffsetDateTime parseDayStart(String date) {
-        return LocalDate.parse(date).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
-    }
-
-    private static OffsetDateTime parseDayAfter(String date) {
-        return LocalDate.parse(date).plusDays(1).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
-    }
-
-    private static void validateWorkspaceBounds(
-            String from,
-            String to,
-            List<String> schoolIds,
-            List<String> teacherIds,
-            List<String> classIds,
-            List<String> subjectIds,
-            List<String> levelIds
-    ) {
-        LocalDate start;
-        LocalDate end;
-        try {
-            start = LocalDate.parse(from);
-            end = LocalDate.parse(to);
-        } catch (RuntimeException ex) {
-            throw new BadRequestException("calendar from/to must be ISO dates");
-        }
-        long days = java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1;
-        if (days < 1 || days > MAX_WORKSPACE_DAYS) {
-            throw new BadRequestException("calendar date range must be between 1 and " + MAX_WORKSPACE_DAYS + " days");
-        }
-        // Arrays.asList intentionally permits null optional filter lists; List.of rejects
-        // null elements before the validation branch can treat them as absent.
-        for (List<String> values : Arrays.asList(schoolIds, teacherIds, classIds, subjectIds, levelIds)) {
-            if (values != null && values.stream().filter(value -> value != null && !value.isBlank()).distinct().count() > MAX_FILTER_VALUES) {
-                throw new BadRequestException("calendar filter list exceeds " + MAX_FILTER_VALUES + " values");
-            }
-        }
     }
 
 }
