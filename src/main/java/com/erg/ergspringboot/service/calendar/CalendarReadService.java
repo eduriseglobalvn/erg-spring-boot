@@ -42,6 +42,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarCatalogQueryUseCase;
 
 @Service
 @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -71,6 +72,7 @@ public class CalendarReadService {
     private final StudentRepository studentRepository;
     private final CalendarBatchRepository batchRepository;
     private final ErgReadTaskExecutor readTaskExecutor;
+    private final CalendarCatalogQueryUseCase catalogQueries;
 
     public CalendarReadService(
             CalendarEventRepository eventRepository,
@@ -95,6 +97,7 @@ public class CalendarReadService {
         this.studentRepository = studentRepository;
         this.batchRepository = batchRepository;
         this.readTaskExecutor = readTaskExecutor;
+        this.catalogQueries = new CalendarCatalogQueryUseCase(roomRepository);
     }
 
     // -------------------------------------------------------------------------
@@ -112,10 +115,7 @@ public class CalendarReadService {
     }
 
     public List<CalendarRoomOptionResponse> activeRooms(String tenantId, String schoolId) {
-        if (schoolId == null || schoolId.isBlank()) return List.of();
-        return roomRepository.findByTenantIdAndSchoolIdAndStatus(tenantId, schoolId, STATUS_ACTIVE).stream()
-                .map(room -> new CalendarRoomOptionResponse(room.getId(), room.getName(), room.getSchoolId()))
-                .toList();
+        return catalogQueries.activeRooms(tenantId, schoolId);
     }
 
     @Cacheable(cacheNames = "calendarWorkspace",
