@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.ErrDetail;
 import com.erg.ergspringboot.common.response.FieldErrorDetail;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Comparator;
 import java.util.List;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -46,6 +48,47 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.unprocessableEntity()
+                .header("X-Request-ID", response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(
+            ConstraintViolationException exception,
+            WebRequest request
+    ) {
+        List<FieldErrorDetail> details = exception.getConstraintViolations().stream()
+                .sorted(Comparator.comparing(violation -> violation.getPropertyPath().toString()))
+                .map(violation -> new FieldErrorDetail(
+                        violation.getPropertyPath().toString(),
+                        "ConstraintViolation",
+                        "ConstraintViolation",
+                        violation.getMessage()))
+                .toList();
+        ApiResponse<Void> response = ApiResponse.failure(
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                new ErrDetail("VALIDATION_ERROR", "validation failed", details),
+                getRequestPath(request),
+                getRequestId(request));
+
+        return ResponseEntity.unprocessableEntity()
+                .header("X-Request-ID", response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestParameter(
+            MissingServletRequestParameterException exception,
+            WebRequest request
+    ) {
+        ApiResponse<Void> response = ApiResponse.failure(
+                HttpStatus.BAD_REQUEST.value(),
+                ErrDetail.of("INVALID_REQUEST",
+                        "Missing required request parameter: " + exception.getParameterName()),
+                getRequestPath(request),
+                getRequestId(request));
+
+        return ResponseEntity.badRequest()
                 .header("X-Request-ID", response.requestId())
                 .body(response);
     }
