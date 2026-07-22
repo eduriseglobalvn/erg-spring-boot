@@ -16,6 +16,9 @@ public interface MediaStorageAdapter {
     /** Short-lived (~5 min) URL the client PUTs raw bytes to. */
     String presignUpload(String storageKey, String mimeType, long byteSize);
 
+    /** Verify that an upload URL is unexpired and bound to the same tenant and object contract. */
+    boolean isAuthorizedUpload(String uploadUrl, String tenantId, String mimeType, long byteSize);
+
     /** Public/CDN URL used to read committed bytes. Immutable, content-hash keyed. */
     String publicUrl(String storageKey);
 }
