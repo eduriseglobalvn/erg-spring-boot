@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 478
+  route-count: 488
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -4126,6 +4126,86 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
+    - route: POST /api/v1/content/lectures/google-slides => com.erg.ergspringboot.controller.learningcontent.LearningContentController.createGoogleSlidesLecture
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/content/items => com.erg.ergspringboot.controller.learningcontent.LearningContentController.createContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.updateContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/content/assets => com.erg.ergspringboot.controller.learningcontent.LearningContentController.createContentAsset
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/content/assets/{contentAssetId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.updateContentAsset
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/content/items/{contentItemId}/assets => com.erg.ergspringboot.controller.learningcontent.LearningContentController.attachContentAsset
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/curriculum/topics/{topicId}/content-items => com.erg.ergspringboot.controller.learningcontent.LearningContentController.placeContentItem
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: DELETE /api/v1/curriculum/topics/{topicId}/content-items/{placementId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.removePlacement
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PATCH /api/v1/curriculum/topics/{topicId}/content-items/reorder => com.erg.ergspringboot.controller.learningcontent.LearningContentController.reorderPlacements
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
 graphql:
   mapped-method-count: 33
   fields:

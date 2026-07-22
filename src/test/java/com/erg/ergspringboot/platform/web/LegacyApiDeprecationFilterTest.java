@@ -46,14 +46,15 @@ class LegacyApiDeprecationFilterTest {
     }
 
     @Test
-    void tracksLegacyRoutesWithoutAdvertisingAnUnreleasedSuccessor() throws Exception {
+    void advertisesTheMountedContentSuccessor() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/content/items");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, (req, res) -> response.setStatus(201));
 
         assertThat(response.getHeader("Deprecation")).isEqualTo("true");
-        assertThat(response.getHeader("Link")).isNull();
+        assertThat(response.getHeader("Link"))
+                .isEqualTo("</api/v1/content/items>; rel=\"successor-version\"");
         assertThat(response.getHeader("X-ERG-API-Owner")).isEqualTo("learningcontent");
     }
 }

@@ -13061,6 +13061,244 @@
         ]
       }
     },
+    "/api/v1/content/assets": {
+      "post": {
+        "operationId": "createContentAssetCanonical",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContentAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContentAsset"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/content/assets/{contentAssetId}": {
+      "patch": {
+        "operationId": "updateContentAssetCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contentAssetId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContentAsset"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/content/items": {
+      "post": {
+        "operationId": "createContentItemCanonical",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContentItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContentItem"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/content/items/{contentItemId}": {
+      "delete": {
+        "operationId": "deleteContentItemCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contentItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "updateContentItemCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contentItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContentItem"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/content/items/{contentItemId}/assets": {
+      "post": {
+        "operationId": "attachContentAssetCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contentItemId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachContentAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseContentItemAsset"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/content/lectures/google-slides": {
+      "post": {
+        "operationId": "createGoogleSlidesLectureCanonical",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoogleSlidesLectureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGoogleSlidesLectureResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
     "/api/v1/courses": {
       "get": {
         "operationId": "list_4",
@@ -14475,6 +14713,124 @@
         },
         "tags": [
           "crm-school-controller"
+        ]
+      }
+    },
+    "/api/v1/curriculum/topics/{topicId}/content-items": {
+      "post": {
+        "operationId": "placeContentItemCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "topicId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceContentItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTopicContentItem"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/curriculum/topics/{topicId}/content-items/reorder": {
+      "patch": {
+        "operationId": "reorderPlacementsCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "topicId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderTopicContentItemsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTopicContentItem"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
+        ]
+      }
+    },
+    "/api/v1/curriculum/topics/{topicId}/content-items/{placementId}": {
+      "delete": {
+        "operationId": "removePlacementCanonical",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "topicId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "placementId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "learning-content-controller"
         ]
       }
     },

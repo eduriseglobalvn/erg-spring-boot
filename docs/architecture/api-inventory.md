@@ -8,7 +8,7 @@ statement, row, payload, state-owner, cache and pagination metadata. The existin
 `RequestMappingHandlerMapping`; a new production mapping therefore fails CI until it is
 explicitly inventoried.
 
-REST route count: `478`
+REST route count: `488`
 
 GraphQL mapped field count: `33`
 
@@ -25,7 +25,7 @@ Every REST row in the appendix must have:
 - persistence source and replacement: represented by `classification`, `state-owner` and
   `disposition` in the catalog during the strangler migration.
 
-The inventory does not duplicate 478 rows in prose. The catalog is the row-level source of
+The inventory does not duplicate 488 rows in prose. The catalog is the row-level source of
 truth, and `RouteInventoryContractTest` verifies that every catalog handler has an owner,
 that the declared count is exact, and that all GraphQL fields are owned below.
 
@@ -78,8 +78,9 @@ Runtime enforcement is provided by `LegacyApiRegistry` and `LegacyApiDeprecation
 legacy requests receive `Deprecation: true`, an RFC 8594-compatible `Sunset` date, `X-ERG-API-Owner`,
 and (when a canonical successor is already mounted) a `successor-version` `Link`. The low-cardinality
 `erg.api.deprecated.requests{route_group,owner}` counter is the removal-readiness signal. Content and
-curriculum placement routes intentionally omit a successor link until their typed `/api/v1` replacement
-is actually mounted; advertising an unavailable endpoint would create a false migration contract.
+curriculum placement commands now expose `/api/v1/content/**` and `/api/v1/curriculum/topics/**`
+successors beside their compatibility routes. Removal remains gated by the legacy request counter and
+the published sunset date; the old handlers are aliases to the same use cases, not duplicated logic.
 
 ## Known boundary findings
 
