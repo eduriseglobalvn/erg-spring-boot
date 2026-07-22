@@ -22,11 +22,14 @@ public class SecurityErrorResponseWriter {
             throws IOException {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        String requestId = requestId(request);
+        response.setHeader("X-Request-ID", requestId);
+        response.setHeader("Cache-Control", "no-store");
         ApiResponse<Void> body = ApiResponse.failure(
                 status,
                 new ErrDetail(code, message, java.util.List.of()),
                 request.getRequestURI(),
-                requestId(request)
+                requestId
         );
         objectMapper.writeValue(response.getWriter(), body);
     }
