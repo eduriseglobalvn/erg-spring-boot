@@ -9,7 +9,7 @@ import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumNodeReq
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumSubjectResponse;
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTopicResponse;
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTreeResponse;
-import com.erg.ergspringboot.service.curriculum.CurriculumService;
+import com.erg.ergspringboot.curriculum.CurriculumOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/curriculum")
 public class CurriculumController {
 
-    private final CurriculumService curriculumService;
+    private final CurriculumOperations curriculumService;
 
-    public CurriculumController(CurriculumService curriculumService) {
+    public CurriculumController(CurriculumOperations curriculumService) {
         this.curriculumService = curriculumService;
     }
 
