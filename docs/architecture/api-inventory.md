@@ -74,6 +74,13 @@ Legacy routes are not aliases forever. A legacy route needs a deprecation metric
 removal date in the release notes. The curriculum legacy tree is removed in Phase 1.2 after
 the canonical `/api/v1/curriculum/tree` contract is green.
 
+Runtime enforcement is provided by `LegacyApiRegistry` and `LegacyApiDeprecationFilter`. Registered
+legacy requests receive `Deprecation: true`, an RFC 8594-compatible `Sunset` date, `X-ERG-API-Owner`,
+and (when a canonical successor is already mounted) a `successor-version` `Link`. The low-cardinality
+`erg.api.deprecated.requests{route_group,owner}` counter is the removal-readiness signal. Content and
+curriculum placement routes intentionally omit a successor link until their typed `/api/v1` replacement
+is actually mounted; advertising an unavailable endpoint would create a false migration contract.
+
 ## Known boundary findings
 
 These controllers are explicitly tracked for prototype/direct-service remediation:
