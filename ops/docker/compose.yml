@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-erg}
       POSTGRES_USER: ${POSTGRES_USER:-erg}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erg-local-password}
+      POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER:-erg_app}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-erg-local-runtime-password}
     command:
       - postgres
       - -c

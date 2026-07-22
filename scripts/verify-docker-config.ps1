@@ -32,6 +32,7 @@ $envDev = Require-File "ops/docker/.env.dev.example"
 $envProduction = Require-File "ops/docker/.env.production.example"
 $windowsScript = Require-File "scripts/docker.ps1"
 $linuxScript = Require-File "scripts/docker.sh"
+$runtimeRoleMigration = Require-File "src/main/resources/db/migration/postgres/V74__runtime_role_rls_grants.sql"
 
 Require-Match $dockerfile 'ghcr\.io/graalvm/native-image-community:25' "Dockerfile must use GraalVM Native Image 25"
 Require-Match $dockerfile 'native:compile' "Dockerfile must compile a native executable"
@@ -41,6 +42,8 @@ Require-Match $dockerfile 'FLYWAY_ENABLED=true' "Native AOT build must include t
 Require-Match $dockerfile 'target/classes/db/migration/postgres' "Runtime image must include Flyway SQL files"
 Require-Match $dockerfile '/ready' "Runtime healthcheck must use the public readiness endpoint"
 Require-Match $composeBase 'postgres:17' "Base Compose must provide PostgreSQL 17"
+Require-Match $composeBase 'POSTGRES_RUNTIME_USER' "PostgreSQL must provision a non-owner runtime role"
+Require-Match $composeBase 'POSTGRES_RUNTIME_PASSWORD' "PostgreSQL runtime role must have a separate password"
 Require-Match $composeBase '(?m)^\s{2}redis-state:' "Base Compose must define redis-state"
 Require-Match $composeBase '(?m)^\s{2}redis-cache:' "Base Compose must define redis-cache"
 Require-Match $composeBase 'redis:8\.8\.0-alpine3\.23' "Redis services must pin Redis 8.8.0 on Alpine 3.23"
@@ -68,6 +71,8 @@ Require-Match $composeDev '127\.0\.0\.1:\$\{REDIS_STATE_HOST_PORT:-6379\}:6379' 
 Require-Match $composeDev '127\.0\.0\.1:\$\{REDIS_CACHE_HOST_PORT:-6380\}:6379' "Development cache Redis must bind loopback"
 Require-Match $composeDev 'host\.docker\.internal' "Development Compose must support Windows host.docker.internal"
 Require-Match $composeNative 'image:\s*\$\{ERG_APP_IMAGE' "Native Compose must use ERG_APP_IMAGE"
+Require-Match $composeNative 'SPRING_DATASOURCE_USERNAME: \$\{POSTGRES_RUNTIME_USER' "Backend must connect with the non-owner runtime role"
+Require-Match $composeNative 'SPRING_FLYWAY_USER: \$\{POSTGRES_USER' "Flyway must use the migration owner role"
 Require-Match $composeNative '/ready' "Native backend healthcheck must use the public readiness endpoint"
 if ($null -ne $composeNative -and $composeNative -match '(?m)^\s+build\s*:') {
     $failures.Add("Native/server Compose must not contain a build directive")
@@ -80,6 +85,8 @@ foreach ($name in @(
     "SPRING_DATASOURCE_URL",
     "SPRING_DATASOURCE_USERNAME",
     "SPRING_DATASOURCE_PASSWORD",
+    "POSTGRES_RUNTIME_USER",
+    "POSTGRES_RUNTIME_PASSWORD",
     "SPRING_DATA_REDIS_URL",
     "SPRING_PROFILES_ACTIVE",
     "SERVER_PORT",
@@ -93,6 +100,8 @@ foreach ($name in @(
 
 Require-Match $envProduction '(?m)^ERG_APP_IMAGE=.+:.+' "Production env must define a versioned ERG_APP_IMAGE"
 Require-Match $envProduction '(?m)^FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres$' "Native production env must use filesystem Flyway migrations"
+Require-Match $runtimeRoleMigration 'grant select, insert, update, delete on all tables' "Runtime role migration must grant table access"
+Require-Match $runtimeRoleMigration 'alter default privileges' "Runtime role migration must protect future tables"
 Require-Match $windowsScript 'linux/amd64' "Windows build command must target linux/amd64"
 Require-Match $windowsScript '(?m)\bpull\b' "Windows deploy command must pull prebuilt images"
 Require-Match $linuxScript '(?m)\bpull\b' "Linux deploy command must pull prebuilt images"

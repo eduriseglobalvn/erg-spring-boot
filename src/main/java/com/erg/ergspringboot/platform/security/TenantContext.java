@@ -3,10 +3,9 @@ package com.erg.ergspringboot.platform.security;
 /**
  * Request-scoped tenant/user/portal identity captured from the authenticated principal (spec §1).
  *
- * <p>Phase 0.4 groundwork for row-level security: the values held here are the ones that will be
- * pushed into PostgreSQL session GUCs ({@code app.tenant_id}/{@code app.user_id}/{@code app.portal})
- * so RLS policies can read them via {@code current_setting(...)}. RLS is NOT enforced yet — this only
- * establishes and proves the plumbing so that turning policies on in Phase 6 is a low-risk switch.
+ * <p>The values held here are pushed into PostgreSQL session GUCs ({@code app.tenant_id}/
+ * {@code app.user_id}/{@code app.portal}) so strict quiz-domain RLS policies can read them via
+ * {@code current_setting(...)}. Policy coverage for legacy tables remains an explicit rollout gate.
  *
  * <p>Held in a {@link ThreadLocal} because request threads own a single DB connection for the span of
  * a transaction; {@link TenantContextFilter} sets it at the start of each request and clears it after.

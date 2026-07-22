@@ -15,9 +15,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Captures the authenticated tenant/user/portal into a request-scoped {@link TenantContext} (spec §1,
- * Phase 0.4). This is the groundwork for PostgreSQL row-level security: later phases push these values
- * into session GUCs so RLS policies can read {@code current_setting('app.tenant_id')}. RLS is not yet
- * enforced — this filter only establishes and clears the per-request identity.
+ * Phase 0.4). The transaction manager pushes these values into PostgreSQL session GUCs so strict
+ * quiz-domain RLS policies can read {@code current_setting('app.tenant_id')}; legacy-table policy
+ * rollout remains incremental. This filter establishes and clears the per-request identity.
  *
  * <p>Runs after {@link ErgAuthenticationFilter} has populated the {@link SecurityContextHolder}, so the
  * principal is available. When no principal is present (public routes, background paths) the context is
