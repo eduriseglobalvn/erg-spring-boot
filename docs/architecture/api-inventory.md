@@ -81,6 +81,8 @@ and (when a canonical successor is already mounted) a `successor-version` `Link`
 curriculum placement commands now expose `/api/v1/content/**` and `/api/v1/curriculum/topics/**`
 successors beside their compatibility routes. Removal remains gated by the legacy request counter and
 the published sunset date; the old handlers are aliases to the same use cases, not duplicated logic.
+Cross-origin clients can read the migration headers because `CorsConfig` exposes `Deprecation`, `Sunset`,
+`Link` and `X-ERG-API-Owner` alongside request/trace identifiers.
 
 ## Known boundary findings
 

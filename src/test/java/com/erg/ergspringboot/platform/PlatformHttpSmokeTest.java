@@ -69,7 +69,9 @@ class PlatformHttpSmokeTest {
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
-                .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-Request-ID")));
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("X-Request-ID")))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Deprecation")))
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Sunset")));
     }
 
     @Test

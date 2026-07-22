@@ -53,7 +53,7 @@ public class CorsConfig implements WebMvcConfigurer {
             @Value("${erg.http.cors.allowed-origins:}") String allowedOrigins,
             @Value("${erg.http.cors.allowed-methods:GET,POST,PUT,DELETE,PATCH,OPTIONS}") String allowedMethods,
             @Value("${erg.http.cors.allowed-headers:Accept,Authorization,Content-Type,X-Tenant-ID,X-Request-ID,X-Trace-ID,X-Idempotency-Key}") String allowedHeaders,
-            @Value("${erg.http.cors.exposed-headers:X-Request-ID,X-Trace-ID}") String exposedHeaders,
+            @Value("${erg.http.cors.exposed-headers:X-Request-ID,X-Trace-ID,Deprecation,Sunset,Link,X-ERG-API-Owner}") String exposedHeaders,
             @Value("${erg.http.cors.allow-credentials:true}") boolean allowCredentials,
             @Value("${erg.http.cors.max-age:86400}") long maxAge
     ) {
