@@ -28,7 +28,7 @@ public class FlywayConfig {
             Environment environment
     ) {
         return Flyway.configure()
-                .dataSource(migrationDataSource(properties))
+                .dataSource(migrationDataSource(properties, environment))
                 .locations(resolveMigrationLocation(environment))
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
@@ -36,12 +36,12 @@ public class FlywayConfig {
                 .load();
     }
 
-    private DataSource migrationDataSource(DataSourceProperties properties) {
+    private DataSource migrationDataSource(DataSourceProperties properties, Environment environment) {
         DriverManagerDataSource dataSource = new DriverManagerDataSource();
         dataSource.setDriverClassName(properties.determineDriverClassName());
         dataSource.setUrl(properties.determineUrl());
-        dataSource.setUsername(properties.determineUsername());
-        dataSource.setPassword(properties.determinePassword());
+        dataSource.setUsername(environment.getProperty("spring.flyway.user", properties.determineUsername()));
+        dataSource.setPassword(environment.getProperty("spring.flyway.password", properties.determinePassword()));
         return dataSource;
     }
 

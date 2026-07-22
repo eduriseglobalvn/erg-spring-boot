@@ -11,10 +11,10 @@ import java.sql.SQLException;
  * <p>Uses {@code set_config(key, value, true)} where the trailing {@code true} scopes the setting to the
  * current transaction, so the value is automatically reset when the transaction ends and never leaks to
  * the next borrower of a pooled connection. {@code current_setting(key, true)} then reads it back without
- * erroring when unset. RLS policies (enabled in Phase 6) will read {@code app.tenant_id} etc. this way.
+ * erroring when unset. Strict quiz-domain RLS policies read {@code app.tenant_id} etc. this way.
  *
- * <p>This helper is intentionally not yet wired into every transaction; it is proven in isolation now and
- * activated when policies are switched on, keeping the RLS rollout a low-risk, reversible step.
+ * <p>The application runtime must use a dedicated non-owner database role; Flyway uses a separate
+ * migration-owner credential. Legacy-table policy rollout remains incremental and explicitly gated.
  */
 public final class TenantGucApplier {
 

@@ -18,8 +18,10 @@ services:
         org.springframework.modulith.observability.autoconfigure.SpringDataRestModuleObservabilityAutoConfiguration,
         org.springframework.modulith.actuator.autoconfigure.ApplicationModulesEndpointConfiguration
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-erg}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-erg}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_RUNTIME_USER:-erg_app}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:?set POSTGRES_RUNTIME_PASSWORD}
+      SPRING_FLYWAY_USER: ${POSTGRES_USER:-erg}
+      SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres
       SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED: "false"
       SPRING_DATA_REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379
