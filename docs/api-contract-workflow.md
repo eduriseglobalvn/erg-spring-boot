@@ -24,6 +24,10 @@ Pull request CI tự động chạy hai gate:
 
 Push branch không có base snapshot để so sánh nhưng vẫn phải qua gate checksum. Khi thay đổi endpoint, commit snapshot và checksum cùng thay đổi; pull request phải có migration/deprecation evidence nếu contract breaking.
 
+REST validation errors and GraphQL resolver errors share stable business codes and request correlation:
+`VALIDATION_ERROR`, `ACCESS_DENIED`, `AUTHENTICATION_REQUIRED` and `INTERNAL_SERVER_ERROR` are
+never replaced by raw framework messages. Field violations remain structured details for clients.
+
 CI phải giữ nguyên exit code của `oasdiff`; cảnh báo breaking cũng làm gate thất bại.
 
 ## Chính sách thay đổi

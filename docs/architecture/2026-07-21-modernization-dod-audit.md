@@ -24,6 +24,7 @@
 - OpenAPI contract governance now has a CI lock: the committed normalized snapshot and SHA-256 are verified on every branch, and pull requests run pinned `oasdiff` breaking-change checks against the base branch. GraphQL now has a canonical schema checksum plus an AST compatibility gate that checks the PR schema against its base for removed/incompatible types, fields, arguments, input fields and enum values; the existing coverage catalog remains the operation/owner lock.
 - Tenant isolation now has a real PostgreSQL RLS proof for quiz-domain tables using a non-superuser runtime role. Docker/Flyway configuration separates the application role from the migration owner, preventing the common owner/superuser RLS bypass. Legacy-table RLS coverage remains open and is not claimed complete.
 - Auth refresh rotation now has a PostgreSQL concurrency proof: two transactions contending for the same refresh hash serialize on `SELECT ... FOR UPDATE`; after the first rotation commits, the contender rechecks the predicate and cannot consume the old token. Existing replay-history/account-revocation tests remain green.
+- REST validation now maps `ConstraintViolationException` and missing request parameters into the typed `ApiResponse` envelope instead of leaking them through the generic 500 handler. GraphQL resolver failures use the same stable `code`, `status`, `request_id`, safe message and validation-detail extensions through `ErgGraphQlExceptionResolver`.
 
 ## Evidence that remains open
 
