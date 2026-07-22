@@ -35,7 +35,7 @@ public class LearningContentController {
         this.learningContentService = learningContentService;
     }
 
-    @PostMapping("/api/content/lectures/google-slides")
+    @PostMapping({"/api/content/lectures/google-slides", "/api/v1/content/lectures/google-slides"})
     public ApiResponse<GoogleSlidesLectureResponse> createGoogleSlidesLecture(
             @RequestBody CreateGoogleSlidesLectureRequest body,
             HttpServletRequest request
@@ -49,7 +49,7 @@ public class LearningContentController {
         return ok(201, "Google Slides lecture created", lecture, request);
     }
 
-    @PostMapping("/api/content/items")
+    @PostMapping({"/api/content/items", "/api/v1/content/items"})
     public ApiResponse<ContentItem> createContentItem(
             @RequestBody CreateContentItemRequest body,
             HttpServletRequest request
@@ -59,7 +59,7 @@ public class LearningContentController {
         return ok(201, "Content item created", item, request);
     }
 
-    @PatchMapping("/api/content/items/{contentItemId}")
+    @PatchMapping({"/api/content/items/{contentItemId}", "/api/v1/content/items/{contentItemId}"})
     public ApiResponse<ContentItem> updateContentItem(
             @PathVariable String contentItemId,
             @RequestBody UpdateContentItemRequest body,
@@ -75,7 +75,7 @@ public class LearningContentController {
         return ok(200, "Content item updated", item, request);
     }
 
-    @DeleteMapping("/api/content/items/{contentItemId}")
+    @DeleteMapping({"/api/content/items/{contentItemId}", "/api/v1/content/items/{contentItemId}"})
     public ApiResponse<Map<String, Boolean>> deleteContentItem(
             @PathVariable String contentItemId,
             HttpServletRequest request
@@ -85,7 +85,7 @@ public class LearningContentController {
         return ok(200, "Content item deleted", Map.of("deleted", true), request);
     }
 
-    @PostMapping("/api/content/assets")
+    @PostMapping({"/api/content/assets", "/api/v1/content/assets"})
     public ApiResponse<ContentAsset> createContentAsset(
             @RequestBody CreateContentAssetRequest body,
             HttpServletRequest request
@@ -95,7 +95,7 @@ public class LearningContentController {
         return ok(201, "Content asset created", asset, request);
     }
 
-    @PatchMapping("/api/content/assets/{contentAssetId}")
+    @PatchMapping({"/api/content/assets/{contentAssetId}", "/api/v1/content/assets/{contentAssetId}"})
     public ApiResponse<ContentAsset> updateContentAsset(
             @PathVariable String contentAssetId,
             @RequestBody UpdateContentAssetRequest body,
@@ -111,7 +111,7 @@ public class LearningContentController {
         return ok(200, "Content asset updated", asset, request);
     }
 
-    @PostMapping("/api/content/items/{contentItemId}/assets")
+    @PostMapping({"/api/content/items/{contentItemId}/assets", "/api/v1/content/items/{contentItemId}/assets"})
     public ApiResponse<ContentItemAsset> attachContentAsset(
             @PathVariable String contentItemId,
             @RequestBody AttachContentAssetRequest body,
@@ -127,7 +127,7 @@ public class LearningContentController {
         return ok(201, "Content asset attached", asset, request);
     }
 
-    @PostMapping("/api/curriculum/topics/{topicId}/content-items")
+    @PostMapping({"/api/curriculum/topics/{topicId}/content-items", "/api/v1/curriculum/topics/{topicId}/content-items"})
     public ApiResponse<TopicContentItem> placeContentItem(
             @PathVariable String topicId,
             @RequestBody PlaceContentItemRequest body,
@@ -143,7 +143,7 @@ public class LearningContentController {
         return ok(201, "Content item placed into topic", placement, request);
     }
 
-    @DeleteMapping("/api/curriculum/topics/{topicId}/content-items/{placementId}")
+    @DeleteMapping({"/api/curriculum/topics/{topicId}/content-items/{placementId}", "/api/v1/curriculum/topics/{topicId}/content-items/{placementId}"})
     public ApiResponse<Void> removePlacement(
             @PathVariable String topicId,
             @PathVariable String placementId,
@@ -154,7 +154,7 @@ public class LearningContentController {
         return ok(200, "Content placement removed", null, request);
     }
 
-    @PatchMapping("/api/curriculum/topics/{topicId}/content-items/reorder")
+    @PatchMapping({"/api/curriculum/topics/{topicId}/content-items/reorder", "/api/v1/curriculum/topics/{topicId}/content-items/reorder"})
     public ApiResponse<List<TopicContentItem>> reorderPlacements(
             @PathVariable String topicId,
             @RequestBody ReorderTopicContentItemsRequest body,

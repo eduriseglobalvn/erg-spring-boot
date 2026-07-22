@@ -21,9 +21,9 @@ public final class LegacyApiRegistry {
                 new LegacyRoute("/api/crawler/**", "crawler-legacy", "platform-crawler",
                         LocalDate.of(2026, 10, 31), "/api/crawler", "/api/v1/crawler"),
                 new LegacyRoute("/api/content/**", "learning-content-legacy", "learningcontent",
-                        LocalDate.of(2026, 12, 31), null, null),
+                        LocalDate.of(2026, 12, 31), "/api/content", "/api/v1/content"),
                 new LegacyRoute("/api/curriculum/topics/**", "curriculum-content-legacy", "learningcontent",
-                        LocalDate.of(2026, 12, 31), null, null)
+                        LocalDate.of(2026, 12, 31), "/api/curriculum", "/api/v1/curriculum")
         );
     }
 

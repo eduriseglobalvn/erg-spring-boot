@@ -17,7 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 30)
-public final class LegacyApiDeprecationFilter extends OncePerRequestFilter {
+public class LegacyApiDeprecationFilter extends OncePerRequestFilter {
 
     private final LegacyApiRegistry routes;
     private final MeterRegistry meters;
