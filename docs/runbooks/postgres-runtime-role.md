@@ -12,6 +12,10 @@ The Docker deployment provisions two credentials:
 
 `ops/docker/postgres/init/02-runtime-role.sh` creates the runtime role on a new PostgreSQL volume.
 Migration `V74__runtime_role_rls_grants.sql` grants table/sequence access and default privileges.
+Migration `V75__tenant_rls_matrix.sql` enables a strict tenant/maintenance policy on every remaining
+table carrying `tenant_id`. Legacy tables are not `FORCE`d during expand/backfill because the Flyway
+owner must retain migration access; the non-owner runtime role is still constrained by PostgreSQL RLS.
+`TenantRlsMatrixIntegrationTest` fails when a new tenant table is added without RLS.
 For an existing database, provision the role and grants before switching the backend datasource;
 do not delete the production volume just to rerun the init script.
 
