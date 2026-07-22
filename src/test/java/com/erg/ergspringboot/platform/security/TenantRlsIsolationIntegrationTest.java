@@ -60,6 +60,22 @@ class TenantRlsIsolationIntegrationTest {
         });
     }
 
+    @Test
+    void legacyUserTableIsIsolatedForANonOwnerRuntimeRole() {
+        entityManager.unwrap(Session.class).doWork(connection -> {
+            TenantGucApplier.apply(connection, TenantContext.maintenance());
+            insertUser(connection, "rls-user-a", "tenant-a");
+            insertUser(connection, "rls-user-b", "tenant-b");
+            assumeRuntimeRole(connection, "erg_rls_legacy_users", "users");
+
+            TenantGucApplier.apply(connection, TenantContext.of("tenant-a", "user-a", "admin"));
+            assertThat(countUsers(connection)).isEqualTo(1);
+            assertThatThrownBy(() -> insertUser(connection, "rls-user-cross", "tenant-b"))
+                    .isInstanceOf(java.sql.SQLException.class)
+                    .hasMessageContaining("row-level security");
+        });
+    }
+
     private long count(java.sql.Connection connection) throws java.sql.SQLException {
         try (PreparedStatement statement = connection.prepareStatement("select count(*) from question_bank_subjects")) {
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -76,10 +92,33 @@ class TenantRlsIsolationIntegrationTest {
                 id, tenantId, id);
     }
 
+    private long countUsers(java.sql.Connection connection) throws java.sql.SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select count(*) from users where id in ('rls-user-a', 'rls-user-b')")) {
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return resultSet.getLong(1);
+            }
+        }
+    }
+
+    private void insertUser(java.sql.Connection connection, String id, String tenantId)
+            throws java.sql.SQLException {
+        execute(connection, "insert into users "
+                        + "(id, created_at, updated_at, email, tenant_id, status) "
+                        + "values (?, now(), now(), ?, ?, 'ACTIVE')",
+                id, id + "@example.test", tenantId);
+    }
+
     private void assumeRuntimeRole(java.sql.Connection connection, String role)
             throws java.sql.SQLException {
+        assumeRuntimeRole(connection, role, "question_bank_subjects");
+    }
+
+    private void assumeRuntimeRole(java.sql.Connection connection, String role, String table)
+            throws java.sql.SQLException {
         execute(connection, "create role " + role + " nologin");
-        execute(connection, "grant select, insert, update on question_bank_subjects to " + role);
+        execute(connection, "grant select, insert, update on " + table + " to " + role);
         execute(connection, "set local role " + role);
     }
 
