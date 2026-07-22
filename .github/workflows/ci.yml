@@ -53,6 +53,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
       - name: Verify committed OpenAPI snapshot and checksum
         run: node scripts/export-openapi-contract.cjs --file contracts/openapi/erg-openapi.json --check
       - name: Verify committed GraphQL schema checksum
@@ -66,6 +71,15 @@ jobs:
           node scripts/check-openapi-breaking.cjs \
             --base "$RUNNER_TEMP/openapi/base.json" \
             --revision contracts/openapi/erg-openapi.json
+      - name: Check GraphQL breaking changes against pull request base
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          git show "origin/${{ github.base_ref }}:src/main/resources/graphql/schema.graphqls" > "$RUNNER_TEMP/openapi/base.graphqls"
+          ./mvnw -B -ntp \
+            -Dtest=GraphQlSchemaCompatibilityTest \
+            -Derg.graphql.base-schema="$RUNNER_TEMP/openapi/base.graphqls" \
+            test
 
   dependency-and-secret-scan:
     name: Dependency and secret scan
