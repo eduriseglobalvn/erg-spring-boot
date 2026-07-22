@@ -304,7 +304,7 @@ erg:
       allowed-origins: ${HTTP__CORS__ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3003,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3003,http://crm.erg.edu.vn:3001,http://lcms.erg.edu.vn:3001,http://lms.erg.edu.vn:3001,http://elearning.erg.edu.vn:3001,https://crm.erg.edu.vn:3001,https://lcms.erg.edu.vn:3001,https://lms.erg.edu.vn:3001,https://elearning.erg.edu.vn:3001}
       allowed-methods: ${HTTP__CORS__ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
       allowed-headers: ${HTTP__CORS__ALLOWED_HEADERS:Accept,Authorization,Content-Type,X-Tenant-ID,X-Request-ID,X-Trace-ID,X-Idempotency-Key,X-Portal}
-      exposed-headers: ${HTTP__CORS__EXPOSED_HEADERS:X-Request-ID,X-Trace-ID}
+      exposed-headers: ${HTTP__CORS__EXPOSED_HEADERS:X-Request-ID,X-Trace-ID,Deprecation,Sunset,Link,X-ERG-API-Owner}
       allow-credentials: ${HTTP__CORS__ALLOW_CREDENTIALS:true}
       max-age: ${HTTP__CORS__MAX_AGE:86400}
   queue:
