@@ -11,6 +11,7 @@ public class ErgCacheProperties {
     private Set<String> l2Names = new LinkedHashSet<>();
     private Duration circuitOpenDuration = Duration.ofSeconds(5);
     private int circuitFailureThreshold = 3;
+    private int maxInFlightLoads = 1024;
 
     public boolean isL2Enabled() {
         return l2Enabled;
@@ -43,5 +44,15 @@ public class ErgCacheProperties {
     public void setCircuitFailureThreshold(int circuitFailureThreshold) {
         this.circuitFailureThreshold = circuitFailureThreshold;
     }
-}
 
+    public int getMaxInFlightLoads() {
+        return maxInFlightLoads;
+    }
+
+    public void setMaxInFlightLoads(int maxInFlightLoads) {
+        if (maxInFlightLoads < 1) {
+            throw new IllegalArgumentException("maxInFlightLoads must be positive");
+        }
+        this.maxInFlightLoads = maxInFlightLoads;
+    }
+}

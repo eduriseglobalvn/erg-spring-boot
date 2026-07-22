@@ -94,7 +94,7 @@ public class CacheConfig {
                 tenants,
                 generations,
                 new CacheFailurePolicy(properties.getCircuitFailureThreshold(), properties.getCircuitOpenDuration()),
-                new CacheLoadCoordinator(),
+                new CacheLoadCoordinator(properties.getMaxInFlightLoads()),
                 properties.isL2Enabled() ? properties.getL2Names() : java.util.Set.of(),
                 invalidations,
                 metrics

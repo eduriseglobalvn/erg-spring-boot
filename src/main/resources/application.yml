@@ -190,6 +190,7 @@ erg:
     l2-names: ${ERG_REDIS_CACHE_L2_NAMES:}
     circuit-open-duration: ${ERG_REDIS_CACHE_CIRCUIT_OPEN_DURATION:5s}
     circuit-failure-threshold: ${ERG_REDIS_CACHE_CIRCUIT_FAILURE_THRESHOLD:3}
+    max-in-flight-loads: ${ERG_CACHE_MAX_IN_FLIGHT_LOADS:1024}
   redis:
     metrics:
       refresh-interval: ${ERG_REDIS_METRICS_REFRESH_INTERVAL:15s}
