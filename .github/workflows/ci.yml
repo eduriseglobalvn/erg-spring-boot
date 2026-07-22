@@ -42,6 +42,31 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: erg
         run: ./mvnw -B -ntp verify
 
+  openapi-contract:
+    name: OpenAPI contract lock and compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify committed OpenAPI snapshot and checksum
+        run: node scripts/export-openapi-contract.cjs --file contracts/openapi/erg-openapi.json --check
+      - name: Verify committed GraphQL schema checksum
+        run: node scripts/check-graphql-schema.cjs
+      - name: Check breaking changes against pull request base
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/openapi"
+          git show "origin/${{ github.base_ref }}:contracts/openapi/erg-openapi.json" > "$RUNNER_TEMP/openapi/base.json"
+          node scripts/check-openapi-breaking.cjs \
+            --base "$RUNNER_TEMP/openapi/base.json" \
+            --revision contracts/openapi/erg-openapi.json
+
   dependency-and-secret-scan:
     name: Dependency and secret scan
     runs-on: ubuntu-latest
