@@ -124,8 +124,10 @@ an owner and permission decision:
 GraphQL schema changes must update this ownership section, the performance catalog and the
 typed input/output contract tests in the same change.
 
-CI also verifies `contracts/graphql/schema.graphqls.sha256` against the canonical
-`src/main/resources/graphql/schema.graphqls` via `scripts/check-graphql-schema.cjs`. This is
-a synchronization gate, not a substitute for a reviewed compatibility decision: a breaking
-schema change still requires an explicit migration/deprecation note and updated typed contract
-tests in the same pull request.
+CI verifies `contracts/graphql/schema.graphqls.sha256` against the canonical
+`src/main/resources/graphql/schema.graphqls` via `scripts/check-graphql-schema.cjs`. Pull
+requests additionally run `GraphQlSchemaCompatibilityTest` against the base branch. The
+checker rejects removed types/fields/arguments/input fields, incompatible type/nullability
+changes, newly required arguments and removed enum values. A breaking change still requires an
+explicit migration/deprecation decision and updated typed contract tests in the same pull
+request.
