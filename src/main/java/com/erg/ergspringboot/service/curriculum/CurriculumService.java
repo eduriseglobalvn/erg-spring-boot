@@ -1,9 +1,7 @@
 package com.erg.ergspringboot.service.curriculum;
 
-import com.erg.ergspringboot.curriculum.internal.command.CurriculumCommandUseCase;
-import com.erg.ergspringboot.curriculum.internal.impact.CurriculumImpactQueryUseCase;
-import com.erg.ergspringboot.curriculum.internal.query.CurriculumTreeQueryUseCase;
-import com.erg.ergspringboot.curriculum.internal.validation.CurriculumChainValidationUseCase;
+import com.erg.ergspringboot.curriculum.CurriculumOperations;
+import com.erg.ergspringboot.curriculum.CurriculumOperationsCompatibility;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
@@ -22,11 +20,13 @@ import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumSubject
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTopicResponse;
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTreeResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
-/** Compatibility facade; curriculum transactions, validation and mapping are owned internally. */
+/**
+ * @deprecated Use {@link CurriculumOperations}. This bean is a compatibility adapter only;
+ * curriculum use cases are owned by the explicit module.
+ */
+@Deprecated
 @Service
 public class CurriculumService {
 
@@ -34,21 +34,11 @@ public class CurriculumService {
     public static final String ARCHIVED = "archived";
     public static final String DRAFT = "draft";
 
-    private final CurriculumTreeQueryUseCase treeQueries;
-    private final CurriculumImpactQueryUseCase impactQueries;
-    private final CurriculumChainValidationUseCase chainValidation;
-    private final CurriculumCommandUseCase commands;
+    private final CurriculumOperations operations;
 
     @Autowired
-    public CurriculumService(
-            CurriculumTreeQueryUseCase treeQueries,
-            CurriculumImpactQueryUseCase impactQueries,
-            CurriculumChainValidationUseCase chainValidation,
-            CurriculumCommandUseCase commands) {
-        this.treeQueries = treeQueries;
-        this.impactQueries = impactQueries;
-        this.chainValidation = chainValidation;
-        this.commands = commands;
+    public CurriculumService(CurriculumOperations operations) {
+        this.operations = operations;
     }
 
     /** Compatibility constructor retained for legacy tests and callers. */
@@ -62,100 +52,82 @@ public class CurriculumService {
             QuizVersionRepository quizVersions,
             AssignmentRepository assignments,
             AttemptRepository attempts) {
-        CurriculumImpactQueryUseCase impactQueries = new CurriculumImpactQueryUseCase(
+        this(CurriculumOperationsCompatibility.fromRepositories(
                 subjects, levels, topics, contentItems, questions, quizzes,
-                quizVersions, assignments, attempts);
-        this.treeQueries = new CurriculumTreeQueryUseCase(subjects, levels, topics);
-        this.impactQueries = impactQueries;
-        this.chainValidation = new CurriculumChainValidationUseCase(subjects, levels, topics);
-        this.commands = new CurriculumCommandUseCase(subjects, levels, topics, impactQueries);
+                quizVersions, assignments, attempts));
     }
 
-    @Cacheable(cacheNames = "curriculumTree",
-            key = "{#access.tenantId(), #status == null ? 'active' : #status.toLowerCase()}")
     public CurriculumTreeResponse listTree(String status, UserAccessContext access) {
-        return treeQueries.tree(status, access);
+        return operations.listTree(status, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumSubjectResponse createSubject(CurriculumNodeRequest request, UserAccessContext access) {
-        return commands.createSubject(request, access);
+        return operations.createSubject(request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumSubjectResponse updateSubject(
             String id, CurriculumNodeRequest request, UserAccessContext access) {
-        return commands.updateSubject(id, request, access);
+        return operations.updateSubject(id, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumSubjectResponse archiveSubject(String id, UserAccessContext access) {
-        return commands.archiveSubject(id, access);
+        return operations.archiveSubject(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumHardDeleteResponse hardDeleteSubject(String id, UserAccessContext access) {
-        return commands.hardDeleteSubject(id, access);
+        return operations.hardDeleteSubject(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumLevelResponse createLevel(
             String subjectId, CurriculumNodeRequest request, UserAccessContext access) {
-        return commands.createLevel(subjectId, request, access);
+        return operations.createLevel(subjectId, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumLevelResponse updateLevel(
             String id, CurriculumNodeRequest request, UserAccessContext access) {
-        return commands.updateLevel(id, request, access);
+        return operations.updateLevel(id, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumLevelResponse archiveLevel(String id, UserAccessContext access) {
-        return commands.archiveLevel(id, access);
+        return operations.archiveLevel(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumHardDeleteResponse hardDeleteLevel(String id, UserAccessContext access) {
-        return commands.hardDeleteLevel(id, access);
+        return operations.hardDeleteLevel(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumTopicResponse createTopic(
             String levelId, CurriculumNodeRequest request, UserAccessContext access) {
-        return commands.createTopic(levelId, request, access);
+        return operations.createTopic(levelId, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumTopicResponse updateTopic(
             String id, CurriculumNodeRequest request, UserAccessContext access) {
-        return commands.updateTopic(id, request, access);
+        return operations.updateTopic(id, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumTopicResponse archiveTopic(String id, UserAccessContext access) {
-        return commands.archiveTopic(id, access);
+        return operations.archiveTopic(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
     public CurriculumHardDeleteResponse hardDeleteTopic(String id, UserAccessContext access) {
-        return commands.hardDeleteTopic(id, access);
+        return operations.hardDeleteTopic(id, access);
     }
 
     public CurriculumImpactResponse subjectImpact(String id, UserAccessContext access) {
-        return impactQueries.subjectImpact(id, access);
+        return operations.subjectImpact(id, access);
     }
 
     public CurriculumImpactResponse levelImpact(String id, UserAccessContext access) {
-        return impactQueries.levelImpact(id, access);
+        return operations.levelImpact(id, access);
     }
 
     public CurriculumImpactResponse topicImpact(String id, UserAccessContext access) {
-        return impactQueries.topicImpact(id, access);
+        return operations.topicImpact(id, access);
     }
 
     public CurriculumTopicResponse validateTopicChain(
             String subjectId, String levelId, String topicId, UserAccessContext access) {
-        return chainValidation.validate(subjectId, levelId, topicId, access);
+        return operations.validateTopicChain(subjectId, levelId, topicId, access);
     }
 }

@@ -1,0 +1,583 @@
+  tenantId: String
+  educationUnitId: String
+  academicYear: String
+  subjectId: String
+  gradeId: String
+  categoryId: String
+  sectionId: String
+  topicId: String
+  status: String
+  visibility: String
+  page: Int
+  size: Int
+}
+
+input ClassWorkspaceInput {
+  tenantId: String
+  classId: String!
+  schoolId: String
+  studentStatus: String
+  page: Int
+  size: Int
+  assignmentStatus: String
+  assignmentPage: Int
+  assignmentSize: Int
+}
+
+input TeacherHomeworkWorkspaceInput {
+  tenantId: String
+  status: String
+  page: Int
+  size: Int
+}
+
+input AssignmentProgressWorkspaceInput {
+  tenantId: String
+  assignmentId: String!
+  attemptStatus: String
+  page: Int
+  size: Int
+}
+
+input StudentGroupsInput {
+  tenantId: String
+  classId: String
+}
+
+input QuestionBankWorkspaceInput {
+  tenantId: String
+  search: String
+  subjectId: String
+  levelId: String
+  topicId: String
+  status: String
+  quizKind: String
+  includeQuestions: Boolean
+  page: Int
+  size: Int
+}
+
+input AccessManagementWorkspaceInput {
+  tenantId: String
+  search: String
+  roleId: String
+  status: String
+  page: Int
+  size: Int
+}
+
+type ClassWorkspace {
+  tenantId: String!
+  classInfo: ClassInfo!
+  scoreSummary: ClassScoreSummary
+  riskSummary: ClassRiskSummary
+  students: StudentRosterPage!
+  assignments: AssignmentSummaryPage!
+}
+
+type ClassScoreSummary {
+  completedAttemptCount: Int!
+  attemptedStudentCount: Int!
+  averagePercent: Int!
+  bestPercent: Int!
+}
+
+type ClassRiskSummary {
+  missingOverdueStudentCount: Int!
+  lowScoreStudentCount: Int!
+  inactiveStudentCount: Int!
+}
+
+type ClassInfo {
+  id: String!
+  schoolId: String!
+  name: String
+  grade: String
+  academicYear: String
+  status: String
+  homeroomTeacherId: String
+  studentCount: Int!
+  assignmentCount: Int!
+  updatedAt: String
+}
+
+type StudentRosterPage {
+  items: [StudentRosterItem!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type StudentRosterItem {
+  id: String!
+  schoolId: String
+  academicClassId: String
+  studentCode: String
+  fullName: String
+  username: String
+  authUserId: String
+  email: String
+  status: String
+  updatedAt: String
+}
+
+type AssignmentSummaryPage {
+  items: [AssignmentSummaryItem!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type AssignmentSummaryItem {
+  id: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  status: String
+  assignedBy: String
+  recipientMode: String
+  resources: [AssignmentResource!]!
+  createdAt: String
+  updatedAt: String
+}
+
+type TeacherHomeworkWorkspace {
+  tenantId: String!
+  teacherId: String!
+  summary: TeacherHomeworkSummary!
+  classOptions: [ClassOption!]!
+  assignments: HomeworkAssignmentCardPage!
+  pendingReviews: PendingReviewPage!
+  overdueStudents: OverdueStudentPage!
+}
+
+type TeacherHomeworkSummary {
+  activeAssignmentCount: Int!
+  overdueAssignmentCount: Int!
+  pendingReviewAssignmentCount: Int!
+}
+
+type HomeworkAssignmentCardPage {
+  items: [HomeworkAssignmentCard!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type HomeworkAssignmentCard {
+  id: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  status: String
+  assignedBy: String
+  recipientMode: String
+  resources: [AssignmentResource!]!
+  createdAt: String
+  updatedAt: String
+}
+
+type ClassOption {
+  id: String!
+  schoolId: String
+  name: String
+  grade: String
+  academicYear: String
+  status: String
+}
+
+type PendingReviewPage {
+  items: [PendingReview!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type PendingReview {
+  attemptId: String!
+  assignmentId: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  studentId: String
+  studentCode: String
+  fullName: String
+  status: String
+  score: Float
+  maxScore: Float
+  percent: Int!
+  submittedAt: String
+  updatedAt: String
+}
+
+type OverdueStudentPage {
+  items: [OverdueStudent!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type OverdueStudent {
+  assignmentId: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  studentId: String!
+  studentCode: String
+  fullName: String
+  status: String
+  updatedAt: String
+}
+
+type AssignmentProgressWorkspace {
+  tenantId: String!
+  assignment: AssignmentDetail!
+  summary: AssignmentProgressSummary!
+  attempts: AssignmentAttemptSummaryPage!
+  recipients: RecipientProgressPage!
+  missingLateStudents: MissingLateStudentPage!
+}
+
+type AssignmentDetail {
+  id: String!
+  academicClassId: String!
+  quizId: String
+  subjectId: String
+  dueAt: String
+  status: String
+  assignedBy: String
+  recipientMode: String
+  resources: [AssignmentResource!]!
+  createdAt: String
+  updatedAt: String
+}
+
+type AssignmentResource {
+  quizId: String!
+  quizVersionId: String
+  quizVersionLabel: String
+  orderIndex: Int!
+}
+
+type AssignmentProgressSummary {
+  submittedCount: Int!
+  inProgressCount: Int!
+  needsReviewCount: Int!
+}
+
+type AssignmentAttemptSummaryPage {
+  items: [AssignmentAttemptSummary!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type AssignmentAttemptSummary {
+  id: String!
+  assignmentId: String!
+  quizId: String
+  studentId: String
+  status: String
+  score: Float
+  maxScore: Float
+  percent: Int!
+  passed: Boolean
+  startedAt: String
+  submittedAt: String
+  updatedAt: String
+}
+
+type RecipientProgressPage {
+  items: [RecipientProgress!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type RecipientProgress {
+  studentId: String!
+  schoolId: String
+  academicClassId: String
+  studentCode: String
+  fullName: String
+  username: String
+  authUserId: String
+  email: String
+  status: String
+  missing: Boolean!
+  late: Boolean!
+  latestAttempt: AssignmentAttemptScore
+  bestAttempt: AssignmentAttemptScore
+  updatedAt: String
+}
+
+type MissingLateStudentPage {
+  items: [MissingLateStudent!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type MissingLateStudent {
+  studentId: String!
+  schoolId: String
+  academicClassId: String
+  studentCode: String
+  fullName: String
+  username: String
+  authUserId: String
+  email: String
+  status: String
+  dueAt: String
+  missing: Boolean!
+  late: Boolean!
+  updatedAt: String
+}
+
+type AssignmentAttemptScore {
+  id: String!
+  assignmentId: String!
+  quizId: String
+  studentId: String!
+  status: String
+  score: Float
+  maxScore: Float
+  percent: Int!
+  passed: Boolean
+  startedAt: String
+  submittedAt: String
+  updatedAt: String
+}
+
+type StudentGroupWorkspace {
+  tenantId: String!
+  groups: [StudentGroup!]!
+}
+
+type StudentGroup {
+  id: String!
+  name: String!
+  classId: String
+  note: String
+  color: String
+  ownerUserId: String
+  studentIds: [String!]!
+  studentCount: Int!
+  createdAt: String
+  updatedAt: String
+}
+
+type QuestionBankWorkspace {
+  tenantId: String!
+  questions: QuestionBankQuestionPage!
+  subjects: [QuestionBankOption!]!
+  levels: [QuestionBankOption!]!
+  topics: [QuestionBankOption!]!
+  quizzes: [QuestionBankQuizOption!]!
+}
+
+type QuestionBankQuestionPage {
+  items: [QuestionBankQuestionRow!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type QuestionBankQuestionRow {
+  id: String!
+  scopeType: String
+  scopeId: String
+  scopeLabel: String
+  subjectId: String
+  subjectLabel: String
+  levelId: String
+  levelLabel: String
+  topicId: String
+  categoryLabel: String
+  gradeLabel: String
+  title: String
+  objective: String
+  type: String
+  difficulty: String
+  status: String
+  tags: [String!]!
+  choices: [QuestionBankChoice!]!
+  answer: String
+  masteryRate: Float
+  usageCount: Int!
+  schoolsUsing: Int
+  lastUsedAt: String
+  recommendedCluster: String
+  rationale: String
+  updatedAt: String
+}
+
+type QuestionBankChoice {
+  id: String!
+  label: String!
+  correct: Boolean!
+}
+
+type QuestionBankOption {
+  id: String!
+  label: String!
+  subjectId: String
+  levelId: String
+  description: String
+  scopeLabel: String
+  categoryIds: [String!]!
+}
+
+type QuestionBankQuizOption {
+  id: String!
+  title: String!
+  status: String
+  kind: String
+  subjectId: String
+  levelId: String
+  categoryId: String
+  questionIds: [String!]!
+  questionCount: Int!
+  durationLabel: String
+  scopeLabel: String
+  sourceMode: String
+  ownerLabel: String
+  updatedAt: String
+}
+
+type AccessManagementWorkspace {
+  tenantId: String!
+  users: UserAccessPage!
+  roleOptions: [RoleOption!]!
+  scopeOptions: [ScopeOption!]!
+  effectivePermissionsIncluded: Boolean!
+}
+
+type UserAccessPage {
+  items: [UserAccessRow!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type UserAccessRow {
+  userId: String!
+  fullName: String
+  email: String
+  status: String
+  roleCount: Int!
+  scopeCount: Int!
+  effectivePermissions: [EffectivePermission!]!
+}
+
+type RoleOption {
+  id: String!
+  name: String!
+}
+
+type ScopeOption {
+  id: String!
+  label: String!
+  kind: String!
+}
+
+type EffectivePermission {
+  permission: String!
+  source: String!
+}
+
+type LearningResourceLibrary {
+  tenantId: String!
+  educationUnitId: String
+  taxonomyTree: [LearningResourceTaxonomyNode!]!
+  resources: LearningResourceCardPage!
+  progress: [LearningResourceProgress!]!
+  recentOpened: [LearningRecentResource!]!
+}
+
+type LearningResourceCardPage {
+  items: [LearningResourceCard!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type LearningResourceCard {
+  id: String!
+  subjectId: String
+  gradeId: String
+  categoryId: String
+  sectionId: String
+  topicId: String
+  title: String!
+  slug: String
+  subtitle: String
+  thumbnailUrl: String
+  visibility: String
+  status: String
+  publishedAt: String
+  updatedAt: String
+}
+
+type LearningResourceTaxonomyNode {
+  id: String!
+  kind: String!
+  label: String!
+  slug: String
+  parentId: String
+  subjectId: String
+  categoryId: String
+  sortOrder: Int!
+  status: String
+  description: String
+  childCount: Int!
+  resourceCount: Int!
+}
+
+type LearningResourceProgress {
+  resourceId: String!
+  progressRate: Int!
+  updatedAt: String
+}
+
+type LearningRecentResource {
+  resourceId: String!
+  title: String!
+  openedAt: String
+}

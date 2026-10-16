@@ -4,7 +4,9 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.A
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AdminSendResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AdminStatsResponse;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.OutboxRunResponse;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.notifications.NotificationAdminOperations;
 import com.erg.ergspringboot.service.notifications.NotificationSecuritySupport;
@@ -57,12 +59,24 @@ public class NotificationAdminController {
         return ok("Notification outbox processed", operations.runOutbox(principal.tenantId()), request);
     }
 
+    @PostMapping("/outbox/replay-dead")
+    public ApiResponse<DeadLetterReplayResponse> replayDeadLetters(
+            @RequestParam(name = "limit", defaultValue = "100") int limit,
+            HttpServletRequest request
+    ) {
+        ErgPrincipal principal = security.principal();
+        return ok(
+                "Dead-lettered notifications requeued for retry",
+                operations.replayDeadLetters(principal.tenantId(), limit),
+                request
+        );
+    }
+
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
         return ApiResponse.success(200, message, data, request.getRequestURI(), requestId(request));
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

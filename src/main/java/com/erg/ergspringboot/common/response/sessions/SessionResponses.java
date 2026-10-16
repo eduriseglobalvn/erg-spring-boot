@@ -29,7 +29,9 @@ public final class SessionResponses {
             AccountLifecycleResponse lifecycle,
             SessionBootstrapScope currentScope,
             List<SessionBootstrapUnit> manageableUnits,
-            List<SessionBootstrapClass> manageableClasses
+            List<SessionBootstrapClass> manageableClasses,
+            String tenantId,
+            List<String> workspaces
     ) {
     }
 

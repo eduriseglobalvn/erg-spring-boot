@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.model.seo;
 
-import com.erg.ergspringboot.model.BaseEntity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -12,8 +11,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class SeoKeyword extends BaseEntity {
+@EqualsAndHashCode(exclude = {"createdAt", "updatedAt"})
+public class SeoKeyword {
+
+    private String id;
+
+    private java.time.OffsetDateTime createdAt;
+
+    private java.time.OffsetDateTime updatedAt;
 
     private String keyword;
 

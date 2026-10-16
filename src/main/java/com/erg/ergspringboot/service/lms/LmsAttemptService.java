@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.service.lms;
 
+import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.model.lms.Attempt;
 import com.erg.ergspringboot.repository.lms.AttemptRepository;
 import java.util.Collection;
@@ -20,8 +21,8 @@ public class LmsAttemptService {
         this.repository = repository;
     }
 
-    public Optional<Attempt> findById(String id) {
-        return repository.findById(id);
+    public Optional<Attempt> findByTenantIdAndId(String tenantId, String id) {
+        return repository.findByTenantIdAndId(tenantId, id);
     }
 
     public Optional<Attempt> findInProgress(String tenantId, String assignmentId, String quizId, String studentId) {
@@ -69,15 +70,28 @@ public class LmsAttemptService {
                 assignmentId,
                 quizId,
                 studentId,
-                List.of("submitted", "needs_review", "review_required", "graded", "completed"));
+                LmsStatePolicy.completedAttemptStates());
     }
 
     public List<Attempt> findByAssignment(String tenantId, String assignmentId) {
         return repository.findByTenantIdAndAssignmentIdOrderByUpdatedAtDesc(tenantId, assignmentId);
     }
 
+    public com.erg.ergspringboot.repository.lms.projection.AssignmentProgressProjection summarizeAssignmentProgress(
+            String tenantId, String assignmentId) {
+        return repository.summarizeAssignmentProgress(tenantId, assignmentId);
+    }
+
     public List<Attempt> findByQuiz(String tenantId, String quizId) {
         return repository.findByTenantIdAndQuizIdOrderByUpdatedAtDesc(tenantId, quizId);
+    }
+
+    // Summary projection (no jsonb blobs) capped for the quiz-students list view; the full answers
+    // payload belongs to the single-attempt detail endpoint, not this roster.
+    public List<com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection> findQuizAttemptSummaries(
+            String tenantId, String quizId) {
+        return repository.findQuizAttemptSummaries(
+                tenantId, quizId, org.springframework.data.domain.PageRequest.of(0, 500));
     }
 
     @Transactional("postgresTransactionManager")

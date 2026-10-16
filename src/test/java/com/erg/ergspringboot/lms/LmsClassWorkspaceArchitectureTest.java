@@ -11,7 +11,7 @@ class LmsClassWorkspaceArchitectureTest {
     void classWorkspaceIsOwnedByInternalReadUseCase() throws Exception {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsClassWorkspaceReadUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java"));
+        String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/lms/internal/readmodel/LmsReadModelUseCase.java"));
         assertThat(legacy).contains("classWorkspace.query(");
         assertThat(legacy).contains("classWorkspace.schoolClasses(");
     }

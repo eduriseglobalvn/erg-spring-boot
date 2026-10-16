@@ -23,6 +23,14 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, String
     @EntityGraph(attributePaths = {"user", "user.roles", "user.roles.permissions", "user.permissionOverrides", "user.accessScopes"})
     Optional<AuthSession> findPrincipalByAccessTokenHashAndTenantId(String accessTokenHash, String tenantId);
 
+    /**
+     * Resolves the tenant from the opaque access-token hash without accepting a
+     * client supplied tenant as the lookup key. The security boundary rejects
+     * ambiguous results before constructing a principal.
+     */
+    @EntityGraph(attributePaths = {"user", "user.roles", "user.roles.permissions", "user.permissionOverrides", "user.accessScopes"})
+    List<AuthSession> findByAccessTokenHash(String accessTokenHash);
+
     Optional<AuthSession> findByRefreshTokenHashAndTenantId(String refreshTokenHash, String tenantId);
 
     Optional<AuthSession> findByRefreshTokenHash(String refreshTokenHash);
@@ -60,4 +68,3 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, String
             @Param("userId") String userId,
             Pageable pageable);
 }
-

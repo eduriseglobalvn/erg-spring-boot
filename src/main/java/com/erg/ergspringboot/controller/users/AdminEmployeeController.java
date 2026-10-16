@@ -26,6 +26,7 @@ import com.erg.ergspringboot.platform.web.RequestIdFilter;
 import com.erg.ergspringboot.users.EmployeeOperations;
 import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.users.UserAuditContext;
+import com.erg.ergspringboot.authorization.authorization.UsersManage;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -57,6 +58,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping({"", "/"})
+    @UsersManage
     public ResponseEntity<ApiResponse<EmployeeListResponse>> listUsers(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
@@ -70,6 +72,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/security-feed")
+    @UsersManage
     public ResponseEntity<ApiResponse<SecurityFeedPageResponse>> securityFeed(
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String sourceType,
@@ -82,6 +85,7 @@ public class AdminEmployeeController {
     }
 
     @PostMapping
+    @UsersManage
     public ResponseEntity<ApiResponse<EmployeeCreatedResponse>> createUser(
             @Valid @RequestBody CreateEmployeeRequest body,
             HttpServletRequest request
@@ -93,6 +97,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}")
+    @UsersManage
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> getEmployee(
             @PathVariable String userId,
             HttpServletRequest request
@@ -101,6 +106,7 @@ public class AdminEmployeeController {
     }
 
     @PatchMapping("/{userId}")
+    @UsersManage
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> updateEmployee(
             @PathVariable String userId,
             @Valid @RequestBody UpdateEmployeeRequest body,
@@ -110,6 +116,7 @@ public class AdminEmployeeController {
     }
 
     @PutMapping("/{userId}/status")
+    @UsersManage
     public ResponseEntity<ApiResponse<UserResponse>> updateStatus(
             @PathVariable String userId,
             @Valid @RequestBody AdminUpdateUserStatusRequest body,
@@ -119,6 +126,7 @@ public class AdminEmployeeController {
     }
 
     @PostMapping("/{userId}/roles")
+    @UsersManage
     public ResponseEntity<ApiResponse<UserResponse>> assignRoles(
             @PathVariable String userId,
             @Valid @RequestBody AdminAssignRolesRequest body,
@@ -128,6 +136,7 @@ public class AdminEmployeeController {
     }
 
     @PostMapping("/{userId}/reset-credential")
+    @UsersManage
     public ResponseEntity<ApiResponse<CredentialDeliveryResponse>> resetCredential(
             @PathVariable String userId,
             @Valid @RequestBody CredentialDeliveryRequest body,
@@ -137,6 +146,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}/activity")
+    @UsersManage
     public ResponseEntity<ApiResponse<ActivityListResponse>> activity(
             @PathVariable String userId,
             @RequestParam(required = false) Integer page,
@@ -147,6 +157,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}/security-events")
+    @UsersManage
     public ResponseEntity<ApiResponse<SecurityEventPageResponse>> securityEvents(
             @PathVariable String userId,
             @RequestParam(required = false) Integer page,
@@ -157,6 +168,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}/sessions")
+    @UsersManage
     public ResponseEntity<ApiResponse<SessionListResponse>> sessions(
             @PathVariable String userId,
             HttpServletRequest request
@@ -165,6 +177,7 @@ public class AdminEmployeeController {
     }
 
     @PostMapping("/{userId}/sessions/revoke")
+    @UsersManage
     public ResponseEntity<ApiResponse<RevokeSessionResponse>> revokeSession(
             @PathVariable String userId,
             @Valid @RequestBody RevokeEmployeeSessionRequest body,
@@ -191,8 +204,7 @@ public class AdminEmployeeController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object value = request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
-        return value == null ? request.getHeader(RequestIdFilter.REQUEST_ID_HEADER) : value.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private UserAuditContext auditContext(HttpServletRequest request) {

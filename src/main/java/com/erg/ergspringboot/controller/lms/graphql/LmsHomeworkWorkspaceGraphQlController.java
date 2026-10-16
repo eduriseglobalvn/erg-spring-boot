@@ -6,7 +6,11 @@ import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.T
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.lms.LmsQueryOperations;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentRead;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentProgressRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -27,6 +31,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "teacherHomeworkWorkspace")
+    @LmsAssignmentRead
     public TeacherHomeworkWorkspaceResponse teacherHomeworkWorkspace(@Argument TeacherHomeworkWorkspaceInput input) {
         TeacherHomeworkWorkspaceInput safeInput = input == null ? TeacherHomeworkWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
@@ -44,6 +49,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "assignmentProgressWorkspace")
+    @LmsAssignmentProgressRead
     public AssignmentProgressWorkspaceResponse assignmentProgressWorkspace(@Argument AssignmentProgressWorkspaceInput input) {
         AssignmentProgressWorkspaceInput safeInput = input == null ? AssignmentProgressWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
@@ -62,6 +68,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "studentGroups")
+    @LmsAssignmentRead
     public StudentGroupWorkspaceResponse studentGroups(@Argument StudentGroupsInput input) {
         StudentGroupsInput safeInput = input == null ? StudentGroupsInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
@@ -100,7 +107,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
         if (normalizedClassId == null) {
             throw new ForbiddenException("GraphQL assignment progress workspace requires class scope.");
         }
-        if (accessSupport.csv(accessSupport.attribute(principal, "managedClassIds")).contains(normalizedClassId)) {
+        if (AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.CLASS).contains(normalizedClassId)) {
             return;
         }
         throw new ForbiddenException("GraphQL assignment progress workspace is outside the authenticated class scope.");
@@ -110,7 +117,7 @@ public class LmsHomeworkWorkspaceGraphQlController {
         if (accessSupport.isWildcardPrincipal(principal)) {
             return List.of("*");
         }
-        List<String> managedClassIds = accessSupport.csv(accessSupport.attribute(principal, "managedClassIds"));
+        List<String> managedClassIds = AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.CLASS);
         if (managedClassIds.contains("*")) {
             return List.of("*");
         }

@@ -13,6 +13,7 @@ import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.auth.SecurityEvent;
 import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.platform.security.ErgAuthProperties;
 import com.erg.ergspringboot.repository.auth.AuthLoginAttemptRepository;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
@@ -23,16 +24,18 @@ import com.erg.ergspringboot.service.auth.AuthTokenService;
 import com.erg.ergspringboot.service.auth.LoginFailureEnforcementService;
 import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.utils.IdGenerator;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Service;
@@ -60,32 +63,61 @@ public class AuthLoginUseCase {
     private final AuthLoginAttemptRepository attempts;
     private final PasswordService passwords;
     private final AuthTokenService tokens;
+    private final Optional<MeterRegistry> meterRegistry;
     private SecurityEventRepository securityEvents;
     private LoginFailureEnforcementService failureEnforcement;
     private AuthLoginRateLimiter rateLimiter;
     private UserRoleAssignmentRepository roleAssignments;
 
-    @Value("${erg.auth.rapid-session-replacement.threshold:5}")
     private int rapidSessionReplacementThreshold = 5;
-    @Value("${erg.auth.rapid-session-replacement.window-minutes:10}")
     private long rapidSessionReplacementWindowMinutes = 10;
 
+    /** Compatibility constructor retained for legacy tests and callers wiring without metrics. */
     public AuthLoginUseCase(
             UserRepository users,
             AuthSessionRepository sessions,
             AuthLoginAttemptRepository attempts,
             PasswordService passwords,
             AuthTokenService tokens) {
+        this(users, sessions, attempts, passwords, tokens, Optional.empty());
+    }
+
+    @Autowired
+    public AuthLoginUseCase(
+            UserRepository users,
+            AuthSessionRepository sessions,
+            AuthLoginAttemptRepository attempts,
+            PasswordService passwords,
+            AuthTokenService tokens,
+            ObjectProvider<MeterRegistry> meterRegistry) {
+        this(users, sessions, attempts, passwords, tokens,
+                Optional.ofNullable(meterRegistry.getIfAvailable()));
+    }
+
+    private AuthLoginUseCase(
+            UserRepository users,
+            AuthSessionRepository sessions,
+            AuthLoginAttemptRepository attempts,
+            PasswordService passwords,
+            AuthTokenService tokens,
+            Optional<MeterRegistry> meterRegistry) {
         this.users = users;
         this.sessions = sessions;
         this.attempts = attempts;
         this.passwords = passwords;
         this.tokens = tokens;
+        this.meterRegistry = meterRegistry;
     }
 
     @Autowired(required = false)
     public void setSecurityEventRepository(SecurityEventRepository securityEvents) {
         this.securityEvents = securityEvents;
+    }
+
+    @Autowired
+    public void setAuthProperties(ErgAuthProperties properties) {
+        this.rapidSessionReplacementThreshold = properties.getRapidSessionReplacement().getThreshold();
+        this.rapidSessionReplacementWindowMinutes = properties.getRapidSessionReplacement().getWindowMinutes();
     }
 
     @Autowired(required = false)
@@ -152,12 +184,10 @@ public class AuthLoginUseCase {
     private AuthResponse issueTokens(
             User user, AuthClientContext context, String loginProvider, String portal) {
         List<String> permissions = effectivePermissions(user);
-        List<String> portals = entitledPortals(permissions, portal);
-        if (!portals.contains("*") && !portals.contains(portal)) {
-            recordLoginAttempt(user.getId(), user.getEmail(), context, portal, "DENIED", "portal_forbidden");
-            recordSecurityEvent(user, context, portal, "PORTAL_FORBIDDEN", "MEDIUM", "portal entitlement denied");
-            throw new AuthFailure.PortalForbidden();
-        }
+        // The requested portal is a compatibility/audit hint only. Shared Auth must issue one
+        // session before workspace selection; authorization is evaluated later from the verified
+        // server-side grants, never from a hostname, query parameter, or login hint.
+        List<String> portals = entitledPortals(permissions, roles(user.getRoles()));
         String accessToken = tokens.newToken();
         String refreshToken = tokens.newToken();
         OffsetDateTime now = now();
@@ -195,6 +225,7 @@ public class AuthLoginUseCase {
         session.setTenantId(tenantId);
         session.setLastActiveAt(now);
         session.setExpiresAt(now.plus(sessionTtl(user)));
+        session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
         recordLoginAttempt(user.getId(), user.getEmail(), context, portal, "SUCCESS", "login_success");
 
@@ -236,6 +267,9 @@ public class AuthLoginUseCase {
         attempt.setReason(reason);
         attempt.setCreatedAt(now());
         attempts.save(attempt);
+        meterRegistry.ifPresent(registry -> registry
+                .counter("erg.auth.login.count", "result", result == null ? "none" : result)
+                .increment());
     }
 
     private void recordFailure(
@@ -311,7 +345,7 @@ public class AuthLoginUseCase {
         return List.copyOf(permissions);
     }
 
-    private List<String> entitledPortals(List<String> permissions, String requestedPortal) {
+    private List<String> entitledPortals(List<String> permissions, List<String> roles) {
         if (permissions.contains("*")) {
             return List.of("*");
         }
@@ -326,8 +360,22 @@ public class AuthLoginUseCase {
                 portals.add(namespace);
             }
         });
-        if (portals.isEmpty()) {
-            portals.add(requestedPortal);
+        if (roles != null) {
+            roles.stream()
+                    .map(role -> role == null ? "" : role.trim().toLowerCase(Locale.ROOT))
+                    .forEach(role -> {
+                        if (role.equals("admin") || role.equals("administrator")
+                                || role.equals("system.super_admin") || role.equals("erg_super_admin")
+                                || role.equals("global_admin") || role.equals("lms_admin")) {
+                            portals.add("admin");
+                        } else if (role.equals("teacher") || role.equals("instructor")) {
+                            portals.add("lms");
+                        } else if (role.equals("student") || role.equals("learner")) {
+                            portals.add("elearning");
+                        } else if (role.equals("crm") || role.equals("crm_manager")) {
+                            portals.add("crm");
+                        }
+                    });
         }
         return List.copyOf(portals);
     }

@@ -9,7 +9,7 @@ import java.time.Instant;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class DiscordEd25519SignatureVerifier implements WebhookSignatureVerifier {
+public class DiscordEd25519SignatureVerifier implements WebhookSignatureVerifier {
     private static final byte[] X509_ED25519_PREFIX = java.util.HexFormat.of().parseHex("302a300506032b6570032100");
     private final WebhookProperties properties;
     private final Clock clock;

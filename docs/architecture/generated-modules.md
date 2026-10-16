@@ -1,13 +1,27 @@
 # Generated module documentation checkpoint
 
-The current explicit module graph contains:
+The current explicit module catalog contains:
 
 ```text
+auth
+authorization
 calendar
-  └── internal.notification (CalendarBatchPublishedListener)
+crm
+curriculum
+elearning
+lcms
+learningcontent
+learningoutcomes
+learningstandards
+enterpriseconnectors
+lms
+notifications
+organization
+reporting
+school
+users
 ```
 
-The graph is verified by `ModulithVerificationTest`. CI should later use
-Spring Modulith Documenter to generate the module canvas/diagram from the same
-`ApplicationModules` model; this checked-in checkpoint prevents an undocumented
-module from silently entering production.
+`ArchitectureRatchetTest` compares this catalog source and the detailed module
+catalog with the `ApplicationModules` model. Spring Modulith `Documenter` still
+generates the diagram and canvas from the compiled application during tests.

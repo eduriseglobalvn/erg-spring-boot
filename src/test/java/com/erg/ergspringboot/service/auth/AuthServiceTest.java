@@ -261,7 +261,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void loginRejectsPortalOutsideDatabaseEntitlementsBeforeIssuingSession() {
+    void loginUsesRequestedPortalOnlyAsCompatibilityContextAndStillIssuesSharedSession() {
         User user = activeUser("user-lms-only", "lms-only@example.com", "secret123");
         Permission permission = new Permission();
         permission.setName("lms.classes.read");
@@ -271,15 +271,13 @@ class AuthServiceTest {
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
         when(userRepository.findForLogin("lms-only@example.com")).thenReturn(Optional.of(user));
 
-        assertThrows(
-                AuthFailure.PortalForbidden.class,
-                () -> authService.login(
-                        new LoginRequest("lms-only@example.com", "secret123", "web-1", "Chrome", null, "crm", false),
-                        new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)
-                )
+        AuthResponse response = authService.login(
+                new LoginRequest("lms-only@example.com", "secret123", "web-1", "Chrome", null, "crm", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)
         );
 
-        verify(sessionRepository, never()).save(any(AuthSession.class));
+        assertEquals(List.of("lms"), response.portals());
+        verify(sessionRepository).save(any(AuthSession.class));
     }
 
     @Test

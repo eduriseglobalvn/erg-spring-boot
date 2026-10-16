@@ -2,6 +2,7 @@ package com.erg.ergspringboot.platform.security;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.ErrDetail;
+import com.erg.ergspringboot.platform.web.RequestCorrelation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -23,7 +24,7 @@ public class SecurityErrorResponseWriter {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         String requestId = requestId(request);
-        response.setHeader("X-Request-ID", requestId);
+        response.setHeader(RequestCorrelation.REQUEST_ID_HEADER, requestId);
         response.setHeader("Cache-Control", "no-store");
         ApiResponse<Void> body = ApiResponse.failure(
                 status,
@@ -35,7 +36,6 @@ public class SecurityErrorResponseWriter {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return RequestCorrelation.getOrCreate(request);
     }
 }

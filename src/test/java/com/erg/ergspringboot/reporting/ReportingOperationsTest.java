@@ -15,8 +15,7 @@ class ReportingOperationsTest {
     void rejectsAssignmentOutsideTenantBeforeEnqueueing() {
         AssignmentScopeLookup assignments = mock(AssignmentScopeLookup.class);
         ReportJobService jobs = mock(ReportJobService.class);
-        when(assignments.findById("assignment-1")).thenReturn(Optional.of(
-                new AssignmentScopeLookup.AssignmentScope("other-tenant", "class-1")));
+        when(assignments.findByTenantIdAndId("tenant-1", "assignment-1")).thenReturn(Optional.empty());
 
         ReportingOperations operations = new ReportingOperations(jobs, assignments);
         UserAccessContext access = new UserAccessContext("user-1", "tenant-1", java.util.List.of("*"),

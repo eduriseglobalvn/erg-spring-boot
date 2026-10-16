@@ -20,7 +20,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "quiz_bank_items",

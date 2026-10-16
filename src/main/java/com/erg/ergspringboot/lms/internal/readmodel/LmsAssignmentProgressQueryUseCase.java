@@ -2,11 +2,17 @@ package com.erg.ergspringboot.lms.internal.readmodel;
 
 import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.*;
-import com.erg.ergspringboot.repository.lms.*;
+import com.erg.ergspringboot.lms.LmsAssignmentQueryPort;
+import com.erg.ergspringboot.lms.LmsAttemptQueryPort;
+import com.erg.ergspringboot.lms.LmsStatePolicy;
+import com.erg.ergspringboot.repository.lms.AssignmentRepository;
+import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
+import com.erg.ergspringboot.repository.lms.AttemptRepository;
 import com.erg.ergspringboot.repository.lms.projection.*;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -14,11 +20,19 @@ import org.springframework.stereotype.Service;
 /** Assignment progress projection boundary. */
 @Service
 public class LmsAssignmentProgressQueryUseCase {
-    private final AttemptRepository attempts;
-    private final AssignmentRepository assignments;
+    private final LmsAttemptQueryPort attempts;
+    private final LmsAssignmentQueryPort assignments;
     private final AssignmentResourceRepository resources;
-    public LmsAssignmentProgressQueryUseCase(AttemptRepository attempts, AssignmentRepository assignments,
+    @Autowired
+    public LmsAssignmentProgressQueryUseCase(LmsAttemptQueryPort attempts, LmsAssignmentQueryPort assignments,
             AssignmentResourceRepository resources) { this.attempts = attempts; this.assignments = assignments; this.resources = resources; }
+
+    /** Compatibility constructor retained for direct legacy callers. */
+    @Deprecated
+    public LmsAssignmentProgressQueryUseCase(AttemptRepository attempts, AssignmentRepository assignments,
+            AssignmentResourceRepository resources) {
+        this(new JpaLmsAttemptQueryAdapter(attempts), new JpaLmsAssignmentQueryAdapter(assignments), resources);
+    }
     public AssignmentProgressProjection summary(String tenantId, String assignmentId) {
         return attempts.summarizeAssignmentProgress(tenantId, assignmentId);
     }
@@ -35,7 +49,7 @@ public class LmsAssignmentProgressQueryUseCase {
         AssignmentProgressProjection summary = attempts.summarizeAssignmentProgress(tenant, id);
         List<AssignmentResourceProjection> assignmentResources = resources.findResourceProjections(tenant, id);
         Page<AttemptSummaryProjection> attemptItems = attempts.findAssignmentAttemptSummaries(tenant, id,
-                attemptStatus == null || attemptStatus.isBlank() ? null : attemptStatus.trim().toLowerCase(), attemptPage);
+                LmsStatePolicy.attemptFilter(attemptStatus), attemptPage);
         Page<RecipientProgressProjection> recipients = assignments.findAssignmentRecipients(tenant, id, recipientPage);
         Page<MissingLateStudentProjection> missing = assignments.findAssignmentMissingLateStudents(tenant, id, recipientPage);
         List<String> recipientIds = recipients.getContent().stream().map(RecipientProgressProjection::studentId).toList();

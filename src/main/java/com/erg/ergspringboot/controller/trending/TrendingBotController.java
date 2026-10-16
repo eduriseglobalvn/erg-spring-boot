@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.erg.ergspringboot.platform.security.ReviewedPublicEndpoint;
 
 @RestController
 @org.springframework.context.annotation.Profile("prototype")
@@ -25,11 +26,13 @@ public class TrendingBotController {
     }
 
     @GetMapping({"/trending/healthz", "/trending/ready", "/trending/topics", "/trending/news", "/trending/snapshots", "/trending/feeds", "/trending/discovery-feed", "/trending/history", "/trending/sources", "/trending/stats"})
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> trendingReads(HttpServletRequest request) {
         return ok("Trending data loaded", workflows.status("trending", last(request)), request);
     }
 
     @GetMapping("/trending/topics/{topic}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> topic(@PathVariable String topic, HttpServletRequest request) {
         return ok("Trending topic loaded", Map.of("topic", topic, "score", 0), request);
     }
@@ -84,8 +87,7 @@ public class TrendingBotController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private String last(HttpServletRequest request) {

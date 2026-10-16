@@ -7,12 +7,12 @@ import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.calendar.CalendarReferenceMaps;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.lms.LevelRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
-import com.erg.ergspringboot.service.calendar.CalendarReadService.ReferenceMaps;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,7 +43,7 @@ public final class CalendarReferenceMapsQueryUseCase {
         this.users = users;
     }
 
-    public ReferenceMaps load(
+    public CalendarReferenceMaps load(
             String tenantId,
             List<String> schoolIds,
             List<CalendarEvent> events,
@@ -69,7 +69,7 @@ public final class CalendarReferenceMapsQueryUseCase {
                 if (!schoolIdSet.contains(schoolId)) allSchoolIds.add(schoolId);
             }
         }
-        return new ReferenceMaps(
+        return new CalendarReferenceMaps(
                 allSchoolIds.isEmpty() ? Map.of() : schools.findByIdInOrderByNameAsc(allSchoolIds).stream()
                         .collect(Collectors.toMap(EducationUnit::getId, Function.identity())),
                 classIdSet.isEmpty() ? Map.of() : classes.findAllById(classIdSet).stream()

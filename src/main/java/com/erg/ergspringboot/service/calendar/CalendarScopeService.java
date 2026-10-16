@@ -5,6 +5,8 @@ import com.erg.ergspringboot.model.calendar.CalendarBatch;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import java.util.List;
@@ -45,8 +47,8 @@ public class CalendarScopeService {
         if (accessSupport.isWildcardPrincipal(principal)) {
             return normalize(requested);
         }
-        List<String> managed = accessSupport.csv(
-                accessSupport.attribute(principal, "managedEducationUnitIds"));
+        List<String> managed = AccessScopeAssembler.from(principal)
+                .managedIds(AccessScopeSet.EDUCATION_UNIT);
         List<String> effective = (requested == null || requested.isEmpty())
                 ? managed
                 : normalize(requested);

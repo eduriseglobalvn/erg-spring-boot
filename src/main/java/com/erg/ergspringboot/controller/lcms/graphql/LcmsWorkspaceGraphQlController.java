@@ -5,6 +5,8 @@ import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.Questio
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.lcms.LcmsQueryOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsWorkspaceRead;
+import com.erg.ergspringboot.lcms.authorization.LcmsScopeRead;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -25,6 +27,7 @@ public class LcmsWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "questionBankWorkspace")
+    @LcmsWorkspaceRead
     public QuestionBankWorkspaceResponse questionBankWorkspace(@Argument QuestionBankWorkspaceInput input) {
         QuestionBankWorkspaceInput safeInput = input == null ? QuestionBankWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
@@ -45,6 +48,7 @@ public class LcmsWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "accessManagementWorkspace")
+    @LcmsScopeRead
     public AccessManagementWorkspaceResponse accessManagementWorkspace(@Argument AccessManagementWorkspaceInput input) {
         AccessManagementWorkspaceInput safeInput = input == null ? AccessManagementWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();

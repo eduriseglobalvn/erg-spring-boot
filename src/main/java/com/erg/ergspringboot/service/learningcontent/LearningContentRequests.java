@@ -31,8 +31,20 @@ public final class LearningContentRequests {
             String title,
             String description,
             String status,
-            String visibility
+            String visibility,
+            Long expectedVersion,
+            String operationId,
+            String idempotencyKey
     ) {
+        public UpdateContentItemRequest(String contentType, String title, String description,
+                                        String status, String visibility) {
+            this(contentType, title, description, status, visibility, null, null, null);
+        }
+
+        public UpdateContentItemRequest withIdempotencyKey(String key) {
+            return new UpdateContentItemRequest(contentType, title, description, status, visibility,
+                    expectedVersion, operationId, key);
+        }
     }
 
     public record CreateContentAssetRequest(
@@ -59,8 +71,22 @@ public final class LearningContentRequests {
             Long byteSize,
             String checksumSha256,
             String status,
-            Map<String, Object> metadata
+            Map<String, Object> metadata,
+            Long expectedVersion,
+            String operationId,
+            String idempotencyKey
     ) {
+        public UpdateContentAssetRequest(String assetType, String title, String storageProvider,
+                                         String storageKey, String storageUrl, String mimeType, Long byteSize,
+                                         String checksumSha256, String status, Map<String, Object> metadata) {
+            this(assetType, title, storageProvider, storageKey, storageUrl, mimeType, byteSize,
+                    checksumSha256, status, metadata, null, null, null);
+        }
+
+        public UpdateContentAssetRequest withIdempotencyKey(String key) {
+            return new UpdateContentAssetRequest(assetType, title, storageProvider, storageKey, storageUrl,
+                    mimeType, byteSize, checksumSha256, status, metadata, expectedVersion, operationId, key);
+        }
     }
 
     public record AttachContentAssetRequest(

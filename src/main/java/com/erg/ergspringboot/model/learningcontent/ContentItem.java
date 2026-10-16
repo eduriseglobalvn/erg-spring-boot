@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "content_items",
@@ -42,6 +42,9 @@ public class ContentItem extends BaseEntity {
     @Column(nullable = false, length = 32)
     private String status;
 
+    @Column(name = "lifecycle_state", nullable = false, length = 32)
+    private String lifecycleState = "DRAFT";
+
     @Column(nullable = false, length = 32)
     private String visibility;
 
@@ -53,4 +56,8 @@ public class ContentItem extends BaseEntity {
 
     @Column(name = "updated_by", length = 96)
     private String updatedBy;
+
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion = 0L;
 }

@@ -33,7 +33,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class AuthSession extends BaseEntity {
 
     @Column(name = "user_id", length = 36, nullable = false)
@@ -71,6 +71,10 @@ public class AuthSession extends BaseEntity {
     private OffsetDateTime lastActiveAt;
 
     private OffsetDateTime expiresAt;
+
+    // Short-lived access-token expiry, independent of the longer session (refresh) lifetime. A leaked
+    // access token stops working after this instant even though the session lives on for refresh.
+    private OffsetDateTime accessTokenExpiresAt;
 
     private OffsetDateTime revokedAt;
 

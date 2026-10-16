@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(name = "teaching_schedule_events")
 public class CalendarEvent extends BaseEntity {
@@ -47,7 +47,6 @@ public class CalendarEvent extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     private CalendarRoom room;
 
     @Column(name = "title", length = 500)

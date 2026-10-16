@@ -1,0 +1,54 @@
+{
+  "title": "ERG Backend SLO",
+  "uid": "erg-backend-slo",
+  "schemaVersion": 39,
+  "tags": ["erg", "spring-modulith", "slo"],
+  "templating": {
+    "list": [
+      {"name": "environment", "type": "query", "query": "label_values(http_server_requests_seconds_count, environment)"},
+      {"name": "requestId", "type": "textbox"},
+      {"name": "traceId", "type": "textbox"}
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "REST p95 by route",
+      "type": "timeseries",
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{environment=\"$environment\"}[5m])))"}]
+    },
+    {
+      "id": 2,
+      "title": "REST error ratio",
+      "type": "timeseries",
+      "targets": [{"expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)"}]
+    },
+    {
+      "id": 3,
+      "title": "GraphQL operation p95",
+      "type": "timeseries",
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le, operation) (rate(graphql_operation_duration_seconds_bucket[5m])))"}]
+    },
+    {
+      "id": 4,
+      "title": "Database pool pending",
+      "type": "timeseries",
+      "targets": [{"expr": "max by (pool) (hikaricp_connections_pending)"}]
+    },
+    {
+      "id": 5,
+      "title": "Cache hit/miss and admission",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "sum by (cache, outcome) (rate(erg_cache_operations_total{operation=\"get\"}[5m]))"},
+        {"expr": "sum by (cache) (rate(erg_cache_operations_total{outcome=~\"size_bypass|decode_failure\"}[5m]))"}
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Modulith publication lag",
+      "type": "timeseries",
+      "targets": [{"expr": "max(spring_modulith_events_publication_lag_seconds)"}]
+    }
+  ]
+}

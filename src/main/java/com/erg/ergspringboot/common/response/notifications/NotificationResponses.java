@@ -77,6 +77,9 @@ public final class NotificationResponses {
     public record OutboxRunResponse(int processed, int sent, int failed, int retried, int dead) {
     }
 
+    public record DeadLetterReplayResponse(int requeued) {
+    }
+
     public static PageResponse<NotificationItemResponse> page(List<NotificationItemResponse> items, int page, int size, long total) {
         int totalPages = size <= 0 ? 0 : (int) Math.ceil((double) total / (double) size);
         return new PageResponse<>(items, page, size, total, totalPages, page + 1 < totalPages, page > 0);

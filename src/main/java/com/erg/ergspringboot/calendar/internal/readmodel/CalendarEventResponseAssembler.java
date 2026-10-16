@@ -10,7 +10,7 @@ import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.service.calendar.CalendarReadService.ReferenceMaps;
+import com.erg.ergspringboot.calendar.CalendarReferenceMaps;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class CalendarEventResponseAssembler {
     public CalendarEventResponse response(
             CalendarEvent event,
             List<CalendarEventTeacher> teachers,
-            ReferenceMaps references) {
+            CalendarReferenceMaps references) {
         List<CalendarTeacherAssignmentResponse> teacherResponses = teachers.stream()
                 .map(teacher -> new CalendarTeacherAssignmentResponse(
                         teacher.getTeacherUserId(),
@@ -54,27 +54,27 @@ public class CalendarEventResponseAssembler {
                 teacherResponses, event.getStatus(), event.getNote(), colorGroup(event.getSubjectId()));
     }
 
-    private String schoolName(String id, ReferenceMaps references) {
+    private String schoolName(String id, CalendarReferenceMaps references) {
         EducationUnit value = id == null ? null : references.schoolMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String className(String id, ReferenceMaps references) {
+    private String className(String id, CalendarReferenceMaps references) {
         Classroom value = id == null ? null : references.classMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String subjectName(String id, ReferenceMaps references) {
+    private String subjectName(String id, CalendarReferenceMaps references) {
         Subject value = id == null ? null : references.subjectMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String levelName(String id, ReferenceMaps references) {
+    private String levelName(String id, CalendarReferenceMaps references) {
         Level value = id == null ? null : references.levelMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String teacherName(String id, ReferenceMaps references) {
+    private String teacherName(String id, CalendarReferenceMaps references) {
         User value = id == null ? null : references.userMap().get(id);
         return value == null ? null : value.getFullName();
     }

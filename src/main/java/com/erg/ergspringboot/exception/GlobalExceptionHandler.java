@@ -3,7 +3,7 @@ package com.erg.ergspringboot.exception;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.ErrDetail;
 import com.erg.ergspringboot.common.response.FieldErrorDetail;
-import com.erg.ergspringboot.platform.web.RequestIdFilter;
+import com.erg.ergspringboot.platform.web.RequestCorrelation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Comparator;
 import java.util.List;
@@ -48,7 +48,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.unprocessableEntity()
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -72,7 +72,7 @@ public class GlobalExceptionHandler {
                 getRequestId(request));
 
         return ResponseEntity.unprocessableEntity()
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -89,7 +89,7 @@ public class GlobalExceptionHandler {
                 getRequestId(request));
 
         return ResponseEntity.badRequest()
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -98,18 +98,15 @@ public class GlobalExceptionHandler {
             org.springframework.http.converter.HttpMessageNotReadableException exception,
             WebRequest request
     ) {
-        ApiResponse<Void> response = new ApiResponse<>(
+        ApiResponse<Void> response = ApiResponse.failure(
                 HttpStatus.BAD_REQUEST.value(),
-                "invalid JSON body",
-                null,
-                "INVALID_REQUEST",
-                java.time.OffsetDateTime.now(),
+                ErrDetail.of("INVALID_REQUEST", "invalid JSON body"),
                 getRequestPath(request),
                 getRequestId(request)
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -128,12 +125,20 @@ public class GlobalExceptionHandler {
                 getRequestId(request)
         );
         return ResponseEntity.unprocessableEntity()
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Void>> handleApiException(ApiException exception, WebRequest request) {
+        if (exception instanceof SyncConflictException syncConflict) {
+            ApiResponse<Void> response = ApiResponse.conflict(
+                    exception.getStatus().value(), exception.getMessage(), syncConflict.conflict(),
+                    getRequestPath(request), getRequestId(request));
+            return ResponseEntity.status(exception.getStatus())
+                    .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
+                    .body(response);
+        }
         ApiResponse<Void> response = buildErrorResponse(
                 exception.getStatus(),
                 exception.getTitle(),
@@ -143,11 +148,63 @@ public class GlobalExceptionHandler {
         );
 
         var builder = ResponseEntity.status(exception.getStatus())
-                .header("X-Request-ID", response.requestId());
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId());
         if ("AUTH_TOO_MANY_ATTEMPTS".equals(exception.getCode())) {
             builder.header("Retry-After", "60");
         }
         return builder.body(response);
+    }
+
+    @ExceptionHandler({
+            org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(Exception exception, WebRequest request) {
+        ApiResponse<Void> response = buildErrorResponse(
+                HttpStatus.CONFLICT,
+                "Conflict",
+                "The resource changed since it was read; reload and retry",
+                "STALE_WRITE",
+                request);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(
+            org.springframework.dao.DataIntegrityViolationException exception,
+            WebRequest request
+    ) {
+        // A retry that reuses an idempotency key can slip past the app-level lookup and be caught by a
+        // unique idempotency index at the DB (uq_*_idempotency, idx_tsb_tenant_idempotency_key, ...).
+        // Surface that with a distinct, actionable code so clients can treat it as a raced retry rather
+        // than an unrelated data conflict. The constraint name is inspected internally but never leaked.
+        boolean idempotencyConflict = mentionsIdempotencyConstraint(exception);
+        ApiResponse<Void> response = buildErrorResponse(
+                HttpStatus.CONFLICT,
+                "Conflict",
+                idempotencyConflict
+                        ? "A concurrent request with the same idempotency key is already being processed"
+                        : "The request conflicts with existing data",
+                idempotencyConflict ? "IDEMPOTENCY_CONFLICT" : "DATA_CONFLICT",
+                request);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
+                .body(response);
+    }
+
+    private boolean mentionsIdempotencyConstraint(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            if (message != null && message.toLowerCase(java.util.Locale.ROOT).contains("idempotency")) {
+                return true;
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
@@ -164,7 +221,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -182,7 +239,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -200,7 +257,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -218,7 +275,7 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .header("X-Request-ID", response.requestId())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
     }
 
@@ -259,14 +316,10 @@ public class GlobalExceptionHandler {
 
     private String getRequestId(WebRequest request) {
         if (request instanceof ServletWebRequest servletWebRequest) {
-            Object attribute = servletWebRequest.getRequest().getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
-            if (attribute instanceof String requestId && !requestId.isBlank()) {
-                return requestId;
-            }
+            return RequestCorrelation.current(servletWebRequest.getRequest());
         }
-
-        String requestId = request.getHeader(RequestIdFilter.REQUEST_ID_HEADER);
-        return requestId == null || requestId.isBlank() ? null : requestId;
+        String requestId = request.getHeader(RequestCorrelation.REQUEST_ID_HEADER);
+        return requestId == null || requestId.isBlank() ? null : requestId.trim();
     }
 
     private String validationTag(FieldError error) {

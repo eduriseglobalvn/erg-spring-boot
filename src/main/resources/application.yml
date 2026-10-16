@@ -25,9 +25,11 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       pool-name: erg-hikari
-      maximum-pool-size: ${DB__MAX_OPEN_CONNS:8}
-      minimum-idle: ${DB__MAX_IDLE_CONNS:1}
-      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:1000}
+      # Ràng buộc: (số instance) × maximum-pool-size ≤ Postgres max_connections (mặc định 100).
+      # Default 25 ⇒ tối đa ~4 instance với Postgres mặc định; nâng max_connections trước khi scale rộng hơn.
+      maximum-pool-size: ${DB__MAX_OPEN_CONNS:25}
+      minimum-idle: ${DB__MAX_IDLE_CONNS:5}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:5000}
       validation-timeout: ${SPRING_DATASOURCE_HIKARI_VALIDATION_TIMEOUT:5000}
       initialization-fail-timeout: ${SPRING_DATASOURCE_HIKARI_INITIALIZATION_FAIL_TIMEOUT:1}
       idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:300000}
@@ -64,6 +66,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        default_batch_fetch_size: ${SPRING_JPA_HIBERNATE_DEFAULT_BATCH_FETCH_SIZE:100}
         jdbc:
           batch_size: ${SPRING_JPA_HIBERNATE_JDBC_BATCH_SIZE:50}
           batch_versioned_data: ${SPRING_JPA_HIBERNATE_JDBC_BATCH_VERSIONED_DATA:true}
@@ -96,8 +99,22 @@ spring:
     graphiql:
       enabled: ${SPRING_GRAPHQL_GRAPHIQL_ENABLED:false}
     schema:
+      # The canonical assembled schema is loaded from graphql/; module fragments
+      # under graphql/modules/ are build-time sources and must not be parsed
+      # independently by Spring GraphQL.
+      locations: ${SPRING_GRAPHQL_SCHEMA_LOCATIONS:classpath:/graphql/}
       introspection:
         enabled: ${SPRING_GRAPHQL_SCHEMA_INTROSPECTION_ENABLED:${ERG_GRAPHQL_INTROSPECTION_ENABLED:false}}
+
+# These bindings must be common, not hidden inside the staging-only document below.
+# A Spring-imported .env is a property source, not a process environment, so
+# SERVER_PORT must be referenced explicitly for IDE launches to reach the Nginx
+# dev upstream on port 1606.
+server:
+  address: ${SERVER_ADDRESS:${HTTP__HOST:${APP__HOST:0.0.0.0}}}
+  port: ${SERVER_PORT:${HTTP__PORT:${APP__PORT:1606}}}
+  forward-headers-strategy: framework
+  shutdown: graceful
 
 ---
 spring:
@@ -114,12 +131,28 @@ server:
   port: ${SERVER_PORT:${HTTP__PORT:${APP__PORT:1606}}}
   forward-headers-strategy: framework
   shutdown: graceful
+  tomcat:
+    # Cap how much of an aborted/rejected request body Tomcat will swallow to keep the
+    # connection alive. Just above the 15MB media limit so legitimately-sized rejects drain
+    # cleanly, but an oversized upload gets its connection reset instead of buffered.
+    max-swallow-size: ${SERVER_TOMCAT_MAX_SWALLOW_SIZE:16MB}
+    # Make Tomcat sizing explicit/overridable. Defaults match Tomcat's built-in values
+    # (max=200, accept-count=100) so behaviour is unchanged until ops tunes them.
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:200}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:100}
   error:
     include-message: never
     include-stacktrace: never
     include-binding-errors: never
 
 management:
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}
+    export:
+      zipkin:
+        endpoint: ${MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
   endpoints:
     web:
       exposure:
@@ -165,6 +198,8 @@ logging:
     org.springframework.jdbc.core: ${SPRING_JDBC_LOG_LEVEL:OFF}
 
 erg:
+  observability:
+    prometheus-public-enabled: ${ERG_OBSERVABILITY_PROMETHEUS_PUBLIC_ENABLED:false}
   webhook:
     max-body-bytes: ${ERG_WEBHOOK_MAX_BODY_BYTES:65536}
     replay-ttl: ${ERG_WEBHOOK_REPLAY_TTL:24h}
@@ -192,8 +227,16 @@ erg:
     circuit-failure-threshold: ${ERG_REDIS_CACHE_CIRCUIT_FAILURE_THRESHOLD:3}
     max-in-flight-loads: ${ERG_CACHE_MAX_IN_FLIGHT_LOADS:1024}
   quiz:
+    package:
+      # HMAC is retained only for legacy web rows. Portable desktop packages
+      # require Ed25519 plus a key managed outside source control.
+      signing-key: ${SECRET_QUIZ_PACKAGE_SIGNING_KEY:}
+      public-key-id: ${QUIZ_PACKAGE_PUBLIC_KEY_ID:unset}
+      signing-algorithm: ${QUIZ_PACKAGE_SIGNING_ALGORITHM:HMAC-SHA256}
+      ed25519-private-key: ${SECRET_QUIZ_PACKAGE_ED25519_PRIVATE_KEY:}
     media:
       signing-secret: ${SECRET_MEDIA_URL_SIGNING_KEY:${SECRET_AUTH__JWT_SECRET:}}
+      local-root: ${ERG_MEDIA_LOCAL_ROOT:.erg-media}
   redis:
     metrics:
       refresh-interval: ${ERG_REDIS_METRICS_REFRESH_INTERVAL:15s}
@@ -271,7 +314,6 @@ erg:
     bearer-prefix: ${AUTH__BEARER_PREFIX:Bearer}
     jwt-secret: ${SECRET_AUTH__JWT_SECRET:}
     jwt-refresh-secret: ${SECRET_AUTH__JWT_REFRESH_SECRET:}
-    access-token-ttl: ${AUTH__ACCESS_TOKEN_TTL:3h}
     refresh-token-ttl: ${AUTH__REFRESH_TOKEN_TTL:7d}
     admin-email: ${AUTH__ADMIN_EMAIL:admin@erg.edu.vn}
     argon2-memory: ${AUTH__ARGON2_MEMORY:32768}
@@ -323,6 +365,7 @@ erg:
     retry-backoff: ${QUEUE__RETRY_BACKOFF:true}
     is-server: ${QUEUE__IS_SERVER:true}
   r2:
+    enabled: ${R2__ENABLED:false}
     endpoint: ${R2__ENDPOINT:}
     access-key-id: ${SECRET_R2__ACCESS_KEY_ID:${R2__ACCESS_KEY_ID:}}
     secret-key: ${SECRET_R2__SECRET_KEY:${R2__SECRET_KEY:}}
@@ -395,20 +438,6 @@ erg:
     topics-limit: ${TRENDING__TOPICS_LIMIT:20}
     news-limit: ${TRENDING__NEWS_LIMIT:20}
     min-hot-score: ${TRENDING__MIN_HOT_SCORE:75}
-  modules:
-    enabled: ${MODULES__ENABLED:}
-    calendar:
-      new-handler-enabled: ${ERG_MODULES_CALENDAR_NEW_HANDLER_ENABLED:true}
-    users:
-      new-handler-enabled: ${ERG_MODULES_USERS_NEW_HANDLER_ENABLED:false}
-    authorization:
-      new-handler-enabled: ${ERG_MODULES_AUTHORIZATION_NEW_HANDLER_ENABLED:false}
-    reporting:
-      new-handler-enabled: ${ERG_MODULES_REPORTING_NEW_HANDLER_ENABLED:false}
-    lms:
-      new-handler-enabled: ${ERG_MODULES_LMS_NEW_HANDLER_ENABLED:false}
-    lcms:
-      new-handler-enabled: ${ERG_MODULES_LCMS_NEW_HANDLER_ENABLED:false}
   compose:
     enabled: ${COMPOSE__ENABLED:false}
     deploy-manifest-path: ${COMPOSE__DEPLOY_MANIFEST_PATH:deploy.yaml}
@@ -517,6 +546,9 @@ erg:
       source-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE:30}
       account-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_ACCOUNT_PER_MINUTE:10}
       device-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_DEVICE_PER_MINUTE:20}
+    rapid-session-replacement:
+      threshold: ${ERG_AUTH_RAPID_SESSION_REPLACEMENT_THRESHOLD:5}
+      window-minutes: ${ERG_AUTH_RAPID_SESSION_REPLACEMENT_WINDOW_MINUTES:10}
     refresh-token-history:
       retention-cron: ${ERG_AUTH_REFRESH_TOKEN_HISTORY_RETENTION_CRON:0 20 3 * * *}
     cookie:
@@ -542,3 +574,34 @@ logging:
     org.hibernate.SQL: OFF
     org.hibernate.orm.jdbc.bind: OFF
     org.springframework.jdbc.core: OFF
+
+---
+# Opt-in distributed Redis preset. Activate alongside your env profile, e.g.
+#   SPRING_PROFILES_ACTIVE=prod,redis
+# Flipping these flags on together switches rate-limiting and cache-invalidation
+# from per-instance (Caffeine local) to distributed/cross-instance:
+#   - state.enabled    -> creates the shared StringRedisTemplate + pub/sub subscriber
+#                         (RedisCacheGenerationService) and the GraphQlRateLimitCounterRouter,
+#                         so AuthLoginRateLimiter and cache generation go cross-instance.
+#   - graphql.rate-limit.redis-enabled -> GraphQlRateLimiter actually routes to the router.
+#   - cache.enabled + cache.l2-enabled -> enables the L2 RedisCacheStore.
+# URLs stay in env (never hardcoded here). Startup fails fast if a URL is missing:
+#   - state uses SPRING_DATA_REDIS_URL (via erg.redis.state.url fallback)
+#   - L2 cache uses ERG_REDIS_CACHE_URL (separate endpoint; no fallback by design)
+# Both are validated by ErgRedisProperties @AssertTrue -> context fails to start.
+# NOTE: L2 caches nothing until ERG_REDIS_CACHE_L2_NAMES lists the cache names to promote.
+spring:
+  config:
+    activate:
+      on-profile: redis
+erg:
+  cache:
+    l2-enabled: true
+  redis:
+    state:
+      enabled: true
+    cache:
+      enabled: true
+  graphql:
+    rate-limit:
+      redis-enabled: true

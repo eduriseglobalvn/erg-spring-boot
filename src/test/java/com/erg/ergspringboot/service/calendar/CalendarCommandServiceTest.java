@@ -42,7 +42,6 @@ import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
-import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
@@ -553,18 +552,10 @@ class CalendarCommandServiceTest {
             when(conflictService.detectConflicts(eq(TENANT_ID), anyList(), anyList(), anyMap()))
                     .thenReturn(List.of(errorConflict));
 
-            // Mock resolveManagedSchoolIds
-            ErgPrincipal principal = mock(ErgPrincipal.class);
-            when(accessSupport.currentPrincipal()).thenReturn(principal);
-            when(accessSupport.attribute(principal, "managedEducationUnitIds"))
-                    .thenReturn("school-001,school-002");
-            when(accessSupport.csv("school-001,school-002"))
-                    .thenReturn(List.of("school-001", "school-002"));
-
             ResolveResult resolveResult = new ResolveResult(
                     List.of(errorConflict), Set.of("existing-evt-1"));
             when(conflictService.resolveConflictsByDeletion(
-                    eq(TENANT_ID), anyList(), eq(List.of("school-001", "school-002"))))
+                    eq(TENANT_ID), anyList(), eq(List.of())))
                     .thenReturn(resolveResult);
 
             when(batchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -614,17 +605,10 @@ class CalendarCommandServiceTest {
             when(conflictService.detectConflicts(eq(TENANT_ID), anyList(), anyList(), anyMap()))
                     .thenReturn(List.of(resolvedConflict, unresolvedConflict));
 
-            ErgPrincipal principal = mock(ErgPrincipal.class);
-            when(accessSupport.currentPrincipal()).thenReturn(principal);
-            when(accessSupport.attribute(principal, "managedEducationUnitIds"))
-                    .thenReturn("school-001");
-            when(accessSupport.csv("school-001"))
-                    .thenReturn(List.of("school-001"));
-
             ResolveResult resolveResult = new ResolveResult(
                     List.of(resolvedConflict), Set.of("existing-evt-1"));
             when(conflictService.resolveConflictsByDeletion(
-                    eq(TENANT_ID), anyList(), eq(List.of("school-001"))))
+                    eq(TENANT_ID), anyList(), eq(List.of())))
                     .thenReturn(resolveResult);
 
             CalendarBulkPayload payload = service.create(TENANT_ID, input, USER_ID);

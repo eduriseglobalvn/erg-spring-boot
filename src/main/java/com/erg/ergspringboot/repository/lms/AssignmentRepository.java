@@ -6,6 +6,7 @@ import com.erg.ergspringboot.repository.lms.projection.AssignmentDetailProjectio
 import com.erg.ergspringboot.repository.lms.projection.MissingLateStudentProjection;
 import com.erg.ergspringboot.repository.lms.projection.RecipientProgressProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentProjection;
+import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentCountProjection;
 import com.erg.ergspringboot.repository.lms.projection.TeacherHomeworkSummaryProjection;
 import java.util.List;
 import java.util.Collection;
@@ -18,8 +19,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface AssignmentRepository extends JpaRepository<Assignment, String> {
 
-    List<Assignment> findTop500ByTenantIdOrderByCreatedAtDesc(String tenantId);
-
     List<Assignment> findByTenantIdAndAssignedByOrderByCreatedAtDesc(String tenantId, String assignedBy);
 
     List<Assignment> findByTenantIdAndAcademicClassIdOrderByCreatedAtDesc(String tenantId, String academicClassId);
@@ -27,45 +26,59 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     List<Assignment> findByTenantIdOrderByCreatedAtDesc(String tenantId);
 
     @Query(value = """
-            select distinct assignment.*
-            from lms_assignments assignment
-            left join assignment_recipients recipient
-              on recipient.tenant_id = assignment.tenant_id
-             and recipient.assignment_id = assignment.id
-             and recipient.student_id = :studentId
-            where assignment.tenant_id = :tenantId
-              and (recipient.id is not null or (
-                    not exists (
-                        select 1 from assignment_recipients any_recipient
-                        where any_recipient.tenant_id = assignment.tenant_id
-                          and any_recipient.assignment_id = assignment.id
-                    )
-                    and (
-                        assignment.academic_class_id = :academicClassId
-                        or assignment.student_ids @> jsonb_build_array(cast(:studentId as text))
-                    )
-              ))
-            order by assignment.created_at desc nulls last, assignment.id desc
+            select matched.*
+            from (
+                select assignment.*
+                from lms_assignments assignment
+                join assignment_recipients recipient
+                  on recipient.tenant_id = assignment.tenant_id
+                 and recipient.assignment_id = assignment.id
+                 and recipient.student_id = :studentId
+                where assignment.tenant_id = :tenantId
+
+                union all
+
+                select assignment.*
+                from lms_assignments assignment
+                where assignment.tenant_id = :tenantId
+                  and (
+                      assignment.academic_class_id = :academicClassId
+                      or assignment.student_ids @> jsonb_build_array(cast(:studentId as text))
+                  )
+                  and not exists (
+                      select 1 from assignment_recipients any_recipient
+                      where any_recipient.tenant_id = assignment.tenant_id
+                        and any_recipient.assignment_id = assignment.id
+                  )
+            ) matched
+            order by matched.created_at desc nulls last, matched.id desc
             """,
             countQuery = """
-            select count(distinct assignment.id)
-            from lms_assignments assignment
-            left join assignment_recipients recipient
-              on recipient.tenant_id = assignment.tenant_id
-             and recipient.assignment_id = assignment.id
-             and recipient.student_id = :studentId
-            where assignment.tenant_id = :tenantId
-              and (recipient.id is not null or (
-                    not exists (
-                        select 1 from assignment_recipients any_recipient
-                        where any_recipient.tenant_id = assignment.tenant_id
-                          and any_recipient.assignment_id = assignment.id
-                    )
-                    and (
-                        assignment.academic_class_id = :academicClassId
-                        or assignment.student_ids @> jsonb_build_array(cast(:studentId as text))
-                    )
-              ))
+            select count(*)
+            from (
+                select assignment.id
+                from lms_assignments assignment
+                join assignment_recipients recipient
+                  on recipient.tenant_id = assignment.tenant_id
+                 and recipient.assignment_id = assignment.id
+                 and recipient.student_id = :studentId
+                where assignment.tenant_id = :tenantId
+
+                union all
+
+                select assignment.id
+                from lms_assignments assignment
+                where assignment.tenant_id = :tenantId
+                  and (
+                      assignment.academic_class_id = :academicClassId
+                      or assignment.student_ids @> jsonb_build_array(cast(:studentId as text))
+                  )
+                  and not exists (
+                      select 1 from assignment_recipients any_recipient
+                      where any_recipient.tenant_id = assignment.tenant_id
+                        and any_recipient.assignment_id = assignment.id
+                  )
+            ) matched
             """, nativeQuery = true)
     Page<Assignment> findStudentAssignments(
             @Param("tenantId") String tenantId,
@@ -75,6 +88,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     );
 
     List<Assignment> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
+
+    Optional<Assignment> findByTenantIdAndId(String tenantId, String id);
 
     Optional<Assignment> findByTenantIdAndIdempotencyKey(String tenantId, String idempotencyKey);
 
@@ -394,7 +409,14 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                 and recipient.studentId = :studentId
             where assignment.tenantId = :tenantId
               and (
-                  recipient.id is not null
+                  (
+                      recipient.id is not null
+                      and (
+                          :academicClassId is null
+                          or recipient.classId = :academicClassId
+                          or assignment.academicClassId = :academicClassId
+                      )
+                  )
                   or (
                       :academicClassId is not null
                       and assignment.academicClassId = :academicClassId
@@ -416,6 +438,52 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     );
 
     @Query("""
+            select new com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentCountProjection(
+                count(distinct case when lower(assignment.status) = 'active' then assignment.id else null end),
+                count(distinct case when lower(assignment.status) = 'active'
+                    and not exists (
+                        select attempt.id
+                        from Attempt attempt
+                        where attempt.tenantId = assignment.tenantId
+                          and attempt.assignmentId = assignment.id
+                          and attempt.studentId = :studentId
+                          and lower(attempt.status) in ('submitted', 'graded', 'completed')
+                    ) then assignment.id else null end)
+            )
+            from Assignment assignment
+            left join AssignmentRecipient recipient
+                on recipient.tenantId = assignment.tenantId
+                and recipient.assignmentId = assignment.id
+                and recipient.studentId = :studentId
+            where assignment.tenantId = :tenantId
+              and (
+                  (
+                      recipient.id is not null
+                      and (
+                          :academicClassId is null
+                          or recipient.classId = :academicClassId
+                          or assignment.academicClassId = :academicClassId
+                      )
+                  )
+                  or (
+                      :academicClassId is not null
+                      and assignment.academicClassId = :academicClassId
+                      and not exists (
+                          select anyRecipient.id
+                          from AssignmentRecipient anyRecipient
+                          where anyRecipient.tenantId = assignment.tenantId
+                            and anyRecipient.assignmentId = assignment.id
+                      )
+                  )
+              )
+            """)
+    StudentDashboardAssignmentCountProjection summarizeStudentDashboardAssignments(
+            String tenantId,
+            String academicClassId,
+            String studentId
+    );
+
+    @Query("""
             select count(distinct assignment.id)
             from Assignment assignment
             left join AssignmentRecipient recipient
@@ -424,7 +492,14 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                 and recipient.studentId = :studentId
             where assignment.tenantId = :tenantId
               and (
-                  recipient.id is not null
+                  (
+                      recipient.id is not null
+                      and (
+                          :academicClassId is null
+                          or recipient.classId = :academicClassId
+                          or assignment.academicClassId = :academicClassId
+                      )
+                  )
                   or (
                       :academicClassId is not null
                       and assignment.academicClassId = :academicClassId
@@ -449,7 +524,14 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                 and recipient.studentId = :studentId
             where assignment.tenantId = :tenantId
               and (
-                  recipient.id is not null
+                  (
+                      recipient.id is not null
+                      and (
+                          :academicClassId is null
+                          or recipient.classId = :academicClassId
+                          or assignment.academicClassId = :academicClassId
+                      )
+                  )
                   or (
                       :academicClassId is not null
                       and assignment.academicClassId = :academicClassId

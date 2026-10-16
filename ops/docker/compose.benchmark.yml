@@ -1,0 +1,273 @@
+name: erg-benchmark
+
+x-backend-environment: &backend-environment
+  SERVER_ADDRESS: 0.0.0.0
+  SERVER_PORT: 1606
+  SPRING_PROFILES_ACTIVE: prod,redis
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/erg_benchmark
+  SPRING_DATASOURCE_USERNAME: erg_app
+  SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-erg-benchmark-runtime}
+  # The measured 500-VU run saturated the generic 25-connection default (169 pending) while
+  # backend/Postgres CPU remained below one core. Keep this single-backend benchmark pool explicit
+  # and below half of Postgres max_connections so Flyway, exporters and operator sessions retain room.
+  DB__MAX_OPEN_CONNS: ${BACKEND_DB_MAX_OPEN_CONNS:-80}
+  DB__MAX_IDLE_CONNS: ${BACKEND_DB_MIN_IDLE_CONNS:-25}
+  SPRING_FLYWAY_USER: erg
+  SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-erg-benchmark-owner}
+  FLYWAY_ENABLED: "true"
+  FLYWAY_LOCATIONS: classpath:db/migration/postgres
+  SPRING_DATA_REDIS_URL: redis://:${REDIS_STATE_PASSWORD:-erg-benchmark-state}@redis-state:6379
+  ERG_REDIS_STATE_ENABLED: "true"
+  ERG_REDIS_STATE_URL: redis://:${REDIS_STATE_PASSWORD:-erg-benchmark-state}@redis-state:6379
+  ERG_REDIS_CACHE_ENABLED: "true"
+  ERG_REDIS_CACHE_URL: redis://:${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}@redis-cache:6379
+  ERG_REDIS_CACHE_L2_NAMES: organizationEducationUnits,lcmsSchoolDirectory,quizRuntimePackage,lmsStudentGroups,lmsAssignmentProgress,lmsStudentAssignments,lmsClassWorkspace,lmsHomeworkWorkspace,studentDashboard
+  QUEUE__REDIS_HOST: redis-state
+  QUEUE__REDIS_PORT: 6379
+  SECRET_QUEUE__REDIS_PASSWORD: ${REDIS_STATE_PASSWORD:-erg-benchmark-state}
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+  ERG_OBSERVABILITY_PROMETHEUS_PUBLIC_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
+  SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+  SECRET_AUTH__JWT_SECRET: benchmark-only-jwt-secret-0123456789-abcdef
+  SECRET_AUTH__JWT_REFRESH_SECRET: benchmark-only-refresh-secret-9876543210-fedcba
+  SECRET_MEDIA_URL_SIGNING_KEY: benchmark-only-media-signing-key-abcdef-0123456789
+  AUTH__GEO_BLOCK_ENABLED: "false"
+  TENANT__ENABLED: "true"
+  ERG_PROCESS_LOCAL_ENABLED: "false"
+  ERG_OUTBOX_WORKER_ENABLED: "false"
+  ERG_REPORTING_WORKER_ENABLED: "false"
+  NOTIFICATIONS__WORKER__ENABLED: "false"
+  NOTIFICATIONS__PUSH__ENABLED: "false"
+
+x-backend-common: &backend-common
+  restart: "no"
+  environment: *backend-environment
+  cpus: ${BACKEND_CPUS:-4.0}
+  mem_limit: ${BACKEND_MEMORY:-4g}
+  read_only: true
+  tmpfs:
+    - /tmp:size=256m,mode=1777
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis-state:
+      condition: service_healthy
+    redis-cache:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:1606/ready"]
+    interval: 10s
+    timeout: 3s
+    retries: 18
+    start_period: 45s
+  networks:
+    benchmark:
+      aliases: [backend]
+
+services:
+  backend-jvm:
+    <<: *backend-common
+    profiles: [jvm]
+    build:
+      context: ../..
+      target: jvm-runtime
+    image: erg-spring:benchmark-jvm
+
+  backend-native:
+    <<: *backend-common
+    profiles: [native]
+    environment:
+      <<: *backend-environment
+      FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres
+    build:
+      context: ../..
+      target: native-runtime
+    image: erg-spring:benchmark-native
+
+  postgres:
+    image: postgres:17-alpine
+    restart: "no"
+    environment:
+      POSTGRES_DB: erg_benchmark
+      POSTGRES_USER: erg
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erg-benchmark-owner}
+      POSTGRES_RUNTIME_USER: erg_app
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-erg-benchmark-runtime}
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-160}
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+    cpus: ${POSTGRES_CPUS:-4.0}
+    mem_limit: ${POSTGRES_MEMORY:-5g}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erg -d erg_benchmark"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks: [benchmark]
+
+  redis-state:
+    image: redis:8.8.0-alpine3.23
+    restart: "no"
+    environment:
+      REDISCLI_AUTH: ${REDIS_STATE_PASSWORD:-erg-benchmark-state}
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_STATE_PASSWORD:-erg-benchmark-state}"]
+    cpus: ${REDIS_STATE_CPUS:-1.0}
+    mem_limit: ${REDIS_STATE_MEMORY:-1280m}
+    volumes:
+      - redis-state-data:/data
+      - ./redis/state.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [benchmark]
+
+  redis-cache:
+    image: redis:8.8.0-alpine3.23
+    restart: "no"
+    environment:
+      REDISCLI_AUTH: ${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}"]
+    cpus: ${REDIS_CACHE_CPUS:-1.0}
+    mem_limit: ${REDIS_CACHE_MEMORY:-2560m}
+    volumes:
+      - redis-cache-data:/data
+      - ./redis/cache.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [benchmark]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: "no"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+      - --web.enable-remote-write-receiver
+    cpus: ${PROMETHEUS_CPUS:-1.5}
+    mem_limit: ${PROMETHEUS_MEMORY:-1536m}
+    volumes:
+      - ./benchmark/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-19090}:9090"
+    networks: [benchmark]
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: "no"
+    environment:
+      GF_SECURITY_ADMIN_USER: benchmark
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-erg-benchmark-grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    cpus: ${GRAFANA_CPUS:-0.75}
+    mem_limit: ${GRAFANA_MEMORY:-768m}
+    volumes:
+      - ./benchmark/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./benchmark/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-13000}:3000"
+    depends_on: [prometheus]
+    networks: [benchmark]
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.57.0
+    restart: "no"
+    privileged: true
+    cpus: ${CADVISOR_CPUS:-0.75}
+    mem_limit: ${CADVISOR_MEMORY:-512m}
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    networks: [benchmark]
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    restart: "no"
+    environment:
+      DATA_SOURCE_NAME: postgresql://erg:${POSTGRES_PASSWORD:-erg-benchmark-owner}@postgres:5432/erg_benchmark?sslmode=disable
+    cpus: 0.25
+    mem_limit: 192m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [benchmark]
+
+  redis-state-exporter:
+    image: oliver006/redis_exporter:v1.77.0
+    restart: "no"
+    environment:
+      REDIS_ADDR: redis://redis-state:6379
+      REDIS_PASSWORD: ${REDIS_STATE_PASSWORD:-erg-benchmark-state}
+    cpus: 0.25
+    mem_limit: 128m
+    depends_on:
+      redis-state:
+        condition: service_healthy
+    networks: [benchmark]
+
+  redis-cache-exporter:
+    image: oliver006/redis_exporter:v1.77.0
+    restart: "no"
+    environment:
+      REDIS_ADDR: redis://redis-cache:6379
+      REDIS_PASSWORD: ${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}
+    cpus: 0.25
+    mem_limit: 128m
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+    networks: [benchmark]
+
+  k6:
+    image: grafana/k6:1.1.0
+    profiles: [load]
+    restart: "no"
+    environment:
+      BASE_URL: http://backend:1606
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: "false"
+      K6_PROMETHEUS_RW_TREND_STATS: p(50),p(95),p(99),avg,min,max
+    cpus: ${K6_CPUS:-4.0}
+    mem_limit: ${K6_MEMORY:-4g}
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    volumes:
+      - ../../load:/load:ro
+      - ../../load/results:/results
+    networks: [benchmark]
+
+networks:
+  benchmark:
+
+volumes:
+  postgres-data:
+  redis-state-data:
+  redis-cache-data:
+  prometheus-data:
+  grafana-data:

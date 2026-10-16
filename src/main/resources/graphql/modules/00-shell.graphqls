@@ -1,0 +1,42 @@
+type Query {
+  lms: LmsQuery!
+  lcms: LcmsQuery!
+  crm: PlatformNamespace!
+  elearning: ElearningQuery!
+}
+
+type LmsQuery {
+  namespace: String!
+  status: String!
+  learningResourceLibrary(input: LearningResourceLibraryInput): LearningResourceLibrary!
+  classWorkspace(input: ClassWorkspaceInput!): ClassWorkspace!
+  teacherHomeworkWorkspace(input: TeacherHomeworkWorkspaceInput): TeacherHomeworkWorkspace!
+  assignmentProgressWorkspace(input: AssignmentProgressWorkspaceInput!): AssignmentProgressWorkspace!
+  studentGroups(input: StudentGroupsInput): StudentGroupWorkspace!
+  myTeachingCalendar(input: MyTeachingCalendarInput!): TeachingCalendarWorkspace!
+  myStudentCalendar(input: MyStudentCalendarInput!): TeachingCalendarWorkspace!
+  attendanceWorkspace(input: AttendanceWorkspaceInput!): AttendanceWorkspace!
+  gradebookWorkspace(input: GradebookWorkspaceInput!): GradebookWorkspace!
+}
+
+type PlatformNamespace {
+  namespace: String!
+  status: String!
+}
+
+type LcmsQuery {
+  namespace: String!
+  status: String!
+  questionBankWorkspace(input: QuestionBankWorkspaceInput): QuestionBankWorkspace!
+  accessManagementWorkspace(input: AccessManagementWorkspaceInput): AccessManagementWorkspace!
+  teachingCalendarWorkspace(input: TeachingCalendarWorkspaceInput!): TeachingCalendarWorkspace!
+  teachingScheduleBatches(input: TeachingScheduleBatchListInput): TeachingScheduleBatchPage!
+  teachingScheduleBatch(input: TeachingScheduleBatchDetailInput!): TeachingScheduleBatchDetail!
+  quizWorkspace(input: QuizWorkspaceInput): QuizWorkspace!
+  quizDraft(quizId: String!): QuizDraftDocument!
+  quizVersions(quizId: String!): QuizVersionHistory!
+  quizQuestionAnalytics(quizVersionId: String!): QuizQuestionAnalytics!
+  assignmentReport(assignmentId: String!, page: Int, size: Int): AssignmentReport!
+  schoolDirectory(input: SchoolDirectoryInput): SchoolDirectoryWorkspace!
+  schoolOperations(input: SchoolOperationsInput!): SchoolOperationsWorkspace!
+}

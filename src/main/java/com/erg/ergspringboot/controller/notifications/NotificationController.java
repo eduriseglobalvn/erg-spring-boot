@@ -170,7 +170,6 @@ public class NotificationController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

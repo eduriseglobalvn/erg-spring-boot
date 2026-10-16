@@ -1,0 +1,29 @@
+{{- if eq .Values.autoscaling.mode "keda" }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "erg-spring.fullname" . }}
+  labels:
+    {{- include "erg-spring.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "erg-spring.fullname" . }}
+  pollingInterval: {{ .Values.autoscaling.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.autoscaling.keda.cooldownPeriod }}
+  minReplicaCount: {{ .Values.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.autoscaling.maxReplicas }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: {{ .Values.autoscaling.hpa.scaleDownStabilizationSeconds }}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.autoscaling.keda.prometheusServerAddress | quote }}
+        metricName: erg_hikari_pending_connections
+        query: 'max(sum(hikaricp_connections_pending{namespace="{{ .Release.Namespace }}"}) or vector(0))'
+        threshold: {{ .Values.autoscaling.keda.pendingConnectionsThreshold | quote }}
+        activationThreshold: "0"
+{{- end }}
+

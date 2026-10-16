@@ -11,7 +11,7 @@ class LmsClassroomQueryArchitectureTest {
     void classroomQueriesAreOwnedByInternalUseCase() throws Exception {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java"));
+        String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/lms/internal/runtime/LmsRuntimeUseCase.java"));
         assertThat(legacy).contains("classrooms.listClassesBySchool(");
         assertThat(legacy).doesNotContain("findByTenantIdAndSchoolIdOrderByNameAsc(");
     }

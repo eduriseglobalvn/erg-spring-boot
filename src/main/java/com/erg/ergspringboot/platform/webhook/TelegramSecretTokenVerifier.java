@@ -5,7 +5,7 @@ import java.security.MessageDigest;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class TelegramSecretTokenVerifier {
+public class TelegramSecretTokenVerifier {
     private final WebhookProperties properties;
 
     public TelegramSecretTokenVerifier(WebhookProperties properties) { this.properties = properties; }

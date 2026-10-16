@@ -16,7 +16,6 @@ import com.erg.ergspringboot.service.auth.AuthTokenService;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -30,6 +29,50 @@ class ErgPrincipalServiceTest {
 
     @Mock
     private UserRoleAssignmentRepository assignmentRepository;
+
+    @Test
+    void bearerLookupResolvesMissingTenantFromTheServerSideSession() {
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, new AuthTokenService());
+
+        assertThat(service.fromBearerToken("token", " ")).isEmpty();
+    }
+
+    @Test
+    void bearerLookupRejectsAmbiguousTokenAcrossTenants() {
+        AuthTokenService tokenService = new AuthTokenService();
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);
+        AuthSession first = activeSession("erg");
+        AuthSession second = activeSession("other");
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken("ambiguous-token")))
+                .thenReturn(List.of(first, second));
+
+        assertThat(service.resolveTenantId("ambiguous-token")).isEmpty();
+        assertThat(service.fromBearerToken("ambiguous-token")).isEmpty();
+    }
+
+    @Test
+    void legacyTenantHeaderIsOnlyAConsistencyCheckAgainstResolvedSession() {
+        AuthTokenService tokenService = new AuthTokenService();
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);
+        AuthSession session = activeSession("erg");
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken("tenant-bound-token")))
+                .thenReturn(List.of(session));
+
+        assertThat(service.fromBearerToken("tenant-bound-token", "other")).isEmpty();
+    }
+
+    private AuthSession activeSession(String tenantId) {
+        User user = new User();
+        user.setId("user-" + tenantId);
+        user.setTenantId(tenantId);
+        user.setStatus("ACTIVE");
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setTenantId(tenantId);
+        session.setSessionId("session-" + tenantId);
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+        return session;
+    }
 
     @Test
     void activeSystemScopedRoleContributesRuntimePermission() {
@@ -58,8 +101,8 @@ class ErgPrincipalServiceTest {
         session.setPortal("lcms");
         session.setExpiresAt(OffsetDateTime.now().plusHours(1));
         String bearerToken = "it-access-token";
-        when(sessionRepository.findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken), "erg"))
-                .thenReturn(Optional.of(session));
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken)))
+                .thenReturn(List.of(session));
         when(assignmentRepository.findActiveForUser(eq("u-it"), eq("erg"), any(OffsetDateTime.class)))
                 .thenReturn(List.of(assignment));
 
@@ -90,8 +133,8 @@ class ErgPrincipalServiceTest {
         session.setExpiresAt(OffsetDateTime.now().plusHours(1));
         String bearerToken = "admin-access-token";
 
-        when(sessionRepository.findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken), "erg"))
-                .thenReturn(Optional.of(session));
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken)))
+                .thenReturn(List.of(session));
 
         ErgPrincipal principal = service.fromBearerToken(bearerToken, "erg").orElseThrow();
 
@@ -117,18 +160,18 @@ class ErgPrincipalServiceTest {
         session.setPortal("admin");
         session.setExpiresAt(OffsetDateTime.now().plusHours(1));
         String bearerToken = "forged-admin-access-token";
-        when(sessionRepository.findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken), "erg"))
-                .thenReturn(Optional.of(session));
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken)))
+                .thenReturn(List.of(session));
 
         ErgPrincipal principal = service.fromBearerToken(bearerToken, "erg").orElseThrow();
 
-        assertThat(principal.portals()).containsExactly("admin");
+        assertThat(principal.portals()).isEmpty();
         assertThat(principal.attributes().get("managedEducationUnitIds")).isEqualTo(List.of());
         assertThat(principal.accessLevel()).isEqualTo("user");
     }
 
     @Test
-    void genericAdminPrincipalRemainsLimitedToItsLoginPortal() {
+    void genericAdminPrincipalUsesCapabilityProjectionInsteadOfLoginPortal() {
         AuthTokenService tokenService = new AuthTokenService();
         ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);
         Role role = new Role();
@@ -145,12 +188,12 @@ class ErgPrincipalServiceTest {
         session.setExpiresAt(OffsetDateTime.now().plusHours(1));
         String bearerToken = "local-admin-access-token";
 
-        when(sessionRepository.findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken), "erg"))
-                .thenReturn(Optional.of(session));
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken)))
+                .thenReturn(List.of(session));
 
         ErgPrincipal principal = service.fromBearerToken(bearerToken, "erg").orElseThrow();
 
-        assertThat(principal.portals()).containsExactly("admin");
+        assertThat(principal.portals()).containsExactly("lcms");
     }
 
     @Test
@@ -158,12 +201,13 @@ class ErgPrincipalServiceTest {
         AuthTokenService tokenService = new AuthTokenService();
         ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);
         AuthSession session = new AuthSession();
+        session.setTenantId("erg");
         session.setRevokedAt(OffsetDateTime.now());
         session.setRevokedReason("status_changed_inactive");
         String bearerToken = "inactive-account-token";
 
-        when(sessionRepository.findByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken), "erg"))
-                .thenReturn(Optional.of(session));
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken)))
+                .thenReturn(List.of(session));
 
         assertThat(service.authenticationFailureCode(bearerToken, "erg"))
                 .contains("ACCOUNT_DISABLED");

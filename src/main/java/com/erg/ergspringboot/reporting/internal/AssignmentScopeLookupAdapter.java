@@ -15,8 +15,8 @@ class AssignmentScopeLookupAdapter implements AssignmentScopeLookup {
     }
 
     @Override
-    public Optional<AssignmentScope> findById(String assignmentId) {
-        return assignments.findById(assignmentId)
+    public Optional<AssignmentScope> findByTenantIdAndId(String tenantId, String assignmentId) {
+        return assignments.findByTenantIdAndId(tenantId, assignmentId)
                 .map(this::toScope);
     }
 

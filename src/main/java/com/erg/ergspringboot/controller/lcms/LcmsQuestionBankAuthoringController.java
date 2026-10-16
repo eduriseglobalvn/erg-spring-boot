@@ -6,6 +6,9 @@ import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lcms.LcmsOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuestionCreate;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuestionUpdate;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuestionDelete;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +27,7 @@ public class LcmsQuestionBankAuthoringController {
     }
 
     @PostMapping("/api/v1/lcms/questions")
+    @LcmsQuestionCreate
     public ApiResponse<SaveQuestionResponse> create(
             @RequestBody SaveQuestionRequest body,
             HttpServletRequest request
@@ -37,6 +41,7 @@ public class LcmsQuestionBankAuthoringController {
     }
 
     @PutMapping("/api/v1/lcms/questions/{questionId}")
+    @LcmsQuestionUpdate
     public ApiResponse<SaveQuestionResponse> update(
             @PathVariable String questionId,
             @RequestBody SaveQuestionRequest body,
@@ -51,6 +56,7 @@ public class LcmsQuestionBankAuthoringController {
     }
 
     @DeleteMapping("/api/v1/lcms/questions/{questionId}")
+    @LcmsQuestionDelete
     public ApiResponse<DeleteQuestionResponse> delete(
             @PathVariable String questionId,
             HttpServletRequest request
@@ -68,7 +74,6 @@ public class LcmsQuestionBankAuthoringController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

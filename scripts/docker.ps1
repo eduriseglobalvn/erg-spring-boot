@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("dev", "test", "build", "push", "up", "prod", "deploy", "down", "logs", "config", "redis-migrate", "help")]
+    [ValidateSet("dev", "test", "build", "release", "push", "up", "prod", "deploy", "down", "logs", "config", "redis-migrate", "help")]
     [string]$Action = "help",
 
     [Parameter(Position = 1)]
@@ -8,6 +8,7 @@ param(
     [int]$Replicas = 2,
 
     [string]$Image = $env:ERG_APP_IMAGE,
+    [string]$RollbackImage = $env:ERG_ROLLBACK_IMAGE,
     [string]$EnvFile
 )
 
@@ -44,6 +45,79 @@ function Compose-Args([string]$EnvironmentFile, [string]$Overlay) {
     )
 }
 
+function Assert-ImmutableImage([string]$Value) {
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "Set -Image to a registry image with a Git SHA tag, for example ghcr.io/acme/erg-spring:abc1234"
+    }
+    if ($Value -notmatch '^[^/]+/.+:[0-9a-f]{7,64}$') {
+        throw "Image must use a registry/repository:git-sha tag (7-64 lowercase hex characters); floating tags such as latest, main or dev are not allowed"
+    }
+}
+
+function Assert-ProductionImage([string]$Value, [string]$Name = "Image") {
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "$Name must be a registry image pinned by digest, for example ghcr.io/acme/erg-spring@sha256:<64-hex-digest>"
+    }
+    if ($Value -notmatch '^[^/]+/.+@sha256:[0-9a-f]{64}$') {
+        throw "$Name must use a registry/repository@sha256:<64 lowercase hex digest>; Git-SHA tags and floating tags are not allowed for production deploy"
+    }
+}
+
+function Read-ConfiguredValue([string]$Path, [string]$Name) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match "^$([regex]::Escape($Name))=(.*)$") {
+            return $Matches[1].Trim()
+        }
+    }
+    return $null
+}
+
+function Invoke-ProductionDeployment([string]$EnvironmentFile) {
+    $configuredImage = Read-ConfiguredValue $EnvironmentFile "ERG_APP_IMAGE"
+    $targetImage = if ($Image) { $Image } else { $configuredImage }
+    $rollbackImage = if ($RollbackImage) { $RollbackImage } else {
+        Read-ConfiguredValue $EnvironmentFile "ERG_ROLLBACK_IMAGE"
+    }
+    Assert-ProductionImage $targetImage "Production image"
+    Assert-ProductionImage $rollbackImage "Rollback image"
+    if ($targetImage -eq $rollbackImage) {
+        throw "Production image and rollback image must be different digests"
+    }
+
+    $compose = Compose-Args $EnvironmentFile $nativeCompose
+    $originalImage = $env:ERG_APP_IMAGE
+    try {
+        $env:ERG_APP_IMAGE = $targetImage
+        Invoke-Docker ($compose + @("pull"))
+        Invoke-Docker ($compose + @(
+            "up", "-d", "--no-build", "--remove-orphans", "--scale", "backend=$Replicas",
+            "--wait", "--wait-timeout", "180"
+        ))
+        Write-Host "Production image is healthy: $targetImage"
+    } catch {
+        Write-Warning "Production health gate failed for $targetImage. Rolling back to $rollbackImage."
+        try {
+            $env:ERG_APP_IMAGE = $rollbackImage
+            Invoke-Docker ($compose + @("pull"))
+            Invoke-Docker ($compose + @(
+                "up", "-d", "--no-build", "--remove-orphans", "--scale", "backend=$Replicas",
+                "--wait", "--wait-timeout", "180"
+            ))
+            Write-Warning "Rollback completed: $rollbackImage"
+        } catch {
+            throw "Production deploy failed and rollback also failed. Target: $targetImage; rollback: $rollbackImage; error: $($_.Exception.Message)"
+        }
+        throw "Production deploy failed health gate; rollback completed to $rollbackImage"
+    } finally {
+        if ($null -eq $originalImage) {
+            Remove-Item Env:ERG_APP_IMAGE -ErrorAction SilentlyContinue
+        } else {
+            $env:ERG_APP_IMAGE = $originalImage
+        }
+    }
+}
+
 switch ($Action) {
     "dev" {
         Ensure-LocalEnv $devEnv ".env.dev.example"
@@ -61,8 +135,19 @@ switch ($Action) {
             $root
         )
     }
+    "release" {
+        Assert-ImmutableImage $Image
+        Invoke-Docker @(
+            "buildx", "build",
+            "--platform", "linux/amd64",
+            "--push",
+            "--tag", $Image,
+            $root
+        )
+        Write-Host "Published immutable native image $Image"
+    }
     "push" {
-        if (-not $Image) { throw "Set -Image to a Registry tag, for example ghcr.io/acme/erg-spring:abc123" }
+        Assert-ImmutableImage $Image
         Invoke-Docker @("push", $Image)
     }
     "test" {
@@ -85,23 +170,13 @@ switch ($Action) {
         if (-not (Test-Path -LiteralPath $productionEnv)) {
             throw "Missing production env file: $productionEnv"
         }
-        if ($Image) { $env:ERG_APP_IMAGE = $Image }
-        $compose = Compose-Args $productionEnv $nativeCompose
-        Invoke-Docker ($compose + @("pull"))
-        Invoke-Docker ($compose + @(
-            "up", "-d", "--no-build", "--remove-orphans", "--scale", "backend=$Replicas"
-        ))
+        Invoke-ProductionDeployment $productionEnv
     }
     "deploy" {
         if (-not (Test-Path -LiteralPath $productionEnv)) {
             throw "Missing production env file: $productionEnv"
         }
-        if ($Image) { $env:ERG_APP_IMAGE = $Image }
-        $compose = Compose-Args $productionEnv $nativeCompose
-        Invoke-Docker ($compose + @("pull"))
-        Invoke-Docker ($compose + @(
-            "up", "-d", "--no-build", "--remove-orphans", "--scale", "backend=$Replicas"
-        ))
+        Invoke-ProductionDeployment $productionEnv
     }
     "down" {
         if (Test-Path -LiteralPath $devEnv) {
@@ -130,14 +205,15 @@ switch ($Action) {
     }
     default {
         Write-Host @"
-Usage: .\scripts\docker.ps1 <action> [replicas] [-Image registry/name:tag] [-EnvFile path]
+Usage: .\scripts\docker.ps1 <action> [replicas] [-Image registry/name:tag] [-RollbackImage registry/name@sha256:digest] [-EnvFile path]
 
   dev       Start PostgreSQL, Redis and Nginx for the IDE-run backend.
   build     Build a Linux amd64 native image locally (default erg-spring:local-native).
-  push      Push the image supplied with -Image.
+  release   Build and push one immutable Linux amd64 image in one command.
+  push      Push an existing immutable Git-SHA image supplied with -Image.
   test      Run the already-built native image locally behind Nginx with N backend replicas.
   up        Alias of test.
-  prod      Pull and run a prebuilt image on the server. Never builds.
+  prod      Pull and run a digest-pinned image with health gate and digest rollback.
   deploy    Alias of prod.
   down      Stop both local development and native stacks.
   logs      Follow Nginx and backend logs.

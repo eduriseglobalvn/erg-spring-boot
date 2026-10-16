@@ -18,7 +18,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "curriculum_subjects",
@@ -44,6 +44,9 @@ public class CurriculumSubject extends BaseEntity {
     @Column(nullable = false, length = 32)
     private String status;
 
+    @Column(name = "lifecycle_state", nullable = false, length = 32)
+    private String lifecycleState = "DRAFT";
+
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
@@ -53,8 +56,11 @@ public class CurriculumSubject extends BaseEntity {
     @Column(name = "updated_by", length = 36)
     private String updatedBy;
 
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion = 0L;
+
     @OneToMany(mappedBy = "subject", fetch = FetchType.LAZY)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private Set<CurriculumLevel> levels = new LinkedHashSet<>();
 }

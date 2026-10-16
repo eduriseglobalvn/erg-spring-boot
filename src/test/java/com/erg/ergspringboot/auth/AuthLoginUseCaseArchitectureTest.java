@@ -15,7 +15,7 @@ class AuthLoginUseCaseArchitectureTest {
                 "com.erg.ergspringboot.auth.internal.login.AuthLoginUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"));
+                "src/main/java/com/erg/ergspringboot/auth/AuthOperations.java"));
         assertThat(facade)
                 .contains("loginFlow.login(")
                 .doesNotContain("issueTokens(")

@@ -15,7 +15,7 @@ class CurriculumChainValidationArchitectureTest {
                 "com.erg.ergspringboot.curriculum.internal.validation.CurriculumChainValidationUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java"));
+                "src/main/java/com/erg/ergspringboot/curriculum/CurriculumOperations.java"));
         assertThat(facade).contains("chainValidation.validate(");
     }
 }

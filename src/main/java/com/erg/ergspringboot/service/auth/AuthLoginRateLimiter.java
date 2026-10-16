@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.platform.graphql.ratelimit.GraphQlRateLimitCounterRouter;
 import com.erg.ergspringboot.platform.graphql.ratelimit.LocalEmergencyRateLimitCounter;
 import com.erg.ergspringboot.platform.graphql.ratelimit.RateLimitCounterResult;
+import com.erg.ergspringboot.platform.security.ErgAuthProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -12,7 +13,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /** Multi-dimensional login limiter. Identifiers are SHA-256 hashed before entering counter keys. */
@@ -31,10 +31,21 @@ public class AuthLoginRateLimiter {
     @Autowired
     public AuthLoginRateLimiter(
             ObjectProvider<GraphQlRateLimitCounterRouter> redisCounter,
-            @Value("${erg.auth.login-rate-limit.enabled:true}") boolean enabled,
-            @Value("${erg.auth.login-rate-limit.source-per-minute:30}") int sourceLimit,
-            @Value("${erg.auth.login-rate-limit.account-per-minute:10}") int accountLimit,
-            @Value("${erg.auth.login-rate-limit.device-per-minute:20}") int deviceLimit) {
+            ErgAuthProperties properties) {
+        this(redisCounter,
+                properties.getLoginRateLimit().isEnabled(),
+                properties.getLoginRateLimit().getSourcePerMinute(),
+                properties.getLoginRateLimit().getAccountPerMinute(),
+                properties.getLoginRateLimit().getDevicePerMinute(), false);
+    }
+
+    /** Compatibility constructor for focused unit tests and old embedders. */
+    public AuthLoginRateLimiter(
+            ObjectProvider<GraphQlRateLimitCounterRouter> redisCounter,
+            boolean enabled,
+            int sourceLimit,
+            int accountLimit,
+            int deviceLimit) {
         this(redisCounter, enabled, sourceLimit, accountLimit, deviceLimit, false);
     }
 

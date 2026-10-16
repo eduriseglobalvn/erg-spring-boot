@@ -20,12 +20,8 @@ public class LmsAssignmentService {
         this.repository = repository;
     }
 
-    public Optional<Assignment> findById(String id) {
-        return repository.findById(id);
-    }
-
-    public List<Assignment> findByTenantIdOrderByCreatedAtDesc(String tenantId) {
-        return repository.findTop500ByTenantIdOrderByCreatedAtDesc(tenantId);
+    public Optional<Assignment> findByTenantIdAndId(String tenantId, String id) {
+        return repository.findByTenantIdAndId(tenantId, id);
     }
 
     public List<Assignment> findByTenantIdAndIdIn(String tenantId, Collection<String> ids) {

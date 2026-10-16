@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.FieldErrorDetail;
+import com.erg.ergspringboot.common.response.ApiResponse.TransportError;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
@@ -37,7 +38,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).isEqualTo("User not found");
         assertThat(response.getBody().path()).isEqualTo("/api/v1/users/1");
         assertThat(response.getBody().requestId()).isEqualTo("req-not-found");
-        assertThat(response.getBody().errors()).isEqualTo("RESOURCE_NOT_FOUND");
+        assertThat(errorCode(response)).isEqualTo("RESOURCE_NOT_FOUND");
     }
 
     @Test
@@ -53,7 +54,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().statusCode()).isEqualTo(500);
         assertThat(response.getBody().message()).isEqualTo("Unexpected server error");
-        assertThat(response.getBody().errors()).isEqualTo("INTERNAL_SERVER_ERROR");
+        assertThat(errorCode(response)).isEqualTo("INTERNAL_SERVER_ERROR");
         assertThat(response.getBody().path()).isEqualTo("/api/v1/orders");
     }
 
@@ -87,7 +88,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).isEqualTo("validation failed");
         assertThat(response.getBody().requestId()).isEqualTo("req-constraint");
         assertThat(response.getBody().path()).isEqualTo("/api/v1/users");
-        assertThat(response.getBody().errors()).asList().singleElement()
+        assertThat(errorFields(response)).singleElement()
                 .isEqualTo(new FieldErrorDetail(
                         "listUsers.page", "ConstraintViolation", "ConstraintViolation",
                         "must be greater than or equal to 1"));
@@ -104,8 +105,67 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().errors()).isEqualTo("INVALID_REQUEST");
+        assertThat(errorCode(response)).isEqualTo("INVALID_REQUEST");
         assertThat(response.getBody().message()).isEqualTo("Missing required request parameter: from");
         assertThat(response.getBody().requestId()).isEqualTo("req-missing-param");
+    }
+
+    @Test
+    void optimisticLockUsesStableConflictEnvelope() {
+        MockHttpServletRequest request = new MockHttpServletRequest("PATCH", "/api/v1/schools/school-1");
+        request.addHeader("X-Request-ID", "req-stale-write");
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleOptimisticLock(
+                new org.springframework.orm.ObjectOptimisticLockingFailureException("School", "school-1"),
+                new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(errorCode(response)).isEqualTo("STALE_WRITE");
+        assertThat(response.getBody().requestId()).isEqualTo("req-stale-write");
+    }
+
+    @Test
+    void uniqueConstraintUsesStableConflictEnvelopeWithoutLeakingSql() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/lms/assignments");
+        var exception = new org.springframework.dao.DataIntegrityViolationException(
+                "duplicate key value violates unique constraint uq_secret_internal_name");
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleDataIntegrity(
+                exception, new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(errorCode(response)).isEqualTo("DATA_CONFLICT");
+        assertThat(response.getBody().message()).doesNotContain("uq_secret_internal_name");
+    }
+
+    @Test
+    void idempotencyIndexViolationUsesDistinctConflictCodeWithoutLeakingSql() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/lms/assignments");
+        request.addHeader("X-Request-ID", "req-idem-race");
+        var exception = new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException(
+                        "duplicate key value violates unique constraint \"uq_lms_assignments_tenant_idempotency\""));
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleDataIntegrity(
+                exception, new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(errorCode(response)).isEqualTo("IDEMPOTENCY_CONFLICT");
+        assertThat(response.getBody().requestId()).isEqualTo("req-idem-race");
+        assertThat(response.getBody().message())
+                .doesNotContain("uq_lms_assignments_tenant_idempotency")
+                .contains("idempotency key");
+    }
+
+    private String errorCode(ResponseEntity<ApiResponse<Void>> response) {
+        return ((TransportError.Code) response.getBody().errors()).value();
+    }
+
+    private java.util.List<FieldErrorDetail> errorFields(ResponseEntity<ApiResponse<Void>> response) {
+        return ((TransportError.Fields) response.getBody().errors()).value();
     }
 }

@@ -118,4 +118,18 @@ public class Attempt {
 
     @Column(name = "start_idempotency_key")
     private String startIdempotencyKey;
+
+    /** Server-authoritative assignment/package policy captured at first start. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "policy_snapshot", columnDefinition = "jsonb")
+    private Map<String, Object> policySnapshot;
+
+    /** Submit retry key retained with the first accepted submission. */
+    @Column(name = "submit_idempotency_key")
+    private String submitIdempotencyKey;
+
+    /** Optimistic concurrency guard for draft/submit races. */
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion;
 }

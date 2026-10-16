@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class LocalEmergencyRateLimitCounter implements GraphQlRateLimitCounter {
+public class LocalEmergencyRateLimitCounter implements GraphQlRateLimitCounter {
 
     private final Cache<String, AtomicLong> counters = Caffeine.newBuilder()
             .maximumSize(20_000)
@@ -29,4 +29,3 @@ public final class LocalEmergencyRateLimitCounter implements GraphQlRateLimitCou
         }
     }
 }
-

@@ -15,7 +15,7 @@ class AuthSessionLifecycleArchitectureTest {
                 "com.erg.ergspringboot.auth.internal.session.AuthSessionLifecycleUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"));
+                "src/main/java/com/erg/ergspringboot/auth/AuthOperations.java"));
         assertThat(facade)
                 .contains("sessionLifecycle.logout(")
                 .contains("sessionLifecycle.logoutAll(");

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaPresignRequest;
+import com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaCommitRequest;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaPresignResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.quiz.media.MediaAsset;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 class MediaServiceValidationTest {
 
     private FakeMediaAssetRepository repository;
+    private VerifyingMediaStorageAdapter storage;
     private MediaService service;
 
     private static final String VALID_SHA = "a".repeat(64);
@@ -27,7 +29,8 @@ class MediaServiceValidationTest {
     @BeforeEach
     void setUp() {
         repository = new FakeMediaAssetRepository();
-        service = new MediaService(repository, new LocalMediaStorageAdapter("/blob", "/upload"));
+        storage = new VerifyingMediaStorageAdapter();
+        service = new MediaService(repository, storage);
     }
 
     @Test
@@ -84,6 +87,51 @@ class MediaServiceValidationTest {
                 new MediaPresignRequest("not-a-hash", "image/png", 2048L, "x.png")))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("sha256");
+    }
+
+    @Test
+    void commitRejectsWhenObjectIsMissing() {
+        MediaPresignResponse presigned = service.presign("erg", "user-1",
+                new MediaPresignRequest(VALID_SHA, "image/png", 2048L, "diagram.png"));
+
+        assertThatThrownBy(() -> service.commit("erg", new MediaCommitRequest(presigned.mediaId(), 100, 80)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("uploaded object");
+    }
+
+    @Test
+    void commitRejectsSizeOrChecksumMismatch() {
+        MediaPresignResponse presigned = service.presign("erg", "user-1",
+                new MediaPresignRequest(VALID_SHA, "image/png", 2048L, "diagram.png"));
+        storage.object = new MediaStorageAdapter.StoredObject(2049L, "b".repeat(64), "image/png");
+
+        assertThatThrownBy(() -> service.commit("erg", new MediaCommitRequest(presigned.mediaId(), 100, 80)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("does not match");
+    }
+
+    @Test
+    void commitOnlyAfterStorageHeadMatchesContract() {
+        MediaPresignResponse presigned = service.presign("erg", "user-1",
+                new MediaPresignRequest(VALID_SHA, "image/png", 2048L, "diagram.png"));
+        storage.object = new MediaStorageAdapter.StoredObject(2048L, VALID_SHA, "image/png");
+
+        var committed = service.commit("erg", new MediaCommitRequest(presigned.mediaId(), 100, 80));
+
+        assertThat(committed.mediaId()).isEqualTo(presigned.mediaId());
+        assertThat(repository.store.get(presigned.mediaId()).getStatus()).isEqualTo("committed");
+    }
+
+    private static final class VerifyingMediaStorageAdapter implements MediaStorageAdapter {
+        private StoredObject object;
+
+        @Override public String storageKey(String tenantId, String sha256, String mimeType) {
+            return "quiz-media/" + tenantId + "/" + sha256 + ".png";
+        }
+        @Override public String presignUpload(String storageKey, String mimeType, long byteSize) { return "/upload/" + storageKey; }
+        @Override public boolean isAuthorizedUpload(String uploadUrl, String tenantId, String mimeType, long byteSize) { return true; }
+        @Override public String publicUrl(String storageKey) { return "/blob/" + storageKey; }
+        @Override public Optional<StoredObject> headObject(String storageKey) { return Optional.ofNullable(object); }
     }
 
     private static final class FakeMediaAssetRepository implements MediaAssetRepository {

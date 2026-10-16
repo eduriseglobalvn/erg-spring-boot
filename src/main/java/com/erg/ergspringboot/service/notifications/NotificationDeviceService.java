@@ -9,6 +9,7 @@ import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationEntity;
 import com.erg.ergspringboot.model.notifications.NotificationTopicMembershipEntity;
+import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationTopicMembershipRepository;
 import java.nio.charset.StandardCharsets;

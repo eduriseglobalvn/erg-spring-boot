@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.service.elearning.readmodel;
 
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAnnouncementCardResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardClassMembershipResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardProfileResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAssignmentCardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardCourseCardResponse;
@@ -10,15 +11,20 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardSummaryResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardViewerResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Student;
+import com.erg.ergspringboot.model.lms.StudentEnrollment;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AttemptRepository;
+import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.repository.lms.StudentEnrollmentRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.lms.projection.AnnouncementCardProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentProjection;
+import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentCountProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardScoreSummaryProjection;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -32,6 +38,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Explicit persistent dashboard read adapter; callers should use {@code ElearningOperations}. */
+@Deprecated(since = "2026-08-08", forRemoval = false)
 @Service
 @Transactional(readOnly = true)
 public class StudentDashboardReadService {
@@ -43,6 +51,8 @@ public class StudentDashboardReadService {
     private final AssignmentRepository assignmentRepository;
     private final AttemptRepository attemptRepository;
     private final StudentRepository studentRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final ClassroomRepository classroomRepository;
     private final UserRepository userRepository;
     private final ErgPolicyService policyService;
     private final StudentDashboardAnnouncementReadPort announcementReadPort;
@@ -54,7 +64,9 @@ public class StudentDashboardReadService {
             StudentRepository studentRepository,
             UserRepository userRepository,
             ErgPolicyService policyService,
-            StudentDashboardAnnouncementReadPort announcementReadPort
+            StudentDashboardAnnouncementReadPort announcementReadPort,
+            StudentEnrollmentRepository studentEnrollmentRepository,
+            ClassroomRepository classroomRepository
     ) {
         this.assignmentRepository = assignmentRepository;
         this.attemptRepository = attemptRepository;
@@ -62,6 +74,28 @@ public class StudentDashboardReadService {
         this.userRepository = userRepository;
         this.policyService = policyService;
         this.announcementReadPort = announcementReadPort;
+        this.studentEnrollmentRepository = studentEnrollmentRepository;
+        this.classroomRepository = classroomRepository;
+    }
+
+    public StudentDashboardReadService(
+            AssignmentRepository assignmentRepository,
+            AttemptRepository attemptRepository,
+            StudentRepository studentRepository,
+            UserRepository userRepository,
+            ErgPolicyService policyService,
+            StudentDashboardAnnouncementReadPort announcementReadPort
+    ) {
+        this(
+                assignmentRepository,
+                attemptRepository,
+                studentRepository,
+                userRepository,
+                policyService,
+                announcementReadPort,
+                null,
+                null
+        );
     }
 
     public StudentDashboardReadService(
@@ -77,13 +111,15 @@ public class StudentDashboardReadService {
                 studentRepository,
                 userRepository,
                 policyService,
-                StudentDashboardAnnouncementReadPort.unavailable()
+                StudentDashboardAnnouncementReadPort.unavailable(),
+                null,
+                null
         );
     }
 
     @Cacheable(
             cacheNames = "studentDashboard",
-            key = "{#scope.userId(), #scope.tenantId(), #scope.requestedTenantId(), #scope.requestedStudentUserId()}",
+            key = "{#scope.userId(), #scope.tenantId(), #scope.requestedTenantId(), #scope.requestedStudentUserId(), #scope.requestedClassId()}",
             unless = "#result == null"
     )
     public StudentDashboardResponse studentDashboard(StudentDashboardReadScope scope) {
@@ -93,9 +129,10 @@ public class StudentDashboardReadService {
 
         User user = userRepository.findWithDetailsByIdAndTenantId(safeScope.userId(), safeScope.tenantId()).orElse(null);
         Student student = studentRepository.findFirstByTenantIdAndAuthUserId(safeScope.tenantId(), safeScope.userId()).orElse(null);
-        StudentDashboardProfileResponse profile = toProfile(safeScope, user, student);
         String studentId = student == null ? null : blankToNull(student.getId());
-        String academicClassId = student == null ? null : blankToNull(student.getAcademicClassId());
+        List<StudentDashboardClassMembershipResponse> classMemberships = classMemberships(safeScope, student);
+        String academicClassId = selectedClassId(safeScope, student, classMemberships);
+        StudentDashboardProfileResponse profile = toProfile(safeScope, user, student, academicClassId);
         List<StudentDashboardAssignmentProjection> assignmentSlice = studentId == null
                 ? List.of()
                 : assignmentRepository.findStudentDashboardAssignments(
@@ -104,15 +141,20 @@ public class StudentDashboardReadService {
                         studentId,
                         PageRequest.of(0, FIRST_SLICE_LIMIT)
                 );
-        long activeAssignmentCount = studentId == null
-                ? 0L
-                : assignmentRepository.countActiveStudentAssignments(safeScope.tenantId(), academicClassId, studentId);
-        long pendingActionCount = studentId == null
-                ? 0L
-                : assignmentRepository.countPendingStudentAssignmentActions(safeScope.tenantId(), academicClassId, studentId);
+        StudentDashboardAssignmentCountProjection assignmentCounts = studentId == null
+                ? null
+                : assignmentRepository.summarizeStudentDashboardAssignments(
+                        safeScope.tenantId(), academicClassId, studentId);
+        long activeAssignmentCount = assignmentCounts == null
+                ? legacyActiveAssignmentCount(safeScope, academicClassId, studentId)
+                : nullToZero(assignmentCounts.activeAssignmentCount());
+        long pendingActionCount = assignmentCounts == null
+                ? legacyPendingActionCount(safeScope, academicClassId, studentId)
+                : nullToZero(assignmentCounts.pendingActionCount());
         StudentDashboardScoreSummaryResponse scoreSummary = studentId == null
                 ? emptyScoreSummary()
-                : toScoreSummary(attemptRepository.summarizeStudentDashboardScores(safeScope.tenantId(), studentId));
+                : toScoreSummary(attemptRepository.summarizeStudentDashboardScores(
+                        safeScope.tenantId(), studentId, academicClassId));
         List<StudentDashboardCourseCardResponse> courses = toCourseCards(assignmentSlice);
         List<StudentDashboardAssignmentCardResponse> assignments = assignmentSlice.stream()
                 .map(this::toAssignmentCard)
@@ -154,7 +196,9 @@ public class StudentDashboardReadService {
                 courses,
                 assignments,
                 nextActions,
-                announcements
+                announcements,
+                academicClassId,
+                classMemberships
         );
     }
 
@@ -167,6 +211,22 @@ public class StudentDashboardReadService {
                 .map(this::toCourseCard)
                 .sorted(Comparator.comparing(StudentDashboardCourseCardResponse::updatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
+    }
+
+    private long legacyActiveAssignmentCount(
+            StudentDashboardReadScope scope,
+            String academicClassId,
+            String studentId
+    ) {
+        return assignmentRepository.countActiveStudentAssignments(scope.tenantId(), academicClassId, studentId);
+    }
+
+    private long legacyPendingActionCount(
+            StudentDashboardReadScope scope,
+            String academicClassId,
+            String studentId
+    ) {
+        return assignmentRepository.countPendingStudentAssignmentActions(scope.tenantId(), academicClassId, studentId);
     }
 
     private StudentDashboardCourseCardResponse toCourseCard(List<StudentDashboardAssignmentProjection> assignments) {
@@ -194,6 +254,7 @@ public class StudentDashboardReadService {
     private StudentDashboardAssignmentCardResponse toAssignmentCard(StudentDashboardAssignmentProjection projection) {
         return new StudentDashboardAssignmentCardResponse(
                 projection.assignmentId(),
+                projection.quizId(),
                 first(projection.title(), projection.subjectName(), projection.subjectId(), "Untitled assignment"),
                 assignmentStatus(projection),
                 projection.dueAt()
@@ -221,7 +282,12 @@ public class StudentDashboardReadService {
         );
     }
 
-    private StudentDashboardProfileResponse toProfile(StudentDashboardReadScope scope, User user, Student student) {
+    private StudentDashboardProfileResponse toProfile(
+            StudentDashboardReadScope scope,
+            User user,
+            Student student,
+            String selectedClassId
+    ) {
         return new StudentDashboardProfileResponse(
                 scope.userId(),
                 student == null ? null : student.getId(),
@@ -235,13 +301,98 @@ public class StudentDashboardReadService {
                         user == null ? null : user.getEmail()
                 ),
                 student == null ? null : student.getSchoolId(),
-                student == null ? null : student.getAcademicClassId(),
+                selectedClassId,
                 first(
                         student == null ? null : student.getStatus(),
                         user == null ? null : user.getStatus()
                 ),
                 student == null ? null : student.getUpdatedAt()
         );
+    }
+
+    private List<StudentDashboardClassMembershipResponse> classMemberships(
+            StudentDashboardReadScope scope,
+            Student student
+    ) {
+        if (student == null || blankToNull(student.getId()) == null) {
+            return List.of();
+        }
+
+        Map<String, StudentEnrollment> enrollmentsByClass = new LinkedHashMap<>();
+        if (studentEnrollmentRepository != null) {
+            studentEnrollmentRepository
+                    .findByTenantIdAndStudentIdAndStatusIgnoreCaseOrderByCreatedAtAsc(
+                            scope.tenantId(), student.getId(), "ENROLLED")
+                    .forEach(enrollment -> {
+                        String classId = blankToNull(enrollment.getClassId());
+                        if (classId != null) enrollmentsByClass.putIfAbsent(classId, enrollment);
+                    });
+        }
+
+        String legacyPrimaryClassId = blankToNull(student.getAcademicClassId());
+        if (legacyPrimaryClassId != null && !enrollmentsByClass.containsKey(legacyPrimaryClassId)) {
+            enrollmentsByClass.put(legacyPrimaryClassId, null);
+        }
+        if (enrollmentsByClass.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Classroom> classroomsById = new LinkedHashMap<>();
+        if (classroomRepository != null && !enrollmentsByClass.isEmpty()
+                && enrollmentsByClass.values().stream().anyMatch(java.util.Objects::nonNull)) {
+            classroomRepository.findByTenantIdAndIdIn(scope.tenantId(), enrollmentsByClass.keySet())
+                    .forEach(classroom -> classroomsById.put(classroom.getId(), classroom));
+        }
+
+        return enrollmentsByClass.entrySet().stream()
+                .map(entry -> toClassMembership(student, entry.getKey(), entry.getValue(), classroomsById.get(entry.getKey())))
+                .sorted(Comparator.comparing(StudentDashboardClassMembershipResponse::className, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private StudentDashboardClassMembershipResponse toClassMembership(
+            Student student,
+            String classId,
+            StudentEnrollment enrollment,
+            Classroom classroom
+    ) {
+        return new StudentDashboardClassMembershipResponse(
+                classId,
+                first(classroom == null ? null : classroom.getName(), classId),
+                first(
+                        classroom == null ? null : classroom.getSchoolId(),
+                        enrollment == null ? null : enrollment.getSchoolId(),
+                        student.getSchoolId()
+                ),
+                classroom == null ? null : blankToNull(classroom.getGrade()),
+                first(
+                        enrollment == null ? null : enrollment.getAcademicYear(),
+                        classroom == null ? null : classroom.getAcademicYear()
+                ),
+                first(enrollment == null ? null : enrollment.getStatus(), "ENROLLED")
+        );
+    }
+
+    private String selectedClassId(
+            StudentDashboardReadScope scope,
+            Student student,
+            List<StudentDashboardClassMembershipResponse> memberships
+    ) {
+        String requestedClassId = blankToNull(scope.requestedClassId());
+        if (requestedClassId != null) {
+            boolean enrolled = memberships.stream().anyMatch(membership -> requestedClassId.equals(membership.classId()));
+            if (!enrolled) {
+                throw new ForbiddenException("Requested class is outside the authenticated student's enrollment scope.");
+            }
+            return requestedClassId;
+        }
+
+        String legacyPrimaryClassId = student == null ? null : blankToNull(student.getAcademicClassId());
+        if (legacyPrimaryClassId != null
+                && memberships.stream().anyMatch(membership -> legacyPrimaryClassId.equals(membership.classId()))) {
+            return legacyPrimaryClassId;
+        }
+        return memberships.isEmpty() ? null : memberships.getFirst().classId();
     }
 
     private StudentDashboardScoreSummaryResponse toScoreSummary(StudentDashboardScoreSummaryProjection projection) {

@@ -41,26 +41,28 @@ public class TransactionalOutboxWorker {
     public void scheduledRun() { runDueBatch(); }
 
     public int runDueBatch() {
-        List<OutboxEvent> due = transaction.execute(status -> {
-            OffsetDateTime now = OffsetDateTime.now();
-            List<OutboxEvent> events = repository.findDueForUpdate(now, BATCH_SIZE);
-            OffsetDateTime lease = now.plus(Duration.ofSeconds(60));
-            events.forEach(event -> {
-                event.setStatus("processing");
-                event.setLeaseUntil(lease);
+        List<OutboxEvent> due;
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.maintenance())) {
+            due = transaction.execute(status -> {
+                OffsetDateTime now = OffsetDateTime.now();
+                List<OutboxEvent> events = repository.findDueForUpdate(now, BATCH_SIZE);
+                OffsetDateTime lease = now.plus(Duration.ofSeconds(60));
+                events.forEach(event -> {
+                    event.setStatus("processing");
+                    event.setLeaseUntil(lease);
+                });
+                if (!events.isEmpty()) repository.saveAll(events);
+                return events;
             });
-            if (!events.isEmpty()) repository.saveAll(events);
-            return events;
-        });
+        }
         if (due == null) return 0;
         for (OutboxEvent event : due) dispatch(event);
         return due.size();
     }
 
     private void dispatch(OutboxEvent event) {
-        TenantContext previous = TenantContext.current();
-        try {
-            TenantContext.set(TenantContext.of(event.getTenantId(), null, "system"));
+        try (TenantContext.Scope ignored = TenantContext.scope(
+                TenantContext.of(event.getTenantId(), null, "system"))) {
             Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
             String recipient = string(payload, "recipient");
             String fullName = string(payload, "fullName");
@@ -74,8 +76,6 @@ public class TransactionalOutboxWorker {
             transition(event.getId(), true, null);
         } catch (RuntimeException failure) {
             transition(event.getId(), false, failure.getMessage());
-        } finally {
-            if (previous == null) TenantContext.clear(); else TenantContext.set(previous);
         }
     }
 

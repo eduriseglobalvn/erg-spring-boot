@@ -12,6 +12,8 @@ public interface SubjectRepository extends JpaRepository<Subject, String> {
 
     List<Subject> findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(String tenantId, String status);
 
+    java.util.Optional<Subject> findByTenantIdAndCodeIgnoreCase(String tenantId, String code);
+
     List<Subject> findTop500ByTenantIdAndStatusIgnoreCaseOrderByNameAsc(String tenantId, String status);
 
     List<Subject> findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(

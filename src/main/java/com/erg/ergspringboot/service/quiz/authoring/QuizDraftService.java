@@ -10,11 +10,15 @@ import com.erg.ergspringboot.exception.StaleDraftException;
 import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
 import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
+import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
+import com.erg.ergspringboot.platform.security.TenantContext;
 import com.erg.ergspringboot.service.quiz.authoring.QuizQuestionLinkService.QuestionLinkInput;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,33 +35,64 @@ public class QuizDraftService {
     private final QuizDraftRepository quizDraftRepository;
     private final QuizRepository quizRepository;
     private final QuizQuestionLinkService quizQuestionLinkService;
+    private final LmsSyncOperationService sync;
 
     public QuizDraftService(
             QuizDraftRepository quizDraftRepository,
             QuizRepository quizRepository,
             QuizQuestionLinkService quizQuestionLinkService
     ) {
+        this(quizDraftRepository, quizRepository, quizQuestionLinkService, (LmsSyncOperationService) null);
+    }
+
+    @Autowired
+    public QuizDraftService(
+            QuizDraftRepository quizDraftRepository,
+            QuizRepository quizRepository,
+            QuizQuestionLinkService quizQuestionLinkService,
+            ObjectProvider<LmsSyncOperationService> sync
+    ) {
+        this(quizDraftRepository, quizRepository, quizQuestionLinkService,
+                sync == null ? null : sync.getIfAvailable());
+    }
+
+    private QuizDraftService(
+            QuizDraftRepository quizDraftRepository,
+            QuizRepository quizRepository,
+            QuizQuestionLinkService quizQuestionLinkService,
+            LmsSyncOperationService sync
+    ) {
         this.quizDraftRepository = quizDraftRepository;
         this.quizRepository = quizRepository;
         this.quizQuestionLinkService = quizQuestionLinkService;
+        this.sync = sync;
     }
 
     /** Full-document autosave (PUT). Replaces settings/playerTemplate/tree wholesale. */
     @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
     public SaveDraftResponse saveDraft(String tenantId, String quizId, SaveDraftRequest request) {
         QuizDraft draft = latestDraft(tenantId, quizId);
-        assertDocVersion(draft, request == null ? null : request.docVersion());
-        if (request.settings() != null) {
-            draft.setSettings(request.settings());
+        LmsSyncOperationService.Receipt receipt = reserve(tenantId, quizId, request, "quiz.draft");
+        if (receipt != null && receipt.replayed()) return sync.result(receipt, SaveDraftResponse.class);
+        try {
+            assertDocVersion(draft, request == null ? null : request.docVersion());
+            if (request.settings() != null) {
+                draft.setSettings(request.settings());
+            }
+            if (request.playerTemplate() != null) {
+                draft.setPlayerTemplate(request.playerTemplate());
+            }
+            if (request.tree() != null) {
+                draft.setTree(request.tree());
+                syncQuizQuestionIds(tenantId, quizId, request.tree());
+            }
+            SaveDraftResponse result = bump(draft);
+            complete(receipt, result, result.docVersion());
+            return result;
+        } catch (RuntimeException exception) {
+            abandon(receipt);
+            throw exception;
         }
-        if (request.playerTemplate() != null) {
-            draft.setPlayerTemplate(request.playerTemplate());
-        }
-        if (request.tree() != null) {
-            draft.setTree(request.tree());
-            syncQuizQuestionIds(tenantId, quizId, request.tree());
-        }
-        return bump(draft);
     }
 
     /** Upserts a single slide into a group tree (§4.2). Server assigns the slide id when absent. */
@@ -65,13 +100,16 @@ public class QuizDraftService {
     @SuppressWarnings("unchecked")
     public SaveDraftResponse upsertSlide(String tenantId, String quizId, SlideUpsertRequest request) {
         QuizDraft draft = latestDraft(tenantId, quizId);
-        assertDocVersion(draft, request == null ? null : request.docVersion());
-        if (request.groupId() == null || request.groupId().isBlank()) {
-            throw new BadRequestException("groupId is required");
-        }
-        if (request.slide() == null) {
-            throw new BadRequestException("slide is required");
-        }
+        LmsSyncOperationService.Receipt receipt = reserve(tenantId, quizId, request, "quiz.draft.slide");
+        if (receipt != null && receipt.replayed()) return sync.result(receipt, SaveDraftResponse.class);
+        try {
+            assertDocVersion(draft, request == null ? null : request.docVersion());
+            if (request.groupId() == null || request.groupId().isBlank()) {
+                throw new BadRequestException("groupId is required");
+            }
+            if (request.slide() == null) {
+                throw new BadRequestException("slide is required");
+            }
         // Slide-tree mutation stays whole-document (spec §1.2): the tree blob is the source of truth.
         List<Map<String, Object>> groups = asGroupList(draft.getTree());
         Map<String, Object> group = findOrCreateGroup(groups, request.groupId());
@@ -82,17 +120,26 @@ public class QuizDraftService {
         replaceOrAppend(slides, slide, request.afterSlideId());
         draft.setTree(groups);
         syncQuizQuestionIds(tenantId, quizId, groups);
-        return bump(draft);
+            SaveDraftResponse result = bump(draft);
+            complete(receipt, result, result.docVersion());
+            return result;
+        } catch (RuntimeException exception) {
+            abandon(receipt);
+            throw exception;
+        }
     }
 
     /** Reorders groups/slides (§4.2). */
     @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
     public SaveDraftResponse reorder(String tenantId, String quizId, ReorderRequest request) {
         QuizDraft draft = latestDraft(tenantId, quizId);
-        assertDocVersion(draft, request == null ? null : request.docVersion());
-        if (request.groups() == null) {
-            throw new BadRequestException("groups is required");
-        }
+        LmsSyncOperationService.Receipt receipt = reserve(tenantId, quizId, request, "quiz.draft.reorder");
+        if (receipt != null && receipt.replayed()) return sync.result(receipt, SaveDraftResponse.class);
+        try {
+            assertDocVersion(draft, request == null ? null : request.docVersion());
+            if (request.groups() == null) {
+                throw new BadRequestException("groups is required");
+            }
         List<Map<String, Object>> groups = asGroupList(draft.getTree());
         for (ReorderRequest.ReorderGroup ordering : request.groups()) {
             Map<String, Object> group = findGroup(groups, ordering.groupId());
@@ -102,7 +149,39 @@ public class QuizDraftService {
         }
         draft.setTree(groups);
         syncQuizQuestionIds(tenantId, quizId, groups);
-        return bump(draft);
+            SaveDraftResponse result = bump(draft);
+            complete(receipt, result, result.docVersion());
+            return result;
+        } catch (RuntimeException exception) {
+            abandon(receipt);
+            throw exception;
+        }
+    }
+
+    private LmsSyncOperationService.Receipt reserve(String tenantId, String quizId, Object request, String entityType) {
+        if (sync == null || request == null) return null;
+        String key = request instanceof SaveDraftRequest value ? value.idempotencyKey()
+                : request instanceof SlideUpsertRequest value ? value.idempotencyKey()
+                : request instanceof ReorderRequest value ? value.idempotencyKey() : null;
+        String operationId = request instanceof SaveDraftRequest value ? value.operationId()
+                : request instanceof SlideUpsertRequest value ? value.operationId()
+                : request instanceof ReorderRequest value ? value.operationId() : null;
+        if (key == null || key.isBlank()) return null;
+        TenantContext context = TenantContext.current();
+        String accountId = context == null || context.userId() == null
+                ? "authoring:" + quizId : context.userId();
+        return sync.reserve(tenantId, accountId, operationId, key, entityType, quizId, request,
+                request instanceof SaveDraftRequest value ? value.docVersion()
+                        : request instanceof SlideUpsertRequest value ? value.docVersion()
+                        : request instanceof ReorderRequest value ? value.docVersion() : null).orElse(null);
+    }
+
+    private void complete(LmsSyncOperationService.Receipt receipt, SaveDraftResponse result, long version) {
+        if (receipt != null) sync.complete(receipt, result, version);
+    }
+
+    private void abandon(LmsSyncOperationService.Receipt receipt) {
+        if (receipt != null) sync.abandon(receipt);
     }
 
     private void syncQuizQuestionIds(String tenantId, String quizId, Object tree) {

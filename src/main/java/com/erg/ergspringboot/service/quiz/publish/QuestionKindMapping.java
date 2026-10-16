@@ -1,7 +1,6 @@
 package com.erg.ergspringboot.service.quiz.publish;
 
 import java.util.Locale;
-import java.util.Map;
 
 /**
  * Authoring-type -> runtime-kind mapping and grading policy (spec §3).
@@ -25,23 +24,6 @@ public final class QuestionKindMapping {
     public record Mapping(String runtimeKind, String gradingPolicy, boolean autoGradable) {
     }
 
-    private static final Map<String, Mapping> BY_AUTHORING_TYPE = Map.ofEntries(
-            Map.entry("multiple-choice", new Mapping("single_choice", POLICY_AUTO, true)),
-            Map.entry("multiple-response", new Mapping("multiple_response", POLICY_AUTO, true)),
-            Map.entry("true-false", new Mapping("true_false", POLICY_AUTO, true)),
-            Map.entry("short-answer", new Mapping("short_answer", POLICY_AUTO, true)),
-            Map.entry("numeric", new Mapping("numeric", POLICY_AUTO, true)),
-            Map.entry("sequence", new Mapping("sequence", POLICY_AUTO, true)),
-            Map.entry("matching", new Mapping("matching", POLICY_AUTO, true)),
-            Map.entry("fill-in-the-blanks", new Mapping("fill_blank", POLICY_AUTO, true)),
-            Map.entry("select-from-lists", new Mapping("select_from_lists", POLICY_AUTO, true)),
-            Map.entry("drag-the-words", new Mapping("drag_words", POLICY_AUTO, true)),
-            Map.entry("hotspot", new Mapping("hotspot", POLICY_AUTO, true)),
-            Map.entry("drag-and-drop", new Mapping("drag_drop", POLICY_AUTO, true)),
-            Map.entry("likert-scale", new Mapping("likert_scale", POLICY_SURVEY, false)),
-            Map.entry("essay", new Mapping("essay", POLICY_MANUAL, false))
-    );
-
     private QuestionKindMapping() {
     }
 
@@ -49,12 +31,18 @@ public final class QuestionKindMapping {
         String normalized = normalize(authoringType);
         return normalized != null
                 && !NON_QUESTION_SLIDE_TYPES.contains(normalized)
-                && BY_AUTHORING_TYPE.containsKey(normalized);
+                && QuestionKindRegistry.byAuthoringType(normalized).isPresent();
     }
 
     /** Returns the mapping for an authoring type, or {@code null} when the type is not a gradable question. */
     public static Mapping forAuthoringType(String authoringType) {
-        return BY_AUTHORING_TYPE.get(normalize(authoringType));
+        return QuestionKindRegistry.byAuthoringType(authoringType)
+                .map(descriptor -> new Mapping(descriptor.runtimeKind(), descriptor.gradingPolicy(), descriptor.autoGradable()))
+                .orElse(null);
+    }
+
+    public static QuestionKindDescriptor requireRuntimeKind(String runtimeKind) {
+        return QuestionKindRegistry.requireRuntimeKind(runtimeKind);
     }
 
     private static String normalize(String value) {

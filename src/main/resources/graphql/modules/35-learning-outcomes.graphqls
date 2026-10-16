@@ -1,0 +1,41 @@
+extend type LmsQuery {
+  learningOutcomes(input: LearningOutcomesQueryInput): LearningOutcomesWorkspace!
+  learningOutcomePath(pathId: String!): LearningPathDetail!
+  verifyOutcomeCertificate(verificationId: String!): OutcomeCertificate!
+}
+
+extend type Mutation {
+  createLearningPath(input: CreateLearningPathInput!): LearningPath!
+  publishLearningPath(input: PublishLearningPathInput!): LearningPath!
+  addLearningPathNode(input: AddLearningPathNodeInput!): LearningPathNode!
+  createCompetency(input: CreateCompetencyInput!): Competency!
+  recordCompetencyAttainment(input: RecordCompetencyAttainmentInput!): CompetencyAttainment!
+  evaluateLearningPathCompletion(input: EvaluateCompletionInput!): LearningPathCompletion!
+  issueOutcomeCertificate(input: IssueOutcomeCertificateInput!): OutcomeCertificate!
+  revokeOutcomeCertificate(input: RevokeOutcomeCertificateInput!): OutcomeCertificate!
+}
+
+input LearningOutcomesQueryInput { tenantId: String, educationUnitId: String, classId: String, status: String, learnerId: String }
+type LearningOutcomesWorkspace {
+  paths: [LearningPath!]!
+  competencies: [Competency!]!
+  completions: [LearningPathCompletion!]!
+  attainments: [CompetencyAttainment!]!
+  certificates: [OutcomeCertificate!]!
+}
+type LearningPath { id: String!, tenantId: String!, title: String!, description: String, status: String!, educationUnitId: String, classId: String, recordVersion: Int!, nodeCount: Int!, createdAt: String, updatedAt: String }
+type LearningPathNode { id: String!, tenantId: String!, pathId: String!, contentRefId: String!, contentKind: String!, sortOrder: Int!, required: Boolean!, createdAt: String }
+type LearningPathDetail { path: LearningPath!, nodes: [LearningPathNode!]! }
+type Competency { id: String!, tenantId: String!, code: String!, name: String!, description: String, status: String!, educationUnitId: String, recordVersion: Int!, createdAt: String, updatedAt: String }
+type CompetencyAttainment { id: String!, tenantId: String!, learnerId: String!, competencyId: String!, learningPathId: String, classId: String, status: String!, evidenceRef: String!, achievedAt: String, recordVersion: Int!, progressPercent: Int! }
+type LearningPathCompletion { id: String!, tenantId: String!, learnerId: String!, learningPathId: String!, status: String!, requiredNodeCount: Int!, completedNodeCount: Int!, progressPercent: Int!, evidenceRef: String!, evaluatedAt: String, recordVersion: Int! }
+type OutcomeCertificate { id: String!, tenantId: String!, learnerId: String!, learningPathId: String!, certificateNumber: String!, verificationId: String!, status: String!, evidenceRef: String!, issuedAt: String, expiresAt: String, revokedAt: String, recordVersion: Int!, revokedBy: String, revocationReason: String }
+
+input CreateLearningPathInput { tenantId: String, title: String!, description: String, educationUnitId: String, classId: String, idempotencyKey: String! }
+input PublishLearningPathInput { pathId: String!, expectedVersion: Int!, idempotencyKey: String! }
+input AddLearningPathNodeInput { pathId: String!, contentRefId: String!, contentKind: String!, sortOrder: Int!, required: Boolean!, expectedPathVersion: Int!, idempotencyKey: String! }
+input CreateCompetencyInput { tenantId: String, code: String!, name: String!, description: String, educationUnitId: String, idempotencyKey: String! }
+input RecordCompetencyAttainmentInput { learnerId: String!, competencyId: String!, learningPathId: String, classId: String, evidenceRef: String!, progressPercent: Int, idempotencyKey: String! }
+input EvaluateCompletionInput { learnerId: String!, learningPathId: String!, expectedVersion: Int!, completedContentRefIds: [String!]!, evidenceRef: String!, idempotencyKey: String! }
+input IssueOutcomeCertificateInput { learnerId: String!, learningPathId: String!, certificateNumber: String!, evidenceRef: String!, expiresAt: String, idempotencyKey: String! }
+input RevokeOutcomeCertificateInput { certificateId: String!, expectedVersion: Int!, reason: String!, idempotencyKey: String! }

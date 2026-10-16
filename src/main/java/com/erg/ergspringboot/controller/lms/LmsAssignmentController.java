@@ -9,6 +9,13 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssi
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.LmsOperations;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentCreate;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentUpdate;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentAssign;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentDelete;
+import com.erg.ergspringboot.lms.authorization.LmsStudentGroupCreate;
+import com.erg.ergspringboot.lms.authorization.LmsStudentGroupUpdate;
+import com.erg.ergspringboot.lms.authorization.LmsStudentGroupDelete;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -34,6 +41,7 @@ public class LmsAssignmentController {
     }
 
     @PostMapping("/api/v1/lms/assignments")
+    @LmsAssignmentCreate
     public ApiResponse<CreateAssignmentResponse> create(
             @RequestBody CreateAssignmentRequest body,
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
@@ -45,6 +53,7 @@ public class LmsAssignmentController {
     }
 
     @PatchMapping("/api/v1/lms/assignments/{assignmentId}")
+    @LmsAssignmentUpdate
     public ApiResponse<Void> update(
             @PathVariable String assignmentId,
             @RequestBody UpdateAssignmentRequest body,
@@ -56,6 +65,7 @@ public class LmsAssignmentController {
     }
 
     @PutMapping("/api/v1/lms/assignments/{assignmentId}/recipients")
+    @LmsAssignmentAssign
     public ApiResponse<CreateAssignmentResponse> updateRecipients(
             @PathVariable String assignmentId,
             @RequestBody UpdateRecipientsRequest body,
@@ -67,6 +77,7 @@ public class LmsAssignmentController {
     }
 
     @DeleteMapping("/api/v1/lms/assignments/{assignmentId}")
+    @LmsAssignmentDelete
     public ApiResponse<Void> delete(@PathVariable String assignmentId, HttpServletRequest request) {
         UserAccessContext access = UserAccessContext.from(request);
         operations.deleteAssignment(access.tenantId(), assignmentId);
@@ -74,6 +85,7 @@ public class LmsAssignmentController {
     }
 
     @PostMapping("/api/v1/lms/student-groups")
+    @LmsStudentGroupCreate
     public ApiResponse<StudentGroupResponse> createGroup(
             @RequestBody StudentGroupRequest body,
             HttpServletRequest request
@@ -84,6 +96,7 @@ public class LmsAssignmentController {
     }
 
     @PutMapping("/api/v1/lms/student-groups/{groupId}")
+    @LmsStudentGroupUpdate
     public ApiResponse<StudentGroupResponse> updateGroup(
             @PathVariable String groupId,
             @RequestBody StudentGroupRequest body,
@@ -95,6 +108,7 @@ public class LmsAssignmentController {
     }
 
     @DeleteMapping("/api/v1/lms/student-groups/{groupId}")
+    @LmsStudentGroupDelete
     public ApiResponse<Void> deleteGroup(@PathVariable String groupId, HttpServletRequest request) {
         UserAccessContext access = UserAccessContext.from(request);
         operations.deleteStudentGroup(access.tenantId(), groupId);
@@ -106,7 +120,6 @@ public class LmsAssignmentController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

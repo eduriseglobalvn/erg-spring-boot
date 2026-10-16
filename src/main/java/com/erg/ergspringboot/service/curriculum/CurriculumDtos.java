@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.service.curriculum;
 
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 public final class CurriculumDtos {
@@ -109,4 +110,44 @@ public final class CurriculumDtos {
             boolean deleted
     ) {
     }
+
+    public record CurriculumTeachingPlanRequest(
+            LocalDate startDate,
+            List<Integer> teachingDays,
+            Integer sessionsPerDay,
+            String timezone,
+            String status,
+            Long expectedVersion
+    ) { }
+
+    public record CurriculumTeachingPlanResponse(
+            String id,
+            String tenantId,
+            String schoolId,
+            String subjectId,
+            String academicYear,
+            LocalDate startDate,
+            List<Integer> teachingDays,
+            Integer sessionsPerDay,
+            String timezone,
+            String status,
+            Long recordVersion,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) { }
+
+    public record CurriculumProgramRowRequest(
+            String id, String topic, Integer period, String title, Integer sessions, String status) { }
+
+    public record CurriculumProgramRequest(
+            String name, String status, List<CurriculumProgramRowRequest> rows, Long expectedVersion) { }
+
+    public record CurriculumProgramRowResponse(
+            String id, String topic, Integer period, String title, Integer sessions,
+            Integer sortOrder, String status, Long recordVersion) { }
+
+    public record CurriculumProgramResponse(
+            String id, String tenantId, String subjectId, String levelId, String academicYear,
+            String name, String status, Long recordVersion, List<CurriculumProgramRowResponse> rows,
+            OffsetDateTime createdAt, OffsetDateTime updatedAt) { }
 }

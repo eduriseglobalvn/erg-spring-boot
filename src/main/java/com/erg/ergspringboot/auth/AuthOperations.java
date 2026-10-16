@@ -12,6 +12,10 @@ import com.erg.ergspringboot.service.auth.AccountVerificationService;
 import com.erg.ergspringboot.common.request.users.UserRequests.RecoveryEmailChallengeRequest;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailChallengeResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVerificationResponse;
+import com.erg.ergspringboot.auth.internal.login.AuthLoginUseCase;
+import com.erg.ergspringboot.auth.internal.refresh.AuthRefreshUseCase;
+import com.erg.ergspringboot.auth.internal.security.AuthSecurityQueryUseCase;
+import com.erg.ergspringboot.auth.internal.session.AuthSessionLifecycleUseCase;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,16 +23,41 @@ import org.springframework.stereotype.Service;
 /** Public authentication facade for login, refresh and session lifecycle. */
 @Service
 public class AuthOperations {
+    private final AuthLoginUseCase loginFlow;
+    private final AuthRefreshUseCase refreshFlow;
+    private final AuthSessionLifecycleUseCase sessionLifecycle;
+    private final AuthSecurityQueryUseCase securityQueries;
     private final AuthService legacy;
     private final AccountVerificationService verification;
 
     @Autowired
+    public AuthOperations(
+            AuthLoginUseCase loginFlow,
+            AuthRefreshUseCase refreshFlow,
+            AuthSessionLifecycleUseCase sessionLifecycle,
+            AuthSecurityQueryUseCase securityQueries,
+            AccountVerificationService verification) {
+        this.loginFlow = loginFlow;
+        this.refreshFlow = refreshFlow;
+        this.sessionLifecycle = sessionLifecycle;
+        this.securityQueries = securityQueries;
+        this.legacy = null;
+        this.verification = verification;
+    }
+
+    /** Compatibility constructor for adapters/tests while the legacy service is retired. */
+    @Deprecated
     public AuthOperations(AuthService legacy, AccountVerificationService verification) {
+        this.loginFlow = null;
+        this.refreshFlow = null;
+        this.sessionLifecycle = null;
+        this.securityQueries = null;
         this.legacy = legacy;
         this.verification = verification;
     }
 
     /** Compatibility constructor for focused auth tests. */
+    @Deprecated
     public AuthOperations(AuthService legacy) { this(legacy, null); }
 
     public RecoveryEmailChallengeResponse requestRecoveryEmailChallenge(
@@ -47,26 +76,59 @@ public class AuthOperations {
     }
 
     public AuthResponse login(LoginRequest request, AuthClientContext context) {
-        return legacy.login(request, context);
+        return legacy != null ? legacy.login(request, context) : loginFlow.login(request, context);
     }
 
     public TokenResponse refresh(RefreshRequest request, AuthClientContext context) {
-        return legacy.refresh(request, context);
+        return legacy != null ? legacy.refresh(request, context) : refreshFlow.refresh(request, context);
     }
 
     public void logout(String userId, String tenantId, String sessionId) {
-        legacy.logout(userId, tenantId, sessionId);
+        if (legacy != null) legacy.logout(userId, tenantId, sessionId);
+        else sessionLifecycle.logout(userId, tenantId, sessionId);
     }
 
     public int logoutAll(String userId, String tenantId) {
-        return legacy.logoutAll(userId, tenantId);
+        return legacy != null
+                ? legacy.logoutAll(userId, tenantId)
+                : sessionLifecycle.logoutAll(userId, tenantId);
     }
 
     public List<LoginAttemptResponse> loginAttempts(String userId, String email) {
-        return legacy.listLoginAttempts(userId, email);
+        return legacy != null
+                ? legacy.listLoginAttempts(userId, email)
+                : securityQueries.loginAttempts(userId, email);
     }
 
     public IpSecurityStatusResponse ipSecurityStatus(String email, AuthClientContext context) {
-        return legacy.ipSecurityStatus(email, context);
+        return legacy != null
+                ? legacy.ipSecurityStatus(email, context)
+                : securityQueries.ipStatus(email, context);
+    }
+
+    public void setSecurityEventRepository(
+            com.erg.ergspringboot.repository.auth.SecurityEventRepository repository) {
+        if (loginFlow != null) loginFlow.setSecurityEventRepository(repository);
+        if (refreshFlow != null) refreshFlow.setSecurityEventRepository(repository);
+    }
+
+    public void setLoginFailureEnforcementService(
+            com.erg.ergspringboot.service.auth.LoginFailureEnforcementService service) {
+        if (loginFlow != null) loginFlow.setLoginFailureEnforcementService(service);
+    }
+
+    public void setAuthLoginRateLimiter(
+            com.erg.ergspringboot.service.auth.AuthLoginRateLimiter limiter) {
+        if (loginFlow != null) loginFlow.setAuthLoginRateLimiter(limiter);
+    }
+
+    public void setUserRoleAssignmentRepository(
+            com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository repository) {
+        if (loginFlow != null) loginFlow.setUserRoleAssignmentRepository(repository);
+    }
+
+    public void setRefreshTokenHistoryRepository(
+            com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository repository) {
+        if (refreshFlow != null) refreshFlow.setRefreshTokenHistoryRepository(repository);
     }
 }

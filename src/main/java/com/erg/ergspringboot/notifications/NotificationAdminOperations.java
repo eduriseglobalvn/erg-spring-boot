@@ -3,6 +3,7 @@ package com.erg.ergspringboot.notifications;
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.AdminSendRequest;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AdminSendResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AdminStatsResponse;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.OutboxRunResponse;
 import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
 import com.erg.ergspringboot.service.notifications.NotificationCommand;
@@ -59,5 +60,9 @@ public class NotificationAdminOperations {
 
     public OutboxRunResponse runOutbox(String tenantId) {
         return worker.runDueBatch(tenantId);
+    }
+
+    public DeadLetterReplayResponse replayDeadLetters(String tenantId, int limit) {
+        return worker.replayDeadLetters(tenantId, limit);
     }
 }

@@ -1,5 +1,8 @@
 package com.erg.ergspringboot.service.authorization;
 
+import com.erg.ergspringboot.audit.AuditOperations;
+import com.erg.ergspringboot.audit.AuditOutcome;
+import com.erg.ergspringboot.audit.AuditRecord;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.auth.SecurityEvent;
 import com.erg.ergspringboot.model.users.User;
@@ -16,6 +19,7 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +29,28 @@ public class AuthorizationMutationAuditService {
     private final UserRepository userRepository;
     private final UserActivityRepository activityRepository;
     private final SecurityEventRepository securityEventRepository;
+    private final AuditOperations auditOperations;
 
+    @Autowired
+    public AuthorizationMutationAuditService(
+            UserRepository userRepository,
+            UserActivityRepository activityRepository,
+            SecurityEventRepository securityEventRepository,
+            AuditOperations auditOperations
+    ) {
+        this.userRepository = userRepository;
+        this.activityRepository = activityRepository;
+        this.securityEventRepository = securityEventRepository;
+        this.auditOperations = auditOperations;
+    }
+
+    /** Compatibility constructor retained for legacy unit tests and callers. */
     public AuthorizationMutationAuditService(
             UserRepository userRepository,
             UserActivityRepository activityRepository,
             SecurityEventRepository securityEventRepository
     ) {
-        this.userRepository = userRepository;
-        this.activityRepository = activityRepository;
-        this.securityEventRepository = securityEventRepository;
+        this(userRepository, activityRepository, securityEventRepository, null);
     }
 
     @Transactional
@@ -79,6 +96,29 @@ public class AuthorizationMutationAuditService {
         userRepository.saveAll(targets);
         activityRepository.saveAll(activities);
         securityEventRepository.saveAll(events);
+        if (auditOperations != null) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("roleId", roleId);
+            details.put("reason", reason);
+            details.put("affectedUserIds", userIds);
+            details.put("affectedCount", userIds.size());
+            auditOperations.record(new AuditRecord(
+                    tenantId,
+                    requiredActor(context),
+                    "TENANT",
+                    tenantId,
+                    "AUTHORIZATION_CHANGED",
+                    "USER_AUTHORIZATION",
+                    roleId,
+                    AuditOutcome.SUCCESS,
+                    context == null ? null : context.requestId(),
+                    context == null ? null : context.requestId(),
+                    null,
+                    details,
+                    idempotencyKey("authorization", tenantId, roleId, reason, context, userIds),
+                    OffsetDateTime.now(),
+                    null));
+        }
     }
 
     @Transactional
@@ -104,6 +144,28 @@ public class AuthorizationMutationAuditService {
         activity.setMetadata(metadata);
         activity.setCreatedAt(OffsetDateTime.now());
         activityRepository.save(activity);
+        if (auditOperations != null) {
+            Map<String, Object> auditDetails = new LinkedHashMap<>();
+            auditDetails.put("roleId", roleId);
+            auditDetails.put("action", action);
+            if (details != null) auditDetails.putAll(details);
+            auditOperations.record(new AuditRecord(
+                    normalizeTenant(tenantId),
+                    requiredActor(context),
+                    "TENANT",
+                    normalizeTenant(tenantId),
+                    "AUTHORIZATION_ROLE_CHANGED",
+                    "ROLE",
+                    roleId,
+                    AuditOutcome.SUCCESS,
+                    context == null ? null : context.requestId(),
+                    context == null ? null : context.requestId(),
+                    null,
+                    auditDetails,
+                    idempotencyKey("role", tenantId, roleId, action, context, List.of()),
+                    OffsetDateTime.now(),
+                    null));
+        }
     }
 
     private UserActivity targetActivity(
@@ -177,6 +239,22 @@ public class AuthorizationMutationAuditService {
 
     private String normalizeTenant(String tenantId) {
         return tenantId == null || tenantId.isBlank() ? "erg" : tenantId.trim();
+    }
+
+    private String idempotencyKey(
+            String prefix,
+            String tenantId,
+            String roleId,
+            String action,
+            AuditContext context,
+            List<String> userIds
+    ) {
+        String requestId = context == null ? null : context.requestId();
+        String stable = String.join(",", userIds == null ? List.of() : userIds);
+        String seed = prefix + ":" + normalizeTenant(tenantId) + ":" + roleId + ":" + action + ":" + stable;
+        if (requestId != null && !requestId.isBlank()) seed = requestId.trim() + ":" + seed;
+        int hash = seed.hashCode();
+        return "authz:" + Integer.toUnsignedString(hash, 36) + ":" + Math.abs((long) hash);
     }
 
     public record UserRef(String userId, String tenantId) {

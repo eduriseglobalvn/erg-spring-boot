@@ -14,11 +14,30 @@ public record StudentDashboardReadScope(
         List<String> deniedPermissions,
         List<String> portals,
         String accountType,
-        String accessLevel
+        String accessLevel,
+        String requestedClassId
 ) {
 
+    public StudentDashboardReadScope(
+            String userId,
+            String tenantId,
+            String requestedTenantId,
+            String requestedStudentUserId,
+            List<String> roles,
+            List<String> permissions,
+            List<String> deniedPermissions,
+            List<String> portals,
+            String accountType,
+            String accessLevel
+    ) {
+        this(
+                userId, tenantId, requestedTenantId, requestedStudentUserId, roles, permissions,
+                deniedPermissions, portals, accountType, accessLevel, null
+        );
+    }
+
     public ErgPrincipal toPrincipal() {
-        return new ErgPrincipal(
+        return ErgPrincipal.authenticated(
                 userId,
                 "graphql-student-dashboard",
                 tenantId,

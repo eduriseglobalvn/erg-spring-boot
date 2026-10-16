@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.model.reviews;
 
-import com.erg.ergspringboot.model.BaseEntity;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,8 +12,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class Review extends BaseEntity {
+@EqualsAndHashCode(exclude = {"createdAt", "updatedAt"})
+public class Review {
+
+    private String id;
+
+    private java.time.OffsetDateTime createdAt;
+
+    private java.time.OffsetDateTime updatedAt;
 
     private String targetId;
 

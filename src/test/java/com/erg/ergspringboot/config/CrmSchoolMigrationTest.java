@@ -57,4 +57,21 @@ class CrmSchoolMigrationTest {
                 .contains("role_school_manager")
                 .contains("role_executive_director");
     }
+
+    @Test
+    void crmWorkspaceMigrationAddsLifecyclePayloadsAndIdempotentCommands() throws IOException {
+        String migration = Files.readString(Path.of(
+                "src/main/resources/db/migration/postgres/V82__crm_workspace_contract.sql"));
+
+        assertThat(migration)
+                .contains("ADD COLUMN IF NOT EXISTS lead_status")
+                .contains("ADD COLUMN IF NOT EXISTS revenue_lines jsonb")
+                .contains("ADD COLUMN IF NOT EXISTS idempotency_key")
+                .contains("CREATE TABLE IF NOT EXISTS crm_handovers")
+                .contains("uq_crm_deals_owner_idempotency")
+                .contains("uq_crm_activities_actor_idempotency")
+                .contains("uq_crm_handovers_tenant_actor_idempotency")
+                .doesNotContain("DROP TABLE")
+                .doesNotContain("DROP COLUMN");
+    }
 }

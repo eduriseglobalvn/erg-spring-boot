@@ -1,0 +1,171 @@
+extend type Mutation {
+  createSchoolClass(input: CreateSchoolClassInput!): OperationalClassResponse!
+  updateSchoolClass(input: UpdateSchoolClassInput!): OperationalClassResponse!
+  archiveSchoolClass(input: ArchiveSchoolClassInput!): OperationalClassResponse!
+  createSchoolStudent(input: CreateSchoolStudentInput!): OperationalStudentResponse!
+  updateSchoolStudent(input: UpdateSchoolStudentInput!): OperationalStudentResponse!
+  archiveSchoolStudent(input: ArchiveSchoolStudentInput!): OperationalStudentResponse!
+  importSchoolStudents(input: ImportSchoolStudentsInput!): BulkStudentImportResponse!
+  createSchoolSubject(input: CreateSchoolSubjectInput!): OperationalSubjectResponse!
+  updateSchoolSubject(input: UpdateSchoolSubjectInput!): OperationalSubjectResponse!
+  archiveSchoolSubject(input: ArchiveSchoolSubjectInput!): OperationalSubjectResponse!
+  enrollSchoolStudent(input: EnrollSchoolStudentInput!): OperationalEnrollmentResponse!
+  bulkEnrollSchoolStudents(input: BulkEnrollSchoolStudentsInput!): BulkEnrollmentResponse!
+}
+
+input CreateSchoolClassInput {
+  tenantId: String
+  schoolId: String!
+  name: String!
+  grade: String
+  academicYear: String
+  homeroomTeacherId: String
+  status: String
+}
+
+input UpdateSchoolClassInput {
+  tenantId: String
+  schoolId: String!
+  classId: String!
+  version: String!
+  name: String
+  grade: String
+  academicYear: String
+  homeroomTeacherId: String
+  status: String
+}
+
+input ArchiveSchoolClassInput { tenantId: String, schoolId: String!, classId: String!, version: String! }
+
+input CreateSchoolStudentInput {
+  tenantId: String
+  schoolId: String
+  studentCode: String!
+  fullName: String!
+  academicClassId: String
+  email: String
+  username: String
+  gender: String
+  birthday: String
+  phone: String
+  address: String
+  parentName: String
+  parentPhone: String
+  parentEmail: String
+  parentRelationship: String
+  enrollmentDate: String
+  note: String
+  status: String
+}
+
+input UpdateSchoolStudentInput {
+  tenantId: String
+  schoolId: String!
+  studentId: String!
+  version: String!
+  studentCode: String
+  fullName: String
+  academicClassId: String
+  email: String
+  username: String
+  gender: String
+  birthday: String
+  phone: String
+  address: String
+  parentName: String
+  parentPhone: String
+  parentEmail: String
+  parentRelationship: String
+  enrollmentDate: String
+  note: String
+  status: String
+}
+
+input ArchiveSchoolStudentInput { tenantId: String, schoolId: String!, studentId: String!, version: String! }
+input ImportSchoolStudentsInput { tenantId: String, schoolId: String!, idempotencyKey: String, items: [CreateSchoolStudentInput!]! }
+
+input CreateSchoolSubjectInput { tenantId: String, schoolId: String, name: String!, code: String!, status: String }
+input UpdateSchoolSubjectInput { tenantId: String, subjectId: String!, version: String!, name: String, code: String, status: String }
+input ArchiveSchoolSubjectInput { tenantId: String, subjectId: String!, version: String! }
+
+input EnrollSchoolStudentInput { tenantId: String, studentId: String!, classId: String!, academicYear: String, idempotencyKey: String }
+input BulkEnrollSchoolStudentsInput { tenantId: String, idempotencyKey: String, items: [EnrollSchoolStudentItemInput!]! }
+input EnrollSchoolStudentItemInput { studentId: String!, classId: String!, academicYear: String }
+
+type OperationalClassResponse {
+  id: String!
+  tenantId: String!
+  schoolId: String!
+  name: String!
+  grade: String
+  academicYear: String
+  homeroomTeacherId: String
+  status: String!
+  version: String!
+  updatedAt: String
+}
+
+type OperationalStudentResponse {
+  id: String!
+  tenantId: String!
+  schoolId: String!
+  academicClassId: String
+  studentCode: String!
+  fullName: String!
+  username: String
+  authUserId: String
+  email: String
+  gender: String
+  birthday: String
+  phone: String
+  address: String
+  parentName: String
+  parentPhone: String
+  parentEmail: String
+  parentRelationship: String
+  enrollmentDate: String
+  note: String
+  status: String!
+  version: String!
+  updatedAt: String
+}
+
+type OperationalSubjectResponse {
+  id: String!
+  tenantId: String!
+  schoolId: String
+  name: String!
+  code: String!
+  status: String!
+  version: String!
+  updatedAt: String
+}
+
+type OperationalEnrollmentResponse {
+  id: String!
+  tenantId: String!
+  schoolId: String!
+  studentId: String!
+  classId: String!
+  academicYear: String
+  status: String!
+  version: String!
+  replayed: Boolean!
+  updatedAt: String
+}
+
+type BulkEnrollmentResponse {
+  idempotencyKey: String
+  requested: Int!
+  enrolled: Int!
+  replayed: Int!
+  items: [OperationalEnrollmentResponse!]!
+}
+
+type BulkStudentImportResponse {
+  idempotencyKey: String
+  requested: Int!
+  created: Int!
+  replayed: Int!
+  items: [OperationalStudentResponse!]!
+}

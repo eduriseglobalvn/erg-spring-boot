@@ -15,7 +15,7 @@ class CalendarWorkspaceQueryArchitectureTest {
                 "com.erg.ergspringboot.calendar.internal.readmodel.CalendarWorkspaceQueryUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarReadService.java"));
+                "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarReadUseCase.java"));
         assertThat(facade)
                 .contains("workspaceQueries.lcms(")
                 .contains("workspaceQueries.teacher(")

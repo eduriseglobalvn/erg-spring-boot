@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 })
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class RefreshTokenHistory extends BaseEntity {
     @Column(name = "token_hash", nullable = false, unique = true, length = 255)
     private String tokenHash;

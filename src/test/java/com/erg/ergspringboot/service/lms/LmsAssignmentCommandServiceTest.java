@@ -56,6 +56,7 @@ class LmsAssignmentCommandServiceTest {
     @Mock private Cache lmsHomeworkWorkspaceCache;
     @Mock private Cache lmsClassWorkspaceCache;
     @Mock private Cache lmsAssignmentProgressCache;
+    @Mock private Cache lmsStudentAssignmentsCache;
     @Mock private Cache studentDashboardCache;
     @Mock private Cache quizAssignmentReportCache;
     @Mock private Cache quizQuestionAnalyticsCache;
@@ -70,6 +71,7 @@ class LmsAssignmentCommandServiceTest {
         when(cacheManager.getCache("lmsHomeworkWorkspace")).thenReturn(lmsHomeworkWorkspaceCache);
         when(cacheManager.getCache("lmsClassWorkspace")).thenReturn(lmsClassWorkspaceCache);
         when(cacheManager.getCache("lmsAssignmentProgress")).thenReturn(lmsAssignmentProgressCache);
+        when(cacheManager.getCache("lmsStudentAssignments")).thenReturn(lmsStudentAssignmentsCache);
         when(cacheManager.getCache("studentDashboard")).thenReturn(studentDashboardCache);
         when(cacheManager.getCache("quizAssignmentReport")).thenReturn(quizAssignmentReportCache);
         when(cacheManager.getCache("quizQuestionAnalytics")).thenReturn(quizQuestionAnalyticsCache);
@@ -145,9 +147,30 @@ class LmsAssignmentCommandServiceTest {
         verify(lmsHomeworkWorkspaceCache).clear();
         verify(lmsClassWorkspaceCache).clear();
         verify(lmsAssignmentProgressCache).clear();
+        verify(lmsStudentAssignmentsCache).clear();
         verify(studentDashboardCache).clear();
         verify(quizAssignmentReportCache).clear();
         verify(quizQuestionAnalyticsCache).clear();
+    }
+
+    @Test
+    void createPersistsExplicitOfflineOptIn() {
+        when(studentRepository.findByTenantIdAndAcademicClassIdOrderByFullNameAsc("tenant-a", "class-1"))
+                .thenReturn(List.of(student("s1", "class-1")));
+        when(quizVersionRepository.findByQuizIdInAndTenantIdAndIsActiveTrue(eq(List.of("quiz-1")), eq("tenant-a")))
+                .thenReturn(List.of(activeVersion("quiz-1")));
+        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(activeVersion("quiz-1")));
+
+        CreateAssignmentRequest request = new CreateAssignmentRequest(
+                "Offline homework", List.of("quiz-1"), "class", "class-1", null, null,
+                null, null, null, null, null, true);
+
+        service.create("tenant-a", "teacher-1", "idem-offline", request);
+
+        ArgumentCaptor<Assignment> captor = ArgumentCaptor.forClass(Assignment.class);
+        verify(assignmentRepository).save(captor.capture());
+        assertThat(captor.getValue().isOfflineAllowed()).isTrue();
     }
 
     @Test
@@ -172,6 +195,7 @@ class LmsAssignmentCommandServiceTest {
         verify(lmsHomeworkWorkspaceCache, never()).clear();
         verify(lmsClassWorkspaceCache, never()).clear();
         verify(lmsAssignmentProgressCache, never()).clear();
+        verify(lmsStudentAssignmentsCache, never()).clear();
         verify(studentDashboardCache, never()).clear();
         verify(quizAssignmentReportCache, never()).clear();
         verify(quizQuestionAnalyticsCache, never()).clear();

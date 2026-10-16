@@ -17,23 +17,35 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ErgPrincipalService {
 
-    private static final String DEFAULT_TENANT = "erg";
     private final AuthSessionRepository sessionRepository;
     private final AuthTokenService tokenService;
+    private final AuthSessionTenantResolver tenantResolver;
     private UserRoleAssignmentRepository userRoleAssignmentRepository;
 
+    @Autowired
+    public ErgPrincipalService(
+            AuthSessionRepository sessionRepository,
+            AuthTokenService tokenService,
+            AuthSessionTenantResolver tenantResolver
+    ) {
+        this.sessionRepository = sessionRepository;
+        this.tokenService = tokenService;
+        this.tenantResolver = tenantResolver;
+    }
+
+    /** Compatibility constructor for focused unit tests and old embedders. */
     public ErgPrincipalService(
             AuthSessionRepository sessionRepository,
             AuthTokenService tokenService
     ) {
-        this.sessionRepository = sessionRepository;
-        this.tokenService = tokenService;
+        this(sessionRepository, tokenService, null);
     }
 
     @Transactional(readOnly = true)
@@ -41,10 +53,53 @@ public class ErgPrincipalService {
         if (bearerToken == null || bearerToken.isBlank()) {
             return Optional.empty();
         }
-        String normalizedTenantId = tenantId == null || tenantId.isBlank() ? DEFAULT_TENANT : tenantId.trim();
-        return sessionRepository.findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken.trim()), normalizedTenantId)
+        String requestedTenantId = SecurityUtils.trimToNull(tenantId);
+        if (requestedTenantId == null) {
+            return fromBearerToken(bearerToken);
+        }
+        // Focused embedders/tests may construct this service without the JDBC
+        // resolver. Keep that compatibility path fully in-memory and fail
+        // closed on a tenant mismatch; production always uses the resolver
+        // before entering the tenant-scoped repository query below.
+        if (tenantResolver == null) {
+            return uniqueSession(bearerToken, false)
+                    .filter(session -> requestedTenantId.equals(session.getTenantId()))
+                    .map(this::principal);
+        }
+        Optional<String> resolvedTenantId = resolveTenantId(bearerToken);
+        if (!resolvedTenantId.filter(requestedTenantId::equals).isPresent()) {
+            return Optional.empty();
+        }
+        return sessionRepository
+                .findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken.trim()), requestedTenantId)
                 .filter(this::active)
                 .map(this::principal);
+    }
+
+    /**
+     * Resolves the tenant from the server-side session row keyed by the opaque
+     * access-token hash. A token must map to exactly one active session; an
+     * absent or ambiguous result is rejected instead of falling back to the
+     * default ERG tenant.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> resolveTenantId(String bearerToken) {
+        if (tenantResolver != null) {
+            if (bearerToken == null || bearerToken.isBlank()) {
+                return Optional.empty();
+            }
+            return tenantResolver.resolve(tokenService.hashToken(bearerToken.trim()));
+        }
+        return uniqueSession(bearerToken, false).map(AuthSession::getTenantId);
+    }
+
+    public Optional<ErgPrincipal> fromBearerToken(String bearerToken) {
+        return resolveTenantId(bearerToken).flatMap(tenantId -> {
+            try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(
+                    AuthenticatedTenant.require(tenantId), null, null))) {
+                return fromBearerToken(bearerToken, tenantId);
+            }
+        });
     }
 
     public String cacheTokenHash(String bearerToken) {
@@ -61,13 +116,52 @@ public class ErgPrincipalService {
         if (bearerToken == null || bearerToken.isBlank()) {
             return Optional.empty();
         }
-        String normalizedTenantId = tenantId == null || tenantId.isBlank() ? DEFAULT_TENANT : tenantId.trim();
-        return sessionRepository
-                .findByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken.trim()), normalizedTenantId)
+        Optional<String> resolved = authenticationFailureCode(bearerToken);
+        String requestedTenantId = SecurityUtils.trimToNull(tenantId);
+        return requestedTenantId == null
+                ? resolved
+                : resolved.filter(code -> matchesRequestedTenant(bearerToken, requestedTenantId));
+    }
+
+    /** Resolves a revoked-session diagnostic without a client tenant lookup key. */
+    @Transactional(readOnly = true)
+    public Optional<String> authenticationFailureCode(String bearerToken) {
+        if (tenantResolver != null) {
+            return Optional.empty();
+        }
+        return uniqueSession(bearerToken, true)
                 .filter(session -> session.getRevokedAt() != null)
                 .map(AuthSession::getRevokedReason)
                 .map(this::authenticationFailureCodeForReason)
                 .filter(java.util.Objects::nonNull);
+    }
+
+    private boolean matchesRequestedTenant(String bearerToken, String requestedTenantId) {
+        return fromBearerToken(bearerToken)
+                .map(principal -> requestedTenantId.equals(principal.tenantId()))
+                .orElseGet(() -> uniqueSession(bearerToken, true)
+                        .map(session -> requestedTenantId.equals(session.getTenantId()))
+                        .orElse(false));
+    }
+
+    private Optional<AuthSession> uniqueSession(String bearerToken, boolean includeRevoked) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            return Optional.empty();
+        }
+        List<AuthSession> sessions = sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken.trim()));
+        if (sessions == null || sessions.isEmpty()) {
+            return Optional.empty();
+        }
+        List<AuthSession> candidates = sessions.stream()
+                .filter(session -> session != null && (includeRevoked || active(session)))
+                .filter(session -> session.getTenantId() != null && !session.getTenantId().isBlank())
+                // Entity graphs may repeat the same session row for each
+                // fetched role/permission. Collapse those duplicates before
+                // applying the ambiguity check; distinct session IDs remain
+                // fail-closed.
+                .distinct()
+                .toList();
+        return candidates.size() == 1 ? Optional.of(candidates.get(0)) : Optional.empty();
     }
 
     private String authenticationFailureCodeForReason(String reason) {
@@ -82,9 +176,15 @@ public class ErgPrincipalService {
 
     private boolean active(AuthSession session) {
         User user = session.getUser();
+        OffsetDateTime now = OffsetDateTime.now();
+        // Short-lived access token expiry is the primary gate; sessions issued before this column
+        // existed have a null value and fall back to the session-level expiry so a deploy doesn't
+        // log everyone out mid-session.
+        OffsetDateTime accessExpiry = session.getAccessTokenExpiresAt();
         return session.getRevokedAt() == null
                 && session.getExpiresAt() != null
-                && session.getExpiresAt().isAfter(OffsetDateTime.now())
+                && session.getExpiresAt().isAfter(now)
+                && (accessExpiry == null || accessExpiry.isAfter(now))
                 && user != null
                 && "ACTIVE".equalsIgnoreCase(user.getStatus());
     }
@@ -96,22 +196,20 @@ public class ErgPrincipalService {
         PermissionEnvelope permissions = permissions(user);
         permissions = permissions.withAssignments(assignments);
         List<String> managedEducationUnitIds = managedEducationUnitIds(user, permissions, assignments);
-        return new ErgPrincipal(
+        return ErgPrincipal.authenticated(
                 user.getId(),
                 session.getSessionId(),
                 session.getTenantId(),
                 roles,
                 permissions.granted(),
                 permissions.denied(),
-                effectivePortals(session, permissions),
+                effectivePortals(roles, permissions),
                 blankToDefault(user.getAccountType(), "erg"),
                 permissions.granted().contains("*") ? "admin" : "user",
-                Map.of(
-                        "managedEducationUnitIds", managedEducationUnitIds,
-                        "managedClassIds", assignedClassIds(assignments),
+                AccessScopeAssembler.mergeLegacyAttributes(Map.of(
                         "assignedScopeIds", assignedScopeIds(assignments),
                         "lifecycleRestricted", isLifecycleRestricted(user)
-                )
+                ), AccessScopeSet.legacy(managedEducationUnitIds, assignedClassIds(assignments), null, null))
         );
     }
 
@@ -122,13 +220,10 @@ public class ErgPrincipalService {
     }
 
     private List<String> effectivePortals(
-            AuthSession session,
+            List<String> roles,
             PermissionEnvelope permissions
     ) {
-        boolean platformWide = permissions.granted().contains("*");
-        return platformWide
-                ? List.of("*")
-                : List.of(blankToDefault(session.getPortal(), "lms"));
+        return WorkspaceCapabilityMapper.legacyPortalsFor(List.of(), roles, permissions.granted());
     }
 
     private List<String> roles(User user, List<UserRoleAssignment> assignments) {
@@ -188,7 +283,7 @@ public class ErgPrincipalService {
     private List<UserRoleAssignment> activeAssignments(User user) {
         if (userRoleAssignmentRepository == null || user == null || user.getId() == null) return List.of();
         return userRoleAssignmentRepository.findActiveForUser(
-                user.getId(), blankToDefault(user.getTenantId(), DEFAULT_TENANT), OffsetDateTime.now());
+                user.getId(), AuthenticatedTenant.require(user.getTenantId()), OffsetDateTime.now());
     }
 
     private List<String> assignedScopeIds(List<UserRoleAssignment> assignments) {

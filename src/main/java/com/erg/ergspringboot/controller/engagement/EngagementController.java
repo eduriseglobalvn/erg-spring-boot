@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.erg.ergspringboot.platform.security.ReviewedPublicEndpoint;
+import com.erg.ergspringboot.authorization.authorization.AuthenticatedEndpoint;
 
 @RestController
 @org.springframework.context.annotation.Profile("prototype")
@@ -26,20 +28,41 @@ public class EngagementController {
         this.workflows = workflows;
     }
 
-    @GetMapping({"/recruitment/jobs", "/reviews", "/reviews/admin", "/reviews/admin/all"})
+    @GetMapping({"/recruitment/jobs", "/reviews"})
+    @ReviewedPublicEndpoint
     public ApiResponse<List<Map<String, Object>>> list(HttpServletRequest request) {
         return okList("Engagement list loaded", workflows.list(module(request), type(request)), request);
     }
 
+    @GetMapping({"/reviews/admin", "/reviews/admin/all"})
+    @AuthenticatedEndpoint
+    public ApiResponse<List<Map<String, Object>>> adminReviewList(HttpServletRequest request) {
+        return okList("Engagement list loaded", workflows.list("reviews", "reviews"), request);
+    }
+
     @GetMapping({"/recruitment/jobs/{slug}", "/recruitment/tracking/{code}", "/reviews/stats"})
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> detail(@PathVariable(required = false) String slug, @PathVariable(required = false) String code, @PathVariable(required = false) String postId, HttpServletRequest request) {
         String id = slug == null ? (code == null ? (postId == null ? "stats" : postId) : code) : slug;
         return ok("Engagement detail loaded", workflows.get(module(request), type(request), id), request);
     }
 
-    @PostMapping({"/recruitment/apply", "/recruitment/jobs", "/reviews", "/reviews/batch/status"})
+    @PostMapping({"/recruitment/apply", "/reviews"})
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> create(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
         return ok("Engagement item saved", workflows.create(module(request), type(request), body), request);
+    }
+
+    @PostMapping("/recruitment/jobs")
+    @AuthenticatedEndpoint
+    public ApiResponse<Map<String, Object>> createRecruitmentJob(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
+        return ok("Engagement item saved", workflows.create("recruitment", "jobs", body), request);
+    }
+
+    @PostMapping("/reviews/batch/status")
+    @AuthenticatedEndpoint
+    public ApiResponse<Map<String, Object>> updateReviewBatchStatus(@RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
+        return ok("Engagement item saved", workflows.create("reviews", "batch-status", body), request);
     }
 
     @PutMapping("/recruitment/jobs/{id}")
@@ -52,8 +75,15 @@ public class EngagementController {
         return ok("Engagement item updated", workflows.update(module(request), type(request), id == null ? reviewId : id, body), request);
     }
 
-    @PostMapping({"/reviews/{reviewId}/helpful", "/reviews/{reviewId}/reply"})
+    @PostMapping("/reviews/{reviewId}/helpful")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> reviewAction(@PathVariable String reviewId, @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
+        return ok("Review action accepted", workflows.accepted("reviews", last(request) + ":" + reviewId, body), request);
+    }
+
+    @PostMapping("/reviews/{reviewId}/reply")
+    @AuthenticatedEndpoint
+    public ApiResponse<Map<String, Object>> replyToReview(@PathVariable String reviewId, @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
         return ok("Review action accepted", workflows.accepted("reviews", last(request) + ":" + reviewId, body), request);
     }
 
@@ -68,11 +98,13 @@ public class EngagementController {
     }
 
     @GetMapping({"/public-disclosure", "/public-disclosure/"})
+    @ReviewedPublicEndpoint
     public ApiResponse<List<Map<String, Object>>> disclosures(HttpServletRequest request) {
         return okList("Public disclosures loaded", workflows.list("public-disclosure", "documents"), request);
     }
 
     @GetMapping("/public-disclosure/{id}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> disclosure(@PathVariable String id, HttpServletRequest request) {
         return ok("Public disclosure loaded", workflows.get("public-disclosure", "documents", id), request);
     }
@@ -115,8 +147,7 @@ public class EngagementController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private String last(HttpServletRequest request) {

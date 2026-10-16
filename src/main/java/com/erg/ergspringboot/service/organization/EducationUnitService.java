@@ -1,50 +1,22 @@
 package com.erg.ergspringboot.service.organization;
 
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitListResponse;
-import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitResponse;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.organization.internal.OrganizationEducationUnitQuery;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Deprecated(since = "2026-08-08", forRemoval = false)
 public class EducationUnitService {
 
-    private final EducationUnitRepository educationUnitRepository;
+    private final OrganizationEducationUnitQuery query;
 
     public EducationUnitService(EducationUnitRepository educationUnitRepository) {
-        this.educationUnitRepository = educationUnitRepository;
+        this.query = new OrganizationEducationUnitQuery(educationUnitRepository);
     }
 
-    @Transactional(readOnly = true)
-    @Cacheable(cacheNames = "organizationEducationUnits", key = "{#access.tenantId(), #access.managedEducationUnitIds()}")
     public EducationUnitListResponse listEducationUnits(UserAccessContext access) {
-        var managedIds = access.managedEducationUnitIds();
-        var limit = PageRequest.of(0, 500);
-        var units = managedIds.contains("*")
-                ? educationUnitRepository.findByTenantIdOrderByNameAsc(access.tenantId(), limit)
-                : managedIds.isEmpty()
-                        ? java.util.List.<EducationUnit>of()
-                        : educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(
-                                access.tenantId(), managedIds, limit);
-        return new EducationUnitListResponse(units.stream()
-                .map(this::toResponse)
-                .toList());
-    }
-
-    private EducationUnitResponse toResponse(EducationUnit unit) {
-        return new EducationUnitResponse(
-                unit.getId(),
-                unit.getName(),
-                unit.getSlug(),
-                unit.getType(),
-                unit.getParentId(),
-                unit.getLogoUrl(),
-                unit.getDescription(),
-                unit.getStatus()
-        );
+        return query.list(access);
     }
 }

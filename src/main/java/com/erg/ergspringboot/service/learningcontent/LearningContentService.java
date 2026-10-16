@@ -2,6 +2,8 @@ package com.erg.ergspringboot.service.learningcontent;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.exception.SyncConflictException;
+import com.erg.ergspringboot.common.response.sync.SyncMutationResponses.ConflictPayload;
 import com.erg.ergspringboot.model.learningcontent.ContentAsset;
 import com.erg.ergspringboot.model.learningcontent.ContentItem;
 import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
@@ -24,6 +26,9 @@ import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.Pla
 import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.ReorderTopicContentItemRequest;
 import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentAssetRequest;
 import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentItemRequest;
+import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -37,7 +42,15 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 
+/**
+ * Legacy persistence adapter retained during the strangler migration. New
+ * callers must use {@code learningcontent.LearningContentOperations}; this
+ * service is not a public module contract.
+ */
+@Deprecated(since = "2026-08-08", forRemoval = false)
 @Service
 @Transactional(value = "postgresTransactionManager")
 public class LearningContentService {
@@ -53,6 +66,7 @@ public class LearningContentService {
     private final ContentItemAssetRepository contentItemAssetRepository;
     private final TopicContentItemRepository topicContentItemRepository;
     private final CurriculumTopicLookupRepository curriculumTopicLookupRepository;
+    private final LmsSyncOperationService sync;
 
     public LearningContentService(
             ContentItemRepository contentItemRepository,
@@ -61,11 +75,25 @@ public class LearningContentService {
             TopicContentItemRepository topicContentItemRepository,
             CurriculumTopicLookupRepository curriculumTopicLookupRepository
     ) {
+        this(contentItemRepository, contentAssetRepository, contentItemAssetRepository, topicContentItemRepository,
+                curriculumTopicLookupRepository, null);
+    }
+
+    @Autowired
+    public LearningContentService(
+            ContentItemRepository contentItemRepository,
+            ContentAssetRepository contentAssetRepository,
+            ContentItemAssetRepository contentItemAssetRepository,
+            TopicContentItemRepository topicContentItemRepository,
+            CurriculumTopicLookupRepository curriculumTopicLookupRepository,
+            ObjectProvider<LmsSyncOperationService> sync
+    ) {
         this.contentItemRepository = contentItemRepository;
         this.contentAssetRepository = contentAssetRepository;
         this.contentItemAssetRepository = contentItemAssetRepository;
         this.topicContentItemRepository = topicContentItemRepository;
         this.curriculumTopicLookupRepository = curriculumTopicLookupRepository;
+        this.sync = sync == null ? null : sync.getIfAvailable();
     }
 
     @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -231,23 +259,35 @@ public class LearningContentService {
                         resolvedTenantId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("content item not found for tenant"));
-        if (request.contentType() != null) {
-            item.setContentType(requiredUpper(request.contentType(), "contentType"));
+        String key = blank(request.idempotencyKey());
+        LmsSyncOperationService.Receipt receipt = reserve(resolvedTenantId, userId, request.operationId(), key,
+                "lms.content_item", item.getId(), request, request.expectedVersion());
+        if (receipt != null && receipt.replayed()) return sync.result(receipt, ContentItem.class);
+        try {
+            checkVersion(request.operationId(), key, "lms.content_item", item.getId(), request.expectedVersion(), version(item));
+            if (request.contentType() != null) {
+                item.setContentType(requiredUpper(request.contentType(), "contentType"));
+            }
+            if (request.title() != null) {
+                item.setTitle(required(request.title(), "title"));
+            }
+            if (request.description() != null) {
+                item.setDescription(blankToNull(request.description()));
+            }
+            if (request.status() != null) {
+                item.setStatus(normalizedOrDefault(request.status(), DEFAULT_STATUS));
+            }
+            if (request.visibility() != null) {
+                item.setVisibility(normalizedOrDefault(request.visibility(), DEFAULT_VISIBILITY));
+            }
+            item.setUpdatedBy(blankToNull(userId));
+            ContentItem saved = contentItemRepository.save(item);
+            complete(receipt, saved, version(saved));
+            return saved;
+        } catch (RuntimeException exception) {
+            abandon(receipt);
+            throw exception;
         }
-        if (request.title() != null) {
-            item.setTitle(required(request.title(), "title"));
-        }
-        if (request.description() != null) {
-            item.setDescription(blankToNull(request.description()));
-        }
-        if (request.status() != null) {
-            item.setStatus(normalizedOrDefault(request.status(), DEFAULT_STATUS));
-        }
-        if (request.visibility() != null) {
-            item.setVisibility(normalizedOrDefault(request.visibility(), DEFAULT_VISIBILITY));
-        }
-        item.setUpdatedBy(blankToNull(userId));
-        return contentItemRepository.save(item);
     }
 
     @CacheEvict(cacheNames = "learningResourceLibrary", allEntries = true)
@@ -308,40 +348,53 @@ public class LearningContentService {
                         required(tenantId, "tenantId")
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("content asset not found for tenant"));
-        if (request.assetType() != null) {
-            asset.setAssetType(requiredUpper(request.assetType(), "assetType"));
+        String resolvedTenantId = required(tenantId, "tenantId");
+        String key = blank(request.idempotencyKey());
+        LmsSyncOperationService.Receipt receipt = reserve(resolvedTenantId, userId, request.operationId(), key,
+                "lms.content_asset", asset.getId(), request, request.expectedVersion());
+        if (receipt != null && receipt.replayed()) return sync.result(receipt, ContentAsset.class);
+        try {
+            checkVersion(request.operationId(), key, "lms.content_asset", asset.getId(), request.expectedVersion(), version(asset));
+            if (request.assetType() != null) {
+                asset.setAssetType(requiredUpper(request.assetType(), "assetType"));
+            }
+            if (request.title() != null) {
+                asset.setTitle(blankToNull(request.title()));
+            }
+            if (request.storageProvider() != null) {
+                asset.setStorageProvider(blankToNull(request.storageProvider()));
+            }
+            if (request.storageKey() != null) {
+                asset.setStorageKey(blankToNull(request.storageKey()));
+            }
+            if (request.storageUrl() != null) {
+                asset.setStorageUrl(blankToNull(request.storageUrl()));
+            }
+            if (request.mimeType() != null) {
+                asset.setMimeType(blankToNull(request.mimeType()));
+            }
+            if (request.byteSize() != null) {
+                asset.setByteSize(nonNegative(request.byteSize(), "byteSize"));
+            }
+            if (request.checksumSha256() != null) {
+                asset.setChecksumSha256(blankToNull(request.checksumSha256()));
+            }
+            if (request.status() != null) {
+                asset.setStatus(normalizedOrDefault(request.status(), DEFAULT_ASSET_STATUS));
+            }
+            if (request.metadata() != null) {
+                Map<String, Object> mergedMetadata = copyMetadata(asset.getMetadata());
+                mergedMetadata.putAll(copyMetadata(request.metadata()));
+                asset.setMetadata(mergedMetadata);
+            }
+            asset.setUpdatedBy(blankToNull(userId));
+            ContentAsset saved = contentAssetRepository.save(asset);
+            complete(receipt, saved, version(saved));
+            return saved;
+        } catch (RuntimeException exception) {
+            abandon(receipt);
+            throw exception;
         }
-        if (request.title() != null) {
-            asset.setTitle(blankToNull(request.title()));
-        }
-        if (request.storageProvider() != null) {
-            asset.setStorageProvider(blankToNull(request.storageProvider()));
-        }
-        if (request.storageKey() != null) {
-            asset.setStorageKey(blankToNull(request.storageKey()));
-        }
-        if (request.storageUrl() != null) {
-            asset.setStorageUrl(blankToNull(request.storageUrl()));
-        }
-        if (request.mimeType() != null) {
-            asset.setMimeType(blankToNull(request.mimeType()));
-        }
-        if (request.byteSize() != null) {
-            asset.setByteSize(nonNegative(request.byteSize(), "byteSize"));
-        }
-        if (request.checksumSha256() != null) {
-            asset.setChecksumSha256(blankToNull(request.checksumSha256()));
-        }
-        if (request.status() != null) {
-            asset.setStatus(normalizedOrDefault(request.status(), DEFAULT_ASSET_STATUS));
-        }
-        if (request.metadata() != null) {
-            Map<String, Object> mergedMetadata = copyMetadata(asset.getMetadata());
-            mergedMetadata.putAll(copyMetadata(request.metadata()));
-            asset.setMetadata(mergedMetadata);
-        }
-        asset.setUpdatedBy(blankToNull(userId));
-        return contentAssetRepository.save(asset);
     }
 
     @CacheEvict(cacheNames = "learningResourceLibrary", allEntries = true)
@@ -511,6 +564,43 @@ public class LearningContentService {
             throw new BadRequestException("limit must be positive");
         }
         return Math.min(limit, 500);
+    }
+
+    private LmsSyncOperationService.Receipt reserve(String tenantId, String accountId, String operationId,
+                                                     String idempotencyKey, String entityType, String entityId,
+                                                     Object payload, Long expectedVersion) {
+        return sync == null ? null : sync.reserve(tenantId, accountId, operationId, idempotencyKey,
+                entityType, entityId, payload, expectedVersion).orElse(null);
+    }
+
+    private void complete(LmsSyncOperationService.Receipt receipt, Object result, long version) {
+        if (receipt != null) sync.complete(receipt, result, version);
+    }
+
+    private void abandon(LmsSyncOperationService.Receipt receipt) {
+        if (receipt != null) sync.abandon(receipt);
+    }
+
+    private void checkVersion(String operationId, String idempotencyKey, String entityType, String entityId,
+                              Long expected, long actual) {
+        if (expected != null && expected.longValue() != actual) {
+            throw new SyncConflictException(new ConflictPayload("STALE_WRITE", operationId, idempotencyKey,
+                    entityType, entityId, expected, actual,
+                    sync == null ? OffsetDateTime.now(ZoneOffset.UTC) : sync.serverTime(), true),
+                    "Learning content has been updated by another request.");
+        }
+    }
+
+    private long version(ContentItem item) {
+        return item.getRecordVersion() == null ? 0L : item.getRecordVersion();
+    }
+
+    private long version(ContentAsset asset) {
+        return asset.getRecordVersion() == null ? 0L : asset.getRecordVersion();
+    }
+
+    private String blank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private ContentItemResponse toContentItemResponse(

@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.model.crawler;
 
-import com.erg.ergspringboot.model.BaseEntity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -12,8 +11,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class ContentBlacklist extends BaseEntity {
+@EqualsAndHashCode(exclude = {"createdAt", "updatedAt"})
+public class ContentBlacklist {
+
+    private String id;
+
+    private java.time.OffsetDateTime createdAt;
+
+    private java.time.OffsetDateTime updatedAt;
 
     private String type;
 

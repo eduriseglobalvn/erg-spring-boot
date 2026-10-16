@@ -20,7 +20,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "curriculum_levels",
@@ -41,7 +41,6 @@ public class CurriculumLevel extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", referencedColumnName = "id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private CurriculumSubject subject;
 
@@ -56,6 +55,9 @@ public class CurriculumLevel extends BaseEntity {
     @Column(nullable = false, length = 32)
     private String status;
 
+    @Column(name = "lifecycle_state", nullable = false, length = 32)
+    private String lifecycleState = "DRAFT";
+
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
@@ -65,8 +67,11 @@ public class CurriculumLevel extends BaseEntity {
     @Column(name = "updated_by", length = 36)
     private String updatedBy;
 
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion = 0L;
+
     @OneToMany(mappedBy = "level", fetch = FetchType.LAZY)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private Set<CurriculumTopic> topics = new LinkedHashSet<>();
 }

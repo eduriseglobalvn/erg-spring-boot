@@ -25,7 +25,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class NotificationOutboxEntity extends BaseEntity {
 
     @Column(name = "tenant_id", length = 64, nullable = false)
@@ -39,6 +39,10 @@ public class NotificationOutboxEntity extends BaseEntity {
 
     @Column(name = "target_ref", length = 255, nullable = false)
     private String targetRef;
+
+    /** Provider is persisted so retries cannot change routing when configuration changes. */
+    @Column(length = 32, nullable = false)
+    private String provider = "firebase";
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)

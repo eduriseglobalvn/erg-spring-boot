@@ -13,6 +13,10 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.Publish
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDraftResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
 import com.erg.ergspringboot.lcms.LcmsOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuizCreate;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuizUpdate;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuizPublish;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuizDelete;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -39,6 +43,7 @@ public class LcmsQuizAuthoringController {
     }
 
     @PostMapping("/api/v1/lcms/quizzes")
+    @LcmsQuizCreate
     public ApiResponse<CreateQuizResponse> create(
             @RequestBody CreateQuizRequest body,
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
@@ -49,46 +54,59 @@ public class LcmsQuizAuthoringController {
     }
 
     @PutMapping("/api/v1/lcms/quizzes/{quizId}/draft")
+    @LcmsQuizUpdate
     public ApiResponse<SaveDraftResponse> saveDraft(
             @PathVariable String quizId,
             @RequestBody SaveDraftRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Draft saved", lcms.saveDraft(access.tenantId(), quizId, body), request);
+        return ok("Draft saved", lcms.saveDraft(access.tenantId(), quizId,
+                idempotencyKey == null || idempotencyKey.isBlank() ? body : body.withIdempotencyKey(idempotencyKey)), request);
     }
 
     @PatchMapping("/api/v1/lcms/quizzes/{quizId}/draft")
+    @LcmsQuizUpdate
     public ApiResponse<SaveDraftResponse> patchDraft(
             @PathVariable String quizId,
             @RequestBody SaveDraftRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Draft saved", lcms.saveDraft(access.tenantId(), quizId, body), request);
+        return ok("Draft saved", lcms.saveDraft(access.tenantId(), quizId,
+                idempotencyKey == null || idempotencyKey.isBlank() ? body : body.withIdempotencyKey(idempotencyKey)), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/slides")
+    @LcmsQuizUpdate
     public ApiResponse<SaveDraftResponse> upsertSlide(
             @PathVariable String quizId,
             @RequestBody SlideUpsertRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Slide upserted", lcms.upsertSlide(access.tenantId(), quizId, body), request);
+        return ok("Slide upserted", lcms.upsertSlide(access.tenantId(), quizId,
+                idempotencyKey == null || idempotencyKey.isBlank() ? body : body.withIdempotencyKey(idempotencyKey)), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/reorder")
+    @LcmsQuizUpdate
     public ApiResponse<SaveDraftResponse> reorder(
             @PathVariable String quizId,
             @RequestBody ReorderRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Slides reordered", lcms.reorder(access.tenantId(), quizId, body), request);
+        return ok("Slides reordered", lcms.reorder(access.tenantId(), quizId,
+                idempotencyKey == null || idempotencyKey.isBlank() ? body : body.withIdempotencyKey(idempotencyKey)), request);
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/validate")
+    @LcmsQuizUpdate
     public ApiResponse<ValidationResultResponse> validate(
             @PathVariable String quizId,
             HttpServletRequest request
@@ -98,6 +116,7 @@ public class LcmsQuizAuthoringController {
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/publish")
+    @LcmsQuizPublish
     public ApiResponse<PublishResponse> publish(
             @PathVariable String quizId,
             @RequestBody PublishRequest body,
@@ -113,6 +132,7 @@ public class LcmsQuizAuthoringController {
     }
 
     @PostMapping("/api/v1/lcms/quizzes/{quizId}/versions/{versionId}/fork")
+    @LcmsQuizCreate
     public ApiResponse<ForkResponse> forkVersion(
             @PathVariable String quizId,
             @PathVariable String versionId,
@@ -123,6 +143,7 @@ public class LcmsQuizAuthoringController {
     }
 
     @DeleteMapping("/api/v1/lcms/quizzes/{quizId}")
+    @LcmsQuizDelete
     public ApiResponse<DeleteQuizResponse> delete(
             @PathVariable String quizId,
             HttpServletRequest request
@@ -136,7 +157,6 @@ public class LcmsQuizAuthoringController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

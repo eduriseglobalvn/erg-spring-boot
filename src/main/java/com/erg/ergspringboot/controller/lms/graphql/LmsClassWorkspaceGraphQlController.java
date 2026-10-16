@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.Clas
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.lms.LmsQueryOperations;
+import com.erg.ergspringboot.lms.authorization.LmsClassRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -23,6 +24,7 @@ public class LmsClassWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "classWorkspace")
+    @LmsClassRead
     public ClassWorkspaceResponse classWorkspace(@Argument ClassWorkspaceInput input) {
         ClassWorkspaceInput safeInput = input == null ? ClassWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();

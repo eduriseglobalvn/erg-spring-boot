@@ -5,6 +5,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -24,7 +26,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class CrmSchoolActivity extends BaseEntity {
 
     @Column(name = "school_id", length = 36, nullable = false)
@@ -44,4 +46,20 @@ public class CrmSchoolActivity extends BaseEntity {
 
     @Column(name = "next_follow_up_at")
     private OffsetDateTime nextFollowUpAt;
+
+    @Column(length = 500)
+    private String title;
+
+    @Column(name = "due_at")
+    private LocalDate dueAt;
+
+    @Column(nullable = false)
+    private Boolean done = false;
+
+    @Column(name = "idempotency_key", length = 192)
+    private String idempotencyKey;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 }

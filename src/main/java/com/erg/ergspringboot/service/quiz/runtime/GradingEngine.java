@@ -1,5 +1,7 @@
 package com.erg.ergspringboot.service.quiz.runtime;
 
+import com.erg.ergspringboot.service.quiz.publish.QuestionKindDescriptor.GradingRule;
+import com.erg.ergspringboot.service.quiz.publish.QuestionKindRegistry;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -32,24 +34,37 @@ public class GradingEngine {
     }
 
     private static final int SCALE = 2;
+    private interface Grader {
+        GradeResult apply(Object rawAnswer, Map<String, Object> answerKey, BigDecimal maxPoints);
+    }
+
+    private final Map<GradingRule, Grader> graders;
+
+    public GradingEngine() {
+        graders = Map.of(
+                GradingRule.EXACT_CHOICE, this::exactChoice,
+                GradingRule.MULTIPLE_RESPONSE, this::multipleResponse,
+                GradingRule.SHORT_ANSWER, this::shortAnswer,
+                GradingRule.NUMERIC, this::numeric,
+                GradingRule.SEQUENCE, this::sequence,
+                GradingRule.PAIR_RATIO, this::pairRatio,
+                GradingRule.BLANKS, this::blanks,
+                GradingRule.HOTSPOT, this::hotspot,
+                GradingRule.SURVEY, (raw, key, max) -> new GradeResult(null, false, BigDecimal.ZERO, false),
+                GradingRule.MANUAL, (raw, key, max) -> new GradeResult(null, false, BigDecimal.ZERO, true)
+        );
+    }
 
     @SuppressWarnings("unchecked")
     public GradeResult grade(String kind, Object rawAnswer, Map<String, Object> answerKey, BigDecimal maxPoints) {
         BigDecimal max = maxPoints == null ? BigDecimal.ZERO : maxPoints;
         Map<String, Object> key = answerKey == null ? Map.of() : answerKey;
-        return switch (kind == null ? "" : kind) {
-            case "single_choice", "true_false" -> exactChoice(rawAnswer, key, max);
-            case "multiple_response" -> multipleResponse(rawAnswer, key, max);
-            case "short_answer" -> shortAnswer(rawAnswer, key, max);
-            case "numeric" -> numeric(rawAnswer, key, max);
-            case "sequence" -> sequence(rawAnswer, key, max);
-            case "matching", "drag_drop" -> pairRatio(rawAnswer, key, max);
-            case "fill_blank", "drag_words", "select_from_lists" -> blanks(rawAnswer, key, max);
-            case "hotspot" -> hotspot(rawAnswer, key, max);
-            case "likert_scale" -> new GradeResult(null, false, BigDecimal.ZERO, false);
-            case "essay" -> new GradeResult(null, false, BigDecimal.ZERO, true);
-            default -> new GradeResult(null, false, BigDecimal.ZERO, false);
-        };
+        GradingRule rule = QuestionKindRegistry.requireRuntimeKind(kind).gradingRule();
+        Grader grader = graders.get(rule);
+        if (grader == null) {
+            throw new IllegalStateException("question kind has no grader rule: " + kind);
+        }
+        return grader.apply(rawAnswer, key, max);
     }
 
     private GradeResult exactChoice(Object rawAnswer, Map<String, Object> key, BigDecimal max) {

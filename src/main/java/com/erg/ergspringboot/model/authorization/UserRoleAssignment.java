@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "user_role_assignments")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class UserRoleAssignment extends BaseEntity {
     @Column(name = "user_id", nullable = false, length = 24)
     private String userId;

@@ -27,16 +27,16 @@ class ErgReadTaskExecutorTest {
     }
 
     @Test
-    void propagatesAndClearsTenantAndSecurityContext() throws Exception {
+    void propagatesTenantButNeverCapturesSecurityContext() throws Exception {
         executor = new ErgReadTaskExecutor(1, 1, 4, Duration.ofSeconds(1));
         TenantContext.set(TenantContext.of("tenant-a", "user-a", "lms"));
         SecurityContextHolder.getContext().setAuthentication(
                 new TestingAuthenticationToken("user-a", "n/a", "ROLE_USER"));
 
         String value = executor.submit(() -> TenantContext.current().tenantId() + ":"
-                + SecurityContextHolder.getContext().getAuthentication().getName()).get(1, TimeUnit.SECONDS);
+                + (SecurityContextHolder.getContext().getAuthentication() == null)).get(1, TimeUnit.SECONDS);
 
-        assertThat(value).isEqualTo("tenant-a:user-a");
+        assertThat(value).isEqualTo("tenant-a:true");
         assertThat(TenantContext.current().tenantId()).isEqualTo("tenant-a");
     }
 

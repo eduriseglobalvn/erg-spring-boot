@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapResponse;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.exception.BadRequestException;
@@ -72,6 +73,8 @@ class SessionServiceTest {
         assertThat(response.manageableUnits()).hasSize(1);
         assertThat(response.manageableUnits().getFirst().id()).isEqualTo("school-1");
         assertThat(response.portals()).containsExactly("lms");
+        assertThat(response.workspaces()).containsExactly("TEACHER");
+        assertThat(response.tenantId()).isEqualTo("erg");
         assertThat(response.lifecycle().status()).isEqualTo("FIRST_LOGIN_RESTRICTED");
         verify(educationUnitRepository, never()).findAllByOrderByNameAsc();
         verify(educationUnitRepository, never()).findByParentIdInOrderByNameAsc(any());
@@ -86,6 +89,9 @@ class SessionServiceTest {
                 userPermissionOverrideRepository
         );
         User user = userWithRole("u-admin", "system.super_admin");
+        Permission wildcard = new Permission();
+        wildcard.setName("*");
+        user.getRoles().iterator().next().setPermissions(new LinkedHashSet<>(List.of(wildcard)));
         user.setIsProfileCompleted(true);
         user.setRecoveryEmailVerified(true);
         user.setMustChangePassword(false);
@@ -107,11 +113,13 @@ class SessionServiceTest {
         );
 
         assertThat(response.portals()).containsExactly("*");
+        assertThat(response.workspaces()).containsExactly("ADMIN", "CRM", "STUDENT", "TEACHER");
+        assertThat(response.tenantId()).isEqualTo("erg");
         assertThat(response.lifecycle().status()).isEqualTo("ACTIVE");
     }
 
     @Test
-    void currentBootstrapKeepsGenericAdminWithinTheLoginPortal() {
+    void currentBootstrapProjectsGenericAdminToCanonicalAdminWorkspace() {
         SessionService service = new SessionService(
                 sessionRepository,
                 educationUnitRepository,
@@ -130,7 +138,6 @@ class SessionServiceTest {
 
         when(sessionRepository.findWithUserBySessionIdAndTenantId("s-local-admin", "erg"))
                 .thenReturn(Optional.of(session));
-        when(educationUnitRepository.findTop500ByOrderByNameAsc()).thenReturn(List.of());
 
         SessionBootstrapResponse response = service.currentBootstrap(
                 "s-local-admin",
@@ -138,7 +145,8 @@ class SessionServiceTest {
                 new UserAccessContext("u-local-admin", "erg", List.of(), List.of(), null, null)
         );
 
-        assertThat(response.portals()).containsExactly("admin");
+        assertThat(response.portals()).containsExactly("lcms");
+        assertThat(response.workspaces()).containsExactly("ADMIN");
     }
 
     @Test
@@ -146,6 +154,9 @@ class SessionServiceTest {
         SessionService service = new SessionService(
                 sessionRepository, educationUnitRepository, classroomRepository, userPermissionOverrideRepository);
         User user = userWithRole("u-admin", "system.super_admin");
+        Permission wildcard = new Permission();
+        wildcard.setName("*");
+        user.getRoles().iterator().next().setPermissions(new LinkedHashSet<>(List.of(wildcard)));
         AuthSession session = new AuthSession();
         session.setUser(user);
         session.setSessionId("s-large");

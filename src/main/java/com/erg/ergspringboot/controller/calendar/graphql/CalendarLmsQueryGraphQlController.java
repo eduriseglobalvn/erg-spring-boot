@@ -7,7 +7,8 @@ import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.calendar.CalendarOperations;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
+import com.erg.ergspringboot.calendar.CalendarReadPort;
+import com.erg.ergspringboot.calendar.authorization.CalendarSelfRead;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -30,12 +31,13 @@ public class CalendarLmsQueryGraphQlController {
 
     /** Compatibility constructor retained for existing focused adapter tests. */
     @Deprecated
-    public CalendarLmsQueryGraphQlController(CalendarReadService reads,
+    public CalendarLmsQueryGraphQlController(CalendarReadPort reads,
             GraphQlAccessSupport accessSupport) {
         this(new CalendarOperations(reads), accessSupport);
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "myTeachingCalendar")
+    @CalendarSelfRead
     public CalendarWorkspaceResponse myTeachingCalendar(@Argument MyCalendarRequest input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.schedule.read_self", "lms.schedule.read",
@@ -56,6 +58,7 @@ public class CalendarLmsQueryGraphQlController {
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "myStudentCalendar")
+    @CalendarSelfRead
     public CalendarWorkspaceResponse myStudentCalendar(@Argument MyStudentCalendarInput input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.schedule.read_self", "lms.schedule.read",

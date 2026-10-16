@@ -2,6 +2,7 @@ package com.erg.ergspringboot.controller.catalog;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.service.catalog.CatalogService;
+import com.erg.ergspringboot.platform.security.ReviewedPublicEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ public class CourseController {
     }
 
     @GetMapping
+    @ReviewedPublicEndpoint
     public ApiResponse<List<Map<String, Object>>> list(HttpServletRequest request) {
         return ok("Courses loaded", catalogService.list("courses"), request);
     }
@@ -36,16 +38,19 @@ public class CourseController {
     }
 
     @GetMapping("/subdomain/{subdomain}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> bySubdomain(@PathVariable String subdomain, HttpServletRequest request) {
         return ok("Course loaded", catalogService.findBySlug("courses", subdomain), request);
     }
 
     @GetMapping("/{id}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> detail(@PathVariable String id, HttpServletRequest request) {
         return ok("Course loaded", catalogService.get("courses", id), request);
     }
 
     @GetMapping("/{id}/schema")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> schema(@PathVariable String id, HttpServletRequest request) {
         return ok("Course schema loaded", catalogService.schema(id), request);
     }
@@ -70,7 +75,6 @@ public class CourseController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

@@ -10,7 +10,7 @@ import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.service.calendar.CalendarReadService.ReferenceMaps;
+import com.erg.ergspringboot.calendar.CalendarReferenceMaps;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +27,7 @@ public class CalendarWorkspaceAssembler {
     public CalendarFilterOptionsResponse filterOptions(
             List<CalendarEvent> events,
             Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
-            ReferenceMaps references,
+            CalendarReferenceMaps references,
             String viewMode) {
         Map<String, Long> schoolCounts = events.stream().collect(Collectors.groupingBy(
                 CalendarEvent::getSchoolId, LinkedHashMap::new, Collectors.counting()));
@@ -65,7 +65,7 @@ public class CalendarWorkspaceAssembler {
     public List<CalendarLaneSummaryResponse> laneSummaries(
             List<CalendarEvent> events,
             Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
-            ReferenceMaps references,
+            CalendarReferenceMaps references,
             String viewMode) {
         if (events == null || events.isEmpty()) return List.of();
         String mode = viewMode != null ? viewMode.toUpperCase() : "BY_SCHOOL";
@@ -99,7 +99,7 @@ public class CalendarWorkspaceAssembler {
     private List<CalendarLaneSummaryResponse> teacherSummaries(
             List<CalendarEvent> events,
             Map<String, List<CalendarEventTeacher>> assignmentsByEvent,
-            ReferenceMaps references) {
+            CalendarReferenceMaps references) {
         Map<String, Long> counts = new LinkedHashMap<>();
         for (CalendarEvent event : events) {
             for (CalendarEventTeacher teacher : assignmentsByEvent.getOrDefault(event.getId(), List.of())) {
@@ -114,32 +114,32 @@ public class CalendarWorkspaceAssembler {
         }).toList();
     }
 
-    private String schoolName(String id, ReferenceMaps references) {
+    private String schoolName(String id, CalendarReferenceMaps references) {
         EducationUnit value = id == null ? null : references.schoolMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String className(String id, ReferenceMaps references) {
+    private String className(String id, CalendarReferenceMaps references) {
         Classroom value = id == null ? null : references.classMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String subjectName(String id, ReferenceMaps references) {
+    private String subjectName(String id, CalendarReferenceMaps references) {
         Subject value = id == null ? null : references.subjectMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String levelName(String id, ReferenceMaps references) {
+    private String levelName(String id, CalendarReferenceMaps references) {
         Level value = id == null ? null : references.levelMap().get(id);
         return value == null ? null : value.getName();
     }
 
-    private String teacherName(String id, ReferenceMaps references) {
+    private String teacherName(String id, CalendarReferenceMaps references) {
         User value = id == null ? null : references.userMap().get(id);
         return value == null ? null : value.getFullName();
     }
 
-    private String teacherColor(String id, ReferenceMaps references) {
+    private String teacherColor(String id, CalendarReferenceMaps references) {
         return id == null ? null : references.teacherColorKeyMap().get(id);
     }
 }

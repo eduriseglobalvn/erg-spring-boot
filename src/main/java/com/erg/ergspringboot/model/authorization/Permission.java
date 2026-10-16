@@ -23,7 +23,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Permission extends BaseEntity {
 
     @Column(nullable = false, unique = true)
@@ -56,16 +56,13 @@ public class Permission extends BaseEntity {
 
     @ManyToMany(mappedBy = "permissions", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<Role> roles = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "permissionRef", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<UserPermissionOverride> userOverrides = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "permission", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<PermissionBinding> bindings = new LinkedHashSet<>();
 }

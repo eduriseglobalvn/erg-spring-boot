@@ -59,9 +59,13 @@ class ApiResponseTest {
         assertThat(response.statusCode()).isEqualTo(422);
         assertThat(response.message()).isEqualTo("Invalid request");
         assertThat(response.data()).isNull();
-        assertThat(response.errors()).isEqualTo(error.details());
+        assertThat(response.errors()).isEqualTo(ApiResponse.TransportError.fields(error.details()));
         assertThat(response.path()).isEqualTo("/api/v1/users");
         assertThat(response.requestId()).isEqualTo("req-456");
+
+        assertThat(objectMapper.writeValueAsString(response))
+                .contains("\"errors\":[{\"field\":\"email\"")
+                .doesNotContain("\"value\"");
     }
 
     @Test

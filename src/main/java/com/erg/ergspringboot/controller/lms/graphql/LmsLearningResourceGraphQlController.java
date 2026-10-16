@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.response.learningcontent.LearningResourceLib
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.service.learningcontent.LearningResourceLibraryReadService;
+import com.erg.ergspringboot.lms.authorization.LmsResourceRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -23,6 +24,7 @@ public class LmsLearningResourceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "learningResourceLibrary")
+    @LmsResourceRead
     public LearningResourceLibraryResponse learningResourceLibrary(@Argument LearningResourceLibraryInput input) {
         LearningResourceLibraryInput safeInput = input == null ? LearningResourceLibraryInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();

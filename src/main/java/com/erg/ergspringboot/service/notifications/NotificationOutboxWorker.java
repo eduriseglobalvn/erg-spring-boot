@@ -1,14 +1,16 @@
 package com.erg.ergspringboot.service.notifications;
 
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.OutboxRunResponse;
 import com.erg.ergspringboot.model.notifications.NotificationDeliveryAttemptEntity;
 import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationEntity;
 import com.erg.ergspringboot.model.notifications.NotificationMessageEntity;
 import com.erg.ergspringboot.model.notifications.NotificationOutboxEntity;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
+import com.erg.ergspringboot.notifications.delivery.NotificationDeliveryAdapterRegistry;
+import com.erg.ergspringboot.notifications.delivery.NotificationDeliveryPayload;
+import com.erg.ergspringboot.notifications.delivery.NotificationDeliveryRequest;
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.notifications.push.FirebasePushPayload;
-import com.erg.ergspringboot.notifications.push.FirebasePushSender;
 import com.erg.ergspringboot.notifications.push.SendResult;
 import com.erg.ergspringboot.repository.notifications.NotificationDeliveryAttemptRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
@@ -37,10 +39,9 @@ public class NotificationOutboxWorker {
     private final NotificationMessageRepository messageRepository;
     private final NotificationDeliveryAttemptRepository deliveryAttemptRepository;
     private final NotificationDeviceRegistrationRepository deviceRepository;
-    private final FirebasePushSender pushSender;
+    private final NotificationDeliveryAdapterRegistry deliveryAdapters;
     private final NotificationPushProperties properties;
     private final TransactionTemplate transactionTemplate;
-    private final NotificationTokenCipher tokenCipher;
     private final NotificationMetrics metrics;
 
     public NotificationOutboxWorker(
@@ -48,20 +49,18 @@ public class NotificationOutboxWorker {
             NotificationMessageRepository messageRepository,
             NotificationDeliveryAttemptRepository deliveryAttemptRepository,
             NotificationDeviceRegistrationRepository deviceRepository,
-            FirebasePushSender pushSender,
+            NotificationDeliveryAdapterRegistry deliveryAdapters,
             NotificationPushProperties properties,
             PlatformTransactionManager transactionManager,
-            NotificationTokenCipher tokenCipher,
             NotificationMetrics metrics
     ) {
         this.outboxRepository = outboxRepository;
         this.messageRepository = messageRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.deviceRepository = deviceRepository;
-        this.pushSender = pushSender;
+        this.deliveryAdapters = deliveryAdapters;
         this.properties = properties;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
-        this.tokenCipher = tokenCipher;
         this.metrics = metrics;
     }
 
@@ -104,6 +103,33 @@ public class NotificationOutboxWorker {
         } finally {
             if (previous == null) TenantContext.clear(); else TenantContext.set(previous);
         }
+    }
+
+    /**
+     * Return dead-lettered notifications to the retry queue so an operator can replay deliveries that
+     * exhausted their attempts (e.g. after a provider outage). Bounded and tenant-scoped: it resets
+     * attempt_count so the normal retry/backoff state machine takes over again, and clears any lease.
+     */
+    public DeadLetterReplayResponse replayDeadLetters(String tenantId, int limit) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return new DeadLetterReplayResponse(0);
+        }
+        int bounded = Math.max(1, Math.min(500, limit));
+        Integer replayed = transactionTemplate.execute(status -> {
+            OffsetDateTime now = OffsetDateTime.now();
+            List<NotificationOutboxEntity> dead =
+                    outboxRepository.findDeadForUpdateByTenant(tenantId, bounded);
+            for (NotificationOutboxEntity outbox : dead) {
+                outbox.setStatus("retry");
+                outbox.setAttemptCount(0);
+                outbox.setNextAttemptAt(now);
+                outbox.setLockedAt(null);
+                outbox.setLockedBy(null);
+                outboxRepository.save(outbox);
+            }
+            return dead.size();
+        });
+        return new DeadLetterReplayResponse(replayed == null ? 0 : replayed);
     }
 
     private List<NotificationOutboxEntity> claimDueBatch(String tenantId) {
@@ -164,23 +190,22 @@ public class NotificationOutboxWorker {
         if (message == null) {
             return SendResult.failure(false, false, 0, "NOTIFICATION_MISSING", "Notification message is missing.", null, 0);
         }
-        FirebasePushPayload payload = new FirebasePushPayload(
+        NotificationDeliveryPayload payload = new NotificationDeliveryPayload(
                 message.getTitle(),
                 message.getBodyPreview(),
                 message.getActionUrl(),
                 message.getCollapseKey(),
                 outbox.getPayload() == null ? Map.of() : outbox.getPayload()
         );
-        try {
-            return switch (outbox.getTargetKind()) {
-                case "registration_token" -> pushSender.sendToRegistrationToken(payload, tokenCipher.decrypt(outbox.getTargetRef()));
-                case "fid" -> pushSender.sendToFid(payload, outbox.getTargetRef());
-                case "topic" -> pushSender.sendToTopic(payload, outbox.getTargetRef());
-                default -> SendResult.failure(false, false, 0, "UNKNOWN_TARGET_KIND", "Unsupported notification target kind.", null, 0);
-            };
-        } catch (RuntimeException exception) {
-            return SendResult.failure(false, false, 0, "TARGET_DECRYPT_FAILED", exception.getMessage(), null, 0);
-        }
+        return deliveryAdapters.deliver(new NotificationDeliveryRequest(
+                outbox.getTenantId(),
+                outbox.getNotificationId(),
+                firstText(message.getChannel(), "push"),
+                firstText(outbox.getTargetKind(), "unknown"),
+                firstText(outbox.getProvider(), "firebase"),
+                outbox.getTargetRef(),
+                payload
+        ));
     }
 
     private void recordAttempt(NotificationOutboxEntity outbox, SendResult result) {
@@ -191,10 +216,12 @@ public class NotificationOutboxWorker {
         attempt.setDeviceRegistrationId(outbox.getPayload() == null ? null : outbox.getPayload().get("deviceRegistrationId"));
         attempt.setTargetKind(outbox.getTargetKind());
         attempt.setTargetRefHash(sha256(outbox.getTargetRef()));
-        attempt.setProvider("firebase");
+        attempt.setProvider(firstText(outbox.getProvider(), "firebase"));
         attempt.setProviderMessageId(result.providerMessageId());
         attempt.setHttpStatus(result.httpStatus() == 0 ? null : result.httpStatus());
         attempt.setFirebaseErrorCode(result.errorCode());
+        attempt.setProviderErrorCode(result.errorCode());
+        attempt.setProviderErrorMessage(sample(result.errorMessage()));
         attempt.setStatus(result.success() ? "sent" : "failed");
         attempt.setDurationMs(result.durationMs());
         attempt.setResponseSample(sample(result.errorMessage()));
@@ -238,6 +265,10 @@ public class NotificationOutboxWorker {
             return null;
         }
         return value.length() <= 500 ? value : value.substring(0, 500);
+    }
+
+    private String firstText(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private String sha256(String value) {

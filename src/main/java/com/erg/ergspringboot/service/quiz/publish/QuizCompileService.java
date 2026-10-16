@@ -31,7 +31,7 @@ public class QuizCompileService {
     // Presentation-only slide fields that never affect grading and are dropped from runtime body (§3).
     private static final java.util.Set<String> PRESENTATION_FIELDS = java.util.Set.of(
             "textStyles", "elementOffsets", "layoutPreset", "animationPreset", "themeColor",
-            "layers", "infoPage", "media"
+            "layers", "infoPage", "media", "runtimeQuestion"
     );
 
     @SuppressWarnings("unchecked")
@@ -72,9 +72,10 @@ public class QuizCompileService {
                 String bankQuestionId = firstNonBlank(string(slide.get("bankQuestionId")), string(slide.get("questionId")));
                 BigDecimal points = autoQuestionPoints(questionOrder, totalQuestionCount);
 
-                Map<String, Object> body = compileBody(slide, mapping.runtimeKind());
-                applyQuestionSettings(body, slide, bankQuestionId, questionSettings, questionSetSettings);
-                Map<String, Object> key = extractAnswerKey(slide, mapping.runtimeKind());
+                Map<String, Object> runtimeSlide = mergeRuntimeQuestion(slide);
+                Map<String, Object> body = compileBody(runtimeSlide, mapping.runtimeKind());
+                applyQuestionSettings(body, runtimeSlide, bankQuestionId, questionSettings, questionSetSettings);
+                Map<String, Object> key = extractAnswerKey(runtimeSlide, mapping.runtimeKind());
                 if (!key.isEmpty()) {
                     answerKey.put(runtimeQuestionId, key);
                 }
@@ -157,6 +158,7 @@ public class QuizCompileService {
             }
             body.put(entry.getKey(), entry.getValue());
         }
+        applyEditorMedia(body, slide, runtimeKind);
         // Strip correctness markers so the player-facing body never leaks answers (§6).
         stripCorrectnessFromList(body, "options");
         stripCorrectnessFromList(body, "choices");
@@ -173,6 +175,47 @@ public class QuizCompileService {
         stripDragAnswers(body);
         stripHotspotAnswers(body);
         return body;
+    }
+
+    /**
+     * The React editor keeps the canonical learner model in runtimeQuestion and
+     * adds authoring-only fields beside it. Publishing must flatten that model;
+     * otherwise advanced kinds look correct in preview but lose their runtime
+     * arrays when serialized.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> mergeRuntimeQuestion(Map<String, Object> slide) {
+        Map<String, Object> merged = new LinkedHashMap<>();
+        Object runtimeQuestion = slide.get("runtimeQuestion");
+        if (runtimeQuestion instanceof Map<?, ?> map) {
+            merged.putAll((Map<String, Object>) map);
+        }
+        merged.putAll(slide);
+        return merged;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void applyEditorMedia(Map<String, Object> body, Map<String, Object> slide, String runtimeKind) {
+        Object value = slide.get("media");
+        if (!(value instanceof Map<?, ?> rawMedia)) return;
+        Map<String, Object> media = (Map<String, Object>) rawMedia;
+        String source = string(media.get("src"));
+        if (source == null || source.isBlank()) return;
+
+        if ("hotspot".equals(runtimeKind)) {
+            Map<String, Object> image = new LinkedHashMap<>(asMap(body.get("hotspotImage")));
+            image.put("url", source);
+            image.putIfAbsent("width", 1200);
+            image.putIfAbsent("height", 675);
+            body.put("hotspotImage", image);
+            return;
+        }
+
+        Map<String, Object> image = new LinkedHashMap<>();
+        image.put("url", source);
+        String alt = string(media.get("alt"));
+        if (alt != null && !alt.isBlank()) image.put("alt", alt);
+        body.put("contentImage", image);
     }
 
     @SuppressWarnings("unchecked")
@@ -349,38 +392,39 @@ public class QuizCompileService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> extractAnswerKey(Map<String, Object> slide, String runtimeKind) {
         Map<String, Object> key = new LinkedHashMap<>();
-        switch (runtimeKind) {
-            case "single_choice", "true_false" -> {
+        switch (QuestionKindRegistry.requireRuntimeKind(runtimeKind).answerKeyRule()) {
+            case EXACT_CHOICE -> {
                 String correct = correctOptionId(slide);
                 if (correct != null) {
                     key.put("correctChoiceId", correct);
                 }
             }
-            case "multiple_response" -> {
+            case MULTIPLE_RESPONSE -> {
                 List<String> correct = correctOptionIds(slide);
                 if (!correct.isEmpty()) {
                     key.put("correctChoiceIds", correct);
                     key.put("acceptPartial", boolValue(slide.get("acceptPartial")));
                 }
             }
-            case "short_answer" -> {
+            case SHORT_ANSWER -> {
                 putIfPresent(key, "correctAnswers", slide.get("correctAnswers"));
                 putIfPresent(key, "blanks", textBlankAnswers(slide.get("textBlanks")));
             }
-            case "numeric" -> {
+            case NUMERIC -> {
                 Object numericAnswer = slide.get("numericAnswer");
                 putIfPresent(key, "value", firstNonNull(slide.get("correctAnswer"), slide.get("value"), mapValue(numericAnswer, "correctValue")));
                 putIfPresent(key, "tolerance", firstNonNull(slide.get("tolerance"), mapValue(numericAnswer, "tolerance")));
             }
-            case "sequence" -> putIfPresent(key, "order", firstNonNull(slide.get("correctOrder"), slide.get("order"), ids(slide.get("sequenceItems"))));
-            case "matching" -> putIfPresent(key, "pairs", firstNonNull(slide.get("correctPairs"), slide.get("pairs"), matchingPairs(slide.get("matching"))));
-            case "fill_blank", "drag_words", "select_from_lists" -> {
+            case SEQUENCE -> putIfPresent(key, "order", firstNonNull(slide.get("correctOrder"), slide.get("order"), ids(slide.get("sequenceItems"))));
+            case MATCHING -> putIfPresent(key, "pairs", firstNonNull(slide.get("correctPairs"), slide.get("pairs"), matchingPairs(slide.get("matching"))));
+            case BLANKS -> {
                 Object answers = firstNonNull(blankAnswers(slide.get("blanks")), textBlankAnswers(slide.get("textBlanks")),
                         inlineBlankAnswers(slide.get("inlineBlanks")), wordSlotAnswers(slide.get("wordSlots")));
                 putIfPresent(key, "blanks", answers);
             }
-            case "hotspot" -> putIfPresent(key, "regions", firstNonNull(slide.get("correctRegions"), slide.get("regions"), correctHotspotAreas(slide.get("hotspotAreas"))));
-            case "drag_drop" -> putIfPresent(key, "targets", firstNonNull(slide.get("correctTargets"), slide.get("targets"), dragDropTargets(slide.get("dragDropItems"))));
+            case HOTSPOT -> putIfPresent(key, "regions", firstNonNull(slide.get("correctRegions"), slide.get("regions"), correctHotspotAreas(slide.get("hotspotAreas"))));
+            case DRAG_DROP -> putIfPresent(key, "targets", firstNonNull(slide.get("correctTargets"), slide.get("targets"), dragDropTargets(slide.get("dragDropItems"))));
+            case NONE -> { }
             default -> {
                 // essay/likert have no answer key.
             }

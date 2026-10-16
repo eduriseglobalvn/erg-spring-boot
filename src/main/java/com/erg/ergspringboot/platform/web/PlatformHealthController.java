@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,9 +54,11 @@ public class PlatformHealthController {
 
     @GetMapping({"/api/v1/ready", "/ready"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> ready(HttpServletRequest request) {
+        boolean dbReady = isDatabaseReady(postgresDataSource);
+
         Map<String, Object> checks = new LinkedHashMap<>();
         checks.put("app", true);
-        checks.put("db.postgres", isDatabaseReady(postgresDataSource));
+        checks.put("db.postgres", dbReady);
         checks.put("redis", isRedisReady());
 
         String status = checks.values().stream().allMatch(Boolean.TRUE::equals) ? "ready" : "degraded";
@@ -65,7 +68,9 @@ public class PlatformHealthController {
         data.put("timestamp", OffsetDateTime.now().toString());
         data.put("checks", checks);
 
-        return ok(data, request);
+        // Only mandatory dependencies (DB) gate readiness. Redis is optional (autoconfig
+        // excluded by default) so its check must not force the probe to 503.
+        return dbReady ? ok(data, request) : serviceUnavailable(data, request);
     }
 
     @GetMapping(value = "/metrics", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -91,6 +96,22 @@ public class PlatformHealthController {
         );
 
         return ResponseEntity.ok()
+                .header(RequestIdFilter.REQUEST_ID_HEADER, requestId)
+                .body(response);
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> serviceUnavailable(
+            Map<String, Object> data, HttpServletRequest request) {
+        String requestId = requestId(request);
+        ApiResponse<Map<String, Object>> response = ApiResponse.success(
+                503,
+                "Service Unavailable",
+                data,
+                request.getRequestURI(),
+                requestId
+        );
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header(RequestIdFilter.REQUEST_ID_HEADER, requestId)
                 .body(response);
     }

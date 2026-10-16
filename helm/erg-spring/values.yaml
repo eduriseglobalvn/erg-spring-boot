@@ -1,0 +1,100 @@
+replicaCount: 2
+
+image:
+  repository: erg-spring
+  tag: latest
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+service:
+  type: ClusterIP
+  port: 1606
+
+config:
+  existingConfigMap: ""
+  existingSecret: erg-spring-secrets
+  springProfilesActive: prod,redis
+
+resources:
+  requests:
+    cpu: "2"
+    memory: 2Gi
+  limits:
+    cpu: "4"
+    memory: 4Gi
+
+dbPool:
+  perPodMaxConnections: 8
+  perPodMinIdleConnections: 2
+  postgresMaxConnections: 160
+  reservedConnections: 40
+
+autoscaling:
+  mode: hpa
+  minReplicas: 2
+  maxReplicas: 15
+  hpa:
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 75
+    scaleUpStabilizationSeconds: 0
+    scaleDownStabilizationSeconds: 300
+  keda:
+    pollingInterval: 15
+    cooldownPeriod: 300
+    prometheusServerAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
+    pendingConnectionsThreshold: "1"
+
+rollingUpdate:
+  maxUnavailable: 0
+  maxSurge: 25%
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 5
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 10
+    failureThreshold: 3
+
+terminationGracePeriodSeconds: 60
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 5s
+  additionalLabels: {}
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceLabels:
+    kubernetes.io/metadata.name: ingress-nginx
+  monitoringNamespaceLabels:
+    kubernetes.io/metadata.name: monitoring
+  externalCIDRs: []
+
+topologySpreadConstraints:
+  enabled: true
+  zoneKey: topology.kubernetes.io/zone
+  hostnameKey: kubernetes.io/hostname
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

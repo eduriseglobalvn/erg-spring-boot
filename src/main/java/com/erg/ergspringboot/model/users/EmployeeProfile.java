@@ -21,7 +21,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "employee_profiles")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class EmployeeProfile extends BaseEntity {
 
     @Column(name = "tenant_id", nullable = false, length = 36)

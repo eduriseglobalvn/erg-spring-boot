@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
+import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.service.lms.LmsClassroomService;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class LmsClassroomQueryUseCase {
         return new EducationUnitListResponse(items);
     }
 
-    @Cacheable(cacheNames = "lmsClassesBySchool", key = "{#access.tenantId(), #schoolId, #access.currentEducationUnitId(), #access.managedEducationUnitIds().toString()}")
+    @Cacheable(cacheNames = "lmsClassesBySchool", key = "{#access.tenantId(), #schoolId, #access.scopeFingerprint()}")
     public ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access) {
         String resolved = schoolId == null || schoolId.isBlank() ? access.currentEducationUnitId() : schoolId.trim();
         if (resolved == null || resolved.isBlank()) throw new BadRequestException("schoolId is required");
@@ -41,5 +42,5 @@ public class LmsClassroomQueryUseCase {
 
     private ClassItem classPayload(Classroom c) { return new ClassItem(c.getId(), c.getName(), c.getSchoolId(), c.getGrade(), c.getAcademicYear()); }
     private AccessScopeResponse scope(UserAccessContext access) { return new AccessScopeResponse(access.tenantId(), access.currentEducationUnitId(), access.currentClassId(), access.managedEducationUnitIds(), access.managedClassIds()); }
-    private String tenant(String value) { return value == null || value.isBlank() ? "erg" : value.trim(); }
+    private String tenant(String value) { return AuthenticatedTenant.require(value); }
 }

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.model.outbox.OutboxEvent;
+import com.erg.ergspringboot.platform.security.TenantContext;
 import com.erg.ergspringboot.repository.outbox.OutboxEventRepository;
 import com.erg.ergspringboot.service.auth.SmtpAccountMailSender;
 import java.time.OffsetDateTime;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +26,28 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 class TransactionalOutboxWorkerTest {
     @Mock private OutboxEventRepository repository;
     @Mock private SmtpAccountMailSender smtp;
+
+    @AfterEach
+    void clearTenantContext() {
+        TenantContext.clear();
+    }
+
+    @Test
+    void claimsCrossTenantBatchInMaintenanceScopeAndRestoresCallerContext() {
+        TenantContext caller = TenantContext.of("outer-tenant", "outer-user", "admin");
+        TenantContext.set(caller);
+        when(repository.findDueForUpdate(any(), any(Integer.class))).thenAnswer(invocation -> {
+            assertThat(TenantContext.current()).isNotNull();
+            assertThat(TenantContext.current().isMaintenance()).isTrue();
+            return List.of();
+        });
+        TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
+                repository, smtp, new OutboxPayloadCipher("test-key"), new ImmediateTransactionManager());
+
+        assertThat(worker.runDueBatch()).isZero();
+
+        assertThat(TenantContext.current()).isSameAs(caller);
+    }
 
     @Test
     void transientProviderFailureMovesEventToRetryWithLeaseCleared() {

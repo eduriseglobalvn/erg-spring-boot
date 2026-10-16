@@ -8,7 +8,8 @@ Tài liệu này quy định bốn quy trình riêng biệt. Tất cả lệnh W
 | --- | --- | --- | --- | --- |
 | Local dev | IDE trên Windows, port `1606` | PostgreSQL, Redis, Nginx | `ops/docker/.env.dev` | `.\scripts\docker.ps1 dev` |
 | Local Docker test | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `.\scripts\docker.ps1 test 2 -Image erg-spring:local-native` |
-| Build release | BuildKit/GraalVM trong Linux container | Không chạy stack ứng dụng | Không dùng env runtime | `.\scripts\docker.ps1 build -Image <registry/image:tag>` |
+| Build release local | BuildKit/GraalVM trong Linux container | Không chạy stack ứng dụng | Không dùng env runtime | `.\scripts\docker.ps1 build -Image <registry/image:tag>` |
+| Publish release | BuildKit/GraalVM trong Linux container | Không chạy stack ứng dụng | Không dùng env runtime | `.\scripts\docker.ps1 release -Image <registry/image:git-sha>` |
 | Production | Native executable trong Linux container | PostgreSQL, Redis, Nginx, nhiều backend | `ops/docker/.env.production` | `./scripts/docker.sh prod 3` |
 
 Ý nghĩa các action:
@@ -18,7 +19,8 @@ Tài liệu này quy định bốn quy trình riêng biệt. Tất cả lệnh W
 - `build`: compile source thành native image `linux/amd64`. Không bật stack.
 - `up`: bí danh của `test`.
 - `push`: đẩy image đã build lên Registry.
-- `prod`: server pull image rồi chạy với `--no-build`. Server tuyệt đối không compile.
+- `release`: kiểm tra image tag là Git SHA bất biến rồi build và push image `linux/amd64` bằng một lệnh. Action này không chạy server và không cần runtime secret.
+- `prod`: server pull digest image rồi chạy với `--no-build --wait`; lỗi health sẽ rollback về digest trước đó. Server tuyệt đối không compile.
 - `deploy`: bí danh của `prod`.
 - `logs`: xem log Nginx và các backend của stack native.
 - `down`: dừng cả stack dev và stack native, không xóa volume dữ liệu.
@@ -155,8 +157,8 @@ docker compose --project-directory ops/docker --env-file ops/docker/.env.product
 2. test mã:     .\mvnw.cmd -Dspring.profiles.active=test test
 3. build:       .\scripts\docker.ps1 build -Image <registry>/erg-spring:<git-sha>
 4. test Docker: .\scripts\docker.ps1 test 2 -Image <registry>/erg-spring:<git-sha>
-5. push:        .\scripts\docker.ps1 push -Image <registry>/erg-spring:<git-sha>
-6. prod:        ./scripts/docker.sh prod 3
+5. release:     .\scripts\docker.ps1 release -Image <registry>/erg-spring:<git-sha>
+6. prod:        ./scripts/docker.sh prod 3   # digest target + rollback digest in .env.production
 ```
 
 ## 4. Build và push bản release tại Windows
@@ -170,11 +172,20 @@ $tag = git rev-parse --short HEAD
 $image = "ghcr.io/your-org/erg-spring:$tag"
 
 docker login ghcr.io
-.\scripts\docker.ps1 build -Image $image
-.\scripts\docker.ps1 push -Image $image
+.\scripts\docker.ps1 release -Image $image
 ```
 
-Sau bước này Registry đã chứa image hoàn chỉnh cho Linux x86_64. Không cần và không được build lại trên server.
+release chạy docker buildx build --platform linux/amd64 --push trực tiếp, nên không tạo image tạm trên máy và không cần lệnh push thứ hai. Action chỉ chấp nhận tên có dạng registry/repository:<7-64 ký tự Git SHA>; các tag trôi nổi như latest, main, dev bị từ chối để giữ khả năng rollback. Sau bước này Registry đã chứa image hoàn chỉnh cho Linux x86_64. Không cần và không được build lại trên server.
+
+Trên Linux có thể dùng cùng workflow:
+
+```bash
+export ERG_APP_IMAGE="ghcr.io/your-org/erg-spring:$(git rev-parse --short HEAD)"
+docker login ghcr.io
+./scripts/docker.sh release
+```
+
+push vẫn tồn tại cho trường hợp image đã được build trước, nhưng cũng áp dụng cùng guard Git-SHA. `prod/deploy` chỉ nhận `registry/repository@sha256:<64 hex digest>`, chạy `pull` rồi `up --no-build --wait --wait-timeout 180`. Nếu health gate thất bại, script tự pull/chạy `ERG_ROLLBACK_IMAGE` (một digest khác); nếu rollback cũng lỗi, lệnh trả mã lỗi để hệ thống vận hành can thiệp. Tag Git-SHA chỉ dùng cho build/release, không dùng trực tiếp để chạy production.
 
 ## 5. Deploy production trên Linux
 
@@ -200,7 +211,8 @@ nano ops/docker/.env.production
 
 Phải thay ít nhất các giá trị sau:
 
-- `ERG_APP_IMAGE`: image và tag vừa push.
+- `ERG_APP_IMAGE`: digest của image vừa push, ví dụ `ghcr.io/your-org/erg-spring@sha256:<64-hex-digest>`.
+- `ERG_ROLLBACK_IMAGE`: digest known-good trước đó và phải khác `ERG_APP_IMAGE`.
 - `POSTGRES_PASSWORD`, `REDIS_STATE_PASSWORD` và `REDIS_CACHE_PASSWORD`.
 - `SECRET_AUTH__JWT_SECRET` và `SECRET_AUTH__JWT_REFRESH_SECRET`.
 - `HTTP__CORS__ALLOWED_ORIGINS` và `AUTH__COOKIE__DOMAIN`.
@@ -216,18 +228,19 @@ chmod +x scripts/docker.sh
 ./scripts/docker.sh logs
 ```
 
-`prod` (và bí danh `deploy`) chỉ chạy hai thao tác:
+`prod` (và bí danh `deploy`) chạy pull và health-gated start:
 
 ```text
 docker compose pull
-docker compose up --no-build --scale backend=3
+docker compose up --no-build --scale backend=3 --wait --wait-timeout 180
 ```
 
 ### Phát hành phiên bản mới
 
 1. Build và push một tag mới từ Windows.
-2. Đổi `ERG_APP_IMAGE` trong `ops/docker/.env.production` trên server.
-3. Chạy lại:
+2. Lấy digest manifest của tag vừa push (`docker buildx imagetools inspect <image:git-sha>`).
+3. Đặt digest mới vào `ERG_APP_IMAGE`, giữ digest đang chạy làm `ERG_ROLLBACK_IMAGE`.
+4. Chạy lại:
 
 ```bash
 ./scripts/docker.sh prod 3
@@ -235,7 +248,7 @@ docker compose up --no-build --scale backend=3
 
 ### Rollback
 
-Đổi `ERG_APP_IMAGE` về tag cũ rồi chạy lại cùng lệnh `prod`. Named volume PostgreSQL và Redis không bị xóa khi container được recreate.
+Không sửa thủ công về tag cũ. Đặt digest cũ vào `ERG_ROLLBACK_IMAGE` và chạy `prod`; health gate của lần phát hành mới sẽ tự rollback về digest đó khi cần. Named volume PostgreSQL và Redis không bị xóa khi container được recreate.
 
 ## 6. File env
 

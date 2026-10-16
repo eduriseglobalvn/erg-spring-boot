@@ -1,0 +1,104 @@
+type ElearningQuery {
+  namespace: String!
+  status: String!
+  studentDashboard(input: StudentDashboardInput): StudentDashboard!
+  discussionFeed(input: StudentDiscussionFeedInput): StudentDiscussionFeed!
+}
+
+input StudentDashboardInput {
+  tenantId: String
+  studentUserId: String
+  classId: String
+}
+
+type StudentDashboard {
+  tenantId: String!
+  viewer: StudentDashboardViewer!
+  profile: StudentDashboardProfile!
+  summary: StudentDashboardSummary!
+  courses: [StudentDashboardCourseCard!]!
+  assignments: [StudentDashboardAssignmentCard!]!
+  nextActions: [StudentDashboardNextAction!]!
+  announcements: [StudentDashboardAnnouncementCard!]!
+  selectedClassId: String
+  classes: [StudentDashboardClassMembership!]!
+}
+
+type StudentDashboardClassMembership {
+  classId: String!
+  className: String!
+  schoolId: String
+  gradeLabel: String
+  academicYear: String
+  status: String!
+}
+
+type StudentDashboardViewer {
+  userId: String!
+  tenantId: String!
+  accountType: String
+  accessLevel: String
+}
+
+type StudentDashboardProfile {
+  userId: String!
+  studentId: String
+  studentCode: String
+  fullName: String
+  email: String
+  schoolId: String
+  academicClassId: String
+  status: String
+  updatedAt: String
+}
+
+type StudentDashboardSummary {
+  enrolledCourseCount: Int!
+  activeAssignmentCount: Int!
+  pendingActionCount: Int!
+  scoreSummary: StudentDashboardScoreSummary!
+  generatedAt: String!
+}
+
+type StudentDashboardScoreSummary {
+  completedAttemptCount: Int!
+  attemptedAssignmentCount: Int!
+  passedAttemptCount: Int!
+  averagePercent: Int!
+  bestPercent: Int!
+}
+
+type StudentDashboardCourseCard {
+  id: String!
+  title: String!
+  status: String
+  progressPercent: Int!
+  updatedAt: String
+}
+
+type StudentDashboardAssignmentCard {
+  id: String!
+  quizId: String
+  title: String!
+  status: String
+  dueAt: String
+}
+
+type StudentDashboardNextAction {
+  id: String!
+  kind: String!
+  label: String!
+  targetId: String
+  dueAt: String
+}
+
+type StudentDashboardAnnouncementCard {
+  id: String!
+  title: String!
+  content: String
+  pinned: Boolean!
+  publishedAt: String
+  updatedAt: String
+}
+
+input LearningResourceLibraryInput {

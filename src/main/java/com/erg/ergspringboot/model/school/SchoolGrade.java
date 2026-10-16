@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "school_grades")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class SchoolGrade extends BaseEntity {
     @Column(name = "tenant_id", nullable = false, length = 36)
     private String tenantId;

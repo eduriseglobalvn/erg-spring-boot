@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.model.notifications;
 
-import com.erg.ergspringboot.model.BaseEntity;
 import java.time.OffsetDateTime;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -14,8 +13,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class Digest extends BaseEntity {
+@EqualsAndHashCode(exclude = {"createdAt", "updatedAt"})
+public class Digest {
+
+    private String id;
+
+    private java.time.OffsetDateTime createdAt;
+
+    private java.time.OffsetDateTime updatedAt;
 
     private String userId;
 

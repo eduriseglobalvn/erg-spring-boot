@@ -16,7 +16,7 @@ class CalendarBatchLifecycleArchitectureTest {
                 .doesNotThrowAnyException();
 
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarCommandService.java"));
+                "src/main/java/com/erg/ergspringboot/calendar/internal/command/CalendarCommandUseCase.java"));
         assertThat(facade)
                 .contains("batchLifecycle.publish(")
                 .contains("batchLifecycle.cancel(")

@@ -33,7 +33,7 @@ public final class TenantContext {
     }
 
     public static TenantContext of(String tenantId, String userId, String portal) {
-        String resolvedTenant = tenantId == null || tenantId.isBlank() ? DEFAULT_TENANT_ID : tenantId.trim();
+        String resolvedTenant = AuthenticatedTenant.require(tenantId);
         return new TenantContext(resolvedTenant, blankToNull(userId), blankToNull(portal));
     }
 
@@ -55,6 +55,28 @@ public final class TenantContext {
         HOLDER.remove();
     }
 
+    /** Opens a nested context and restores the previous value when closed. */
+    public static Scope scope(TenantContext context) {
+        TenantContext previous = current();
+        if (context == null) {
+            clear();
+        } else {
+            set(context);
+        }
+        return new Scope(previous);
+    }
+
+    /** Captures only tenant/correlation identity; it never captures a principal, token or SecurityContext. */
+    public static Carrier capture() {
+        TenantContext context = current();
+        return context == null ? null : new Carrier(context.tenantId, context.userId, context.portal, context.maintenance);
+    }
+
+    /** Installs a previously captured tenant carrier and guarantees cleanup/restoration. */
+    public static Scope install(Carrier carrier) {
+        return scope(carrier == null ? null : carrier.toContext());
+    }
+
     public String tenantId() {
         return tenantId;
     }
@@ -69,6 +91,28 @@ public final class TenantContext {
 
     public boolean isMaintenance() {
         return maintenance;
+    }
+
+    public record Carrier(String tenantId, String userId, String portal, boolean maintenance) {
+        private TenantContext toContext() {
+            return new TenantContext(tenantId, userId, portal, maintenance);
+        }
+    }
+
+    public static final class Scope implements AutoCloseable {
+        private final TenantContext previous;
+        private boolean closed;
+
+        private Scope(TenantContext previous) {
+            this.previous = previous;
+        }
+
+        @Override
+        public void close() {
+            if (closed) return;
+            closed = true;
+            if (previous == null) clear(); else set(previous);
+        }
     }
 
     private static String blankToNull(String value) {

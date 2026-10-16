@@ -79,8 +79,7 @@ public class WebhookController {
 
     private ResponseEntity<ApiResponse<Void>> accepted(HttpServletRequest request) {
         String path = request.getRequestURI();
-        Object requestId = request.getAttribute("requestId");
-        String id = requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        String id = com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
         return ResponseEntity.accepted().body(ApiResponse.success(202, "Webhook accepted", null, path, id));
     }
 }

@@ -5,15 +5,18 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.UUID;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class RequestIdFilter extends OncePerRequestFilter {
 
-    public static final String REQUEST_ID_HEADER = "X-Request-ID";
-    public static final String REQUEST_ID_ATTRIBUTE = "request_id";
+    public static final String REQUEST_ID_HEADER = RequestCorrelation.REQUEST_ID_HEADER;
+    public static final String REQUEST_ID_ATTRIBUTE = RequestCorrelation.REQUEST_ID_ATTRIBUTE;
+    public static final String TRACE_ID_HEADER = RequestCorrelation.TRACE_ID_HEADER;
+    public static final String REQUEST_ID_MDC_KEY = RequestCorrelation.REQUEST_ID_MDC_KEY;
+    public static final String TRACE_ID_MDC_KEY = RequestCorrelation.TRACE_ID_MDC_KEY;
 
     @Override
     protected void doFilterInternal(
@@ -21,13 +24,22 @@ public class RequestIdFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String requestId = request.getHeader(REQUEST_ID_HEADER);
-        if (requestId == null || requestId.isBlank()) {
-            requestId = UUID.randomUUID().toString();
-        }
+        String requestId = RequestCorrelation.getOrCreate(request);
+        String traceId = request.getHeader(TRACE_ID_HEADER);
 
-        request.setAttribute(REQUEST_ID_ATTRIBUTE, requestId);
         response.setHeader(REQUEST_ID_HEADER, requestId);
-        filterChain.doFilter(request, response);
+
+        // Populate MDC so downstream service/repo logs carry the correlation id.
+        // Must clear in finally to avoid leaking onto pooled threads.
+        MDC.put(REQUEST_ID_MDC_KEY, requestId);
+        if (traceId != null && !traceId.isBlank()) {
+            MDC.put(TRACE_ID_MDC_KEY, traceId);
+        }
+        try {
+            filterChain.doFilter(RequestCorrelation.exposeAsHeader(request, requestId), response);
+        } finally {
+            MDC.remove(REQUEST_ID_MDC_KEY);
+            MDC.remove(TRACE_ID_MDC_KEY);
+        }
     }
 }

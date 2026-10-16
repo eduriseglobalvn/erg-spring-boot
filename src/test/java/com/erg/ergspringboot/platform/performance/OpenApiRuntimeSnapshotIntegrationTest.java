@@ -19,6 +19,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @ActiveProfiles("test")
 @SpringBootTest
@@ -54,7 +55,9 @@ class OpenApiRuntimeSnapshotIntegrationTest {
                 "/api/v1/content/lectures/google-slides",
                 "/api/v1/curriculum/topics/{topicId}/content-items",
                 "/api/v1/curriculum/topics/{topicId}/content-items/{placementId}",
-                "/api/v1/curriculum/topics/{topicId}/content-items/reorder");
+                "/api/v1/curriculum/topics/{topicId}/content-items/reorder",
+                "/api/v1/audit/events",
+                "/api/v1/audit/export");
         assertThat(names(runtimePaths)).containsAll(requiredPaths);
         assertThat(names(committedPaths)).containsAll(requiredPaths);
         for (String path : requiredPaths) {
@@ -62,6 +65,19 @@ class OpenApiRuntimeSnapshotIntegrationTest {
                     .as("HTTP methods for %s", path)
                     .isEqualTo(methods(runtimePaths.path(path)));
         }
+    }
+
+    @Test
+    void normalizedRuntimeDocumentExactlyMatchesPublishedSnapshot() throws Exception {
+        JsonNode runtime = objectMapper.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        JsonNode published = objectMapper.readTree(Files.readString(
+                Path.of("contracts/openapi/erg-openapi.json")));
+
+        ((ObjectNode) runtime).set("servers", published.path("servers").deepCopy());
+
+        assertThat(runtime).isEqualTo(published);
     }
 
     private Set<String> names(JsonNode node) {

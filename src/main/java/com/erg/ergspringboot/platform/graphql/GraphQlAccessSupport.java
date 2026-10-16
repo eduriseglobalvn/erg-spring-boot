@@ -3,6 +3,10 @@ package com.erg.ergspringboot.platform.graphql;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
+import com.erg.ergspringboot.platform.security.AuthorizationCapabilityPolicy;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.AccessScopeSet;
+import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.security.core.Authentication;
@@ -27,15 +31,12 @@ public class GraphQlAccessSupport {
     }
 
     public String verifiedTenantId(ErgPrincipal principal, String requestedTenantId) {
-        String principalTenantId = blankToNull(principal == null ? null : principal.tenantId());
+        String principalTenantId = AuthenticatedTenant.require(principal == null ? null : principal.tenantId());
         String requested = blankToNull(requestedTenantId);
-        if (principalTenantId != null && requested != null && !principalTenantId.equals(requested)) {
+        if (requested != null && !principalTenantId.equals(requested)) {
             throw new ForbiddenException("GraphQL tenant scope does not match the authenticated principal.");
         }
-        if (principalTenantId != null) {
-            return principalTenantId;
-        }
-        return requested == null ? "erg" : requested;
+        return principalTenantId;
     }
 
     public void assertPermission(ErgPrincipal principal, String... allowedPermissions) {
@@ -68,7 +69,8 @@ public class GraphQlAccessSupport {
         if (requested == null) {
             return;
         }
-        List<String> managedEducationUnitIds = csv(attribute(principal, "managedEducationUnitIds"));
+        List<String> managedEducationUnitIds = AccessScopeAssembler.from(principal)
+                .managedIds(AccessScopeSet.EDUCATION_UNIT);
         if (managedEducationUnitIds.contains("*") || managedEducationUnitIds.contains(requested)) {
             return;
         }
@@ -83,11 +85,12 @@ public class GraphQlAccessSupport {
         if (requested == null) {
             throw new ForbiddenException("GraphQL class scope requires a class id.");
         }
-        List<String> managedClassIds = csv(attribute(principal, "managedClassIds"));
+        AccessScopeSet scopes = AccessScopeAssembler.from(principal);
+        List<String> managedClassIds = scopes.managedIds(AccessScopeSet.CLASS);
         if (managedClassIds.contains("*") || managedClassIds.contains(requested)) {
             return;
         }
-        List<String> managedEducationUnitIds = csv(attribute(principal, "managedEducationUnitIds"));
+        List<String> managedEducationUnitIds = scopes.managedIds(AccessScopeSet.EDUCATION_UNIT);
         String requestedSchoolId = blankToNull(schoolId);
         if (requestedSchoolId != null
                 && (managedEducationUnitIds.contains("*") || managedEducationUnitIds.contains(requestedSchoolId))) {
@@ -101,7 +104,7 @@ public class GraphQlAccessSupport {
             return;
         }
         String requestedClassId = blankToNull(classId);
-        List<String> managedClassIds = csv(attribute(principal, "managedClassIds"));
+        List<String> managedClassIds = AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.CLASS);
         if (requestedClassId != null
                 && (managedClassIds.contains("*") || managedClassIds.contains(requestedClassId))) {
             return;
@@ -144,7 +147,7 @@ public class GraphQlAccessSupport {
     }
 
     public boolean isWildcardPrincipal(ErgPrincipal principal) {
-        return principal != null && principal.permissions() != null && principal.permissions().contains("*");
+        return new AuthorizationCapabilityPolicy().isPlatformWide(principal);
     }
 
     private String firstAttribute(ErgPrincipal principal, String... keys) {

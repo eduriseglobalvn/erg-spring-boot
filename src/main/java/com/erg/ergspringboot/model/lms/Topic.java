@@ -20,7 +20,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "lms_topics",
@@ -39,7 +39,6 @@ public class Topic extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "level_id", referencedColumnName = "id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private Level level;
 
