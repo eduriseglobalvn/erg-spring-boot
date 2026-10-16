@@ -3,6 +3,7 @@ package com.erg.ergspringboot.repository.quiz.runtime;
 import com.erg.ergspringboot.model.quiz.runtime.StudentProgress;
 import java.util.List;
 import java.util.Optional;
+import java.time.OffsetDateTime;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,26 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
     Page<StudentProgress> findByTenantIdAndAssignmentIdOrderBySubmittedAtDesc(
             String tenantId, String assignmentId, Pageable pageable);
 
+    @Query("""
+            select progress from StudentProgress progress
+            where progress.tenantId = :tenantId
+              and progress.assignmentId = :assignmentId
+              and (:classId is null or progress.classId = :classId)
+              and (:status is null or lower(progress.status) = :status)
+              and (:submittedFrom is null or progress.submittedAt >= :submittedFrom)
+              and (:submittedTo is null or progress.submittedAt <= :submittedTo)
+            order by case when progress.submittedAt is null then 1 else 0 end,
+                     progress.submittedAt desc, progress.id asc
+            """)
+    Page<StudentProgress> findAssignmentReport(
+            String tenantId,
+            String assignmentId,
+            String classId,
+            String status,
+            OffsetDateTime submittedFrom,
+            OffsetDateTime submittedTo,
+            Pageable pageable);
+
     List<StudentProgress> findByTenantIdAndClassIdAndQuizIdOrderByStudentNameAsc(String tenantId, String classId, String quizId);
 
     @Query("""
@@ -38,6 +59,29 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
               and progress.assignmentId = :assignmentId
             """)
     StudentProgressSummaryProjection summarizeAssignment(String tenantId, String assignmentId);
+
+    @Query("""
+            select
+                count(progress.id) as totalRecipients,
+                coalesce(sum(case when lower(progress.status) = 'submitted' then 1 else 0 end), 0) as submittedCount,
+                coalesce(sum(case when lower(progress.status) = 'in_progress' then 1 else 0 end), 0) as inProgressCount,
+                coalesce(sum(case when lower(progress.status) in ('needs_review', 'review_required') then 1 else 0 end), 0) as needsReviewCount,
+                coalesce(avg(progress.score), 0) as averagePercent
+            from StudentProgress progress
+            where progress.tenantId = :tenantId
+              and progress.assignmentId = :assignmentId
+              and (:classId is null or progress.classId = :classId)
+              and (:status is null or lower(progress.status) = :status)
+              and (:submittedFrom is null or progress.submittedAt >= :submittedFrom)
+              and (:submittedTo is null or progress.submittedAt <= :submittedTo)
+            """)
+    StudentProgressSummaryProjection summarizeAssignment(
+            String tenantId,
+            String assignmentId,
+            String classId,
+            String status,
+            OffsetDateTime submittedFrom,
+            OffsetDateTime submittedTo);
 
     @Query(value = """
             select

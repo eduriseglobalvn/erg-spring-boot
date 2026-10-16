@@ -35,7 +35,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class EducationUnit extends BaseEntity {
 
     @Column(name = "tenant_id", nullable = false, length = 36)
@@ -57,7 +57,6 @@ public class EducationUnit extends BaseEntity {
 
     @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<EducationUnit> children = new LinkedHashSet<>();
 
     private String logoUrl;

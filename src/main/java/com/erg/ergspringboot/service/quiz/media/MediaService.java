@@ -22,10 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(value = "postgresTransactionManager")
 public class MediaService {
 
-    static final long MAX_IMAGE_BYTES = 15L * 1024L * 1024L;
-    // Slides embed images only — never documents/video (spec §5 security note).
+    public static final long MAX_IMAGE_BYTES = 15L * 1024L * 1024L;
+    // Slides embed images only — never documents/video (spec §5 security note). SVG is excluded:
+    // it is XML that can carry <script>/event handlers, so an inline-served SVG is a stored-XSS
+    // vector. Slides only need raster formats.
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
-            "image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"
+            "image/png", "image/jpeg", "image/webp", "image/gif"
     );
     private static final Pattern SHA256_HEX = Pattern.compile("^[0-9a-f]{64}$");
     private static final String STATUS_PENDING = "pending";
@@ -80,6 +82,10 @@ public class MediaService {
         return MediaPresignResponse.upload(saved.getId(), uploadUrl, storageKey);
     }
 
+    public boolean storeSignedUpload(String uploadUrl, String tenantId, String mimeType, byte[] bytes) {
+        return storageAdapter.storeAuthorizedUpload(uploadUrl, tenantId, mimeType, bytes);
+    }
+
     public MediaCommitResponse commit(String tenantId, MediaCommitRequest request) {
         String mediaId = request == null ? null : request.mediaId();
         if (mediaId == null || mediaId.isBlank()) {
@@ -88,8 +94,13 @@ public class MediaService {
         MediaAsset asset = mediaAssetRepository.findByIdAndTenantId(mediaId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("media asset not found"));
 
-        // The client PUT the bytes to the presigned URL; mark the asset committed and record dimensions.
-        // A real R2/S3 adapter will HEAD the object here to re-verify size/hash before flipping status.
+        MediaStorageAdapter.StoredObject stored = storageAdapter.headObject(asset.getStorageKey())
+                .orElseThrow(() -> new BadRequestException("uploaded object is missing or not visible yet"));
+        if (stored.byteSize() != asset.getByteSize()
+                || !asset.getSha256().equalsIgnoreCase(stored.sha256())
+                || !asset.getMimeType().equalsIgnoreCase(stored.mimeType())) {
+            throw new BadRequestException("uploaded object does not match the presigned media contract");
+        }
         asset.setStatus(STATUS_COMMITTED);
         if (request.width() != null) {
             asset.setWidth(request.width());

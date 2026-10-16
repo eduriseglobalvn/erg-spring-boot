@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Explicit legacy CRM reporting adapter; new callers must use {@code CrmOperations}. */
+@Deprecated(since = "2026-08-08", forRemoval = false)
 @Service
 public class CrmSchoolService {
 

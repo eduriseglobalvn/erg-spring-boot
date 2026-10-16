@@ -29,7 +29,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "lms_quizzes",
@@ -61,7 +61,6 @@ public class Quiz extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", referencedColumnName = "id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private CurriculumSubject subject;
 
@@ -70,7 +69,6 @@ public class Quiz extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "level_id", referencedColumnName = "id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private CurriculumLevel level;
 
@@ -79,7 +77,6 @@ public class Quiz extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", referencedColumnName = "id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private CurriculumTopic category;
 
@@ -112,6 +109,9 @@ public class Quiz extends BaseEntity {
 
     private String status;
 
+    @Column(name = "lifecycle_state", nullable = false, length = 32)
+    private String lifecycleState = "DRAFT";
+
     private Integer version;
 
     @Column(name = "package_hash")
@@ -131,7 +131,6 @@ public class Quiz extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_user_id", referencedColumnName = "id", insertable = false, updatable = false)
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     private User owner;
 
@@ -147,4 +146,8 @@ public class Quiz extends BaseEntity {
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
+
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion = 0L;
 }

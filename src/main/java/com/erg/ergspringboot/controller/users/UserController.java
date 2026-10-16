@@ -49,6 +49,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import com.erg.ergspringboot.authorization.authorization.UserSelfPasswordChange;
+import com.erg.ergspringboot.authorization.authorization.UserSelfRead;
+import com.erg.ergspringboot.authorization.authorization.UserSelfSessionsRead;
+import com.erg.ergspringboot.authorization.authorization.UserSelfUpdate;
+import com.erg.ergspringboot.authorization.authorization.UsersManage;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -71,12 +76,14 @@ public class UserController {
     }
 
     @GetMapping("/me")
+    @UserSelfRead
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(HttpServletRequest servletRequest) {
         UserResponse data = users.current(userId(servletRequest), tenantId(servletRequest));
         return ok(data, servletRequest);
     }
 
     @PatchMapping("/me")
+    @UserSelfUpdate
     public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             HttpServletRequest servletRequest
@@ -87,6 +94,7 @@ public class UserController {
     }
 
     @PostMapping("/me/recovery-email/challenges")
+    @UserSelfUpdate
     public ResponseEntity<ApiResponse<RecoveryEmailChallengeResponse>> requestRecoveryEmailChallenge(
             @Valid @RequestBody RecoveryEmailChallengeRequest request,
             HttpServletRequest servletRequest
@@ -99,6 +107,7 @@ public class UserController {
     }
 
     @PostMapping("/me/recovery-email/verify")
+    @UserSelfUpdate
     public ResponseEntity<ApiResponse<RecoveryEmailVerificationResponse>> verifyRecoveryEmailChallenge(
             @Valid @RequestBody RecoveryEmailVerifyRequest request,
             HttpServletRequest servletRequest
@@ -111,6 +120,7 @@ public class UserController {
     }
 
     @PostMapping("/onboarding")
+    @UserSelfUpdate
     public ResponseEntity<ApiResponse<OnboardingResponse>> completeOnboarding(
             @Valid @RequestBody OnboardingRequest request,
             HttpServletRequest servletRequest
@@ -120,6 +130,7 @@ public class UserController {
     }
 
     @PutMapping("/me/password")
+    @UserSelfPasswordChange
     public ResponseEntity<ApiResponse<PasswordChangeResponse>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             HttpServletRequest servletRequest
@@ -131,6 +142,7 @@ public class UserController {
     }
 
     @GetMapping("/me/sessions")
+    @UserSelfSessionsRead
     public ResponseEntity<ApiResponse<SessionListResponse>> listSessions(HttpServletRequest servletRequest) {
         SessionListResponse data = users.listSessions(
                 userId(servletRequest),
@@ -141,6 +153,7 @@ public class UserController {
     }
 
     @DeleteMapping("/me/sessions/{sessionId}")
+    @UserSelfSessionsRead
     public ResponseEntity<ApiResponse<RevokeSessionResponse>> revokeSession(
             @PathVariable String sessionId,
             HttpServletRequest servletRequest
@@ -150,6 +163,7 @@ public class UserController {
     }
 
     @GetMapping({"", "/"})
+    @UsersManage
     public ResponseEntity<ApiResponse<UserListResponse>> listUsers(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
@@ -163,6 +177,7 @@ public class UserController {
     }
 
     @PostMapping
+    @UsersManage
     public ResponseEntity<ApiResponse<UserCreatedResponse>> createUser(
             @Valid @RequestBody AdminCreateUserRequest request,
             HttpServletRequest servletRequest
@@ -181,6 +196,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/resend-invite")
+    @UsersManage
     public ResponseEntity<ApiResponse<CredentialDeliveryResponse>> resendInvite(
             @PathVariable String userId,
             HttpServletRequest servletRequest
@@ -190,6 +206,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/reset-credential")
+    @UsersManage
     public ResponseEntity<ApiResponse<CredentialDeliveryResponse>> resetCredential(
             @PathVariable String userId,
             @Valid @RequestBody CredentialDeliveryRequest request,
@@ -200,6 +217,7 @@ public class UserController {
     }
 
     @PutMapping("/bulk/status")
+    @UsersManage
     public ResponseEntity<ApiResponse<BulkOperationResponse>> bulkUpdateStatus(
             @Valid @RequestBody BulkStatusRequest request,
             HttpServletRequest servletRequest
@@ -209,6 +227,7 @@ public class UserController {
     }
 
     @DeleteMapping("/bulk")
+    @UsersManage
     public ResponseEntity<ApiResponse<BulkOperationResponse>> bulkDelete(
             @Valid @RequestBody BulkDeleteRequest request,
             HttpServletRequest servletRequest
@@ -218,6 +237,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
+    @UsersManage
     public ResponseEntity<ApiResponse<UserDetailResponse>> getUserDetail(
             @PathVariable String userId,
             HttpServletRequest servletRequest
@@ -227,6 +247,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}/activity")
+    @UsersManage
     public ResponseEntity<ApiResponse<ActivityListResponse>> listActivity(
             @PathVariable String userId,
             @RequestParam(required = false) Integer page,
@@ -238,6 +259,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}/status")
+    @UsersManage
     public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
             @PathVariable String userId,
             @Valid @RequestBody AdminUpdateUserStatusRequest request,
@@ -248,6 +270,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/roles")
+    @UsersManage
     public ResponseEntity<ApiResponse<UserResponse>> assignRoles(
             @PathVariable String userId,
             @Valid @RequestBody AdminAssignRolesRequest request,
@@ -259,6 +282,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/permissions")
+    @UsersManage
     public ResponseEntity<ApiResponse<PermissionOverrideResponse>> assignPermissions(
             @PathVariable String userId,
             @Valid @RequestBody AdminAssignPermissionsRequest request,
@@ -270,6 +294,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
+    @UsersManage
     public ResponseEntity<ApiResponse<BulkOperationResponse>> deleteUser(
             @PathVariable String userId,
             HttpServletRequest servletRequest
@@ -325,8 +350,7 @@ public class UserController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
-        return requestId == null ? null : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private UserAuditContext auditContext(HttpServletRequest request) {

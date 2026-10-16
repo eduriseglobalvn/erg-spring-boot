@@ -24,22 +24,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 @EnableConfigurationProperties(PostgresHikariProperties.class)
 @EnableJpaRepositories(
-        basePackages = {
-                "com.erg.ergspringboot.repository.auth",
-                "com.erg.ergspringboot.repository.authorization",
-                "com.erg.ergspringboot.repository.calendar",
-                "com.erg.ergspringboot.repository.crm",
-                "com.erg.ergspringboot.repository.curriculum",
-                "com.erg.ergspringboot.repository.lms",
-                "com.erg.ergspringboot.repository.learningcontent",
-                "com.erg.ergspringboot.repository.notifications",
-                "com.erg.ergspringboot.repository.organization",
-                "com.erg.ergspringboot.repository.outbox",
-                "com.erg.ergspringboot.repository.quiz",
-                "com.erg.ergspringboot.repository.reporting",
-                "com.erg.ergspringboot.repository.school",
-                "com.erg.ergspringboot.repository.users"
-        },
+        basePackages = JpaRegistrationCatalog.REPOSITORY_ROOT,
         entityManagerFactoryRef = "postgresEntityManagerFactory",
         transactionManagerRef = "postgresTransactionManager"
 )
@@ -91,23 +76,8 @@ public class PostgresJpaConfig {
     @Bean
     @Primary
     public PersistenceManagedTypes postgresManagedTypes(ResourceLoader resourceLoader) {
-        return new PersistenceManagedTypesScanner(resourceLoader)
-                .scan(
-                        "com.erg.ergspringboot.model.auth",
-                        "com.erg.ergspringboot.model.authorization",
-                        "com.erg.ergspringboot.model.calendar",
-                        "com.erg.ergspringboot.model.crm",
-                        "com.erg.ergspringboot.model.curriculum",
-                        "com.erg.ergspringboot.model.learningcontent",
-                        "com.erg.ergspringboot.model.lms",
-                        "com.erg.ergspringboot.model.notifications",
-                        "com.erg.ergspringboot.model.organization",
-                        "com.erg.ergspringboot.model.outbox",
-                        "com.erg.ergspringboot.model.quiz",
-                        "com.erg.ergspringboot.model.reporting",
-                        "com.erg.ergspringboot.model.school",
-                        "com.erg.ergspringboot.model.users"
-                );
+        return new PersistenceManagedTypesScanner(resourceLoader, JpaRegistrationCatalog::isManagedEntityClass)
+                .scan(JpaRegistrationCatalog.entityScanPackages().toArray(String[]::new));
     }
 
     @Bean

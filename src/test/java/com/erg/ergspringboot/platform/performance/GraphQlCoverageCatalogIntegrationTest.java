@@ -24,12 +24,12 @@ class GraphQlCoverageCatalogIntegrationTest {
             "row-budget", "payload-budget-bytes", "latency-budget-ms", "selection-scenario",
             "cacheability", "cache-ttl-seconds", "cache-scope", "generation-domain",
             "cold-warm-scenario", "fixture-id");
-    private static final Pattern SCHEMA_TYPE = Pattern.compile("^type\\s+([A-Za-z][A-Za-z0-9_]*)\\b");
+    private static final Pattern SCHEMA_TYPE = Pattern.compile("^(?:extend\\s+)?type\\s+([A-Za-z][A-Za-z0-9_]*)\\b");
     private static final Pattern SCHEMA_FIELD = Pattern.compile("^\\s{2}([A-Za-z][A-Za-z0-9_]*)\\s*(?:\\([^)]*\\))?\\s*:");
     private static final Pattern SCHEMA_MAPPING = Pattern.compile(
             "@SchemaMapping\\s*\\(\\s*typeName\\s*=\\s*\"([^\"]+)\"\\s*,\\s*field\\s*=\\s*\"([^\"]+)\"\\s*\\)");
     private static final Pattern ROOT_MAPPING = Pattern.compile(
-            "@(QueryMapping|MutationMapping)(?:\\s*\\([^)]*\\))?\\s+public\\s+[A-Za-z0-9_<>?,.\\[\\] ]+\\s+([A-Za-z][A-Za-z0-9_]*)\\s*\\(",
+            "@(QueryMapping|MutationMapping)(?:\\s*\\([^)]*\\))?(?:\\s+@[A-Za-z][A-Za-z0-9_.]*(?:\\s*\\([^)]*\\))?)*\\s+public\\s+[A-Za-z0-9_<>?,.\\[\\] ]+\\s+([A-Za-z][A-Za-z0-9_]*)\\s*\\(",
             Pattern.MULTILINE);
 
     @Test
@@ -128,9 +128,11 @@ class GraphQlCoverageCatalogIntegrationTest {
     }
 
     private Set<String> controllerSources() throws IOException {
-        try (var files = Files.walk(Path.of("src/main/java/com/erg/ergspringboot/controller"))) {
+        try (var files = Files.walk(Path.of("src/main/java/com/erg/ergspringboot"))) {
             return files.filter(path -> path.toString().endsWith(".java"))
-                    .map(this::read).collect(Collectors.toCollection(LinkedHashSet::new));
+                    .map(this::read)
+                    .filter(source -> source.contains("@Controller"))
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
         }
     }
 

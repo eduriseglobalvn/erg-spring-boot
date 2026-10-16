@@ -15,7 +15,7 @@ class AuthSecurityQueryArchitectureTest {
                 "com.erg.ergspringboot.auth.internal.security.AuthSecurityQueryUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"));
+                "src/main/java/com/erg/ergspringboot/auth/AuthOperations.java"));
         assertThat(facade)
                 .contains("securityQueries.loginAttempts(")
                 .contains("securityQueries.ipStatus(");

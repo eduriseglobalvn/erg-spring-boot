@@ -15,7 +15,7 @@ class CurriculumCommandArchitectureTest {
                 "com.erg.ergspringboot.curriculum.internal.command.CurriculumCommandUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java"));
+                "src/main/java/com/erg/ergspringboot/curriculum/CurriculumOperations.java"));
         assertThat(facade)
                 .contains("commands.createSubject(")
                 .contains("commands.hardDeleteLevel(")

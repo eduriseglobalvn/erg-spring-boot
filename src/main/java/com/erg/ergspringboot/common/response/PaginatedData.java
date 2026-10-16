@@ -1,5 +1,7 @@
 package com.erg.ergspringboot.common.response;
 
+/** Legacy Go-compatible shape retained for source compatibility; do not use for new endpoints. */
+@Deprecated(forRemoval = false)
 public record PaginatedData<T>(
         T data,
         long total,

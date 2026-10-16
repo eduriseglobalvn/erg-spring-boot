@@ -98,13 +98,18 @@ foreach ($name in @(
     Require-Match $envProduction "(?m)^$([regex]::Escape($name))=" "Production env must define $name"
 }
 
-Require-Match $envProduction '(?m)^ERG_APP_IMAGE=.+:.+' "Production env must define a versioned ERG_APP_IMAGE"
+Require-Match $envProduction '(?m)^ERG_APP_IMAGE=[^/]+/.+@sha256:[0-9a-f]{64}$' "Production env must define a digest-pinned ERG_APP_IMAGE"
+Require-Match $envProduction '(?m)^ERG_ROLLBACK_IMAGE=[^/]+/.+@sha256:[0-9a-f]{64}$' "Production env must define a digest-pinned ERG_ROLLBACK_IMAGE"
 Require-Match $envProduction '(?m)^FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres$' "Native production env must use filesystem Flyway migrations"
 Require-Match $runtimeRoleMigration 'grant select, insert, update, delete on all tables' "Runtime role migration must grant table access"
 Require-Match $runtimeRoleMigration 'alter default privileges' "Runtime role migration must protect future tables"
 Require-Match $windowsScript 'linux/amd64' "Windows build command must target linux/amd64"
 Require-Match $windowsScript '(?m)\bpull\b' "Windows deploy command must pull prebuilt images"
+Require-Match $windowsScript 'Assert-ProductionImage' "Windows production deploy must reject tag-pinned images"
+Require-Match $windowsScript 'wait-timeout' "Windows production deploy must wait for health"
 Require-Match $linuxScript '(?m)\bpull\b' "Linux deploy command must pull prebuilt images"
+Require-Match $linuxScript 'assert_production_image' "Linux production deploy must reject tag-pinned images"
+Require-Match $linuxScript '--wait --wait-timeout' "Linux production deploy must wait for health"
 
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Error $_ -ErrorAction Continue }

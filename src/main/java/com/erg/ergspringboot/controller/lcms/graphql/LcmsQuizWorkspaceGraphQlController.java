@@ -6,6 +6,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWor
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.lcms.LcmsQueryOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsQuizWorkspaceRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -30,6 +31,7 @@ public class LcmsQuizWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "quizWorkspace")
+    @LcmsQuizWorkspaceRead
     public QuizWorkspaceResponse quizWorkspace(@Argument QuizWorkspaceInput input) {
         QuizWorkspaceInput safeInput = input == null ? QuizWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
@@ -49,6 +51,7 @@ public class LcmsQuizWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "quizDraft")
+    @LcmsQuizWorkspaceRead
     public QuizDraftDocumentResponse quizDraft(@Argument String quizId) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "lms.exercise.create", "lms.quiz.create", "lms.manage", "*");
@@ -57,6 +60,7 @@ public class LcmsQuizWorkspaceGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "quizVersions")
+    @LcmsQuizWorkspaceRead
     public QuizVersionHistoryResponse quizVersions(@Argument String quizId) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "lms.exercise.create", "lms.quiz.create", "lms.manage", "*");

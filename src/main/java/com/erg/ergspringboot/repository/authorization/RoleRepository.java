@@ -30,13 +30,14 @@ public interface RoleRepository extends JpaRepository<Role, String> {
             """)
     List<RoleOptionProjection> findAccessManagementRoleOptions(Pageable pageable);
 
-    @Query("select distinct role from Role role left join fetch role.permissions left join fetch role.users")
+    // Fetch permissions only; users load lazily and are batched via hibernate.default_batch_fetch_size.
+    // Fetching both collections in one query is a cartesian product (P permissions x U users per role).
+    @Query("select distinct role from Role role left join fetch role.permissions")
     List<Role> findAllWithPermissionsAndUsers();
 
     @Query("""
             select distinct role from Role role
             join fetch role.permissions permission
-            left join fetch role.users
             where permission.id in :permissionIds
             """)
     List<Role> findAllWithPermissionsAndUsersByPermissionIds(@Param("permissionIds") Collection<String> permissionIds);

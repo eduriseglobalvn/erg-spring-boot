@@ -97,6 +97,7 @@ public class AuthRefreshUseCase {
         session.setAccessTokenHash(tokens.hashToken(accessToken));
         session.setRefreshTokenHash(tokens.hashToken(refreshToken));
         session.setLastActiveAt(now);
+        session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
 
         return new TokenResponse(accessToken, refreshToken, ACCESS_TOKEN_TTL.toSeconds(), "Bearer");

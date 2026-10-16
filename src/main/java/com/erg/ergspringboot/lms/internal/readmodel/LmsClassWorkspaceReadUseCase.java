@@ -3,6 +3,7 @@ package com.erg.ergspringboot.lms.internal.readmodel;
 import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.*;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.AssignmentResourceResponse;
+import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.repository.lms.*;
 import com.erg.ergspringboot.repository.lms.projection.*;
 import java.util.*;
@@ -28,7 +29,7 @@ public class LmsClassWorkspaceReadUseCase {
         Pageable studentPage=PageRequest.of(safe(page,20),limit(size,50),Sort.by("fullName").ascending().and(Sort.by("studentCode").ascending()));
         Pageable assignmentPageable=PageRequest.of(safe(assignmentPage,20),limit(assignmentSize,50));
         Page<StudentRosterProjection> roster=students.findClassRoster(tenant,id,normalize(studentStatus),studentPage);
-        Page<AssignmentCardProjection> cards=assignments.findClassAssignmentCards(tenant,id,normalize(assignmentStatus),assignmentPageable);
+        Page<AssignmentCardProjection> cards=assignments.findClassAssignmentCards(tenant,id,LmsStatePolicy.assignmentFilter(assignmentStatus),assignmentPageable);
         ClassScoreSummaryResponse scores=includeScore?score(attempts.summarizeClassWorkspaceScores(tenant,id)):null;
         ClassRiskSummaryResponse risks=includeRisk?risk(students.summarizeClassWorkspaceRisks(tenant,id,50.0D)):null;
         return new ClassWorkspaceResponse(tenant,classInfo(info),scores,risks,studentPage(roster),assignmentPage(cards,tenant));

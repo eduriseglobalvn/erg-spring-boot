@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
 
@@ -13,8 +13,14 @@ import org.springframework.stereotype.Component;
 public class TrustedClientIpResolver {
     private final List<IpAddressMatcher> trustedProxies;
 
+    @Autowired
+    public TrustedClientIpResolver(com.erg.ergspringboot.platform.web.ErgHttpProperties properties) {
+        this(properties.getTrustedProxyCidrs());
+    }
+
+    /** Compatibility constructor for focused unit tests and old embedders. */
     public TrustedClientIpResolver(
-            @Value("${erg.http.trusted-proxy-cidrs:}") String trustedProxyCidrs) {
+            String trustedProxyCidrs) {
         this.trustedProxies = Arrays.stream(value(trustedProxyCidrs).split(","))
                 .map(String::trim)
                 .filter(item -> !item.isEmpty())

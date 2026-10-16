@@ -28,22 +28,47 @@ public final class QuizAuthoringRequests {
             Long docVersion,
             Map<String, Object> settings,
             Map<String, Object> playerTemplate,
-            Object tree
+            Object tree,
+            String operationId,
+            String idempotencyKey
     ) {
+        public SaveDraftRequest(Long docVersion, Map<String, Object> settings,
+                                Map<String, Object> playerTemplate, Object tree) {
+            this(docVersion, settings, playerTemplate, tree, null, null);
+        }
+        public SaveDraftRequest withIdempotencyKey(String key) {
+            return new SaveDraftRequest(docVersion, settings, playerTemplate, tree, operationId, key);
+        }
     }
 
     public record SlideUpsertRequest(
             Long docVersion,
             String groupId,
             Map<String, Object> slide,
-            String afterSlideId
+            String afterSlideId,
+            String operationId,
+            String idempotencyKey
     ) {
+        public SlideUpsertRequest(Long docVersion, String groupId, Map<String, Object> slide, String afterSlideId) {
+            this(docVersion, groupId, slide, afterSlideId, null, null);
+        }
+        public SlideUpsertRequest withIdempotencyKey(String key) {
+            return new SlideUpsertRequest(docVersion, groupId, slide, afterSlideId, operationId, key);
+        }
     }
 
     public record ReorderRequest(
             Long docVersion,
-            List<ReorderGroup> groups
+            List<ReorderGroup> groups,
+            String operationId,
+            String idempotencyKey
     ) {
+        public ReorderRequest(Long docVersion, List<ReorderGroup> groups) {
+            this(docVersion, groups, null, null);
+        }
+        public ReorderRequest withIdempotencyKey(String key) {
+            return new ReorderRequest(docVersion, groups, operationId, key);
+        }
         public record ReorderGroup(String groupId, List<String> slideIds) {
         }
     }

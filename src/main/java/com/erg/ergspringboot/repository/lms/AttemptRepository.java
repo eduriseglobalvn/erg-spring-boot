@@ -18,6 +18,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface AttemptRepository extends JpaRepository<Attempt, String> {
 
+    Optional<Attempt> findByTenantIdAndId(String tenantId, String id);
+
     Optional<Attempt> findFirstByTenantIdAndAssignmentIdAndQuizIdAndStudentIdAndStatusIgnoreCase(
             String tenantId,
             String assignmentId,
@@ -158,6 +160,34 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
             String tenantId,
             String assignmentId,
             String status,
+            Pageable pageable
+    );
+
+    // Summary projection avoids deserializing the answers/events/client jsonb blobs (unused in the
+    // students list view); Pageable caps a popular quiz's thousands of attempts.
+    @Query("""
+            select new com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection(
+                attempt.id,
+                attempt.assignmentId,
+                attempt.quizId,
+                attempt.studentId,
+                attempt.status,
+                attempt.score,
+                attempt.maxScore,
+                attempt.percent,
+                attempt.passed,
+                attempt.startedAt,
+                attempt.submittedAt,
+                attempt.updatedAt
+            )
+            from Attempt attempt
+            where attempt.tenantId = :tenantId
+              and attempt.quizId = :quizId
+            order by attempt.updatedAt desc
+            """)
+    List<AttemptSummaryProjection> findQuizAttemptSummaries(
+            String tenantId,
+            String quizId,
             Pageable pageable
     );
 
@@ -353,9 +383,21 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                 max(attempt.percent)
             )
             from Attempt attempt
+            left join Assignment assignment
+                on assignment.tenantId = attempt.tenantId
+                and assignment.id = attempt.assignmentId
             where attempt.tenantId = :tenantId
               and attempt.studentId = :studentId
+              and (
+                  :academicClassId is null
+                  or attempt.classId = :academicClassId
+                  or (attempt.classId is null and assignment.academicClassId = :academicClassId)
+              )
               and lower(attempt.status) in ('submitted', 'graded', 'completed')
             """)
-    StudentDashboardScoreSummaryProjection summarizeStudentDashboardScores(String tenantId, String studentId);
+    StudentDashboardScoreSummaryProjection summarizeStudentDashboardScores(
+            String tenantId,
+            String studentId,
+            String academicClassId
+    );
 }

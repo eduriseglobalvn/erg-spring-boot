@@ -2,11 +2,14 @@ package com.erg.ergspringboot.notifications.config;
 
 import com.erg.ergspringboot.notifications.push.AccessTokenProvider;
 import com.erg.ergspringboot.notifications.push.FirebaseHttpV1PushSender;
+import com.erg.ergspringboot.notifications.push.FirebasePushPayload;
 import com.erg.ergspringboot.notifications.push.FirebasePushSender;
+import com.erg.ergspringboot.notifications.push.SendResult;
 import com.erg.ergspringboot.notifications.push.ServiceAccountAccessTokenProvider;
 import com.erg.ergspringboot.notifications.push.StaticAccessTokenProvider;
 import java.net.http.HttpClient;
 import java.util.Optional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
@@ -19,6 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 public class FirebaseNotificationConfiguration {
 
     @Bean
+    @ConditionalOnProperty(prefix = "erg.notifications.push", name = "enabled", havingValue = "true")
     HttpClient firebaseHttpClient(NotificationPushProperties properties) {
         return HttpClient.newBuilder()
                 .connectTimeout(properties.getConnectTimeout())
@@ -26,6 +30,7 @@ public class FirebaseNotificationConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "erg.notifications.push", name = "enabled", havingValue = "true")
     AccessTokenProvider firebaseAccessTokenProvider(
             NotificationPushProperties properties,
             HttpClient firebaseHttpClient,
@@ -46,6 +51,7 @@ public class FirebaseNotificationConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "erg.notifications.push", name = "enabled", havingValue = "true")
     FirebasePushSender firebasePushSender(
             NotificationPushProperties properties,
             HttpClient firebaseHttpClient,
@@ -53,6 +59,38 @@ public class FirebaseNotificationConfiguration {
             ObjectMapper objectMapper
     ) {
         return new FirebaseHttpV1PushSender(properties, firebaseHttpClient, accessTokenProvider, objectMapper);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "erg.notifications.push",
+            name = "enabled",
+            havingValue = "false",
+            matchIfMissing = true
+    )
+    FirebasePushSender disabledFirebasePushSender() {
+        return new DisabledFirebasePushSender();
+    }
+
+    private static final class DisabledFirebasePushSender implements FirebasePushSender {
+        @Override
+        public SendResult sendToRegistrationToken(FirebasePushPayload payload, String registrationToken) {
+            return disabled();
+        }
+
+        @Override
+        public SendResult sendToFid(FirebasePushPayload payload, String firebaseInstallationId) {
+            return disabled();
+        }
+
+        @Override
+        public SendResult sendToTopic(FirebasePushPayload payload, String topicName) {
+            return disabled();
+        }
+
+        private SendResult disabled() {
+            return SendResult.failure(false, false, 0, "PUSH_DISABLED", "Push notifications are disabled.", null, 0);
+        }
     }
 
     private String firstText(String... values) {

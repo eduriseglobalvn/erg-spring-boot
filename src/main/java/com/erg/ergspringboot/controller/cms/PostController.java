@@ -2,6 +2,8 @@ package com.erg.ergspringboot.controller.cms;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.service.cms.CmsService;
+import com.erg.ergspringboot.platform.security.ReviewedPublicEndpoint;
+import com.erg.ergspringboot.authorization.authorization.CmsEditorialRead;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
@@ -25,17 +27,26 @@ public class PostController {
         this.cmsService = cmsService;
     }
 
-    @GetMapping({"", "/hidden", "/trash"})
+    @GetMapping({"", "/"})
+    @ReviewedPublicEndpoint
     public ApiResponse<List<Map<String, Object>>> list(HttpServletRequest request) {
         return ok("Posts loaded", cmsService.list("posts"), request);
     }
 
+    @GetMapping({"/hidden", "/trash"})
+    @CmsEditorialRead
+    public ApiResponse<List<Map<String, Object>>> editorialList(HttpServletRequest request) {
+        return ok("Posts loaded", cmsService.list("posts"), request);
+    }
+
     @GetMapping("/{id}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> detail(@PathVariable String id, HttpServletRequest request) {
         return ok("Post loaded", cmsService.get("posts", id), request);
     }
 
     @GetMapping("/slug/{slug}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> bySlug(@PathVariable String slug, HttpServletRequest request) {
         return ok("Post loaded", cmsService.bySlug("posts", slug), request);
     }
@@ -86,11 +97,13 @@ public class PostController {
     }
 
     @GetMapping("/categories")
+    @ReviewedPublicEndpoint
     public ApiResponse<List<Map<String, Object>>> categories(HttpServletRequest request) {
         return ok("Categories loaded", cmsService.list("categories"), request);
     }
 
     @GetMapping("/categories/{id}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> category(@PathVariable String id, HttpServletRequest request) {
         return ok("Category loaded", cmsService.get("categories", id), request);
     }
@@ -115,7 +128,6 @@ public class PostController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

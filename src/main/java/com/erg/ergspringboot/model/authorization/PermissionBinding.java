@@ -24,7 +24,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class PermissionBinding extends BaseEntity {
 
     @Column(name = "permission_id", nullable = false, length = 36)

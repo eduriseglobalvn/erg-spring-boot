@@ -16,6 +16,7 @@ import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.lms.StudentGroup;
 import com.erg.ergspringboot.model.lms.StudentGroupMember;
 import com.erg.ergspringboot.model.quiz.version.QuizVersion;
+import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.repository.lms.AssignmentRecipientRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
@@ -36,6 +37,8 @@ import java.util.Set;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -63,6 +66,7 @@ public class LmsAssignmentCommandService {
             "lmsHomeworkWorkspace",
             "lmsClassWorkspace",
             "lmsAssignmentProgress",
+            "lmsStudentAssignments",
             "studentDashboard",
             "quizAssignmentReport",
             "quizQuestionAnalytics"
@@ -76,6 +80,7 @@ public class LmsAssignmentCommandService {
     private final StudentRepository studentRepository;
     private final QuizVersionRepository quizVersionRepository;
     private final CacheManager cacheManager;
+    private final LmsSyncOperationService sync;
 
     public LmsAssignmentCommandService(
             AssignmentRepository assignmentRepository,
@@ -87,6 +92,39 @@ public class LmsAssignmentCommandService {
             QuizVersionRepository quizVersionRepository,
             CacheManager cacheManager
     ) {
+        this(assignmentRepository, resourceRepository, recipientRepository, studentGroupRepository,
+                studentGroupMemberRepository, studentRepository, quizVersionRepository, cacheManager,
+                (LmsSyncOperationService) null);
+    }
+
+    @Autowired
+    public LmsAssignmentCommandService(
+            AssignmentRepository assignmentRepository,
+            AssignmentResourceRepository resourceRepository,
+            AssignmentRecipientRepository recipientRepository,
+            StudentGroupRepository studentGroupRepository,
+            StudentGroupMemberRepository studentGroupMemberRepository,
+            StudentRepository studentRepository,
+            QuizVersionRepository quizVersionRepository,
+            CacheManager cacheManager,
+            ObjectProvider<LmsSyncOperationService> sync
+    ) {
+        this(assignmentRepository, resourceRepository, recipientRepository, studentGroupRepository,
+                studentGroupMemberRepository, studentRepository, quizVersionRepository, cacheManager,
+                sync == null ? null : sync.getIfAvailable());
+    }
+
+    private LmsAssignmentCommandService(
+            AssignmentRepository assignmentRepository,
+            AssignmentResourceRepository resourceRepository,
+            AssignmentRecipientRepository recipientRepository,
+            StudentGroupRepository studentGroupRepository,
+            StudentGroupMemberRepository studentGroupMemberRepository,
+            StudentRepository studentRepository,
+            QuizVersionRepository quizVersionRepository,
+            CacheManager cacheManager,
+            LmsSyncOperationService sync
+    ) {
         this.assignmentRepository = assignmentRepository;
         this.resourceRepository = resourceRepository;
         this.recipientRepository = recipientRepository;
@@ -95,6 +133,7 @@ public class LmsAssignmentCommandService {
         this.studentRepository = studentRepository;
         this.quizVersionRepository = quizVersionRepository;
         this.cacheManager = cacheManager;
+        this.sync = sync;
     }
 
     public CreateAssignmentResponse create(String tenantId, String userId, String idempotencyKey, CreateAssignmentRequest request) {
@@ -102,12 +141,18 @@ public class LmsAssignmentCommandService {
             throw new BadRequestException("at least one quizId is required");
         }
         String key = blankToNull(idempotencyKey);
-        if (key != null) {
-            Assignment existing = assignmentRepository.findByTenantIdAndIdempotencyKey(tenantId, key).orElse(null);
-            if (existing != null) {
-                return describe(existing);
+        LmsSyncOperationService.Receipt receipt = sync == null || key == null ? null
+                : sync.reserve(tenantId, userId, key, key, "lms.assignment", key, request, null).orElse(null);
+        if (receipt != null && receipt.replayed()) return sync.result(receipt, CreateAssignmentResponse.class);
+        try {
+            if (key != null) {
+                Assignment existing = assignmentRepository.findByTenantIdAndIdempotencyKey(tenantId, key).orElse(null);
+                if (existing != null) {
+                    CreateAssignmentResponse replay = describe(existing);
+                    if (receipt != null) sync.complete(receipt, replay, existing.getRecordVersion() == null ? 0L : existing.getRecordVersion());
+                    return replay;
+                }
             }
-        }
 
         String mode = normalizeMode(request.recipientMode());
         List<Student> recipients = resolveRecipients(tenantId, mode, request.classId(), request.groupId(), request.studentIds());
@@ -127,6 +172,7 @@ public class LmsAssignmentCommandService {
         assignment.setDueAt(request.dueAt());
         assignment.setAttemptLimit(request.attemptLimit());
         assignment.setMaxDurationMinutes(request.maxDurationMinutes());
+        assignment.setOfflineAllowed(Boolean.TRUE.equals(request.offlineAllowed()));
         assignment.setTeacherNote(blankToNull(request.teacherNote()));
         assignment.setStatus(STATUS_ACTIVE);
         assignment.setAssignedBy(userId);
@@ -138,7 +184,13 @@ public class LmsAssignmentCommandService {
         persistRecipients(tenantId, saved.getId(), primaryClassId, mode, recipients);
         evictAssignmentReadCachesAfterCommit();
 
-        return new CreateAssignmentResponse(saved.getId(), recipients.size(), toResourceResponses(resources));
+            CreateAssignmentResponse result = new CreateAssignmentResponse(saved.getId(), recipients.size(), toResourceResponses(resources));
+            if (receipt != null) sync.complete(receipt, result, saved.getRecordVersion() == null ? 0L : saved.getRecordVersion());
+            return result;
+        } catch (RuntimeException exception) {
+            if (receipt != null) sync.abandon(receipt);
+            throw exception;
+        }
     }
 
     public CreateAssignmentResponse updateRecipients(String tenantId, String assignmentId, UpdateRecipientsRequest request) {
@@ -184,6 +236,9 @@ public class LmsAssignmentCommandService {
         }
         if (request.maxDurationMinutes() != null) {
             assignment.setMaxDurationMinutes(request.maxDurationMinutes());
+        }
+        if (request.offlineAllowed() != null) {
+            assignment.setOfflineAllowed(request.offlineAllowed());
         }
         if (request.teacherNote() != null) {
             assignment.setTeacherNote(blankToNull(request.teacherNote()));

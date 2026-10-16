@@ -24,6 +24,31 @@ class ProductionConfigurationSafetyTest {
     }
 
     @Test
+    void authCookieDefaultsToSecure() throws Exception {
+        // BE-014 findings #4/#6: auth cookies must default to Secure so sessions never travel over
+        // plain HTTP unless an operator explicitly opts out.
+        String common = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertThat(common).contains("secure: ${AUTH__COOKIE__SECURE:true}");
+    }
+
+    @Test
+    void productionProfilePinsSecurityHardening() throws Exception {
+        // BE-014 findings #1/#4/#6: the prod profile hardcodes introspection off, Secure/strict
+        // cookies and no-override error masking, so no env var can widen them in production.
+        String common = Files.readString(Path.of("src/main/resources/application.yml"));
+        int prodProfile = common.indexOf("on-profile: prod");
+        assertThat(prodProfile).isPositive();
+        String prodSection = common.substring(prodProfile);
+
+        assertThat(prodSection)
+                .contains("introspection:")
+                .contains("enabled: false")
+                .contains("secure: true")
+                .contains("same-site: strict");
+    }
+
+    @Test
     void localConvenienceIsExplicitlyOptIn() throws Exception {
         String local = Files.readString(Path.of("src/main/resources/application-local.yml"));
 
@@ -32,5 +57,21 @@ class ProductionConfigurationSafetyTest {
                 .contains("include-message: always")
                 .contains("api-docs:")
                 .contains("process-local:");
+    }
+
+    @Test
+    void enterpriseAuthProfileUsesBffSessionAndHostCookieWithoutLocalTokenLogin() throws Exception {
+        String enterprise = Files.readString(Path.of("src/main/resources/application-enterprise-auth.yml"));
+
+        assertThat(enterprise)
+                .contains("bff-enabled: true")
+                .contains("local-login-enabled: false")
+                .contains("name: __Host-erg_session")
+                .contains("http-only: true")
+                .contains("secure: true")
+                .contains("same-site: lax")
+                .contains("allowed-headers:")
+                .contains("X-XSRF-TOKEN")
+                .doesNotContain("X-Tenant-ID,X-Portal");
     }
 }

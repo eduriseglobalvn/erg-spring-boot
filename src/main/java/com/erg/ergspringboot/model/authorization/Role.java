@@ -25,7 +25,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Role extends BaseEntity {
 
     private String name;
@@ -39,7 +39,6 @@ public class Role extends BaseEntity {
             inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<Permission> permissions = new LinkedHashSet<>();
 
     private Boolean isDefault;
@@ -49,6 +48,5 @@ public class Role extends BaseEntity {
 
     @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<User> users = new LinkedHashSet<>();
 }

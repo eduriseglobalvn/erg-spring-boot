@@ -3,11 +3,17 @@ package com.erg.ergspringboot.repository.crm;
 import com.erg.ergspringboot.model.crm.CrmSchoolDeal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Collection;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CrmSchoolDealRepository extends JpaRepository<CrmSchoolDeal, String> {
+
+    List<CrmSchoolDeal> findBySchoolIdInOrderByCreatedAtDesc(Collection<String> schoolIds);
+
+    Optional<CrmSchoolDeal> findByOwnerUserIdAndIdempotencyKey(String ownerUserId, String idempotencyKey);
 
     List<CrmSchoolDeal> findByOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc(String ownerUserId, String stage);
 

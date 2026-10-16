@@ -1,0 +1,44 @@
+enum TeachingScheduleTeacherRole { MAIN ASSISTANT }
+enum TeachingCalendarViewMode { ALL BY_SCHOOL BY_TEACHER BY_SUBJECT }
+enum TeachingScheduleStatus { DRAFT PUBLISHED CANCELLED }
+
+input TeachingCalendarWorkspaceInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, schoolIds: [String!], teacherIds: [String!], classIds: [String!], subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input MyTeachingCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, schoolIds: [String!], classIds: [String!], subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input MyStudentCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input TeachingScheduleBulkInput { tenantId: String, idempotencyKey: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode, rows: [TeachingScheduleBulkRowInput!]! }
+input TeachingScheduleBulkRowInput { clientRowId: String!, classIds: [String!]!, weekday: Int!, session: String, periodStart: Int!, periodCount: Int!, startTime: String!, endTime: String!, subjectId: String!, levelId: String, roomId: String, roomName: String, mainTeacherIds: [String!]!, assistantTeacherIds: [String!], note: String }
+input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String }
+input TeachingScheduleEventDeleteInput { tenantId: String, eventId: String! }
+input DeleteTeacherScheduleInput { tenantId: String, teacherUserId: String!, schoolIds: [String!], dateFrom: String, dateTo: String }
+input CreateRoomInput { tenantId: String, schoolId: String!, roomName: String! }
+input TeachingScheduleExcelImportInput { tenantId: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode }
+input TeachingScheduleBatchListInput { tenantId: String, schoolId: String, status: TeachingScheduleStatus, page: Int, size: Int }
+input TeachingScheduleBatchDetailInput { tenantId: String, batchId: String! }
+enum TeachingScheduleResolveMode { REJECT DELETE_CONFLICTING }
+
+type TeachingCalendarWorkspace { tenantId: String!, from: String!, to: String!, viewMode: TeachingCalendarViewMode!, events: [TeachingCalendarEvent!]!, filterOptions: TeachingCalendarFilterOptions!, laneSummaries: [TeachingCalendarLaneSummary!]!, catalog: TeachingScheduleCatalog!, permissions: TeachingCalendarPermissions!, generatedAt: String! }
+type TeachingCalendarEvent { id: String!, batchId: String, title: String!, startAt: String!, endAt: String!, date: String!, startTime: String!, endTime: String!, schoolId: String!, schoolName: String!, classId: String!, className: String!, subjectId: String, subjectName: String, levelId: String, levelName: String, roomId: String, roomName: String, periodStart: Int!, periodCount: Int!, teachers: [TeachingScheduleTeacherAssignment!]!, status: TeachingScheduleStatus!, note: String, colorGroup: TeachingCalendarColorGroup! }
+type TeachingScheduleTeacherAssignment { userId: String!, displayName: String!, role: TeachingScheduleTeacherRole!, colorKey: String }
+type TeachingCalendarFilterOptions { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarFilterOption!]!, teachers: [TeachingCalendarFilterOption!]!, subjects: [TeachingCalendarFilterOption!]!, levels: [TeachingCalendarFilterOption!]! }
+type TeachingCalendarFilterOption { id: String!, label: String!, count: Int!, colorKey: String }
+type TeachingCalendarLaneSummary { id: String!, label: String!, count: Int!, colorKey: String }
+type TeachingCalendarColorGroup { key: String!, label: String!, kind: String! }
+type TeachingScheduleCatalog { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarClassOption!]!, teachers: [TeachingCalendarTeacherOption!]!, assistantTeachers: [TeachingCalendarTeacherOption!]!, subjects: [TeachingCalendarSubjectOption!]!, levels: [TeachingCalendarLevelOption!]!, rooms: [TeachingCalendarRoomOption!]! }
+type TeachingCalendarClassOption { id: String!, schoolId: String!, label: String!, grade: String, academicYear: String }
+type TeachingCalendarTeacherOption { id: String!, label: String!, colorKey: String }
+type TeachingCalendarSubjectOption { id: String!, label: String! }
+type TeachingCalendarLevelOption { id: String!, subjectId: String!, label: String!, sortOrder: Int }
+type TeachingCalendarRoomOption { id: String, label: String!, schoolId: String }
+type TeachingScheduleRoomOption { id: String!, label: String!, schoolId: String! }
+type TeachingCalendarPermissions { canCreate: Boolean!, canUpdate: Boolean!, canDelete: Boolean!, canPublish: Boolean!, canViewAggregate: Boolean! }
+type TeachingSchedulePreviewPayload { valid: Boolean!, previewEventCount: Int!, teacherScheduleCount: Int!, totalPeriodCount: Int!, rowResults: [TeachingScheduleRowResult!]!, conflicts: [TeachingScheduleConflict!]! }
+type TeachingScheduleBulkPayload { batchId: String, createdEventCount: Int!, teacherScheduleCount: Int!, totalPeriodCount: Int!, rowResults: [TeachingScheduleRowResult!]!, conflicts: [TeachingScheduleConflict!]! }
+type TeachingScheduleEventPayload { event: TeachingCalendarEvent! }
+type TeachingScheduleDeletePayload { eventId: String!, deleted: Boolean!, affectedEventCount: Int! }
+type TeachingScheduleBatchPayload { batchId: String!, status: TeachingScheduleStatus!, affectedEventCount: Int! }
+type TeachingScheduleBatchPage { items: [TeachingScheduleBatchSummary!]!, page: Int!, size: Int!, totalItems: Int!, totalPages: Int!, hasNext: Boolean!, hasPrevious: Boolean! }
+type TeachingScheduleBatchSummary { id: String!, tenantId: String!, schoolId: String!, academicYear: String, applyFrom: String, repeatWeeks: Int!, status: TeachingScheduleStatus!, source: String, note: String, createdBy: String, publishedBy: String, publishedAt: String, createdAt: String }
+type TeachingScheduleBatchDetail { id: String!, tenantId: String!, schoolId: String!, academicYear: String, applyFrom: String, repeatWeeks: Int!, status: TeachingScheduleStatus!, source: String, note: String, createdBy: String, publishedBy: String, publishedAt: String, createdAt: String, eventCount: Int! }
+type TeachingScheduleRowResult { clientRowId: String!, valid: Boolean!, eventCount: Int!, teacherScheduleCount: Int!, errors: [TeachingScheduleRowMessage!]!, warnings: [TeachingScheduleRowMessage!]! }
+type TeachingScheduleRowMessage { code: String!, field: String, message: String! }
+type TeachingScheduleConflict { code: String!, severity: String!, clientRowId: String, existingEventId: String, message: String! }

@@ -210,4 +210,31 @@ class QuizCompileServiceTest {
                 .containsEntry("timeLimitSeconds", 45)
                 .containsEntry("showFeedback", "set");
     }
+
+    @Test
+    void flattensRuntimeQuestionAndMapsEditorMediaIntoPortableRuntimeFields() {
+        CompiledQuiz compiled = compileSlides(Map.of(
+                "slideId", "q-media",
+                "type", "matching",
+                "runtimeQuestion", Map.of(
+                        "title", "Match the images",
+                        "matching", List.of(Map.of(
+                                "id", "pair-1",
+                                "prompt", "Prompt",
+                                "response", "Response",
+                                "responseImage", Map.of("url", "data:image/png;base64,aW1hZ2U=")))),
+                "media", Map.of(
+                        "type", "image",
+                        "src", "data:image/png;base64,cXVlc3Rpb24=",
+                        "alt", "Question illustration")
+        ));
+
+        Map<String, Object> body = compiled.questions().getFirst().body();
+        assertThat(body).containsKey("matching").containsKey("contentImage");
+        assertThat(body).doesNotContainKeys("runtimeQuestion", "media");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> contentImage = (Map<String, Object>) body.get("contentImage");
+        assertThat(contentImage).containsEntry("url", "data:image/png;base64,cXVlc3Rpb24=")
+                .containsEntry("alt", "Question illustration");
+    }
 }

@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.model.documents;
 
-import com.erg.ergspringboot.model.BaseEntity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -12,8 +11,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class Document extends BaseEntity {
+@EqualsAndHashCode(exclude = {"createdAt", "updatedAt"})
+public class Document {
+
+    private String id;
+
+    private java.time.OffsetDateTime createdAt;
+
+    private java.time.OffsetDateTime updatedAt;
 
     private String tenantId;
 

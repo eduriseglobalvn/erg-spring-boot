@@ -27,13 +27,18 @@ class ApplicationYamlMigrationTest {
     }
 
     @Test
-    void pilotConnectionBudgetDefaultsFitTheSingleHostPostgresBudget() throws IOException {
+    void runtimePoolAndProductionOverrideKeepConnectionBudgetsExplicit() throws IOException {
         String applicationYaml = Files.readString(Path.of("src/main/resources/application.yml"));
+        String productionEnvironment = Files.readString(Path.of("ops/docker/.env.production.example"));
 
         assertThat(applicationYaml)
-                .contains("maximum-pool-size: ${DB__MAX_OPEN_CONNS:8}")
-                .contains("minimum-idle: ${DB__MAX_IDLE_CONNS:1}")
-                .contains("connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:1000}");
+                .contains("maximum-pool-size: ${DB__MAX_OPEN_CONNS:25}")
+                .contains("minimum-idle: ${DB__MAX_IDLE_CONNS:5}")
+                .contains("connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:5000}");
+        assertThat(productionEnvironment)
+                .contains("DB__MAX_OPEN_CONNS=8")
+                .contains("DB__MAX_IDLE_CONNS=1")
+                .contains("SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=5000");
     }
 
     @Test

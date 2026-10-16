@@ -6,11 +6,17 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaCommitResponse;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaPresignResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
+import com.erg.ergspringboot.platform.security.ReviewedPublicEndpoint;
 import com.erg.ergspringboot.lcms.LcmsOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsMediaWrite;
+import com.erg.ergspringboot.exception.BadRequestException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -26,7 +32,29 @@ public class LcmsMediaController {
         this.lcms = lcms;
     }
 
+    @PutMapping("/api/v1/lcms/media/upload/quiz-media/{tenantId}/{prefix}/{filename}")
+    @ReviewedPublicEndpoint
+    public ResponseEntity<Void> uploadLocal(
+            @PathVariable String tenantId,
+            @PathVariable String prefix,
+            @PathVariable String filename,
+            @RequestHeader("Content-Type") String mimeType,
+            @RequestBody byte[] bytes,
+            HttpServletRequest request
+    ) {
+        if (bytes.length > lcms.maxMediaUploadBytes()) {
+            throw new BadRequestException("media exceeds the maximum allowed size");
+        }
+        String uploadUrl = request.getRequestURL()
+                + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
+        if (!lcms.storeSignedMediaUpload(uploadUrl, tenantId, mimeType, bytes)) {
+            throw new BadRequestException("signed media upload is invalid or expired");
+        }
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/api/v1/lcms/media/presign")
+    @LcmsMediaWrite
     public ApiResponse<MediaPresignResponse> presign(
             @RequestBody MediaPresignRequest body,
             HttpServletRequest request
@@ -36,6 +64,7 @@ public class LcmsMediaController {
     }
 
     @PostMapping("/api/v1/lcms/media/{mediaId}/commit")
+    @LcmsMediaWrite
     public ApiResponse<MediaCommitResponse> commit(
             @PathVariable String mediaId,
             @RequestBody(required = false) MediaCommitRequest body,
@@ -55,7 +84,6 @@ public class LcmsMediaController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

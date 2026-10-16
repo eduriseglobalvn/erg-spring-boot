@@ -1,0 +1,26 @@
+image:
+  repository: erg-spring
+  tag: benchmark-jvm
+  pullPolicy: IfNotPresent
+config:
+  existingSecret: erg-spring-secrets
+autoscaling:
+  mode: disabled
+replicaCount: 2
+serviceMonitor:
+  enabled: false
+networkPolicy:
+  enabled: false
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+dbPool:
+  perPodMaxConnections: 8
+  perPodMinIdleConnections: 2
+  postgresMaxConnections: 160
+  reservedConnections: 40
+

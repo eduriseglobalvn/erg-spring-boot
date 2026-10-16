@@ -17,7 +17,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "content_assets",
@@ -68,4 +68,8 @@ public class ContentAsset extends BaseEntity {
 
     @Column(name = "updated_by", length = 96)
     private String updatedBy;
+
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion;
 }

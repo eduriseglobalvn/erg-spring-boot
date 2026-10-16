@@ -14,6 +14,8 @@ import com.erg.ergspringboot.model.calendar.CalendarBatch;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
@@ -299,7 +301,7 @@ public class CalendarBulkCreateUseCase {
         GraphQlAccessSupport support = require(accessSupports, "access support");
         var principal = support.currentPrincipal();
         if (principal == null) return List.of();
-        return support.csv(support.attribute(principal, "managedEducationUnitIds"));
+        return AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.EDUCATION_UNIT);
     }
 
     private static <T> ObjectProvider<T> provider(T value) {

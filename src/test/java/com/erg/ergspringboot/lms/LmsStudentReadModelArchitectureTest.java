@@ -11,7 +11,7 @@ class LmsStudentReadModelArchitectureTest {
     void studentReadsAreOwnedByReadModelUseCase() throws Exception {
         assertThatCode(() -> Class.forName("com.erg.ergspringboot.lms.internal.readmodel.LmsStudentReadModelUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java"));
+        String legacy = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/lms/internal/runtime/LmsRuntimeUseCase.java"));
         assertThat(legacy).contains("students.listAssignments(");
         assertThat(legacy).contains("students.listScores(");
         assertThat(legacy).contains("students.assignmentProgress(");

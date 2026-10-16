@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.service.quiz.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.service.quiz.runtime.GradingEngine.GradeResult;
 import java.math.BigDecimal;
@@ -154,5 +155,12 @@ class GradingEngineTest {
         GradeResult result = engine.grade("essay", Map.of("text", "an answer"), Map.of(), TEN);
         assertThat(result.correct()).isNull();
         assertThat(result.needsManualGrade()).isTrue();
+    }
+
+    @Test
+    void unknownKindFailsClosedInsteadOfReceivingAZeroGrade() {
+        assertThatThrownBy(() -> engine.grade("future_kind", Map.of(), Map.of(), TEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsupported question kind");
     }
 }

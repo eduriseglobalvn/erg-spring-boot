@@ -5,8 +5,6 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEv
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.calendar.CalendarCommandService;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,18 +12,18 @@ import org.springframework.stereotype.Service;
 /** Public facade for calendar use cases. No repository or JPA type is exposed. */
 @Service
 public class CalendarOperations {
-    private final CalendarReadService reads;
-    private final CalendarCommandService commands;
+    private final CalendarReadPort reads;
+    private final CalendarCommandPort commands;
 
     @Autowired
-    public CalendarOperations(CalendarReadService reads, CalendarCommandService commands) {
+    public CalendarOperations(CalendarReadPort reads, CalendarCommandPort commands) {
         this.reads = reads;
         this.commands = commands;
     }
 
     /** Compatibility seams for adapters being migrated independently. */
-    public CalendarOperations(CalendarCommandService commands) { this(null, commands); }
-    public CalendarOperations(CalendarReadService reads) { this(reads, null); }
+    public CalendarOperations(CalendarCommandPort commands) { this(null, commands); }
+    public CalendarOperations(CalendarReadPort reads) { this(reads, null); }
 
     public CalendarWorkspaceResponse workspace(String tenantId, List<String> schools, String from, String to,
             String viewMode, List<String> teachers, List<String> classes, List<String> subjects,

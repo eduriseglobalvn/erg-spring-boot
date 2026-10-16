@@ -1,5 +1,37 @@
 # syntax=docker/dockerfile:1.7
 
+FROM eclipse-temurin:25-jdk AS jvm-builder
+
+WORKDIR /workspace
+
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN --mount=type=cache,target=/root/.m2 \
+    chmod +x mvnw && ./mvnw -B -ntp -DskipTests dependency:go-offline
+
+COPY src/ src/
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B -ntp -Dmaven.test.skip=true package
+
+FROM eclipse-temurin:25-jre AS jvm-runtime
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 999 erg \
+    && useradd --system --uid 999 --gid 999 --home-dir /app --shell /usr/sbin/nologin erg
+
+WORKDIR /app
+COPY --from=jvm-builder --chown=erg:erg /workspace/target/erg-spring-0.0.1-SNAPSHOT.jar /app/erg-spring.jar
+
+USER erg
+EXPOSE 1606
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=8 \
+    CMD curl --fail --silent http://127.0.0.1:1606/ready >/dev/null || exit 1
+
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/erg-spring.jar"]
+
 FROM --platform=$TARGETPLATFORM ghcr.io/graalvm/native-image-community:25 AS native-builder
 
 ARG TARGETARCH
@@ -7,6 +39,9 @@ ENV LANG=C \
     LC_ALL=C \
     NATIVE_IMAGE_OPTIONS=-march=compatibility \
     SPRING_PROFILES_ACTIVE=prod \
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,prometheus \
+    MANAGEMENT_ENDPOINT_PROMETHEUS_ACCESS=read-only \
+    MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED=true \
     FLYWAY_ENABLED=true \
     ERG_REDIS_STATE_ENABLED=true \
     ERG_REDIS_STATE_URL=redis://:native-build-placeholder@redis-state:6379 \
@@ -26,13 +61,13 @@ COPY src/ src/
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw -B -ntp -Pnative -Dmaven.test.skip=true native:compile
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim AS native-runtime
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system erg \
-    && useradd --system --gid erg --home-dir /app --shell /usr/sbin/nologin erg
+    && groupadd --system --gid 999 erg \
+    && useradd --system --uid 999 --gid 999 --home-dir /app --shell /usr/sbin/nologin erg
 
 WORKDIR /app
 COPY --from=native-builder --chown=erg:erg /workspace/target/erg-spring-native /app/erg-spring

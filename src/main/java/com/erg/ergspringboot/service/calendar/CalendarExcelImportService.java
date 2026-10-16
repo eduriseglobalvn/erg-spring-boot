@@ -3,6 +3,7 @@ package com.erg.ergspringboot.service.calendar;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarExcelImportRequest;
+import com.erg.ergspringboot.exception.NotImplementedException;
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
 import java.util.Collections;
 import java.util.List;
@@ -47,6 +48,8 @@ import org.springframework.stereotype.Service;
  * </pre>
  */
 @Service
+@org.springframework.context.annotation.Profile("prototype")
+@Deprecated(since = "2026-08-08", forRemoval = false)
 public class CalendarExcelImportService {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarExcelImportService.class);
@@ -58,14 +61,14 @@ public class CalendarExcelImportService {
      * Parses an Excel import request and converts it to a {@link CalendarBulkCreateRequest}.
      *
      * <p><b>Current implementation:</b> This is a STUB. It validates the file extension
-     * and then throws {@link UnsupportedOperationException}. Future work should
+     * and then throws {@link NotImplementedException}. Future work should
      * implement the actual Excel parsing logic using Apache POI or a similar library.
      *
      * @param tenantId the tenant identifier
      * @param request  the Excel import request containing file data and metadata
      * @param refData  reference data (classes, subjects, teachers, etc.)
      * @return a fully populated CalendarBulkCreateRequest ready for the bulk pipeline
-     * @throws UnsupportedOperationException always, until Excel parsing is implemented
+     * @throws NotImplementedException until Excel parsing is implemented
      */
     public CalendarBulkCreateRequest parseImport(
             String tenantId,
@@ -80,12 +83,10 @@ public class CalendarExcelImportService {
                 request.schoolId(),
                 request.applyFrom());
 
-        throw new UnsupportedOperationException(
-                "Excel import not yet implemented. The Excel parsing logic is a stub. "
-                        + "A future implementation should use Apache POI to parse the workbook, "
-                        + "validate column headers, transform rows into CalendarBulkRowRequest entries, "
-                        + "and produce a CalendarBulkCreateRequest for the standard bulk pipeline. "
-                        + "Use createTeachingSchedule or previewTeachingSchedule with bulk input instead.");
+        throw new NotImplementedException(
+                "CALENDAR_EXCEL_IMPORT_NOT_IMPLEMENTED",
+                "Excel import is not yet available. Use createTeachingSchedule or previewTeachingSchedule "
+                        + "with bulk input instead.");
     }
 
     /**
@@ -111,7 +112,7 @@ public class CalendarExcelImportService {
      * This is a stub method for future implementation.
      *
      * @param headerRow the parsed header row column names (lowercase)
-     * @throws UnsupportedOperationException always, until Excel parsing is implemented
+     * @throws NotImplementedException until Excel parsing is implemented
      */
     private void validateRequiredColumns(List<String> headerRow) {
         List<String> missing = REQUIRED_COLUMNS.stream()

@@ -5,6 +5,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ForkRes
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.PublishResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationErrorResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
+import com.erg.ergspringboot.content.lifecycle.ContentLifecyclePort;
 import com.erg.ergspringboot.exception.ApiException;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -29,10 +30,14 @@ import com.erg.ergspringboot.service.quiz.publish.CompiledQuiz.CompiledSection;
 import com.erg.ergspringboot.service.quiz.publish.QuizValidationService.ValidationError;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
@@ -69,7 +74,45 @@ public class QuizPublishService {
     private final AssessmentCurriculumBridge assessmentCurriculumBridge;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
+    private final ContentLifecyclePort lifecycle;
 
+    @Autowired
+    public QuizPublishService(
+            QuizRepository quizRepository,
+            QuestionRepository bankQuestionRepository,
+            QuizQuestionRepository quizQuestionRepository,
+            QuizDraftRepository quizDraftRepository,
+            QuizVersionRepository quizVersionRepository,
+            QuizVersionSectionRepository sectionRepository,
+            QuizVersionQuestionRepository versionQuestionRepository,
+            QuizPackageRepository packageRepository,
+            QuizCompileService compileService,
+            QuizValidationService validationService,
+            QuizPackageSigner packageSigner,
+            AssessmentCurriculumBridge assessmentCurriculumBridge,
+            ObjectMapper objectMapper,
+            CacheManager cacheManager,
+            ContentLifecyclePort lifecycle
+    ) {
+        this.quizRepository = quizRepository;
+        this.bankQuestionRepository = bankQuestionRepository;
+        this.quizQuestionRepository = quizQuestionRepository;
+        this.quizDraftRepository = quizDraftRepository;
+        this.quizVersionRepository = quizVersionRepository;
+        this.sectionRepository = sectionRepository;
+        this.versionQuestionRepository = versionQuestionRepository;
+        this.packageRepository = packageRepository;
+        this.compileService = compileService;
+        this.validationService = validationService;
+        this.packageSigner = packageSigner;
+        this.assessmentCurriculumBridge = assessmentCurriculumBridge;
+        this.objectMapper = objectMapper;
+        this.cacheManager = cacheManager;
+        this.lifecycle = lifecycle;
+    }
+
+    /** Compatibility constructor for focused publish tests during lifecycle migration. */
+    @Deprecated
     public QuizPublishService(
             QuizRepository quizRepository,
             QuestionRepository bankQuestionRepository,
@@ -86,20 +129,10 @@ public class QuizPublishService {
             ObjectMapper objectMapper,
             CacheManager cacheManager
     ) {
-        this.quizRepository = quizRepository;
-        this.bankQuestionRepository = bankQuestionRepository;
-        this.quizQuestionRepository = quizQuestionRepository;
-        this.quizDraftRepository = quizDraftRepository;
-        this.quizVersionRepository = quizVersionRepository;
-        this.sectionRepository = sectionRepository;
-        this.versionQuestionRepository = versionQuestionRepository;
-        this.packageRepository = packageRepository;
-        this.compileService = compileService;
-        this.validationService = validationService;
-        this.packageSigner = packageSigner;
-        this.assessmentCurriculumBridge = assessmentCurriculumBridge;
-        this.objectMapper = objectMapper;
-        this.cacheManager = cacheManager;
+        this(quizRepository, bankQuestionRepository, quizQuestionRepository, quizDraftRepository,
+                quizVersionRepository, sectionRepository, versionQuestionRepository, packageRepository,
+                compileService, validationService, packageSigner, assessmentCurriculumBridge,
+                objectMapper, cacheManager, null);
     }
 
     @Transactional(value = "postgresTransactionManager", readOnly = true)
@@ -128,7 +161,7 @@ public class QuizPublishService {
                 .findFirst()
                 .orElse(null);
         if (existing != null) {
-            QuizPackage pkg = packageRepository.findByQuizVersionId(existing.getId()).orElse(null);
+            QuizPackage pkg = packageRepository.findByQuizVersionIdAndTenantId(existing.getId(), tenantId).orElse(null);
             return new PublishResponse(
                     existing.getId(), existing.getVersionLabel(), existing.getVersionNumber(),
                     pkg == null ? null : pkg.getId(), existing.getContentHash());
@@ -150,10 +183,10 @@ public class QuizPublishService {
                 .orElse(0) + 1;
         String versionLabel = resolveLabel(request == null ? null : request.versionLabel(), versionNumber);
 
-        Map<String, Object> hashPayload = new LinkedHashMap<>();
-        hashPayload.put("runtimeQuiz", compiled.runtimeQuiz());
-        hashPayload.put("answerKey", compiled.answerKey());
-        String contentHash = packageSigner.contentHash(canonicalJson(hashPayload));
+        Map<String, Object> packagePayload = packagePayload(
+                quiz.getId(), versionLabel, compiled, gradingMode);
+        String canonicalPackagePayload = canonicalJson(packagePayload);
+        String contentHash = packageSigner.contentHash(canonicalPackagePayload);
 
         // Deactivate the previous active version, then insert this one active.
         quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue(quizId, tenantId)
@@ -181,7 +214,14 @@ public class QuizPublishService {
 
         persistSections(tenantId, savedVersion.getId(), compiled);
 
-        QuizPackage pkg = buildPackage(tenantId, quiz, savedVersion, compiled, gradingMode, contentHash);
+        QuizPackage pkg = buildPackage(
+                tenantId,
+                quiz,
+                savedVersion,
+                gradingMode,
+                contentHash,
+                packagePayload,
+                canonicalPackagePayload);
         QuizPackage savedPackage = packageRepository.save(pkg);
 
         quiz.setCurrentVersionId(savedVersion.getId());
@@ -190,6 +230,9 @@ public class QuizPublishService {
         quiz.setPackageHash(contentHash);
         quiz.setPublishedAt(savedVersion.getPublishedAt());
         quizRepository.save(quiz);
+        if (lifecycle != null) {
+            lifecycle.recordPublishedSnapshot(tenantId, quizId, userId, key);
+        }
 
         evictQuizCachesAfterCommit(tenantId, quizId);
 
@@ -309,25 +352,15 @@ public class QuizPublishService {
             String tenantId,
             Quiz quiz,
             QuizVersion version,
-            CompiledQuiz compiled,
             String gradingMode,
-            String contentHash
+            String contentHash,
+            Map<String, Object> packageJson,
+            String canonicalPackagePayload
     ) {
         // server-authoritative packages must never embed the answer key (spec §6 anti-leak).
-        Map<String, Object> packageJson = new LinkedHashMap<>();
-        packageJson.put("schemaVersion", SCHEMA_VERSION);
-        packageJson.put("quizId", quiz.getId());
-        packageJson.put("version", version.getVersionLabel());
-        packageJson.put("gradingMode", gradingMode);
-        packageJson.put("quiz", compiled.runtimeQuiz());
-        if (MODE_CLIENT_FIRST.equals(gradingMode)) {
-            // client-first (training/homework) MAY embed the key so the FE engine can grade offline.
-            packageJson.put("answerKey", compiled.answerKey());
-        }
-
         String hashPrefix = contentHash.length() >= 8 ? contentHash.substring(0, 8) : contentHash;
         String packageId = "pkg_" + quiz.getId() + "_" + version.getVersionLabel() + "_" + hashPrefix;
-        String signature = packageSigner.sign(canonicalJson(packageJson));
+        String signature = packageSigner.sign(canonicalPackagePayload);
 
         QuizPackage pkg = new QuizPackage();
         pkg.setId(packageId);
@@ -338,20 +371,34 @@ public class QuizPublishService {
         pkg.setContentHash(contentHash);
         pkg.setSignature(signature);
         pkg.setPublicKeyId(packageSigner.publicKeyId());
+        pkg.setSignatureAlgorithm(packageSigner.signatureAlgorithm());
         pkg.setGradingMode(gradingMode);
         pkg.setSchemaVersion(SCHEMA_VERSION);
         pkg.setPackageFormat("single");
-        pkg.setAssetsManifest(assetsManifest(compiled.runtimeQuiz()));
+        pkg.setAssetsManifest(asMap(packageJson.get("assetsManifest")));
         pkg.setPackageJson(packageJson);
         pkg.setGeneratedAt(OffsetDateTime.now(ZoneOffset.UTC));
         return pkg;
     }
 
-    private Map<String, Object> assetsManifest(Map<String, Object> runtimeQuiz) {
-        // Media manifest is populated when slide media referencing is wired end-to-end; empty is valid.
-        Map<String, Object> manifest = new LinkedHashMap<>();
-        manifest.put("assets", List.of());
-        return manifest;
+    private Map<String, Object> packagePayload(
+            String quizId,
+            String versionLabel,
+            CompiledQuiz compiled,
+            String gradingMode
+    ) {
+        PortableQuizAssetBundler.Bundle bundledAssets = PortableQuizAssetBundler.bundle(compiled.runtimeQuiz());
+        Map<String, Object> packageJson = new LinkedHashMap<>();
+        packageJson.put("schemaVersion", SCHEMA_VERSION);
+        packageJson.put("quizId", quizId);
+        packageJson.put("version", versionLabel);
+        packageJson.put("gradingMode", gradingMode);
+        packageJson.put("quiz", bundledAssets.runtimeQuiz());
+        packageJson.put("assetsManifest", bundledAssets.assetsManifest());
+        if (MODE_CLIENT_FIRST.equals(gradingMode)) {
+            packageJson.put("answerKey", compiled.answerKey());
+        }
+        return packageJson;
     }
 
     private Map<String, Object> snapshot(QuizDraft draft, Map<String, Object> curriculumSnapshot) {
@@ -454,7 +501,35 @@ public class QuizPublishService {
 
     // Stable serialization for hashing/signing: keys are ordered so the same content always hashes equal.
     private String canonicalJson(Map<String, Object> payload) {
-        return objectMapper.writeValueAsString(payload);
+        return objectMapper.writeValueAsString(canonicalValue(payload));
+    }
+
+    private Object canonicalValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> sorted = new TreeMap<>();
+            map.forEach((key, item) -> sorted.put(String.valueOf(key), canonicalValue(item)));
+            return sorted;
+        }
+        if (value instanceof Collection<?> collection) {
+            return collection.stream().map(this::canonicalValue).toList();
+        }
+        if (value instanceof BigDecimal decimal) {
+            BigDecimal normalized = decimal.stripTrailingZeros();
+            return normalized.scale() < 0 ? normalized.setScale(0) : normalized;
+        }
+        if (value instanceof Double number) {
+            if (!Double.isFinite(number)) {
+                throw new IllegalArgumentException("package payload contains a non-finite number");
+            }
+            return canonicalValue(BigDecimal.valueOf(number));
+        }
+        if (value instanceof Float number) {
+            if (!Float.isFinite(number)) {
+                throw new IllegalArgumentException("package payload contains a non-finite number");
+            }
+            return canonicalValue(BigDecimal.valueOf(number.doubleValue()));
+        }
+        return value;
     }
 
     /** 422 with the field-level error list (spec §4.2 publish returns VALIDATION_FAILED). */

@@ -12,9 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Callable;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /** Bounded executor for blocking read fan-out; never uses the common ForkJoinPool. */
@@ -24,12 +22,18 @@ public class ErgReadTaskExecutor implements AutoCloseable {
     private final ExecutorService executor;
     private final Duration shutdownTimeout;
 
+    @Autowired
+    public ErgReadTaskExecutor(ErgReadExecutorProperties properties) {
+        this(properties.getCoreSize(), properties.getMaxSize(), properties.getQueueCapacity(),
+                properties.getShutdownTimeout());
+        properties.validate();
+    }
+
+    /** Compatibility constructor for focused unit tests and old embedders. */
     public ErgReadTaskExecutor(
-            @Value("${erg.performance.read-executor.core-size:4}") int coreSize,
-            @Value("${erg.performance.read-executor.max-size:4}") int maxSize,
-            @Value("${erg.performance.read-executor.queue-capacity:32}") int queueCapacity,
-            @Value("${erg.performance.read-executor.shutdown-timeout:5s}") Duration shutdownTimeout) {
-        if (coreSize < 1 || maxSize < coreSize || queueCapacity < 0) {
+            int coreSize, int maxSize, int queueCapacity, Duration shutdownTimeout) {
+        if (coreSize < 1 || maxSize < coreSize || queueCapacity < 0
+                || shutdownTimeout == null || shutdownTimeout.isZero() || shutdownTimeout.isNegative()) {
             throw new IllegalArgumentException("Invalid read executor bounds");
         }
         this.shutdownTimeout = shutdownTimeout;
@@ -52,47 +56,24 @@ public class ErgReadTaskExecutor implements AutoCloseable {
     }
 
     public <T> CompletableFuture<T> submit(Callable<T> task) {
-        TenantContext tenantContext = TenantContext.current();
-        SecurityContext securityContext = copySecurityContext();
+        TenantContext.Carrier tenantContext = TenantContext.capture();
         RequestExecutionContext.Carrier requestContext = RequestExecutionContext.capture();
         CompletableFuture<T> result = new CompletableFuture<>();
         try {
             executor.execute(() -> {
-                TenantContext previousTenant = TenantContext.current();
-                SecurityContext previousSecurity = SecurityContextHolder.getContext();
                 try {
-                    if (tenantContext == null) {
-                        TenantContext.clear();
-                    } else {
-                        TenantContext.set(tenantContext);
-                    }
-                    SecurityContextHolder.setContext(securityContext);
-                    try (RequestExecutionContext.Scope ignored = RequestExecutionContext.attach(requestContext)) {
+                    try (TenantContext.Scope ignoredTenant = TenantContext.install(tenantContext);
+                         RequestExecutionContext.Scope ignoredRequest = RequestExecutionContext.attach(requestContext)) {
                         result.complete(task.call());
                     }
                 } catch (Throwable failure) {
                     result.completeExceptionally(failure);
-                } finally {
-                    if (previousTenant == null) {
-                        TenantContext.clear();
-                    } else {
-                        TenantContext.set(previousTenant);
-                    }
-                    SecurityContextHolder.clearContext();
-                    SecurityContextHolder.setContext(previousSecurity);
                 }
             });
         } catch (RejectedExecutionException rejected) {
             result.completeExceptionally(rejected);
         }
         return result;
-    }
-
-    private SecurityContext copySecurityContext() {
-        SecurityContext source = SecurityContextHolder.getContext();
-        SecurityContext copy = SecurityContextHolder.createEmptyContext();
-        copy.setAuthentication(source.getAuthentication());
-        return copy;
     }
 
     @Override

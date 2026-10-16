@@ -4,7 +4,7 @@ import java.util.Optional;
 
 /** Reporting's narrow authorization port; persistence types never cross it. */
 public interface AssignmentScopeLookup {
-    Optional<AssignmentScope> findById(String assignmentId);
+    Optional<AssignmentScope> findByTenantIdAndId(String tenantId, String assignmentId);
 
     record AssignmentScope(String tenantId, String academicClassId) { }
 }

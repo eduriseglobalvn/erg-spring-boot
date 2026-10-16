@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class ErgPolicyService {
 
+    private final AuthorizationCapabilityPolicy capabilityPolicy = new AuthorizationCapabilityPolicy();
+
     private static final Map<String, List<String>> ALIASES = Map.of(
             "roles.read", List.of("rbac.role.read", "rbac.permission.read"),
             "roles.create", List.of("rbac.role.create"),
@@ -23,11 +25,11 @@ public class ErgPolicyService {
     private static final Set<String> BASELINE_PERMISSIONS = Set.of("profile.self");
 
     public Map<String, Object> decide(ErgPrincipal principal, String permission, String portal, String tenantId) {
-        boolean portalAllowed = portal == null || portal.isBlank() || principal.portals().contains("*") || principal.portals().contains(portal);
-        boolean tenantAllowed = tenantId == null || tenantId.isBlank() || tenantId.equals(principal.tenantId());
+        boolean portalAllowed = capabilityPolicy.hasWorkspace(principal, portal);
+        boolean tenantAllowed = capabilityPolicy.tenantMatches(principal, tenantId);
         boolean denied = matchesAny(expand(principal.deniedPermissions()), permission);
         boolean granted = !denied && (BASELINE_PERMISSIONS.contains(permission)
-                || matchesAny(expand(grants(principal)), permission));
+                || matchesAny(principal, expand(grants(principal)), permission));
         boolean allowed = portalAllowed && tenantAllowed && granted;
         return Map.of(
                 "allowed", allowed,
@@ -75,6 +77,12 @@ public class ErgPolicyService {
                 "lmsScopeEnforcedInServiceLayer", true,
                 "springSecurityModel", "Spring Security filter-chain route authorization"
         );
+    }
+
+    private boolean matchesAny(ErgPrincipal principal, List<String> permissions, String required) {
+        return permissions.stream().anyMatch(permission ->
+                capabilityPolicy.isPermissionWildcardAllowed(principal, permission)
+                        || matches(permission, required));
     }
 
     private boolean matchesAny(List<String> permissions, String required) {

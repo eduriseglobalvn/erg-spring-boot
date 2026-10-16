@@ -14,10 +14,10 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardViewerResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.controller.elearning.graphql.StudentDashboardGraphQlController.StudentDashboardInput;
+import com.erg.ergspringboot.elearning.ElearningOperations;
+import com.erg.ergspringboot.elearning.api.ElearningCommands.DashboardReadQuery;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadScope;
-import com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -35,14 +35,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class StudentDashboardGraphQlControllerTest {
 
     @Mock
-    private StudentDashboardReadService studentDashboardReadService;
+    private ElearningOperations elearningOperations;
 
     private StudentDashboardGraphQlController controller;
 
     @BeforeEach
     void setUp() {
         controller = new StudentDashboardGraphQlController(
-                studentDashboardReadService,
+                elearningOperations,
                 new GraphQlAccessSupport(new com.erg.ergspringboot.platform.security.ErgPolicyService()));
     }
 
@@ -55,16 +55,16 @@ class StudentDashboardGraphQlControllerTest {
     void studentDashboardBuildsReadScopeFromAuthenticatedPrincipal() {
         authenticate(principal("student-1", "tenant-a"));
         StudentDashboardResponse expected = response("tenant-a", "student-1");
-        when(studentDashboardReadService.studentDashboard(any(StudentDashboardReadScope.class))).thenReturn(expected);
+        when(elearningOperations.studentDashboard(any(DashboardReadQuery.class))).thenReturn(expected);
 
         StudentDashboardResponse actual = controller.studentDashboard(
                 new StudentDashboardInput("tenant-a", "student-1")
         );
 
         assertThat(actual).isSameAs(expected);
-        ArgumentCaptor<StudentDashboardReadScope> captor = ArgumentCaptor.forClass(StudentDashboardReadScope.class);
-        verify(studentDashboardReadService).studentDashboard(captor.capture());
-        StudentDashboardReadScope scope = captor.getValue();
+        ArgumentCaptor<DashboardReadQuery> captor = ArgumentCaptor.forClass(DashboardReadQuery.class);
+        verify(elearningOperations).studentDashboard(captor.capture());
+        DashboardReadQuery scope = captor.getValue();
         assertThat(scope.userId()).isEqualTo("student-1");
         assertThat(scope.tenantId()).isEqualTo("tenant-a");
         assertThat(scope.requestedTenantId()).isEqualTo("tenant-a");
@@ -76,13 +76,13 @@ class StudentDashboardGraphQlControllerTest {
     void studentDashboardPassesRequestedSelfScopeThroughForServiceEnforcement() {
         authenticate(principal("student-1", "tenant-a"));
         StudentDashboardResponse expected = response("tenant-a", "student-1");
-        when(studentDashboardReadService.studentDashboard(any(StudentDashboardReadScope.class))).thenReturn(expected);
+        when(elearningOperations.studentDashboard(any(DashboardReadQuery.class))).thenReturn(expected);
 
         controller.studentDashboard(new StudentDashboardInput("tenant-b", "student-2"));
 
-        ArgumentCaptor<StudentDashboardReadScope> captor = ArgumentCaptor.forClass(StudentDashboardReadScope.class);
-        verify(studentDashboardReadService).studentDashboard(captor.capture());
-        StudentDashboardReadScope scope = captor.getValue();
+        ArgumentCaptor<DashboardReadQuery> captor = ArgumentCaptor.forClass(DashboardReadQuery.class);
+        verify(elearningOperations).studentDashboard(captor.capture());
+        DashboardReadQuery scope = captor.getValue();
         assertThat(scope.userId()).isEqualTo("student-1");
         assertThat(scope.tenantId()).isEqualTo("tenant-a");
         assertThat(scope.requestedTenantId()).isEqualTo("tenant-b");
@@ -94,7 +94,7 @@ class StudentDashboardGraphQlControllerTest {
     void studentDashboardRejectsMissingPrincipalBeforeServiceCall() {
         assertThatThrownBy(() -> controller.studentDashboard(new StudentDashboardInput(null, null)))
                 .isInstanceOf(ForbiddenException.class);
-        verifyNoInteractions(studentDashboardReadService);
+        verifyNoInteractions(elearningOperations);
     }
 
     private void authenticate(ErgPrincipal principal) {

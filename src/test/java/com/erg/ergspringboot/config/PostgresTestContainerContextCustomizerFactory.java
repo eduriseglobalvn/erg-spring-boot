@@ -44,6 +44,7 @@ public class PostgresTestContainerContextCustomizerFactory implements ContextCus
                 // PostgreSQL integration runs continue to use validate + Flyway.
                 context.getEnvironment().getPropertySources().addFirst(
                         new MapPropertySource("testH2Schema", java.util.Map.of(
+                                "spring.flyway.enabled", "false",
                                 "spring.jpa.hibernate.ddl-auto", "create-drop",
                                 "spring.jpa.properties.hibernate.hbm2ddl.auto", "create-drop"
                         ))

@@ -27,7 +27,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class CommunityPost extends BaseEntity {
 
     private String tenantId;
@@ -78,11 +78,9 @@ public class CommunityPost extends BaseEntity {
 
     @OneToMany(mappedBy = "post", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<CommunityMedia> media = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "post", fetch = FetchType.LAZY)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Set<CommunityComment> comments = new LinkedHashSet<>();
 }

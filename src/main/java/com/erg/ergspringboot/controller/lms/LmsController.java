@@ -19,6 +19,13 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.LmsOperations;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentRead;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentReadSelf;
+import com.erg.ergspringboot.lms.authorization.LmsAssignmentProgressRead;
+import com.erg.ergspringboot.lms.authorization.LmsClassRead;
+import com.erg.ergspringboot.lms.authorization.LmsGradeRead;
+import com.erg.ergspringboot.lms.authorization.LmsQuizRead;
+import com.erg.ergspringboot.lms.authorization.LmsSubmit;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
@@ -49,6 +56,7 @@ public class LmsController {
     }
 
     @GetMapping("/students/me/assignments")
+    @LmsAssignmentReadSelf
     public ApiResponse<StudentAssignmentListResponse> assignments(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
@@ -61,6 +69,7 @@ public class LmsController {
     }
 
     @GetMapping("/students/me/scores")
+    @LmsAssignmentReadSelf
     public ApiResponse<StudentScoreListResponse> scores(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
@@ -73,6 +82,7 @@ public class LmsController {
     }
 
     @GetMapping("/quizzes/{quizId}/package")
+    @LmsQuizRead
     public ResponseEntity<ApiResponse<QuizPackageResponse>> quizPackage(@PathVariable String quizId, HttpServletRequest request) {
         QuizPackageResponse data = lms.getQuizPackage(quizId, UserAccessContext.from(request));
         String eTag = packageETag(data);
@@ -90,11 +100,13 @@ public class LmsController {
     }
 
     @GetMapping("/quizzes/{quizId}")
+    @LmsQuizRead
     public ApiResponse<QuizDetailResponse> quiz(@PathVariable String quizId, HttpServletRequest request) {
         return ok("Quiz loaded", lms.getQuiz(quizId, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts")
+    @LmsSubmit
     public ApiResponse<AttemptResponse> startAttempt(
             @Valid @RequestBody StartAttemptRequest body,
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
@@ -105,67 +117,96 @@ public class LmsController {
     }
 
     @PatchMapping("/attempts/{attemptId}/draft")
+    @LmsSubmit
     public ApiResponse<AttemptResponse> saveDraft(
             @PathVariable String attemptId,
             @RequestBody AttemptDraftRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
-        return ok("Draft saved", lms.saveDraft(attemptId, body, UserAccessContext.from(request)), request);
+        AttemptDraftRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        return ok("Draft remains in client storage", lms.saveDraft(attemptId, effectiveBody, UserAccessContext.from(request)), request);
     }
 
     @PutMapping("/attempts/{attemptId}/answers/{questionId}")
+    @LmsSubmit
     public ApiResponse<AnswerResultResponse> saveAnswer(
             @PathVariable String attemptId,
             @PathVariable String questionId,
             @RequestBody SaveAnswerRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
-        return ok("Answer saved", lms.saveAnswer(attemptId, questionId, body, UserAccessContext.from(request)), request);
+        SaveAnswerRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        return ok("Answer remains in client storage", lms.saveAnswer(attemptId, questionId, effectiveBody, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/answers")
+    @LmsSubmit
     public ApiResponse<AttemptResponse> saveAnswers(
             @PathVariable String attemptId,
             @RequestBody AttemptDraftRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
-        return ok("Answers saved", lms.saveDraft(attemptId, body, UserAccessContext.from(request)), request);
+        AttemptDraftRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        return ok("Answers remain in client storage", lms.saveDraft(attemptId, effectiveBody, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/sync")
+    @LmsSubmit
     public ApiResponse<AttemptSyncResponse> syncAttempt(
             @PathVariable String attemptId,
             @Valid @RequestBody AttemptSyncRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
-        return ok("Attempt synced", lms.syncAttempt(attemptId, body, UserAccessContext.from(request)), request);
+        AttemptSyncRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        return ok("Client state checked", lms.syncAttempt(attemptId, effectiveBody, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/submit")
+    @LmsSubmit
     public ApiResponse<AttemptSubmitResponse> submitAttempt(
             @PathVariable String attemptId,
             @RequestBody SubmitAttemptRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
-        return ok("Attempt submitted", lms.submitAttempt(attemptId, body, UserAccessContext.from(request)), request);
+        SubmitAttemptRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        return ok("Attempt submitted", lms.submitAttempt(attemptId, effectiveBody, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/quizzes/{quizId}/students")
+    @LmsGradeRead
     public ApiResponse<List<AttemptResponse>> quizStudents(@PathVariable String quizId, HttpServletRequest request) {
         return ok("Quiz students loaded", lms.quizStudents(quizId, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/assignments/{assignmentId}/progress")
+    @LmsAssignmentProgressRead
     public ApiResponse<AssignmentProgressResponse> assignmentProgress(@PathVariable String assignmentId, HttpServletRequest request) {
         return ok("Assignment progress loaded", lms.assignmentProgress(assignmentId, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/education-units")
+    @LmsClassRead
     public ApiResponse<EducationUnitListResponse> educationUnits(HttpServletRequest request) {
         return ok("Education units loaded", lms.listEducationUnits(UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/classes")
+    @LmsClassRead
     public ApiResponse<ClassesBySchoolResponse> classes(@RequestParam(required = false) String schoolId, HttpServletRequest request) {
         // Classes are intentionally fetched by selected school instead of being bundled into session bootstrap.
         return ok("Classes loaded", lms.listClassesBySchool(schoolId, UserAccessContext.from(request)), request);
@@ -176,8 +217,7 @@ public class LmsController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private String packageETag(QuizPackageResponse data) {

@@ -1,0 +1,5 @@
+# source<TAB>import<TAB>owner<TAB>expires-on
+# Temporary strangler seams reviewed for BE-029. Delete rows as BE-035 reverses the dependency.
+# BE-048 reviewed 2026-08-08. The legacy education-unit adapter is a temporary
+# compatibility seam while its callers migrate to organization.OrganizationOperations.
+service/organization/EducationUnitService.java	com.erg.ergspringboot.organization.internal.OrganizationEducationUnitQuery	BE-048	2026-09-30

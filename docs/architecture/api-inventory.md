@@ -8,9 +8,9 @@ statement, row, payload, state-owner, cache and pagination metadata. The existin
 `RequestMappingHandlerMapping`; a new production mapping therefore fails CI until it is
 explicitly inventoried.
 
-REST route count: `488`
+REST route count: `555`
 
-GraphQL mapped field count: `33`
+GraphQL mapped field count: `44`
 
 ## Route metadata contract
 
@@ -25,7 +25,7 @@ Every REST row in the appendix must have:
 - persistence source and replacement: represented by `classification`, `state-owner` and
   `disposition` in the catalog during the strangler migration.
 
-The inventory does not duplicate 488 rows in prose. The catalog is the row-level source of
+The inventory does not duplicate 522 rows in prose. The catalog is the row-level source of
 truth, and `RouteInventoryContractTest` verifies that every catalog handler has an owner,
 that the declared count is exact, and that all GraphQL fields are owned below.
 
@@ -35,10 +35,12 @@ that the declared count is exact, and that all GraphQL fields are owned below.
 |---|---|---|---|
 | `com.erg.ergspringboot.controller.ai` | `platform-ai` | `prototype` | authenticated; tenant-scoped; replace Map payloads before production |
 | `com.erg.ergspringboot.controller.auth` | `auth` | `canonical` | login/refresh exact public exceptions; session routes authenticated |
+| `com.erg.ergspringboot.controller.audit` | `audit` | `canonical` | authenticated + audit.read/export; tenant/scope bounded |
 | `com.erg.ergspringboot.controller.authorization` | `authorization` | `canonical` | authenticated + permission; tenant/education-unit scope |
 | `com.erg.ergspringboot.controller.bot` | `platform-webhook` | `canonical` | exact provider verification; durable enqueue; no blanket public access |
 | `com.erg.ergspringboot.controller.calendar` | `calendar` | `canonical` | authenticated + calendar permission; tenant/class scope |
 | `com.erg.ergspringboot.controller.catalog` | `learningcontent` | `legacy` | authenticated for writes; tenant-scoped; prototype rows disabled in production |
+| `com.erg.ergspringboot.controller.content` | `learningcontent` | `canonical` | authenticated + lifecycle permission; tenant/resource scope |
 | `com.erg.ergspringboot.controller.cms` | `learningcontent` | `legacy` | authenticated for writes; typed DTO migration required |
 | `com.erg.ergspringboot.controller.crawler` | `platform-crawler` | `prototype` | authenticated; process-local stubs disabled in production |
 | `com.erg.ergspringboot.controller.crm` | `crm` | `canonical` | authenticated + CRM permission; tenant-scoped |
@@ -46,7 +48,10 @@ that the declared count is exact, and that all GraphQL fields are owned below.
 | `com.erg.ergspringboot.controller.documents` | `documents` | `canonical` | authenticated + document permission; tenant ownership required |
 | `com.erg.ergspringboot.controller.engagement` | `crm` | `canonical` | public read only where explicitly configured; mutations authenticated and tenant-scoped |
 | `com.erg.ergspringboot.controller.lcms` | `lcms` | `canonical` | authenticated + authoring permission; tenant/school scope |
-| `com.erg.ergspringboot.controller.learningcontent` | `learningcontent` | `legacy` | authenticated + content permission; migrate to `/api/v1` |
+| `com.erg.ergspringboot.controller.learningcontent` | `learningcontent` | `canonical` | authenticated + content permission; `/api` aliases remain under deprecation policy |
+| `com.erg.ergspringboot.controller.learningoutcomes` | `learningoutcomes` | `canonical` | authenticated + learning.outcomes policy; tenant/education-unit/class scope; idempotency on mutations |
+| `com.erg.ergspringboot.controller.learningstandards` | `learningstandards` | `canonical` | authenticated + learning.standards policy; tenant-scoped package/LTI/xAPI metadata; idempotency on mutations; provider I/O stays behind adapters |
+| `com.erg.ergspringboot.controller.enterpriseconnectors` | `enterpriseconnectors` | `canonical` | authenticated + enterprise.connectors policy; tenant-scoped provider metadata and bounded run records; provider secrets/payloads stay behind adapters |
 | `com.erg.ergspringboot.controller.lms` | `lms` | `canonical` | authenticated + LMS permission; tenant/class/attempt scope |
 | `com.erg.ergspringboot.controller.notifications` | `notifications` | `canonical` | authenticated except exact provider/admin policies; tenant ownership |
 | `com.erg.ergspringboot.controller.operations` | `platform-operations` | `prototype` | admin-only; process-local rows disabled in production |
@@ -127,9 +132,15 @@ an owner and permission decision:
 `quizVersions`, `quizQuestionAnalytics`, `assignmentReport`, `schoolDirectory`,
 `schoolOperations`, `lcms`
 
-### `users` / `reporting` / `crm` / `learningcontent`
+### `users` / `reporting` / `crm` / `learningcontent` / `learningoutcomes`
 
 `studentDashboard`, `crm`, `elearning`
+
+Learning-outcomes GraphQL coordinates are `learningOutcomes`, `learningOutcomePath`,
+`verifyOutcomeCertificate`, `createLearningPath`, `publishLearningPath`,
+`addLearningPathNode`, `createCompetency`, `recordCompetencyAttainment`,
+`evaluateLearningPathCompletion`, `issueOutcomeCertificate` and
+`revokeOutcomeCertificate`; all delegate to the tenant-scoped module facade.
 
 GraphQL schema changes must update this ownership section, the performance catalog and the
 typed input/output contract tests in the same change.

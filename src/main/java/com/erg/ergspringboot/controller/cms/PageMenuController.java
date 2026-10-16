@@ -2,6 +2,7 @@ package com.erg.ergspringboot.controller.cms;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.service.cms.CmsService;
+import com.erg.ergspringboot.platform.security.ReviewedPublicEndpoint;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,11 +22,13 @@ public class PageMenuController {
     }
 
     @GetMapping("/pages/{slug}")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> page(@PathVariable String slug, HttpServletRequest request) {
         return ok("Page loaded", cmsService.bySlug("pages", slug), request);
     }
 
     @GetMapping("/menus/structure")
+    @ReviewedPublicEndpoint
     public ApiResponse<Map<String, Object>> menu(HttpServletRequest request) {
         return ok("Menu loaded", cmsService.menuStructure(), request);
     }
@@ -35,7 +38,6 @@ public class PageMenuController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

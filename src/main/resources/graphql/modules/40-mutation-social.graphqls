@@ -1,0 +1,41 @@
+type Mutation {
+  upsertAttendance(input: UpsertAttendanceInput!): AttendanceRecord!
+  upsertGradebookScore(input: UpsertGradebookScoreInput!): GradebookScore!
+  createStudentDiscussion(input: CreateStudentDiscussionInput!): StudentDiscussionPost!
+  replyStudentDiscussion(input: ReplyStudentDiscussionInput!): StudentDiscussionComment!
+  setStudentDiscussionReaction(input: SetStudentDiscussionReactionInput!): StudentDiscussionReactionPayload!
+  markStudentAnnouncementRead(input: MarkStudentAnnouncementReadInput!): StudentAnnouncementReadPayload!
+  previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
+  createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
+  updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
+  deleteTeachingScheduleEvent(input: TeachingScheduleEventDeleteInput!): TeachingScheduleDeletePayload!
+  deleteTeacherSchedule(input: DeleteTeacherScheduleInput!): TeachingScheduleDeletePayload!
+  publishTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
+  cancelTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
+  createRoom(input: CreateRoomInput!): TeachingScheduleRoomOption!
+  importTeachingScheduleFromExcel(input: TeachingScheduleExcelImportInput!): TeachingSchedulePreviewPayload!
+}
+
+input AttendanceWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String!, from: String, to: String }
+input GradebookWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String! }
+input UpsertAttendanceInput { tenantId: String, classId: String!, schoolId: String, studentId: String!, subjectId: String!, attendanceDate: String!, lessonIndex: Int!, status: String!, expectedVersion: Int, operationId: String, idempotencyKey: String }
+input UpsertGradebookScoreInput { tenantId: String, classId: String!, schoolId: String, studentId: String!, subjectId: String!, columnId: String!, label: String!, maxScore: Float!, kind: String!, position: Int, score: Float!, expectedVersion: Int, operationId: String, idempotencyKey: String }
+
+type AttendanceWorkspace { tenantId: String!, classId: String!, subjectId: String!, from: String!, to: String!, records: [AttendanceRecord!]! }
+type AttendanceRecord { id: String!, studentId: String!, subjectId: String!, attendanceDate: String!, lessonIndex: Int!, status: String!, version: Int!, updatedAt: String! }
+type GradebookWorkspace { tenantId: String!, classId: String!, subjectId: String!, columns: [GradebookColumn!]!, scores: [GradebookScore!]! }
+type GradebookColumn { id: String!, label: String!, maxScore: Float!, kind: String!, position: Int!, version: Int!, updatedAt: String! }
+type GradebookScore { studentId: String!, columnId: String!, score: Float!, maxScore: Float!, version: Int!, updatedAt: String! }
+
+input StudentDiscussionFeedInput { tenantId: String, page: Int, size: Int }
+input CreateStudentDiscussionInput { tenantId: String, idempotencyKey: String!, title: String!, content: String!, assignmentId: String, attachmentIds: [String!] }
+input ReplyStudentDiscussionInput { tenantId: String, idempotencyKey: String!, postId: String!, parentCommentId: String, content: String!, attachmentIds: [String!] }
+input SetStudentDiscussionReactionInput { tenantId: String, targetType: String!, targetId: String!, reaction: String! }
+input MarkStudentAnnouncementReadInput { tenantId: String, announcementId: String! }
+
+type StudentDiscussionFeed { items: [StudentDiscussionPost!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }
+type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]! }
+type StudentDiscussionComment { id: String!, parentId: String, authorId: String, authorName: String, authorInitials: String, content: String, createdAt: String, attachmentIds: [String!]!, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, replies: [StudentDiscussionComment!]! }
+type StudentDiscussionReactionCount { reaction: String!, count: Int! }
+type StudentDiscussionReactionPayload { targetType: String!, targetId: String!, viewerReaction: String, reactions: [StudentDiscussionReactionCount!]! }
+type StudentAnnouncementReadPayload { announcementId: String!, read: Boolean!, readAt: String! }

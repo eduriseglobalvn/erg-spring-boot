@@ -26,7 +26,7 @@ import lombok.ToString;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class NotificationRecipientEntity extends BaseEntity {
 
     @Column(name = "tenant_id", length = 64, nullable = false)
@@ -38,7 +38,6 @@ public class NotificationRecipientEntity extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "notification_id", referencedColumnName = "id", insertable = false, updatable = false)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private NotificationMessageEntity message;
 
     @Column(name = "user_id", length = 36, nullable = false)

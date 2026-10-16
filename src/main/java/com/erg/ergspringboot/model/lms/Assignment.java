@@ -30,7 +30,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Assignment extends BaseEntity {
 
     @Column(name = "tenant_id")
@@ -42,7 +42,6 @@ public class Assignment extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "academic_class_id", referencedColumnName = "id", nullable = false, insertable = false, updatable = false)
     @ToString.Exclude
-    @EqualsAndHashCode.Exclude
     private Classroom classroom;
 
     @Column(name = "quiz_id")
@@ -77,6 +76,10 @@ public class Assignment extends BaseEntity {
     @Column(name = "max_duration_minutes")
     private Integer maxDurationMinutes;
 
+    /** Explicit server-side opt-in for learner offline resume/sync. Defaults to deny. */
+    @Column(name = "offline_allowed", nullable = false)
+    private boolean offlineAllowed;
+
     @Column(name = "start_at")
     private OffsetDateTime startAt;
 
@@ -85,4 +88,9 @@ public class Assignment extends BaseEntity {
 
     @Column(name = "recipient_count")
     private Integer recipientCount;
+
+    /** Version used by offline assignment updates and replay acknowledgements. */
+    @jakarta.persistence.Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion;
 }

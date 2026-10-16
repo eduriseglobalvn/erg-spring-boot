@@ -16,8 +16,26 @@ public final class StudentDashboardResponses {
             List<StudentDashboardCourseCardResponse> courses,
             List<StudentDashboardAssignmentCardResponse> assignments,
             List<StudentDashboardNextActionResponse> nextActions,
-            List<StudentDashboardAnnouncementCardResponse> announcements
+            List<StudentDashboardAnnouncementCardResponse> announcements,
+            String selectedClassId,
+            List<StudentDashboardClassMembershipResponse> classes
     ) {
+        public StudentDashboardResponse(
+                String tenantId,
+                StudentDashboardViewerResponse viewer,
+                StudentDashboardProfileResponse profile,
+                StudentDashboardSummaryResponse summary,
+                List<StudentDashboardCourseCardResponse> courses,
+                List<StudentDashboardAssignmentCardResponse> assignments,
+                List<StudentDashboardNextActionResponse> nextActions,
+                List<StudentDashboardAnnouncementCardResponse> announcements
+        ) {
+            this(
+                    tenantId, viewer, profile, summary, courses, assignments, nextActions, announcements,
+                    profile == null ? null : profile.academicClassId(), List.of()
+            );
+        }
+
         public StudentDashboardResponse(
                 String tenantId,
                 StudentDashboardViewerResponse viewer,
@@ -52,6 +70,16 @@ public final class StudentDashboardResponses {
     ) {
     }
 
+    public record StudentDashboardClassMembershipResponse(
+            String classId,
+            String className,
+            String schoolId,
+            String gradeLabel,
+            String academicYear,
+            String status
+    ) {
+    }
+
     public record StudentDashboardSummaryResponse(
             int enrolledCourseCount,
             int activeAssignmentCount,
@@ -81,6 +109,7 @@ public final class StudentDashboardResponses {
 
     public record StudentDashboardAssignmentCardResponse(
             String id,
+            String quizId,
             String title,
             String status,
             OffsetDateTime dueAt

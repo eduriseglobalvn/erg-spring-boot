@@ -49,13 +49,13 @@ public class QuizRuntimePackageService {
     )
     public Optional<QuizPackageResponse> activePackage(String tenantId, String quizId) {
         return quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue(quizId, tenantId)
-                .flatMap(version -> packageRepository.findByQuizVersionId(version.getId())
+                .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId)
                         .map(pkg -> toResponse(quizId, version, pkg)));
     }
 
     public Optional<QuizPackage> activePackageEntity(String tenantId, String quizId) {
         return quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue(quizId, tenantId)
-                .flatMap(version -> packageRepository.findByQuizVersionId(version.getId()));
+                .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId));
     }
 
     @SuppressWarnings("unchecked")

@@ -1,38 +1,39 @@
 package com.erg.ergspringboot.controller.learningcontent;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
-import com.erg.ergspringboot.model.learningcontent.ContentAsset;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
-import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
+import com.erg.ergspringboot.learningcontent.LearningContentOperations;
+import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.ContentAssetResponse;
+import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.ContentItemAssetResponse;
+import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.ContentItemResponse;
+import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.DeletedResponse;
+import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.GoogleSlidesLectureResponse;
+import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.TopicContentItemResponse;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.AttachContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.CreateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.CreateGoogleSlidesLectureRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.CreateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.PlaceContentItemRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.ReorderTopicContentItemsRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.UpdateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.api.LearningContentRequests.UpdateContentItemRequest;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.AttachContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateGoogleSlidesLectureRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.GoogleSlidesLectureResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.PlaceContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.ReorderTopicContentItemsRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class LearningContentController {
 
-    private final LearningContentService learningContentService;
+    private final LearningContentOperations learningContentOperations;
 
-    public LearningContentController(LearningContentService learningContentService) {
-        this.learningContentService = learningContentService;
+    public LearningContentController(LearningContentOperations learningContentOperations) {
+        this.learningContentOperations = learningContentOperations;
     }
 
     @PostMapping({"/api/content/lectures/google-slides", "/api/v1/content/lectures/google-slides"})
@@ -41,7 +42,7 @@ public class LearningContentController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        GoogleSlidesLectureResponse lecture = learningContentService.createGoogleSlidesLecture(
+        GoogleSlidesLectureResponse lecture = learningContentOperations.createGoogleSlidesLecture(
                 access.tenantId(),
                 access.userId(),
                 body
@@ -50,75 +51,83 @@ public class LearningContentController {
     }
 
     @PostMapping({"/api/content/items", "/api/v1/content/items"})
-    public ApiResponse<ContentItem> createContentItem(
+    public ApiResponse<ContentItemResponse> createContentItem(
             @RequestBody CreateContentItemRequest body,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        ContentItem item = learningContentService.createContentItem(access.tenantId(), access.userId(), body);
+        ContentItemResponse item = learningContentOperations.createContentItem(access.tenantId(), access.userId(), body);
         return ok(201, "Content item created", item, request);
     }
 
     @PatchMapping({"/api/content/items/{contentItemId}", "/api/v1/content/items/{contentItemId}"})
-    public ApiResponse<ContentItem> updateContentItem(
+    public ApiResponse<ContentItemResponse> updateContentItem(
             @PathVariable String contentItemId,
             @RequestBody UpdateContentItemRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        ContentItem item = learningContentService.updateContentItem(
+        UpdateContentItemRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        ContentItemResponse item = learningContentOperations.updateContentItem(
                 access.tenantId(),
                 contentItemId,
                 access.userId(),
-                body
+                effectiveBody
         );
         return ok(200, "Content item updated", item, request);
     }
 
     @DeleteMapping({"/api/content/items/{contentItemId}", "/api/v1/content/items/{contentItemId}"})
-    public ApiResponse<Map<String, Boolean>> deleteContentItem(
+    public ApiResponse<DeletedResponse> deleteContentItem(
             @PathVariable String contentItemId,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        learningContentService.deleteContentItem(access.tenantId(), contentItemId);
-        return ok(200, "Content item deleted", Map.of("deleted", true), request);
+        DeletedResponse result = learningContentOperations.deleteContentItem(access.tenantId(), contentItemId);
+        return ok(200, "Content item deleted", result, request);
     }
 
     @PostMapping({"/api/content/assets", "/api/v1/content/assets"})
-    public ApiResponse<ContentAsset> createContentAsset(
+    public ApiResponse<ContentAssetResponse> createContentAsset(
             @RequestBody CreateContentAssetRequest body,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        ContentAsset asset = learningContentService.createContentAsset(access.tenantId(), access.userId(), body);
+        ContentAssetResponse asset = learningContentOperations.createContentAsset(access.tenantId(), access.userId(), body);
         return ok(201, "Content asset created", asset, request);
     }
 
     @PatchMapping({"/api/content/assets/{contentAssetId}", "/api/v1/content/assets/{contentAssetId}"})
-    public ApiResponse<ContentAsset> updateContentAsset(
+    public ApiResponse<ContentAssetResponse> updateContentAsset(
             @PathVariable String contentAssetId,
             @RequestBody UpdateContentAssetRequest body,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        ContentAsset asset = learningContentService.updateContentAsset(
+        UpdateContentAssetRequest effectiveBody = body == null || idempotencyKey == null || idempotencyKey.isBlank()
+                ? body
+                : body.withIdempotencyKey(idempotencyKey);
+        ContentAssetResponse asset = learningContentOperations.updateContentAsset(
                 access.tenantId(),
                 contentAssetId,
                 access.userId(),
-                body
+                effectiveBody
         );
         return ok(200, "Content asset updated", asset, request);
     }
 
     @PostMapping({"/api/content/items/{contentItemId}/assets", "/api/v1/content/items/{contentItemId}/assets"})
-    public ApiResponse<ContentItemAsset> attachContentAsset(
+    public ApiResponse<ContentItemAssetResponse> attachContentAsset(
             @PathVariable String contentItemId,
             @RequestBody AttachContentAssetRequest body,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        ContentItemAsset asset = learningContentService.attachContentAsset(
+        ContentItemAssetResponse asset = learningContentOperations.attachContentAsset(
                 access.tenantId(),
                 contentItemId,
                 access.userId(),
@@ -128,13 +137,13 @@ public class LearningContentController {
     }
 
     @PostMapping({"/api/curriculum/topics/{topicId}/content-items", "/api/v1/curriculum/topics/{topicId}/content-items"})
-    public ApiResponse<TopicContentItem> placeContentItem(
+    public ApiResponse<TopicContentItemResponse> placeContentItem(
             @PathVariable String topicId,
             @RequestBody PlaceContentItemRequest body,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        TopicContentItem placement = learningContentService.placeContentItem(
+        TopicContentItemResponse placement = learningContentOperations.placeContentItem(
                 access.tenantId(),
                 topicId,
                 access.userId(),
@@ -144,24 +153,24 @@ public class LearningContentController {
     }
 
     @DeleteMapping({"/api/curriculum/topics/{topicId}/content-items/{placementId}", "/api/v1/curriculum/topics/{topicId}/content-items/{placementId}"})
-    public ApiResponse<Void> removePlacement(
+    public ApiResponse<DeletedResponse> removePlacement(
             @PathVariable String topicId,
             @PathVariable String placementId,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        learningContentService.removePlacement(access.tenantId(), topicId, placementId);
-        return ok(200, "Content placement removed", null, request);
+        DeletedResponse result = learningContentOperations.removePlacement(access.tenantId(), topicId, placementId);
+        return ok(200, "Content placement removed", result, request);
     }
 
     @PatchMapping({"/api/curriculum/topics/{topicId}/content-items/reorder", "/api/v1/curriculum/topics/{topicId}/content-items/reorder"})
-    public ApiResponse<List<TopicContentItem>> reorderPlacements(
+    public ApiResponse<List<TopicContentItemResponse>> reorderPlacements(
             @PathVariable String topicId,
             @RequestBody ReorderTopicContentItemsRequest body,
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        List<TopicContentItem> placements = learningContentService.reorderPlacements(
+        List<TopicContentItemResponse> placements = learningContentOperations.reorderPlacements(
                 access.tenantId(),
                 topicId,
                 body == null ? null : body.placements()
@@ -174,7 +183,6 @@ public class LearningContentController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

@@ -157,8 +157,7 @@ public class AuthController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
-        return requestId == null ? null : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private String userId(HttpServletRequest request) {

@@ -15,7 +15,17 @@ class CalendarFullCatalogArchitectureTest {
                 "com.erg.ergspringboot.calendar.internal.readmodel.CalendarFullCatalogQueryUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarReadService.java"));
+                "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarReadUseCase.java"));
         assertThat(facade).contains("fullCatalogQueries.catalog(");
+    }
+
+    @Test
+    void fullCatalogConsumesTheUserDirectoryPortInsteadOfTheUserEntity() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarFullCatalogQueryUseCase.java"));
+        assertThat(source)
+                .contains("UserDirectoryPort")
+                .doesNotContain("model.users.User")
+                .doesNotContain("UserRepository");
     }
 }

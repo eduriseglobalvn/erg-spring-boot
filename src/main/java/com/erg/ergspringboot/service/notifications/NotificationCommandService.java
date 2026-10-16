@@ -5,6 +5,7 @@ import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationE
 import com.erg.ergspringboot.model.notifications.NotificationMessageEntity;
 import com.erg.ergspringboot.model.notifications.NotificationOutboxEntity;
 import com.erg.ergspringboot.model.notifications.NotificationRecipientEntity;
+import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationMessageRepository;
@@ -222,6 +223,7 @@ public class NotificationCommandService {
         outbox.setNotificationId(message.getId());
         outbox.setTargetKind(targetKind);
         outbox.setTargetRef(targetRef);
+        outbox.setProvider("firebase");
         outbox.setPayload(payload);
         outbox.setStatus("pending");
         outbox.setAttemptCount(0);

@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: test-a
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - {name: POSTGRES_DB, value: erg_kubernetes_test}
+            - {name: POSTGRES_USER, value: erg}
+            - {name: POSTGRES_PASSWORD, value: erg-test-owner}
+            - {name: POSTGRES_RUNTIME_USER, value: erg_app}
+            - {name: POSTGRES_RUNTIME_PASSWORD, value: erg-test-runtime}
+          args: ["-c", "max_connections=160"]
+          ports: [{name: postgres, containerPort: 5432}]
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U erg -d erg_kubernetes_test"]
+            periodSeconds: 3
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "2", memory: 2Gi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d}
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: init
+          configMap:
+            name: postgres-init
+            defaultMode: 0555
+---
+apiVersion: v1
+kind: Service
+metadata: {name: postgres}
+spec:
+  selector: {app: postgres}
+  ports: [{name: postgres, port: 5432, targetPort: postgres}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: redis-state}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: redis-state}
+  template:
+    metadata:
+      labels: {app: redis-state}
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: test-a
+      containers:
+        - name: redis
+          image: redis:8.8.0-alpine3.23
+          command: ["sh", "-c", "exec redis-server --save '' --appendonly no --requirepass erg-test-state"]
+          ports: [{name: redis, containerPort: 6379}]
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "REDISCLI_AUTH=erg-test-state redis-cli ping | grep PONG"]
+            periodSeconds: 3
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis-state}
+spec:
+  selector: {app: redis-state}
+  ports: [{name: redis, port: 6379, targetPort: redis}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: redis-cache}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: redis-cache}
+  template:
+    metadata:
+      labels: {app: redis-cache}
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: test-a
+      containers:
+        - name: redis
+          image: redis:8.8.0-alpine3.23
+          command: ["sh", "-c", "exec redis-server --save '' --appendonly no --maxmemory 192mb --maxmemory-policy allkeys-lru --requirepass erg-test-cache"]
+          ports: [{name: redis, containerPort: 6379}]
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "REDISCLI_AUTH=erg-test-cache redis-cli ping | grep PONG"]
+            periodSeconds: 3
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis-cache}
+spec:
+  selector: {app: redis-cache}
+  ports: [{name: redis, port: 6379, targetPort: redis}]

@@ -11,8 +11,8 @@ import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolSummaryRespon
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.SchoolContactResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.SchoolReferrerResponse;
 import com.erg.ergspringboot.exception.GlobalExceptionHandler;
+import com.erg.ergspringboot.crm.CrmOperations;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
-import com.erg.ergspringboot.service.crm.CrmSchoolService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -24,7 +24,7 @@ class CrmSchoolControllerContractTest {
 
     @Test
     void listsSignedSchoolsForSeo() throws Exception {
-        CrmSchoolService service = mock(CrmSchoolService.class);
+        CrmOperations service = mock(CrmOperations.class);
         when(service.signedSchoolsBySeo("seo_1")).thenReturn(List.of(new CrmSchoolSummaryResponse(
                 "sch_binh_an",
                 "THCS Binh An",
@@ -45,7 +45,7 @@ class CrmSchoolControllerContractTest {
 
     @Test
     void returnsSeoPerformance() throws Exception {
-        CrmSchoolService service = mock(CrmSchoolService.class);
+        CrmOperations service = mock(CrmOperations.class);
         OffsetDateTime from = OffsetDateTime.parse("2026-01-01T00:00:00Z");
         OffsetDateTime to = OffsetDateTime.parse("2026-05-26T00:00:00Z");
         when(service.performance("seo_1", from, to)).thenReturn(new CrmSchoolPerformanceResponse(
@@ -68,7 +68,7 @@ class CrmSchoolControllerContractTest {
                 .andExpect(jsonPath("$.data.signedRevenue").value(120000000));
     }
 
-    private MockMvc mockMvc(CrmSchoolService service) {
+    private MockMvc mockMvc(CrmOperations service) {
         return MockMvcBuilders.standaloneSetup(new CrmSchoolController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilter(new RequestIdFilter())

@@ -5,12 +5,18 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -24,7 +30,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class CrmSchoolDeal extends BaseEntity {
 
     @Column(name = "school_id", length = 36, nullable = false)
@@ -56,4 +62,31 @@ public class CrmSchoolDeal extends BaseEntity {
 
     @Column(name = "lost_at")
     private OffsetDateTime lostAt;
+
+    @Column(length = 100)
+    private String code;
+
+    @Column(name = "academic_year", length = 32)
+    private String academicYear;
+
+    @Column(name = "contract_term", length = 100)
+    private String contractTerm;
+
+    @Column(name = "start_month", length = 32)
+    private String startMonth;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "revenue_lines", nullable = false, columnDefinition = "jsonb")
+    private List<Map<String, Object>> revenueLines = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "cost_lines", nullable = false, columnDefinition = "jsonb")
+    private List<Map<String, Object>> costLines = new ArrayList<>();
+
+    @Column(name = "idempotency_key", length = 192)
+    private String idempotencyKey;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 }

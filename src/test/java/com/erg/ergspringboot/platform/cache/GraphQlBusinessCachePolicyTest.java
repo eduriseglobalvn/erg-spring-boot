@@ -15,7 +15,7 @@ class GraphQlBusinessCachePolicyTest {
         String school = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/school/SchoolOperationsReadService.java"));
         String config = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/config/CacheConfig.java"));
+                "src/main/java/com/erg/ergspringboot/config/PlatformCacheDescriptorContributor.java"));
 
         assertThat(learning).contains("cacheNames = \"learningResourceLibrary\"");
         assertThat(learning).contains("#tenantId", "#educationUnitId", "#userId", "#page", "#size");

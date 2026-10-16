@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,15 +23,38 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
 
     private final ErgPrincipalService principalService;
     private final ErgSecurityProperties securityProperties;
+    private final boolean bffEnabled;
 
+    /** Compatibility constructor for stateless bearer mode and focused tests. */
     public ErgAuthenticationFilter(ErgPrincipalService principalService, ErgSecurityProperties securityProperties) {
+        this(principalService, securityProperties, false);
+    }
+
+    @Autowired
+    public ErgAuthenticationFilter(
+            ErgPrincipalService principalService,
+            ErgSecurityProperties securityProperties,
+            ErgAuthProperties authProperties) {
+        this(principalService, securityProperties, authProperties.isBffEnabled());
+    }
+
+    /** Compatibility constructor for focused unit tests and old embedders. */
+    public ErgAuthenticationFilter(
+            ErgPrincipalService principalService,
+            ErgSecurityProperties securityProperties,
+            boolean bffEnabled) {
         this.principalService = principalService;
         this.securityProperties = securityProperties;
+        this.bffEnabled = bffEnabled;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        if (bffEnabled && bearerToken(request) != null) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "BFF_COOKIE_AUTH_REQUIRED");
+            return;
+        }
         if (SecurityContextHolder.getContext().getAuthentication() == null && hasAuthenticationInput(request)) {
             Optional<ErgPrincipal> principal = principalFrom(request);
             if (principal.isEmpty()) {
@@ -49,11 +74,19 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void markBearerAuthenticationFailure(HttpServletRequest request) {
+        if (request.getAttribute(AUTH_FAILURE_CODE_ATTRIBUTE) != null) {
+            return;
+        }
         String bearerToken = bearerToken(request);
         if (bearerToken == null) {
             return;
         }
-        principalService.authenticationFailureCode(bearerToken, request.getHeader("X-Tenant-ID"))
+        String requestedTenantId = SecurityUtils.trimToNull(request.getHeader("X-Tenant-ID"));
+        Supplier<Optional<String>> lookup = requestedTenantId == null
+                ? () -> principalService.authenticationFailureCode(bearerToken)
+                : () -> withBearerLookupContext(request, () -> principalService.authenticationFailureCode(
+                        bearerToken, requestedTenantId));
+        lookup.get()
                 .ifPresent(code -> request.setAttribute(AUTH_FAILURE_CODE_ATTRIBUTE, code));
     }
 
@@ -70,7 +103,18 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
     private Optional<ErgPrincipal> principalFrom(HttpServletRequest request) {
         String bearerToken = bearerToken(request);
         if (bearerToken != null) {
-            return principalService.fromBearerToken(bearerToken, request.getHeader("X-Tenant-ID"));
+            String requestedTenantId = SecurityUtils.trimToNull(request.getHeader("X-Tenant-ID"));
+            if (requestedTenantId == null) {
+                Optional<String> resolvedTenantId = principalService.resolveTenantId(bearerToken);
+                if (resolvedTenantId.isEmpty()) {
+                    request.setAttribute(AUTH_FAILURE_CODE_ATTRIBUTE, "AUTHENTICATION_REQUIRED");
+                    return Optional.empty();
+                }
+                return withBearerLookupContext(request, resolvedTenantId.get(), () -> principalService.fromBearerToken(
+                        bearerToken, resolvedTenantId.get()));
+            }
+            return withBearerLookupContext(request, () -> principalService.fromBearerToken(
+                    bearerToken, requestedTenantId));
         }
         if (!securityProperties.isTrustedHeaderAuthEnabled()) {
             return Optional.empty();
@@ -78,14 +122,47 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         return Optional.of(headerPrincipal(request));
     }
 
+    /**
+     * Installs only the tenant lookup hint before the principal service opens its RLS-bound transaction.
+     * The bearer token plus tenant ID still identifies the session; this context does not authenticate
+     * the request and is removed before the verified principal is installed for downstream processing.
+     */
+    private <T> T withBearerLookupContext(HttpServletRequest request, Supplier<T> lookup) {
+        return withBearerLookupContext(request, SecurityUtils.trimToNull(request.getHeader("X-Tenant-ID")), lookup);
+    }
+
+    private <T> T withBearerLookupContext(
+            HttpServletRequest request,
+            String resolvedTenantId,
+            Supplier<T> lookup) {
+        TenantContext previous = TenantContext.current();
+        TenantContext.set(TenantContext.of(
+                resolvedTenantId,
+                null,
+                SecurityUtils.portalFromPath(request.getRequestURI())
+        ));
+        try {
+            return lookup.get();
+        } finally {
+            if (previous == null) {
+                TenantContext.clear();
+            } else {
+                TenantContext.set(previous);
+            }
+        }
+    }
+
     private ErgPrincipal headerPrincipal(HttpServletRequest request) {
         String userId = SecurityUtils.firstPresent(request.getHeader("X-User-ID"), "token-user");
         String sessionId = SecurityUtils.firstPresent(request.getHeader("X-Session-ID"), "token-session");
-        String tenantId = SecurityUtils.firstPresent(request.getHeader("X-Tenant-ID"), "erg");
+        String tenantId = AuthenticatedTenant.require(request.getHeader("X-Tenant-ID"));
         List<String> roles = SecurityUtils.csv(request.getHeader("X-Roles"));
         List<String> permissions = SecurityUtils.csv(request.getHeader("X-Permissions"));
         List<String> deniedPermissions = SecurityUtils.csv(request.getHeader("X-Denied-Permissions"));
-        List<String> portals = csvOrDefault(request.getHeader("X-Portals"), List.of("*"));
+        // Portal headers are compatibility metadata only; an absent header must
+        // not become a wildcard grant. Workspace authority is derived later
+        // from verified roles/permissions.
+        List<String> portals = SecurityUtils.csv(request.getHeader("X-Portals"));
         String managedEducationUnitIds = SecurityUtils.firstNonBlank(
                 request.getHeader("X-Managed-EducationUnit-IDs"),
                 request.getHeader("X-Managed-Education-Unit-IDs"),
@@ -103,7 +180,7 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
                 request.getHeader("X-Current-Class-ID"),
                 request.getHeader("X-Class-ID")
         );
-        return new ErgPrincipal(
+        return ErgPrincipal.authenticated(
                 userId,
                 sessionId,
                 tenantId,
@@ -113,12 +190,11 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
                 portals,
                 SecurityUtils.firstPresent(request.getHeader("X-Account-Type"), "erg"),
                 SecurityUtils.firstPresent(request.getHeader("X-Access-Level"), ""),
-                Map.of(
-                        "managedEducationUnitIds", SecurityUtils.csv(managedEducationUnitIds),
-                        "managedClassIds", SecurityUtils.csv(request.getHeader("X-Managed-Class-IDs")),
-                        "currentEducationUnitId", currentEducationUnitId == null ? "" : currentEducationUnitId,
-                        "currentClassId", currentClassId == null ? "" : currentClassId
-                )
+                AccessScopeAssembler.toLegacyAttributes(AccessScopeSet.legacy(
+                        SecurityUtils.csv(managedEducationUnitIds),
+                        SecurityUtils.csv(request.getHeader("X-Managed-Class-IDs")),
+                        currentEducationUnitId,
+                        currentClassId))
         );
     }
 
@@ -138,7 +214,7 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         if (requiredPortal == null) {
             return true;
         }
-        return principal.portals().contains("*") || principal.portals().contains(requiredPortal);
+        return new AuthorizationCapabilityPolicy().hasWorkspace(principal, requiredPortal);
     }
 
     private boolean isLifecycleRestricted(ErgPrincipal principal) {

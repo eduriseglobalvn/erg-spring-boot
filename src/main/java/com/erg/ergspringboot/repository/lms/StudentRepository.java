@@ -18,6 +18,8 @@ public interface StudentRepository extends JpaRepository<Student, String> {
 
     Optional<Student> findByTenantIdAndId(String tenantId, String id);
 
+    Optional<Student> findByTenantIdAndStudentCodeIgnoreCase(String tenantId, String studentCode);
+
     long countByTenantIdAndSchoolId(String tenantId, String schoolId);
 
     List<Student> findByTenantIdAndSchoolIdOrderByFullNameAsc(String tenantId, String schoolId);

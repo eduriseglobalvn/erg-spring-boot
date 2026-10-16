@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,7 +20,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
         name = "lms_students",
@@ -84,4 +85,8 @@ public class Student extends BaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metrics", columnDefinition = "jsonb")
     private StudentMetrics metrics;
+
+    @Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion;
 }

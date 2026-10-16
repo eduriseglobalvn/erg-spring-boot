@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.IncompleteEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -32,10 +32,17 @@ public class ModuleEventRecoveryJob {
     private final Duration minAge;
     private final AtomicBoolean running = new AtomicBoolean();
 
+    @Autowired
     public ModuleEventRecoveryJob(FailedEventPublications failed, IncompleteEventPublications incomplete,
-            @Value("${erg.module-events.recovery.batch-size:100}") int batchSize,
-            @Value("${erg.module-events.recovery.max-in-flight:16}") int maxInFlight,
-            @Value("${erg.module-events.recovery.min-age:30s}") Duration minAge) {
+            ErgModuleEventsProperties properties) {
+        this(failed, incomplete, properties.getRecovery().getBatchSize(),
+                properties.getRecovery().getMaxInFlight(), properties.getRecovery().getMinAge());
+        properties.validate();
+    }
+
+    /** Compatibility constructor for focused unit tests and old embedders. */
+    public ModuleEventRecoveryJob(FailedEventPublications failed, IncompleteEventPublications incomplete,
+            int batchSize, int maxInFlight, Duration minAge) {
         if (batchSize < 1 || batchSize > 1000 || maxInFlight < 1 || maxInFlight > 128 || minAge.isNegative()) {
             throw new IllegalArgumentException("Invalid Modulith event recovery bounds");
         }

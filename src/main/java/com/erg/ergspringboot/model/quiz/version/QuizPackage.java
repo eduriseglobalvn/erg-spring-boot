@@ -7,6 +7,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import lombok.AllArgsConstructor;
@@ -64,6 +65,10 @@ public class QuizPackage {
     @Column(name = "public_key_id")
     private String publicKeyId;
 
+    /** Algorithm identifier used by the desktop verifier (for example Ed25519). */
+    @Column(name = "signature_algorithm", length = 32)
+    private String signatureAlgorithm;
+
     @Column(name = "grading_mode", nullable = false)
     private String gradingMode;
 
@@ -86,6 +91,31 @@ public class QuizPackage {
 
     @Column(name = "expires_at")
     private OffsetDateTime expiresAt;
+
+    /** Minimum shared desktop/runtime version that can consume this package. */
+    @Column(name = "min_runtime_version", length = 64)
+    private String minRuntimeVersion;
+
+    /** Immutable object-storage location for the packaged artifact, when one exists. */
+    @Column(name = "download_url", length = 2048)
+    private String downloadUrl;
+
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
+
+    /** Revocation is explicit so clients never infer validity from version ordering alone. */
+    @Column(name = "revoked_at")
+    private OffsetDateTime revokedAt;
+
+    @Column(name = "revocation_reason", length = 256)
+    private String revocationReason;
+
+    @Column(name = "release_channel", length = 32)
+    private String releaseChannel;
+
+    @Version
+    @Column(name = "lock_version", nullable = false)
+    private Integer lockVersion;
 
     @PrePersist
     protected void onCreate() {

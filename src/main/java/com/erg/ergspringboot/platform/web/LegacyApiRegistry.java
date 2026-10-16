@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 
 @Component
-public final class LegacyApiRegistry {
+public class LegacyApiRegistry {
 
     private final AntPathMatcher paths = new AntPathMatcher();
     private final List<LegacyRoute> routes;

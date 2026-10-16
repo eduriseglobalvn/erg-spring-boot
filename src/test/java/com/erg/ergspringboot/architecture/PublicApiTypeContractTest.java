@@ -20,9 +20,6 @@ class PublicApiTypeContractTest {
     private static final Set<String> LEGACY_DYNAMIC_MAP_ALLOWLIST = Set.of(
             "AuthController#logout",
             "AuthController#logoutAll",
-            "LcmsQuizBundleController#exportActive",
-            "LcmsQuizBundleController#exportVersion",
-            "LearningContentController#deleteContentItem",
             "NotificationDeviceController#revoke",
             "NotificationDeviceController#unregister"
     );

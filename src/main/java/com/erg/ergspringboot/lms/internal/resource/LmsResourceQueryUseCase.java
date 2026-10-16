@@ -5,6 +5,7 @@ import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.lms.LmsQuizService;
 import com.erg.ergspringboot.service.quiz.runtime.QuizRuntimePackageService;
+import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -20,8 +21,7 @@ public class LmsResourceQueryUseCase {
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
-        Quiz quiz = quizzes.findById(quizId)
-                .filter(item -> tenant(access.tenantId()).equals(tenant(item.getTenantId())))
+        Quiz quiz = quizzes.findByTenantIdAndId(tenant(access.tenantId()), quizId)
                 .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
         QuizPackageResponse published = packages.activePackage(tenant(access.tenantId()), quizId).orElse(null);
         if (published != null) return published;
@@ -36,7 +36,7 @@ public class LmsResourceQueryUseCase {
     }
 
     public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return getQuizPackage(quizId, access).quiz(); }
-    private String tenant(String value) { return value == null || value.isBlank() ? "erg" : value.trim(); }
+    private String tenant(String value) { return AuthenticatedTenant.require(value); }
     private <T> List<T> list(List<T> value) { return value == null ? List.of() : value; }
     private <K,V> Map<K,V> map(Map<K,V> value) { return value == null ? Map.of() : value; }
 }

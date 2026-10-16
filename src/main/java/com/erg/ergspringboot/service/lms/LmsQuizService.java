@@ -16,7 +16,7 @@ public class LmsQuizService {
         this.repository = repository;
     }
 
-    public Optional<Quiz> findById(String id) {
-        return repository.findById(id);
+    public Optional<Quiz> findByTenantIdAndId(String tenantId, String id) {
+        return repository.findByIdAndTenantId(id, tenantId);
     }
 }

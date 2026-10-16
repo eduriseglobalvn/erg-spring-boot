@@ -31,6 +31,7 @@ class CacheStampedeIntegrationTest {
                 new LocalCacheGenerationService(), new CacheFailurePolicy(3, Duration.ofSeconds(1)),
                 new CacheLoadCoordinator());
         AtomicInteger loads = new AtomicInteger();
+        CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
 
         try (var executor = Executors.newFixedThreadPool(20)) {
@@ -38,11 +39,14 @@ class CacheStampedeIntegrationTest {
             for (int index = 0; index < 100; index++) {
                 results.add(executor.submit(() -> cache.get("same-key", () -> {
                     loads.incrementAndGet();
+                    started.countDown();
                     release.await();
                     return "value";
                 })));
             }
-            while (loads.get() == 0) Thread.onSpinWait();
+            assertThat(started.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("one cache loader should be admitted for the shared miss")
+                    .isTrue();
             release.countDown();
             for (Future<String> result : results) {
                 assertThat(result.get()).isEqualTo("value");

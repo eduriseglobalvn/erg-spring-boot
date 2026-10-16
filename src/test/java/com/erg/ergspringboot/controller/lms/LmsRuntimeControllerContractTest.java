@@ -40,7 +40,9 @@ class LmsRuntimeControllerContractTest {
     @Test
     void lmsHotPathUsesVersionedEnvelopeAndKeepsAttemptLifecycleIdempotent() throws Exception {
         mockMvc.perform(get("/api/v1/lms/students/me/assignments")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .header("X-Request-ID", "req-lms-list"))
                 .andExpect(status().isOk())
@@ -51,7 +53,9 @@ class LmsRuntimeControllerContractTest {
 
         String startJson = mockMvc.perform(post("/api/v1/lms/attempts")
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("""
                                 {
@@ -71,7 +75,9 @@ class LmsRuntimeControllerContractTest {
 
         mockMvc.perform(put("/api/v1/lms/attempts/{attemptId}/answers/{questionId}", attemptId, "que_math_g6_001")
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("""
                                 {
@@ -85,7 +91,9 @@ class LmsRuntimeControllerContractTest {
 
         mockMvc.perform(post("/api/v1/lms/attempts/{attemptId}/sync", attemptId)
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("""
                                 {
@@ -99,7 +107,9 @@ class LmsRuntimeControllerContractTest {
 
         mockMvc.perform(post("/api/v1/lms/attempts/{attemptId}/submit", attemptId)
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("""
                                 {
@@ -112,7 +122,9 @@ class LmsRuntimeControllerContractTest {
 
         mockMvc.perform(post("/api/v1/lms/attempts/{attemptId}/submit", attemptId)
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("{}"))
                 .andExpect(status().isOk())
@@ -120,7 +132,9 @@ class LmsRuntimeControllerContractTest {
 
         mockMvc.perform(patch("/api/v1/lms/attempts/{attemptId}/draft", attemptId)
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_ba_0001")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("""
                                 {
@@ -134,18 +148,24 @@ class LmsRuntimeControllerContractTest {
     @Test
     void unusedLmsPlaceholderSurfaceIsRemoved() throws Exception {
         mockMvc.perform(get("/api/v1/lms/dashboard/overview")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "admin")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*"))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/v1/lms/subjects")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "admin")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*"))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(post("/api/v1/lms/imports/google-sheet/preview")
                         .contentType("application/json")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "admin")
+                        .header("X-Roles", "system.super_admin")
                         .header("X-Permissions", "*")
                         .content("""
                                 {
@@ -159,6 +179,7 @@ class LmsRuntimeControllerContractTest {
     @Test
     void lmsReadsOnlyReturnManagedEducationUnitsAndClasses() throws Exception {
         mockMvc.perform(get("/api/v1/lms/classes")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "teacher")
                         .header("X-Permissions", "lms.class.read")
                         .header("X-Managed-EducationUnit-IDs", "sch_binh_an")
@@ -169,6 +190,7 @@ class LmsRuntimeControllerContractTest {
                 .andExpect(jsonPath("$.data.items[0].schoolId").value("sch_binh_an"));
 
         mockMvc.perform(get("/api/v1/lms/students/me/assignments")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "usr_stu_cl_0001")
                         .header("X-Permissions", "lms.assignment.read_self")
                         .header("X-Managed-EducationUnit-IDs", "sch_binh_an")
@@ -180,6 +202,7 @@ class LmsRuntimeControllerContractTest {
     @Test
     void lmsEducationUnitsAliasReturnsOnlyManagedEducationUnits() throws Exception {
         mockMvc.perform(get("/api/v1/lms/education-units")
+                        .header("X-Tenant-ID", "erg")
                         .header("X-User-ID", "teacher")
                         .header("X-Permissions", "lms.class.read")
                         .header("X-Managed-EducationUnit-IDs", "sch_binh_an"))

@@ -3,7 +3,7 @@ package com.erg.ergspringboot.controller.crm;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolListResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolPerformanceResponse;
 import com.erg.ergspringboot.common.response.ApiResponse;
-import com.erg.ergspringboot.service.crm.CrmSchoolService;
+import com.erg.ergspringboot.crm.CrmOperations;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/crm")
 public class CrmSchoolController {
 
-    private final CrmSchoolService crmSchoolService;
+    private final CrmOperations crmSchoolService;
 
-    public CrmSchoolController(CrmSchoolService crmSchoolService) {
+    public CrmSchoolController(CrmOperations crmSchoolService) {
         this.crmSchoolService = crmSchoolService;
     }
 
@@ -49,7 +49,6 @@ public class CrmSchoolController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

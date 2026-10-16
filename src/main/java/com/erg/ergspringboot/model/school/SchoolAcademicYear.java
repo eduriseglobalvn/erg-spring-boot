@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 })
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class SchoolAcademicYear extends BaseEntity {
     @Column(name = "tenant_id", nullable = false, length = 36)
     private String tenantId;

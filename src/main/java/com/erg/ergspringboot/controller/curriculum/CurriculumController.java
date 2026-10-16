@@ -9,7 +9,17 @@ import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumNodeReq
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumSubjectResponse;
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTopicResponse;
 import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTreeResponse;
+import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTeachingPlanRequest;
+import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTeachingPlanResponse;
+import com.erg.ergspringboot.service.curriculum.CurriculumTeachingPlanService;
+import com.erg.ergspringboot.service.curriculum.CurriculumProgramService;
+import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumProgramRequest;
+import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumProgramResponse;
 import com.erg.ergspringboot.curriculum.CurriculumOperations;
+import com.erg.ergspringboot.authorization.AuthorizationOperations;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,9 +36,53 @@ import org.springframework.web.bind.annotation.RestController;
 public class CurriculumController {
 
     private final CurriculumOperations curriculumService;
+    private final CurriculumTeachingPlanService teachingPlanService;
+    private final AuthorizationOperations authorization;
+    private final CurriculumProgramService programService;
 
-    public CurriculumController(CurriculumOperations curriculumService) {
+    public CurriculumController(CurriculumOperations curriculumService, CurriculumTeachingPlanService teachingPlanService,
+                                AuthorizationOperations authorization, CurriculumProgramService programService) {
         this.curriculumService = curriculumService;
+        this.teachingPlanService = teachingPlanService;
+        this.authorization = authorization;
+        this.programService = programService;
+    }
+
+    @GetMapping("/program")
+    public ApiResponse<CurriculumProgramResponse> program(
+            @RequestParam String subjectId, @RequestParam String levelId, @RequestParam String academicYear,
+            HttpServletRequest request) {
+        return ok("Curriculum program loaded", programService.get(subjectId, levelId, academicYear, access(request)), request);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/program")
+    public ApiResponse<CurriculumProgramResponse> upsertProgram(
+            @RequestParam String subjectId, @RequestParam String levelId, @RequestParam String academicYear,
+            @RequestBody CurriculumProgramRequest body, HttpServletRequest request) {
+        return ok("Curriculum program saved", programService.upsert(subjectId, levelId, academicYear, body, access(request)), request);
+    }
+
+    @GetMapping("/teaching-plan")
+    public ApiResponse<CurriculumTeachingPlanResponse> teachingPlan(
+            @RequestParam String schoolId, @RequestParam String subjectId, @RequestParam String academicYear,
+            HttpServletRequest request) {
+        return ok("Curriculum teaching plan loaded",
+                teachingPlanService.get(schoolId, subjectId, academicYear, access(request), hasGlobalCurriculumPermission()), request);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/teaching-plan")
+    public ApiResponse<CurriculumTeachingPlanResponse> upsertTeachingPlan(
+            @RequestParam String schoolId, @RequestParam String subjectId, @RequestParam String academicYear,
+            @RequestBody CurriculumTeachingPlanRequest body, HttpServletRequest request) {
+        return ok("Curriculum teaching plan saved",
+                teachingPlanService.upsert(schoolId, subjectId, academicYear, body, access(request), hasGlobalCurriculumPermission()), request);
+    }
+
+    private boolean hasGlobalCurriculumPermission() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof ErgPrincipal principal)) return false;
+        return authorization.isAllowed(principal, "curriculum.manage", null, principal.tenantId())
+                || authorization.isAllowed(principal, "*", null, principal.tenantId());
     }
 
     @GetMapping("/tree")
@@ -173,7 +227,6 @@ public class CurriculumController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }

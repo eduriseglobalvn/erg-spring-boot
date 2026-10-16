@@ -13,11 +13,11 @@ class EventBoundaryContractTest {
         String catalog = Files.readString(Path.of("docs/architecture/event-catalog.md"));
         String event = Files.readString(Path.of("src/main/java/com/erg/ergspringboot/calendar/CalendarBatchPublished.java"));
         String listener = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/calendar/internal/notification/CalendarBatchPublishedListener.java"));
+                "src/main/java/com/erg/ergspringboot/notifications/internal/CalendarBatchPublishedConsumer.java"));
 
         assertThat(policy).contains("at-least-once", "@ApplicationModuleListener", "JPA entities");
         assertThat(catalog).contains("CalendarBatchPublished", "schedule-published:<batchId>");
         assertThat(event).contains("eventId", "tenantId", "actorId", "schemaVersion");
-        assertThat(listener).contains("@ApplicationModuleListener", "event.eventId()");
+        assertThat(listener).contains("@ApplicationModuleListener", "event.eventId()", "CalendarPublishedBatchProjection");
     }
 }

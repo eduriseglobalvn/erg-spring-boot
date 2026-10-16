@@ -31,6 +31,56 @@ compose_native() {
     -f "$BASE_COMPOSE" -f "$NATIVE_COMPOSE" "$@"
 }
 
+assert_immutable_image() {
+  local image="$1"
+  [[ "$image" =~ ^[^/]+/.+:[0-9a-fA-F]{7,64}$ ]] || {
+    echo "Image must use a registry/repository:git-sha tag (7-64 hex characters); floating tags such as latest, main or dev are not allowed" >&2
+    exit 2
+  }
+}
+
+assert_production_image() {
+  local image="$1"
+  [[ "$image" =~ ^[^/]+/.+@sha256:[0-9a-f]{64}$ ]] || {
+    echo "Image must use a registry/repository@sha256:<64 lowercase hex digest>; Git-SHA tags and floating tags are not allowed for production deploy" >&2
+    exit 2
+  }
+}
+
+configured_value() {
+  local name="$1"
+  [[ -f "$PRODUCTION_ENV" ]] || return 0
+  awk -F= -v key="$name" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$PRODUCTION_ENV"
+}
+
+deploy_production() {
+  local target_image="${IMAGE:-$(configured_value ERG_APP_IMAGE)}"
+  local rollback_image="${ERG_ROLLBACK_IMAGE:-$(configured_value ERG_ROLLBACK_IMAGE)}"
+  assert_production_image "$target_image"
+  assert_production_image "$rollback_image"
+  [[ "$target_image" != "$rollback_image" ]] || {
+    echo "Production image and rollback image must be different digests" >&2
+    exit 2
+  }
+
+  export ERG_APP_IMAGE="$target_image"
+  if compose_native pull && compose_native up -d --no-build --remove-orphans \
+      --scale "backend=$REPLICAS" --wait --wait-timeout 180; then
+    printf 'Production image is healthy: %s\n' "$target_image"
+    return 0
+  fi
+
+  printf 'Production health gate failed for %s; rolling back to %s\n' "$target_image" "$rollback_image" >&2
+  export ERG_APP_IMAGE="$rollback_image"
+  if compose_native pull && compose_native up -d --no-build --remove-orphans \
+      --scale "backend=$REPLICAS" --wait --wait-timeout 180; then
+    printf 'Rollback completed: %s\n' "$rollback_image" >&2
+    return 1
+  fi
+  echo "Production deploy failed and rollback also failed" >&2
+  return 1
+}
+
 case "$ACTION" in
   dev)
     ensure_local_env "$DEV_ENV" ".env.dev.example"
@@ -41,8 +91,15 @@ case "$ACTION" in
     IMAGE="${IMAGE:-erg-spring:local-native}"
     docker buildx build --platform linux/amd64 --load --tag "$IMAGE" "$ROOT"
     ;;
+  release)
+    [[ -n "$IMAGE" ]] || { echo "Set ERG_APP_IMAGE to a registry image with a Git SHA tag, for example ghcr.io/acme/erg-spring:abc1234" >&2; exit 2; }
+    assert_immutable_image "$IMAGE"
+    docker buildx build --platform linux/amd64 --push --tag "$IMAGE" "$ROOT"
+    printf 'Published immutable native image %s\n' "$IMAGE"
+    ;;
   push)
-    [[ -n "$IMAGE" ]] || { echo "Set ERG_APP_IMAGE to a versioned Registry tag" >&2; exit 2; }
+    [[ -n "$IMAGE" ]] || { echo "Set ERG_APP_IMAGE to a registry image with a Git SHA tag" >&2; exit 2; }
+    assert_immutable_image "$IMAGE"
     docker push "$IMAGE"
     ;;
   test|up)
@@ -52,8 +109,7 @@ case "$ACTION" in
     ;;
   prod|deploy)
     [[ -f "$PRODUCTION_ENV" ]] || { echo "Missing $PRODUCTION_ENV" >&2; exit 2; }
-    compose_native pull
-    compose_native up -d --no-build --remove-orphans --scale "backend=$REPLICAS"
+    deploy_production
     ;;
   down)
     [[ ! -f "$DEV_ENV" ]] || compose_dev down --remove-orphans
@@ -80,10 +136,11 @@ Usage: ./scripts/docker.sh <action> [replicas]
 
   dev       Start PostgreSQL, Redis and Nginx for an IDE-run backend.
   build     Build a Linux amd64 native image locally.
-  push      Push ERG_APP_IMAGE to the Registry.
+  release   Build and push one immutable Linux amd64 image in one command.
+  push      Push an existing immutable Git-SHA image to the Registry.
   test      Run the already-built native image locally with N backend replicas.
   up        Alias of test.
-  prod      Pull and run the prebuilt image. Never builds on the server.
+  prod      Pull and run a digest-pinned image with health gate and digest rollback.
   deploy    Alias of prod.
   down      Stop development and native stacks.
   logs      Follow Nginx and backend logs.

@@ -42,6 +42,73 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: erg
         run: ./mvnw -B -ntp verify
 
+  portal-suites:
+    name: Portal contract — ${{ matrix.portal }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: erg
+          POSTGRES_USER: erg
+          POSTGRES_PASSWORD: erg
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U erg -d erg"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    strategy:
+      fail-fast: false
+      matrix:
+        portal: [lms, lcms, crm, elearning]
+        include:
+          # `tests` selects contract/unit suites (surefire); `itTests` selects the portal's
+          # *IntegrationTest classes (failsafe). Surefire excludes *IntegrationTest via pom, so the
+          # two globs never double-run the same class. CRM has no integration test yet — the
+          # failIfNoSpecifiedTests=false flags keep an empty glob from failing the leg.
+          - portal: lms
+            tests: '*Lms*Test,*Assignment*Test,*Attempt*Test'
+            itTests: '*Lms*IntegrationTest,*Assignment*IntegrationTest,*Attempt*IntegrationTest'
+          - portal: lcms
+            tests: '*Lcms*Test,*Quiz*Test,*QuestionBank*Test,*Media*Test'
+            itTests: '*Lcms*IntegrationTest,*Quiz*IntegrationTest,*QuestionBank*IntegrationTest,*Media*IntegrationTest'
+          - portal: crm
+            tests: '*Crm*Test'
+            itTests: '*Crm*IntegrationTest'
+          - portal: elearning
+            tests: '*StudentDashboard*Test,*Elearning*Test'
+            itTests: '*StudentDashboard*IntegrationTest,*Elearning*IntegrationTest'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Run portal contract and integration suite
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/erg
+          SPRING_DATASOURCE_USERNAME: erg
+          SPRING_DATASOURCE_PASSWORD: erg
+          ERG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:5432/erg
+          ERG_TEST_POSTGRES_USERNAME: erg
+          ERG_TEST_POSTGRES_PASSWORD: erg
+        run: >-
+          ./mvnw -B -ntp
+          -Dtest="${{ matrix.tests }}"
+          -Dit.test="${{ matrix.itTests }}"
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -Dfailsafe.failIfNoSpecifiedTests=false
+          verify
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: portal-test-reports-${{ matrix.portal }}
+          path: |
+            target/surefire-reports
+            target/failsafe-reports
+          if-no-files-found: warn
+
   openapi-contract:
     name: OpenAPI contract lock and compatibility
     runs-on: ubuntu-latest
@@ -58,6 +125,11 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
+      - name: Boot runtime and verify OpenAPI/GraphQL parity
+        run: >-
+          ./mvnw -B -ntp
+          -Dtest=OpenApiRuntimeSnapshotIntegrationTest,GraphQlCoverageCatalogIntegrationTest
+          test
       - name: Verify committed OpenAPI snapshot and checksum
         run: node scripts/export-openapi-contract.cjs --file contracts/openapi/erg-openapi.json --check
       - name: Verify committed GraphQL schema checksum
@@ -135,3 +207,32 @@ jobs:
           BASE_URL: ${{ env.BENCHMARK_BASE_URL }}
           WEBHOOK_SECRET: ${{ env.BENCHMARK_WEBHOOK_SECRET }}
         run: k6 run --vus 2 --iterations 2 load/k6/webhook-burst.js
+
+  release-load-gates:
+    name: Release load and event gates
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BASE_URL: ${{ secrets.BENCHMARK_BASE_URL }}
+      ACCESS_TOKEN: ${{ secrets.BENCHMARK_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Require isolated benchmark environment
+        shell: bash
+        run: test -n "$BASE_URL" && test -n "$ACCESS_TOKEN"
+      - name: Steady 100 to 5000 VU gate
+        run: k6 run --summary-export=steady.json load/k6/erg-5k-steady.js
+      - name: Submission burst gate
+        run: k6 run --summary-export=submission.json load/k6/erg-5k-submission-burst.js
+      - name: Outbox replay/duplicate gate
+        run: k6 run --summary-export=outbox.json load/k6/outbox-dispatch.js
+      - name: Modulith event overhead gate
+        run: k6 run --summary-export=modulith.json load/k6/modulith-events.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-load-evidence
+          path: '*.json'
+          if-no-files-found: error

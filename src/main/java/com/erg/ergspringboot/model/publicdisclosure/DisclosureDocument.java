@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.model.publicdisclosure;
 
-import com.erg.ergspringboot.model.BaseEntity;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,8 +12,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class DisclosureDocument extends BaseEntity {
+@EqualsAndHashCode(exclude = {"createdAt", "updatedAt"})
+public class DisclosureDocument {
+
+    private String id;
+
+    private java.time.OffsetDateTime createdAt;
+
+    private java.time.OffsetDateTime updatedAt;
 
     private String tenantId;
 

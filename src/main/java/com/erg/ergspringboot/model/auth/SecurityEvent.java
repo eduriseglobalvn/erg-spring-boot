@@ -16,7 +16,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "security_events")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class SecurityEvent extends BaseEntity {
     private String tenantId;
     private String userId;

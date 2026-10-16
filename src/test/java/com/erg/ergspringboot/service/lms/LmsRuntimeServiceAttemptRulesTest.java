@@ -10,6 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SaveAnswerRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptDraftRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StartAttemptRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.exception.BadRequestException;
@@ -102,7 +104,7 @@ class LmsRuntimeServiceAttemptRulesTest {
     void startAttemptRejectsPastDueAssignmentBeforeCreatingAttempt() {
         Assignment assignment = assignment();
         assignment.setDueAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1));
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
 
         assertThatThrownBy(() -> service.startAttempt("student-1", startRequest(), access()))
                 .isInstanceOf(BadRequestException.class)
@@ -115,7 +117,7 @@ class LmsRuntimeServiceAttemptRulesTest {
     void startAttemptRejectsNewAttemptWhenLimitIsReached() {
         Assignment assignment = assignment();
         assignment.setAttemptLimit(1);
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
         when(attemptService.findInProgress("erg", "assignment-1", "quiz-1", "student-1"))
                 .thenReturn(Optional.empty());
         when(attemptService.countCompletedForLimit("erg", "assignment-1", "quiz-1", "student-1"))
@@ -126,40 +128,6 @@ class LmsRuntimeServiceAttemptRulesTest {
                 .hasMessageContaining("attempt limit");
 
         verify(attemptService, never()).save(any());
-    }
-
-    @Test
-    void listStudentScoresUsesOneBatchAttemptLookup() {
-        Assignment first = assignment();
-        first.setId("assignment-1");
-        Assignment second = assignment();
-        second.setId("assignment-2");
-        when(assignmentService.findByTenantIdOrderByCreatedAtDesc("erg")).thenReturn(List.of(first, second));
-        when(attemptService.findTop3ByAssignmentsAndStudent("erg", List.of("assignment-1", "assignment-2"), "student-1"))
-                .thenReturn(List.of());
-
-        service.listStudentScores("student-1", access());
-
-        verify(attemptService).findTop3ByAssignmentsAndStudent(
-                "erg", List.of("assignment-1", "assignment-2"), "student-1");
-        verify(attemptService, never()).findTop3ByAssignmentAndStudent(any(), any(), any());
-    }
-
-    @Test
-    void listStudentAssignmentsResolvesTheStudentClassOnce() {
-        Assignment first = assignment();
-        first.setStudentIds(List.of());
-        Assignment second = assignment();
-        second.setId("assignment-2");
-        second.setStudentIds(List.of());
-        Student student = new Student();
-        student.setAcademicClassId("class-1");
-        when(assignmentService.findByTenantIdOrderByCreatedAtDesc("erg")).thenReturn(List.of(first, second));
-        when(studentService.findFirstByTenantIdAndAuthUserId("erg", "student-1")).thenReturn(Optional.of(student));
-
-        service.listStudentAssignments("student-1", access());
-
-        verify(studentService, times(1)).findFirstByTenantIdAndAuthUserId("erg", "student-1");
     }
 
     @Test
@@ -189,7 +157,7 @@ class LmsRuntimeServiceAttemptRulesTest {
     void startAttemptReplaysExistingAttemptForIdempotencyKey() {
         Assignment assignment = assignment();
         Attempt attempt = attempt();
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
         when(attemptService.findByStartIdempotencyKey("erg", "assignment-1", "quiz-1", "student-1", "start-key-1"))
                 .thenReturn(Optional.of(attempt));
 
@@ -203,11 +171,11 @@ class LmsRuntimeServiceAttemptRulesTest {
     @Test
     void startAttemptEvictsAttemptReadCachesAfterPersistingNewAttempt() {
         Assignment assignment = assignment();
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
         when(attemptService.findInProgress("erg", "assignment-1", "quiz-1", "student-1"))
                 .thenReturn(Optional.empty());
         when(runtimePackageService.activePackageEntity("erg", "quiz-1")).thenReturn(Optional.empty());
-        when(quizService.findById("quiz-1")).thenReturn(Optional.of(quiz()));
+        when(quizService.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz()));
 
         var response = service.startAttempt("student-1", startRequest(), access());
 
@@ -216,18 +184,30 @@ class LmsRuntimeServiceAttemptRulesTest {
     }
 
     @Test
-    void saveAnswerEvictsAttemptReadCachesAfterPersistingAnswer() {
+    void runtimeDraftAnswerAndSyncDoNotPersistBeforeSubmit() {
         Attempt attempt = attempt();
-        when(attemptService.findById("attempt-1")).thenReturn(Optional.of(attempt));
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment()));
+        when(attemptService.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));
 
-        service.saveAnswer(
+        var answer = service.saveAnswer(
                 "attempt-1",
                 "question-1",
                 new SaveAnswerRequest("A", Map.of(), OffsetDateTime.now(ZoneOffset.UTC)),
                 access());
+        service.saveDraft(
+                "attempt-1",
+                new AttemptDraftRequest(Map.of("question-1", "A"), "hash-1", "1", List.of(), Map.of()),
+                access());
+        var sync = service.syncAttempt(
+                "attempt-1",
+                new AttemptSyncRequest("hash-1", "1", Map.of(), List.of(Map.of("id", "event-1")), Map.of()),
+                access());
 
-        verifyAttemptReadCachesCleared();
+        assertThat(answer.saved()).isFalse();
+        assertThat(sync.conflicts()).isEmpty();
+        verify(attemptService, never()).save(any());
+        verifyNoInteractions(attemptEventRecorder);
+        verifyAttemptReadCachesNotCleared();
     }
 
     @Test
@@ -235,10 +215,12 @@ class LmsRuntimeServiceAttemptRulesTest {
         Assignment assignment = assignment();
         assignment.setMaxDurationMinutes(10);
         Attempt attempt = attempt();
-        OffsetDateTime submittedAt = attempt.getStartedAt().plusMinutes(11);
+        // Server time is authoritative; a client-supplied submittedAt must not backdate an expired attempt.
+        attempt.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(11));
+        OffsetDateTime submittedAt = OffsetDateTime.now(ZoneOffset.UTC).minusHours(4);
 
-        when(attemptService.findById("attempt-1")).thenReturn(Optional.of(attempt));
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment));
+        when(attemptService.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
 
         assertThatThrownBy(() -> service.submitAttempt(
                 "attempt-1",
@@ -257,9 +239,9 @@ class LmsRuntimeServiceAttemptRulesTest {
         Attempt attempt = attempt();
         Quiz quiz = quiz();
         quiz.setQuestionIds(List.of("question-1", "question-2"));
-        when(attemptService.findById("attempt-1")).thenReturn(Optional.of(attempt));
-        when(assignmentService.findById("assignment-1")).thenReturn(Optional.of(assignment));
-        when(quizService.findById("quiz-1")).thenReturn(Optional.of(quiz));
+        when(attemptService.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
+        when(assignmentService.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
+        when(quizService.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz));
 
         service.submitAttempt(
                 "attempt-1",

@@ -5,10 +5,17 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -22,7 +29,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class CrmSchoolProfile extends BaseEntity {
 
     @Column(name = "school_id", length = 36, nullable = false)
@@ -66,4 +73,32 @@ public class CrmSchoolProfile extends BaseEntity {
 
     @Column(name = "note", length = 2000)
     private String note;
+
+    @Column(name = "lead_status", nullable = false, length = 32)
+    private String leadStatus = "new_lead";
+
+    private String segment;
+
+    @Column(nullable = false)
+    private Integer probability = 0;
+
+    @Column(name = "expected_students", nullable = false)
+    private Integer expectedStudents = 0;
+
+    @Column(name = "expected_classes", nullable = false)
+    private Integer expectedClasses = 0;
+
+    @Column(name = "next_follow_up_at")
+    private LocalDate nextFollowUpAt;
+
+    @Column(name = "last_touch_at")
+    private OffsetDateTime lastTouchAt;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "risks", nullable = false, columnDefinition = "jsonb")
+    private List<String> risks = new ArrayList<>();
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 }

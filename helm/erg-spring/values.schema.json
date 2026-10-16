@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["image", "resources", "dbPool", "autoscaling"],
+  "properties": {
+    "replicaCount": {"type": "integer", "minimum": 1},
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string"},
+        "digest": {"type": "string", "pattern": "^$|^sha256:[a-f0-9]{64}$"},
+        "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]}
+      }
+    },
+    "dbPool": {
+      "type": "object",
+      "required": ["perPodMaxConnections", "perPodMinIdleConnections", "postgresMaxConnections", "reservedConnections"],
+      "properties": {
+        "perPodMaxConnections": {"type": "integer", "minimum": 1},
+        "perPodMinIdleConnections": {"type": "integer", "minimum": 0},
+        "postgresMaxConnections": {"type": "integer", "minimum": 10},
+        "reservedConnections": {"type": "integer", "minimum": 1}
+      }
+    },
+    "autoscaling": {
+      "type": "object",
+      "required": ["mode", "minReplicas", "maxReplicas"],
+      "properties": {
+        "mode": {"enum": ["disabled", "hpa", "keda"]},
+        "minReplicas": {"type": "integer", "minimum": 2},
+        "maxReplicas": {"type": "integer", "minimum": 2}
+      }
+    }
+  }
+}
+

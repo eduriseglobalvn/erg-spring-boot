@@ -1,7 +1,10 @@
 package com.erg.ergspringboot.platform.graphql;
 
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
+import com.erg.ergspringboot.platform.web.RequestCorrelation;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -24,11 +27,14 @@ public class GraphQlRequestContextFactory {
         assertTenantMatchesPrincipal(requestedTenantId, principal);
         assertPortalAllowed(requestedPortal, principal);
 
+        AccessScopeSet principalScopes = AccessScopeAssembler.from(principal);
+        List<String> educationUnits = principalScopes.managedIds(AccessScopeSet.EDUCATION_UNIT);
+        List<String> classes = principalScopes.managedIds(AccessScopeSet.CLASS);
         UserAccessContext access = new UserAccessContext(
                 principal.userId(),
                 principal.tenantId(),
-                listAttribute(principal, "managedEducationUnitIds"),
-                listAttribute(principal, "managedClassIds"),
+                educationUnits,
+                classes,
                 first(
                         headers.getFirst("X-Current-EducationUnit-ID"),
                         headers.getFirst("X-Current-Education-Unit-ID"),
@@ -36,14 +42,14 @@ public class GraphQlRequestContextFactory {
                         headers.getFirst("X-EducationUnit-ID"),
                         headers.getFirst("X-Education-Unit-ID"),
                         headers.getFirst("X-Center-ID"),
-                        stringAttribute(principal, "currentEducationUnitId"),
-                        firstOrNull(listAttribute(principal, "managedEducationUnitIds"))
+                        principalScopes.currentId(AccessScopeSet.EDUCATION_UNIT).orElse(null),
+                        firstOrNull(educationUnits)
                 ),
                 first(
                         headers.getFirst("X-Current-Class-ID"),
                         headers.getFirst("X-Class-ID"),
-                        stringAttribute(principal, "currentClassId"),
-                        firstOrNull(listAttribute(principal, "managedClassIds"))
+                        principalScopes.currentId(AccessScopeSet.CLASS).orElse(null),
+                        firstOrNull(classes)
                 )
         );
 
@@ -54,7 +60,8 @@ public class GraphQlRequestContextFactory {
                 principal.tenantId(),
                 requestedTenantId,
                 requestedPortal,
-                first(headers.getFirst("X-Request-ID"), headers.getFirst("X-Trace-ID")),
+                first(headers.getFirst(RequestCorrelation.REQUEST_ID_HEADER),
+                        headers.getFirst(RequestCorrelation.TRACE_ID_HEADER)),
                 trimToNull(operationName),
                 hasBearer(headers),
                 safeList(principal.roles()),
@@ -97,41 +104,6 @@ public class GraphQlRequestContextFactory {
     private boolean hasBearer(HttpHeaders headers) {
         String authorization = headers.getFirst(HttpHeaders.AUTHORIZATION);
         return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, "Bearer ".length());
-    }
-
-    private List<String> listAttribute(ErgPrincipal principal, String key) {
-        if (principal.attributes() == null) {
-            return List.of();
-        }
-        Object value = principal.attributes().get(key);
-        if (value instanceof List<?> list) {
-            return list.stream()
-                    .map(String::valueOf)
-                    .map(String::trim)
-                    .filter(item -> !item.isBlank())
-                    .distinct()
-                    .toList();
-        }
-        return csv(value == null ? null : value.toString());
-    }
-
-    private String stringAttribute(ErgPrincipal principal, String key) {
-        if (principal.attributes() == null) {
-            return null;
-        }
-        Object value = principal.attributes().get(key);
-        return value == null ? null : trimToNull(value.toString());
-    }
-
-    private List<String> csv(String value) {
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(item -> !item.isBlank())
-                .distinct()
-                .toList();
     }
 
     private String normalizePortal(String portal) {

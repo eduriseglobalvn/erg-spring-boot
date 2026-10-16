@@ -22,11 +22,18 @@ class RuntimePermissionCatalogContractTest {
     void everyRuntimePermissionIsSeededAndRegisteredAsAnEnforcedBinding() throws Exception {
         Set<String> runtime = runtimePermissions();
         Set<String> seeded = valuesFromFiles(MIGRATIONS, ".sql");
-        String catalogMigration = Files.readString(MIGRATIONS.resolve("V57__permission_catalog_and_bindings.sql"));
+        String catalogMigrations;
+        try (Stream<Path> files = Files.walk(MIGRATIONS)) {
+            catalogMigrations = files
+                    .filter(path -> path.toString().endsWith(".sql"))
+                    .sorted()
+                    .map(RuntimePermissionCatalogContractTest::readUnchecked)
+                    .collect(java.util.stream.Collectors.joining("\n"));
+        }
 
         assertThat(seeded).containsAll(runtime);
         assertThat(runtime)
-                .allSatisfy(permission -> assertThat(catalogMigration).contains("('" + permission + "')"));
+                .allSatisfy(permission -> assertThat(catalogMigrations).contains("'" + permission + "'"));
     }
 
     private Set<String> runtimePermissions() throws IOException {
@@ -59,5 +66,13 @@ class RuntimePermissionCatalogContractTest {
             values.add(matcher.group(1));
         }
         return values;
+    }
+
+    private static String readUnchecked(Path path) {
+        try {
+            return Files.readString(path);
+        } catch (IOException error) {
+            throw new java.io.UncheckedIOException(error);
+        }
     }
 }

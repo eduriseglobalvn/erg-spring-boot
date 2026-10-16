@@ -1,9 +1,11 @@
 package com.erg.ergspringboot.platform.graphql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
+import com.erg.ergspringboot.platform.security.AuthenticationRequiredException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,12 @@ class GraphQlAccessSupportPermissionTest {
         );
 
         assertThat(access.isAllowed(principal, "lms.grade.finalize", "lms.manage")).isFalse();
+    }
+
+    @Test
+    void tenantResolutionRequiresTheVerifiedPrincipalEvenWhenTheClientRequestsATenant() {
+        assertThatThrownBy(() -> access.verifiedTenantId(null, "tenant-a"))
+                .isInstanceOf(AuthenticationRequiredException.class);
     }
 
     private ErgPrincipal principal(List<String> permissions, List<String> denies) {

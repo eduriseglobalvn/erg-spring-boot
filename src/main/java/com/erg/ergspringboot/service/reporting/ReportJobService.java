@@ -1,58 +1,50 @@
 package com.erg.ergspringboot.service.reporting;
 
 import com.erg.ergspringboot.common.response.reporting.ReportJobResponses.ReportJobResponse;
-import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.reporting.ReportJob;
+import com.erg.ergspringboot.reporting.ReportingOperations;
+import com.erg.ergspringboot.reporting.ReportingOperationsCompatibility;
+import com.erg.ergspringboot.reporting.ReportJobPort;
 import com.erg.ergspringboot.repository.reporting.ReportJobRepository;
-import com.erg.ergspringboot.utils.IdGenerator;
-import java.time.OffsetDateTime;
-import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @deprecated Use {@link ReportingOperations}. This bean is a compatibility
+ *             adapter for the worker and older integrations.
+ */
+@Deprecated
 @Service
 public class ReportJobService {
     public static final String ASSIGNMENT_PROGRESS = "ASSIGNMENT_PROGRESS";
-    private final ReportJobRepository repository;
+    private final ReportJobPort operations;
 
+    @Autowired
+    public ReportJobService(ReportJobPort operations) {
+        this.operations = operations;
+    }
+
+    /** Compatibility constructor for older tests and callers. */
+    @Deprecated
     public ReportJobService(ReportJobRepository repository) {
-        this.repository = repository;
+        this(ReportingOperationsCompatibility.fromRepository(repository));
     }
 
-    @Transactional(value = "postgresTransactionManager")
     public ReportJobResponse enqueueAssignmentProgress(
-            String tenantId, String requestedBy, String assignmentId, String idempotencyKey
-    ) {
-        String key = idempotencyKey == null || idempotencyKey.isBlank()
-                ? ASSIGNMENT_PROGRESS + ":" + assignmentId + ":" + requestedBy + ":" + OffsetDateTime.now().toEpochSecond()
-                : idempotencyKey.trim();
-        ReportJob existing = repository.findByTenantIdAndIdempotencyKey(tenantId, key).orElse(null);
-        if (existing != null) return toResponse(existing);
-        ReportJob job = new ReportJob();
-        job.setId(IdGenerator.newId());
-        job.setTenantId(tenantId);
-        job.setRequestedBy(requestedBy);
-        job.setReportType(ASSIGNMENT_PROGRESS);
-        job.setAggregateId(assignmentId);
-        job.setIdempotencyKey(key);
-        job.setRequestJson(Map.of("assignmentId", assignmentId));
-        job.setStatus("queued");
-        job.setProgress(0);
-        job.setAvailableAt(OffsetDateTime.now());
-        job.setCreatedAt(OffsetDateTime.now());
-        return toResponse(repository.save(job));
+            String tenantId, String requestedBy, String assignmentId, String idempotencyKey) {
+        return operations.enqueueAssignmentProgress(tenantId, requestedBy, assignmentId, idempotencyKey);
     }
 
-    @Transactional(value = "postgresTransactionManager", readOnly = true)
     public ReportJobResponse get(String tenantId, String id) {
-        return repository.findByIdAndTenantId(id, tenantId)
-                .map(this::toResponse)
-                .orElseThrow(() -> new ResourceNotFoundException("report job not found"));
+        return operations.get(tenantId, id);
     }
 
+    /** Legacy response helper retained for source compatibility. */
     public ReportJobResponse toResponse(ReportJob job) {
         return new ReportJobResponse(
                 job.getId(), job.getReportType(), job.getAggregateId(), job.getStatus(), job.getProgress(),
-                job.getCreatedAt(), job.getCompletedAt(), job.getResultJson(), job.getLastError());
+                job.getCreatedAt(), job.getCompletedAt(), job.getResultJson(), job.getLastError(),
+                job.getFormat(), job.getExpiresAt(), "/api/v1/reports/jobs/" + job.getId() + "/download");
     }
+
 }

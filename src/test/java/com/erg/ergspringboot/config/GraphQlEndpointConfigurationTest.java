@@ -31,6 +31,7 @@ class GraphQlEndpointConfigurationTest {
                 .contains("http:")
                 .contains("path: ${SPRING_GRAPHQL_PATH:/api/v1/graphql}")
                 .contains("schema:")
+                .contains("locations: ${SPRING_GRAPHQL_SCHEMA_LOCATIONS:classpath:/graphql/}")
                 .contains("introspection:")
                 .contains("enabled: ${SPRING_GRAPHQL_SCHEMA_INTROSPECTION_ENABLED:${ERG_GRAPHQL_INTROSPECTION_ENABLED:false}}");
         assertThat(applicationYaml)

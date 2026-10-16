@@ -24,6 +24,7 @@ import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
+import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.Comparator;
@@ -42,8 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SessionService {
 
     private static final String DEFAULT_TENANT = "erg";
-    private static final Set<String> SYSTEM_ADMIN_ROLES = Set.of("system.super_admin", "erg_super_admin", "super_admin", "admin");
-    private static final Set<String> PLATFORM_WIDE_PORTAL_ROLES = Set.of("system.super_admin", "erg_super_admin", "super_admin");
     private static final int MAX_BOOTSTRAP_UNITS = 500;
     private static final int MAX_BOOTSTRAP_CLASSES = 500;
 
@@ -99,7 +98,7 @@ public class SessionService {
 
         List<String> roles = roleNames(user);
         PermissionEnvelope permissionEnvelope = permissionEnvelope(user);
-        boolean canAccessGlobalErg = isSystemAdmin(roles) || permissionEnvelope.grantedPermissions().contains("*");
+        boolean canAccessGlobalErg = permissionEnvelope.grantedPermissions().contains("*");
 
         List<ManagedUnit> managedUnits = resolveManageableUnits(user, roles, canAccessGlobalErg, normalizeTenant(tenantId));
         List<SessionBootstrapUnit> manageableUnits = toBootstrapUnits(managedUnits);
@@ -120,11 +119,13 @@ public class SessionService {
                         permissionEnvelope.grantedPermissions(),
                         permissionEnvelope.deniedPermissions()
                 ),
-                effectivePortals(session, roles, permissionEnvelope.grantedPermissions()),
+                effectivePortals(roles, permissionEnvelope.grantedPermissions()),
                 lifecycle(user),
                 currentScope,
                 manageableUnits,
-                manageableClasses
+                manageableClasses,
+                session.getTenantId(),
+                WorkspaceCapabilityMapper.canonicalWorkspaces(List.of(), roles, permissionEnvelope.grantedPermissions())
         );
     }
 
@@ -365,22 +366,8 @@ public class SessionService {
                 .anyMatch(role -> role.contains("teacher") || role.contains("instructor"));
     }
 
-    private boolean isSystemAdmin(List<String> roles) {
-        return roles.stream()
-                .filter(Objects::nonNull)
-                .map(role -> role.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(SYSTEM_ADMIN_ROLES::contains);
-    }
-
-    private List<String> effectivePortals(AuthSession session, List<String> roles, List<String> grantedPermissions) {
-        boolean platformWide = grantedPermissions.contains("*") || roles.stream()
-                .filter(Objects::nonNull)
-                .map(role -> role.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(PLATFORM_WIDE_PORTAL_ROLES::contains);
-        if (platformWide) {
-            return List.of("*");
-        }
-        return List.of(session.getPortal() == null || session.getPortal().isBlank() ? "lms" : session.getPortal());
+    private List<String> effectivePortals(List<String> roles, List<String> grantedPermissions) {
+        return WorkspaceCapabilityMapper.legacyPortalsFor(List.of(), roles, grantedPermissions);
     }
 
     private SessionBootstrapScope resolveCurrentScope(

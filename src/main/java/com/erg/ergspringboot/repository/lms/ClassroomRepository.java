@@ -23,6 +23,9 @@ public interface ClassroomRepository extends JpaRepository<Classroom, String> {
 
     List<Classroom> findByTenantIdAndSchoolIdOrderByNameAsc(String tenantId, String schoolId);
 
+    boolean existsByTenantIdAndSchoolIdAndNameIgnoreCaseAndAcademicYear(
+            String tenantId, String schoolId, String name, String academicYear);
+
     List<Classroom> findByTenantIdAndSchoolIdOrderByNameAsc(
             String tenantId, String schoolId, Pageable pageable);
 
@@ -32,6 +35,8 @@ public interface ClassroomRepository extends JpaRepository<Classroom, String> {
             String tenantId, Collection<String> schoolIds, Pageable pageable);
 
     List<Classroom> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
+
+    java.util.Optional<Classroom> findByTenantIdAndId(String tenantId, String id);
 
     @Query("""
             select distinct classroom.schoolId

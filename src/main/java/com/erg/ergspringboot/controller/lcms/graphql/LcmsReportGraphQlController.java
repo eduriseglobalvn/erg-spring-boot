@@ -5,6 +5,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.QuestionAn
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.lcms.LcmsQueryOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsReportRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
@@ -26,6 +27,7 @@ public class LcmsReportGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "quizQuestionAnalytics")
+    @LcmsReportRead
     public QuestionAnalyticsResponse quizQuestionAnalytics(@Argument String quizVersionId) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.report.read", "lms.grade.read", "lms.manage", "*");
@@ -36,6 +38,7 @@ public class LcmsReportGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "assignmentReport")
+    @LcmsReportRead
     public AssignmentReportResponse assignmentReport(
             @Argument String assignmentId,
             @Argument Integer page,

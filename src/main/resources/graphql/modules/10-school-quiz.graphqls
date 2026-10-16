@@ -1,0 +1,173 @@
+input SchoolDirectoryInput { tenantId: String, search: String, status: String, schoolType: String, page: Int, size: Int }
+input SchoolOperationsInput { tenantId: String, schoolId: String! }
+
+type SchoolDirectoryWorkspace {
+  items: [SchoolDirectoryItem!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type SchoolDirectoryItem {
+  id: String!
+  name: String!
+  slug: String
+  schoolType: String!
+  status: String!
+  district: String
+  academicYear: String
+  classCount: Int!
+  studentCount: Int!
+  version: String!
+}
+
+type SchoolOperationsWorkspace {
+  school: SchoolOperationsProfile!
+  summary: SchoolOperationsSummary!
+  academicYears: [SchoolAcademicYear!]!
+  grades: [SchoolGrade!]!
+  classes: [SchoolClass!]!
+  students: [SchoolStudent!]!
+  subjects: [SchoolSubject!]!
+  permissions: SchoolOperationsPermissions!
+}
+
+type SchoolOperationsProfile {
+  id: String!
+  name: String!
+  slug: String
+  schoolType: String!
+  status: String!
+  address: String
+  district: String
+  principalName: String
+  contactPhone: String
+  contactEmail: String
+  currentAcademicYearId: String
+  version: String!
+}
+
+type SchoolOperationsSummary { classCount: Int!, activeClassCount: Int!, studentCount: Int!, gradeCount: Int! }
+type SchoolOperationsPermissions { canCreateSchool: Boolean!, canUpdateSchool: Boolean!, canArchiveSchool: Boolean!, canManageClasses: Boolean! }
+type SchoolAcademicYear { id: String!, startYear: Int!, endYear: Int!, displayName: String!, status: String!, startsOn: String, endsOn: String, version: String! }
+type SchoolGrade { id: String!, academicYearId: String!, gradeCode: String!, label: String!, sortOrder: Int!, status: String!, source: String! }
+type SchoolClass { id: String!, name: String!, grade: String, homeroomTeacher: String, studentCount: Int!, status: String }
+type SchoolStudent { id: String!, code: String, fullName: String!, birthDate: String, grade: String, className: String, guardianPhone: String, subjectIds: [String!]!, status: String!, averageScore: Float }
+type SchoolSubject { id: String!, name: String!, code: String, studentCount: Int!, teacherCount: Int! }
+
+type QuizQuestionAnalytics {
+  quizVersionId: String!
+  questions: [QuestionAnalyticsRow!]!
+}
+
+type QuestionAnalyticsRow {
+  quizVersionQuestionId: String!
+  questionKind: String
+  answeredCount: Int!
+  correctCount: Int!
+  partialCount: Int!
+  correctRate: Float!
+  averageAwardedPoints: Float!
+  maxPoints: Float!
+}
+
+type AssignmentReport {
+  assignmentId: String!
+  totalRecipients: Int!
+  submittedCount: Int!
+  inProgressCount: Int!
+  notStartedCount: Int!
+  needsReviewCount: Int!
+  averagePercent: Float!
+  students: [StudentProgressRow!]!
+  page: Int!
+  size: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+}
+
+type StudentProgressRow {
+  studentUserId: String!
+  studentName: String
+  status: String
+  answeredCount: Int!
+  totalQuestions: Int!
+  percentComplete: Float
+  score: Float
+  passed: Boolean
+  submittedAt: String
+}
+
+type QuizVersionHistory {
+  quizId: String!
+  items: [QuizVersionSummary!]!
+}
+
+type QuizVersionSummary {
+  id: String!
+  versionLabel: String!
+  versionNumber: Int!
+  gradingMode: String
+  contentHash: String
+  publishedBy: String
+  publishedAt: String
+  isActive: Boolean!
+}
+
+input QuizWorkspaceInput {
+  tenantId: String
+  search: String
+  subjectId: String
+  levelId: String
+  categoryId: String
+  status: String
+  kind: String
+  page: Int
+  size: Int
+}
+
+type QuizWorkspace {
+  tenantId: String!
+  quizzes: QuizSummaryPage!
+  subjects: [QuestionBankOption!]!
+  levels: [QuestionBankOption!]!
+  categories: [QuestionBankOption!]!
+}
+
+type QuizSummaryPage {
+  items: [QuizSummary!]!
+  page: Int!
+  size: Int!
+  totalItems: Int!
+  totalPages: Int!
+  hasNext: Boolean!
+  hasPrevious: Boolean!
+}
+
+type QuizSummary {
+  id: String!
+  title: String!
+  subtitle: String
+  kind: String
+  status: String
+  subjectId: String
+  levelId: String
+  categoryId: String
+  currentVersionLabel: String
+  questionCount: Int!
+  updatedAt: String
+}
+
+type QuizDraftDocument {
+  quizId: String!
+  draftId: String!
+  docVersion: Int!
+  baseVersionLabel: String
+  updatedAt: String
+  settings: String
+  playerTemplate: String
+  tree: String
+}

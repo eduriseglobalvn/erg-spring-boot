@@ -11,6 +11,7 @@ import com.erg.ergspringboot.repository.quiz.runtime.StudentProgressRepository;
 import com.erg.ergspringboot.repository.quiz.runtime.StudentProgressRepository.StudentProgressSummaryProjection;
 import com.erg.ergspringboot.repository.quiz.runtime.projection.QuestionAnalyticsProjection;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.reporting.AssignmentProgressFilter;
 import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.cache.annotation.Cacheable;
@@ -101,6 +102,31 @@ public class QuizReportService {
                 assignmentId, (int) total, submitted, inProgress, notStarted, needsReview, averagePercent, students,
                 safePage, safeSize, pageResult == null ? (total == 0 ? 0 : (int) Math.ceil((double) total / safeSize))
                         : pageResult.getTotalPages(), pageResult != null && pageResult.hasNext());
+    }
+
+    /** Filtered assignment progress for REST reporting and bounded exports. */
+    public AssignmentReportResponse assignmentReport(
+            String tenantId, String assignmentId, AssignmentProgressFilter filter) {
+        AssignmentProgressFilter safe = filter == null
+                ? new AssignmentProgressFilter(null, null, null, null, java.time.ZoneId.of("UTC"), 0, 100)
+                : filter;
+        Page<StudentProgress> pageResult = studentProgressRepository.findAssignmentReport(
+                tenantId, assignmentId, safe.classId(), safe.status(), safe.submittedFrom(), safe.submittedTo(),
+                PageRequest.of(safe.page(), safe.size()));
+        StudentProgressSummaryProjection summary = studentProgressRepository.summarizeAssignment(
+                tenantId, assignmentId, safe.classId(), safe.status(), safe.submittedFrom(), safe.submittedTo());
+        List<StudentProgress> progress = pageResult == null ? List.of() : pageResult.getContent();
+        long total = summary == null ? (pageResult == null ? 0 : pageResult.getTotalElements()) : summary.getTotalRecipients();
+        int submitted = summary == null ? (int) progress.stream().filter(this::isSubmitted).count() : (int) summary.getSubmittedCount();
+        int inProgress = summary == null ? (int) progress.stream().filter(this::isInProgress).count() : (int) summary.getInProgressCount();
+        int needsReview = summary == null ? (int) progress.stream().filter(this::isNeedsReview).count() : (int) summary.getNeedsReviewCount();
+        int notStarted = Math.max(0, (int) total - submitted - inProgress - needsReview);
+        double averagePercent = summary == null ? averageScore(progress) : summary.getAveragePercent();
+        int totalPages = pageResult == null ? (total == 0 ? 0 : (int) Math.ceil((double) total / safe.size())) : pageResult.getTotalPages();
+        return new AssignmentReportResponse(
+                assignmentId, (int) total, submitted, inProgress, notStarted, needsReview, averagePercent,
+                progress.stream().map(this::toProgressRow).toList(), safe.page(), safe.size(), totalPages,
+                pageResult != null && pageResult.hasNext());
     }
 
     private boolean isSubmitted(StudentProgress row) { return STATUS_SUBMITTED.equalsIgnoreCase(row.getStatus()); }

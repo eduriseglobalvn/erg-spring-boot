@@ -19,6 +19,12 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
 import com.erg.ergspringboot.authorization.AuthorizationAuditContext;
 import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
+import com.erg.ergspringboot.authorization.authorization.RbacPermissionRead;
+import com.erg.ergspringboot.authorization.authorization.RbacRoleAssign;
+import com.erg.ergspringboot.authorization.authorization.RbacRoleCreate;
+import com.erg.ergspringboot.authorization.authorization.RbacRoleDelete;
+import com.erg.ergspringboot.authorization.authorization.RbacRoleRead;
+import com.erg.ergspringboot.authorization.authorization.RbacRoleUpdate;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -64,16 +70,19 @@ public class AuthorizationController {
     }
 
     @GetMapping("/roles")
+    @RbacRoleRead
     public ApiResponse<List<RoleResponse>> listRoles(HttpServletRequest request) {
         return ok("Roles loaded", authorizationService.listRoles(), request);
     }
 
     @GetMapping("/roles/{roleId}")
+    @RbacRoleRead
     public ApiResponse<RoleResponse> getRole(@PathVariable String roleId, HttpServletRequest request) {
         return ok("Role loaded", authorizationService.getRole(roleId), request);
     }
 
     @PostMapping("/roles")
+    @RbacRoleCreate
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<RoleResponse> createRole(@Valid @RequestBody CreateRoleRequest body, HttpServletRequest request) {
         ErgPrincipal principal = principal();
@@ -86,6 +95,7 @@ public class AuthorizationController {
     }
 
     @RequestMapping(method = {RequestMethod.PUT, RequestMethod.PATCH}, path = "/roles/{roleId}")
+    @RbacRoleUpdate
     public ApiResponse<RoleResponse> updateRole(
             @PathVariable String roleId,
             @Valid @RequestBody UpdateRoleRequest body,
@@ -99,6 +109,7 @@ public class AuthorizationController {
     }
 
     @DeleteMapping("/roles/{roleId}")
+    @RbacRoleDelete
     public ApiResponse<Void> deleteRole(@PathVariable String roleId, HttpServletRequest request) {
         ErgPrincipal principal = principal();
         authorizationService.deleteRole(roleId, principal, auditContext(request));
@@ -106,11 +117,13 @@ public class AuthorizationController {
     }
 
     @GetMapping("/permissions")
+    @RbacPermissionRead
     public ApiResponse<List<PermissionResponse>> listPermissions(HttpServletRequest request) {
         return ok("Permissions loaded", authorizationService.listPermissions(), request);
     }
 
     @GetMapping("/permissions/catalog")
+    @RbacPermissionRead
     public ApiResponse<PermissionPageResponse> permissionCatalog(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
@@ -129,6 +142,7 @@ public class AuthorizationController {
     }
 
     @GetMapping("/permissions/{permissionId}")
+    @RbacPermissionRead
     public ApiResponse<PermissionResponse> permissionDetail(
             @PathVariable String permissionId,
             HttpServletRequest request
@@ -137,11 +151,13 @@ public class AuthorizationController {
     }
 
     @GetMapping("/permission-groups")
+    @RbacPermissionRead
     public ApiResponse<List<PermissionGroupResponse>> listPermissionGroups(HttpServletRequest request) {
         return ok("Permission groups loaded", authorizationService.listPermissionGroups(), request);
     }
 
     @DeleteMapping("/users/{userId}/roles/{roleId}")
+    @RbacRoleAssign
     public ApiResponse<Void> removeRole(
             @PathVariable String userId,
             @PathVariable String roleId,
@@ -154,6 +170,7 @@ public class AuthorizationController {
     }
 
     @PostMapping("/users/roles/bulk")
+    @RbacRoleAssign
     public ApiResponse<BulkOperationResponse> bulkAssignRole(
             @Valid @RequestBody BulkAssignRoleRequest body,
             HttpServletRequest request
@@ -167,6 +184,7 @@ public class AuthorizationController {
     }
 
     @PostMapping("/users/{userId}/role-assignments")
+    @RbacRoleAssign
     public ApiResponse<ScopedRoleAssignmentResponse> assignScopedRole(
             @PathVariable String userId,
             @Valid @RequestBody AssignScopedRoleRequest body,
@@ -181,6 +199,7 @@ public class AuthorizationController {
     }
 
     @DeleteMapping("/users/{userId}/role-assignments/{assignmentId}")
+    @RbacRoleAssign
     public ApiResponse<ScopedRoleAssignmentResponse> revokeScopedRole(
             @PathVariable String userId,
             @PathVariable String assignmentId,
@@ -197,6 +216,7 @@ public class AuthorizationController {
     }
 
     @DeleteMapping("/users/{userId}/permissions/{overrideId}")
+    @RbacRoleAssign
     public ApiResponse<Void> deletePermissionOverride(
             @PathVariable String userId,
             @PathVariable String overrideId,
@@ -209,26 +229,31 @@ public class AuthorizationController {
     }
 
     @GetMapping("/users/{userId}/effective-permissions")
+    @RbacPermissionRead
     public ApiResponse<EffectivePermissionsResponse> effectivePermissions(@PathVariable String userId, HttpServletRequest request) {
         return ok("Effective permissions loaded", authorizationService.effectivePermissions(userId), request);
     }
 
     @GetMapping("/users/{userId}/permission-overrides")
+    @RbacPermissionRead
     public ApiResponse<List<PermissionOverrideResponse>> permissionOverrides(@PathVariable String userId, HttpServletRequest request) {
         return ok("Permission overrides loaded", authorizationService.listPermissionOverrides(userId), request);
     }
 
     @GetMapping("/users/{userId}/feature-config")
+    @RbacPermissionRead
     public ApiResponse<FeatureConfigResponse> featureConfig(@PathVariable String userId, HttpServletRequest request) {
         return ok("Feature config loaded", authorizationService.featureConfig(userId), request);
     }
 
     @GetMapping("/me/feature-config")
+    @RbacPermissionRead
     public ApiResponse<FeatureConfigResponse> currentFeatureConfig(HttpServletRequest request) {
         return ok("Feature config loaded", authorizationService.featureConfig(userId(request)), request);
     }
 
     @PostMapping("/users/{userId}/preview")
+    @RbacPermissionRead
     public ApiResponse<PreviewChangesResponse> previewChanges(
             @PathVariable String userId,
             @RequestBody(required = false) PreviewChangesRequest body,
@@ -242,8 +267,7 @@ public class AuthorizationController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private String userId(HttpServletRequest request) {

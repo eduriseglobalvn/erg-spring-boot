@@ -3,6 +3,7 @@ package com.erg.ergspringboot.platform.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.model.authorization.Permission;
@@ -10,6 +11,7 @@ import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -43,7 +45,7 @@ class OidcPrincipalBridgeFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-Tenant-ID", "tenant-1");
 
-        new OidcPrincipalBridgeFilter(userRepository).doFilter(
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
                 request,
                 new MockHttpServletResponse(),
                 (servletRequest, servletResponse) -> {
@@ -79,7 +81,7 @@ class OidcPrincipalBridgeFilterTest {
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-Tenant-ID", "tenant-1");
-        new OidcPrincipalBridgeFilter(userRepository).doFilter(
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
                 request,
                 new MockHttpServletResponse(),
                 (servletRequest, servletResponse) -> {
@@ -107,7 +109,7 @@ class OidcPrincipalBridgeFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-Tenant-ID", "tenant-requested");
 
-        new OidcPrincipalBridgeFilter(userRepository).doFilter(
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-requested").doFilter(
                 request,
                 new MockHttpServletResponse(),
                 (servletRequest, servletResponse) ->
@@ -122,34 +124,55 @@ class OidcPrincipalBridgeFilterTest {
         User user = activeUser();
         user.setStatus("INVITED");
         when(userRepository.findWithDetailsByTenantAndIdentifier(
-                "erg", "invited@example.test", "invited@example.test"))
+                "tenant-1", "invited@example.test", "invited@example.test"))
                 .thenReturn(Optional.of(user));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(oidcUser, null, List.of())
         );
 
-        new OidcPrincipalBridgeFilter(userRepository).doFilter(
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
                 new MockHttpServletRequest(),
                 new MockHttpServletResponse(),
                 (request, response) -> assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull()
         );
+        verify(userRepository).findWithDetailsByTenantAndIdentifier("tenant-1", "invited@example.test", "invited@example.test");
     }
 
     @Test
     void clearsAuthenticationWhenOidcIdentityHasNoInternalAccount() throws Exception {
         UserRepository userRepository = mock(UserRepository.class);
         OidcUser oidcUser = oidcUser("unknown", null);
-        when(userRepository.findWithDetailsByTenantAndIdentifier("erg", "unknown", "unknown"))
-                .thenReturn(Optional.empty());
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(oidcUser, null, List.of())
         );
 
-        new OidcPrincipalBridgeFilter(userRepository).doFilter(
+        when(userRepository.findWithDetailsByTenantAndIdentifier("tenant-1", "unknown", "unknown"))
+                .thenReturn(Optional.empty());
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
                 new MockHttpServletRequest(),
                 new MockHttpServletResponse(),
                 (request, response) -> assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull()
         );
+        verify(userRepository).findWithDetailsByTenantAndIdentifier("tenant-1", "unknown", "unknown");
+    }
+
+    @Test
+    void rejectsClientTenantOverrideWhenVerifiedOidcClaimIsPresent() throws Exception {
+        UserRepository userRepository = mock(UserRepository.class);
+        OidcUser oidcUser = oidcUser("staff-01", null);
+        when(oidcUser.getClaims()).thenReturn(Map.of("tenant_id", "tenant-1"));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(oidcUser, null, List.of()));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Tenant-ID", "tenant-foreign");
+
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
+                request,
+                new MockHttpServletResponse(),
+                (servletRequest, servletResponse) -> assertThat(SecurityContextHolder.getContext().getAuthentication())
+                        .isNull());
+
+        verifyNoInteractions(userRepository);
     }
 
     private static OidcUser oidcUser(String preferredUsername, String email) {

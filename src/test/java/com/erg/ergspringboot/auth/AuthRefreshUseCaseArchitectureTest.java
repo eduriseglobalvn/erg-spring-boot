@@ -15,9 +15,9 @@ class AuthRefreshUseCaseArchitectureTest {
                 "com.erg.ergspringboot.auth.internal.refresh.AuthRefreshUseCase"))
                 .doesNotThrowAnyException();
         String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"));
+                "src/main/java/com/erg/ergspringboot/auth/AuthOperations.java"));
         assertThat(facade)
-                .contains("refreshTokens.refresh(")
+                .contains("refreshFlow.refresh(")
                 .doesNotContain("handleRefreshTokenReplay(");
     }
 }

@@ -34,3 +34,10 @@ erg:
   auth:
     bff-enabled: true
     local-login-enabled: false
+  http:
+    cors:
+      # Browser/PWA BFF clients are explicit origins. Override with the deployment
+      # environment for staging; never use a wildcard with credentials.
+      allowed-origins: ${ERG_BFF_CORS_ALLOWED_ORIGINS:https://lms.erg.edu.vn,https://crm.erg.edu.vn,https://auth.erg.edu.vn}
+      allowed-headers: ${ERG_BFF_CORS_ALLOWED_HEADERS:Accept,Content-Type,X-Request-ID,X-Trace-ID,X-Idempotency-Key,X-XSRF-TOKEN}
+      allow-credentials: true

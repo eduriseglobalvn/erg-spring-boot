@@ -11,15 +11,20 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Student;
+import com.erg.ergspringboot.model.lms.StudentEnrollment;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AttemptRepository;
+import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.repository.lms.StudentEnrollmentRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.lms.projection.AnnouncementCardProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentProjection;
+import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentCountProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardScoreSummaryProjection;
 import java.lang.reflect.RecordComponent;
 import java.time.OffsetDateTime;
@@ -53,6 +58,12 @@ class StudentDashboardReadServiceTest {
 
     @Mock
     private StudentDashboardAnnouncementReadPort announcementReadPort;
+
+    @Mock
+    private StudentEnrollmentRepository studentEnrollmentRepository;
+
+    @Mock
+    private ClassroomRepository classroomRepository;
 
     private StudentDashboardReadService service;
 
@@ -174,9 +185,9 @@ class StudentDashboardReadServiceTest {
                 "student-row-1",
                 PageRequest.of(0, 8)
         )).thenReturn(List.of(math, science));
-        when(assignmentRepository.countActiveStudentAssignments("tenant-a", "class-1", "student-row-1")).thenReturn(12L);
-        when(assignmentRepository.countPendingStudentAssignmentActions("tenant-a", "class-1", "student-row-1")).thenReturn(3L);
-        when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1"))
+        when(assignmentRepository.summarizeStudentDashboardAssignments("tenant-a", "class-1", "student-row-1"))
+                .thenReturn(new StudentDashboardAssignmentCountProjection(12L, 3L));
+        when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-1"))
                 .thenReturn(new StudentDashboardScoreSummaryProjection(4L, 2L, 3L, 72.4D, 98.8D));
         when(announcementReadPort.findStudentDashboardAnnouncements("tenant-a", "student-row-1", "school-1", "class-1", 5))
                 .thenReturn(List.of(
@@ -213,6 +224,9 @@ class StudentDashboardReadServiceTest {
                 .extracting("id")
                 .containsExactly("assignment-1", "assignment-2");
         assertThat(response.assignments())
+                .extracting("quizId")
+                .containsExactly("quiz-1", "quiz-2");
+        assertThat(response.assignments())
                 .extracting("title")
                 .containsExactly("Algebra practice", "Energy review");
         assertThat(response.courses())
@@ -246,9 +260,8 @@ class StudentDashboardReadServiceTest {
                 "student-row-1",
                 PageRequest.of(0, 8)
         );
-        verify(assignmentRepository).countActiveStudentAssignments("tenant-a", "class-1", "student-row-1");
-        verify(assignmentRepository).countPendingStudentAssignmentActions("tenant-a", "class-1", "student-row-1");
-        verify(attemptRepository).summarizeStudentDashboardScores("tenant-a", "student-row-1");
+        verify(assignmentRepository).summarizeStudentDashboardAssignments("tenant-a", "class-1", "student-row-1");
+        verify(attemptRepository).summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-1");
         verify(announcementReadPort).findStudentDashboardAnnouncements("tenant-a", "student-row-1", "school-1", "class-1", 5);
         verifyNoMoreInteractions(userRepository, studentRepository, assignmentRepository, attemptRepository, announcementReadPort);
     }
@@ -263,7 +276,7 @@ class StudentDashboardReadServiceTest {
         StudentDashboardAssignmentProjection assignment = new StudentDashboardAssignmentProjection(
                 "assignment-1",
                 "class-from-recipient",
-                "quiz-1",
+                null,
                 "math",
                 "Mathematics",
                 "Group practice",
@@ -286,9 +299,9 @@ class StudentDashboardReadServiceTest {
                 "student-row-1",
                 PageRequest.of(0, 8)
         )).thenReturn(List.of(assignment));
-        when(assignmentRepository.countActiveStudentAssignments("tenant-a", null, "student-row-1")).thenReturn(1L);
-        when(assignmentRepository.countPendingStudentAssignmentActions("tenant-a", null, "student-row-1")).thenReturn(1L);
-        when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1"))
+        when(assignmentRepository.summarizeStudentDashboardAssignments("tenant-a", null, "student-row-1"))
+                .thenReturn(new StudentDashboardAssignmentCountProjection(1L, 1L));
+        when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1", null))
                 .thenReturn(new StudentDashboardScoreSummaryProjection(0L, 0L, 0L, null, null));
 
         StudentDashboardResponse response = service.studentDashboard(scope("tenant-a", "student-1", null, null));
@@ -296,10 +309,67 @@ class StudentDashboardReadServiceTest {
         assertThat(response.assignments())
                 .extracting("id")
                 .containsExactly("assignment-1");
+        assertThat(response.assignments().getFirst().quizId()).isNull();
         assertThat(response.summary().activeAssignmentCount()).isEqualTo(1);
         assertThat(response.summary().pendingActionCount()).isEqualTo(1);
         verify(announcementReadPort, org.mockito.Mockito.never())
                 .findStudentDashboardAnnouncements(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void studentDashboardSelectsRequestedEnrollmentAndScopesEveryAggregateToThatClass() {
+        Student student = new Student();
+        student.setId("student-row-1");
+        student.setAuthUserId("student-1");
+        student.setAcademicClassId("class-a");
+        student.setSchoolId("school-1");
+
+        StudentEnrollment classAEnrollment = enrollment("enrollment-a", "class-a", "2026-2027");
+        StudentEnrollment classBEnrollment = enrollment("enrollment-b", "class-b", "2026-2027");
+        Classroom classA = classroom("class-a", "6A1", "6");
+        Classroom classB = classroom("class-b", "CLB Robotics", "Ngoáº¡i khÃ³a");
+
+        StudentDashboardReadService multiClassService = new StudentDashboardReadService(
+                assignmentRepository,
+                attemptRepository,
+                studentRepository,
+                userRepository,
+                policyService,
+                announcementReadPort,
+                studentEnrollmentRepository,
+                classroomRepository
+        );
+        when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
+                .thenReturn(true);
+        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
+        when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.of(student));
+        when(studentEnrollmentRepository.findByTenantIdAndStudentIdAndStatusIgnoreCaseOrderByCreatedAtAsc(
+                "tenant-a", "student-row-1", "ENROLLED"))
+                .thenReturn(List.of(classAEnrollment, classBEnrollment));
+        when(classroomRepository.findByTenantIdAndIdIn(eq("tenant-a"), any()))
+                .thenReturn(List.of(classA, classB));
+        when(assignmentRepository.findStudentDashboardAssignments(
+                "tenant-a", "class-b", "student-row-1", PageRequest.of(0, 8)))
+                .thenReturn(List.of());
+        when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-b"))
+                .thenReturn(new StudentDashboardScoreSummaryProjection(1L, 1L, 1L, 88D, 88D));
+        when(announcementReadPort.findStudentDashboardAnnouncements(
+                "tenant-a", "student-row-1", "school-1", "class-b", 5))
+                .thenReturn(List.of());
+
+        StudentDashboardResponse response = multiClassService.studentDashboard(
+                scope("tenant-a", "student-1", null, null, "class-b"));
+
+        assertThat(response.selectedClassId()).isEqualTo("class-b");
+        assertThat(response.profile().academicClassId()).isEqualTo("class-b");
+        assertThat(response.classes())
+                .extracting("classId")
+                .containsExactly("class-a", "class-b");
+        assertThat(response.classes())
+                .extracting("className")
+                .containsExactly("6A1", "CLB Robotics");
+        assertThat(response.summary().scoreSummary().averagePercent()).isEqualTo(88);
+        verify(assignmentRepository).summarizeStudentDashboardAssignments("tenant-a", "class-b", "student-row-1");
     }
 
     @Test
@@ -338,6 +408,16 @@ class StudentDashboardReadServiceTest {
             String requestedTenantId,
             String requestedStudentUserId
     ) {
+        return scope(tenantId, userId, requestedTenantId, requestedStudentUserId, null);
+    }
+
+    private StudentDashboardReadScope scope(
+            String tenantId,
+            String userId,
+            String requestedTenantId,
+            String requestedStudentUserId,
+            String requestedClassId
+    ) {
         return new StudentDashboardReadScope(
                 userId,
                 tenantId,
@@ -348,7 +428,32 @@ class StudentDashboardReadServiceTest {
                 List.of(),
                 List.of("elearning"),
                 "student",
-                "self"
+                "self",
+                requestedClassId
         );
+    }
+
+    private StudentEnrollment enrollment(String id, String classId, String academicYear) {
+        StudentEnrollment enrollment = new StudentEnrollment();
+        enrollment.setId(id);
+        enrollment.setTenantId("tenant-a");
+        enrollment.setSchoolId("school-1");
+        enrollment.setStudentId("student-row-1");
+        enrollment.setClassId(classId);
+        enrollment.setAcademicYear(academicYear);
+        enrollment.setStatus("ENROLLED");
+        return enrollment;
+    }
+
+    private Classroom classroom(String id, String name, String grade) {
+        Classroom classroom = new Classroom();
+        classroom.setId(id);
+        classroom.setTenantId("tenant-a");
+        classroom.setSchoolId("school-1");
+        classroom.setName(name);
+        classroom.setGrade(grade);
+        classroom.setAcademicYear("2026-2027");
+        classroom.setStatus("ACTIVE");
+        return classroom;
     }
 }

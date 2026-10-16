@@ -3,6 +3,7 @@ package com.erg.ergspringboot.platform.security;
 import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.model.organization.UserAccessScope;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import jakarta.servlet.FilterChain;
@@ -17,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -32,10 +34,28 @@ public class OidcPrincipalBridgeFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
     private final OidcMfaPolicy mfaPolicy;
+    private final String configuredTenantId;
 
-    public OidcPrincipalBridgeFilter(UserRepository userRepository) {
+    @Autowired
+    public OidcPrincipalBridgeFilter(
+            UserRepository userRepository,
+            ErgAuthProperties authProperties
+    ) {
         this.userRepository = userRepository;
         this.mfaPolicy = new OidcMfaPolicy();
+        this.configuredTenantId = AuthenticatedTenant.require(authProperties.getBffTenantId());
+    }
+
+    /** Compatibility constructor retained for focused unit tests and old embedders. */
+    public OidcPrincipalBridgeFilter(UserRepository userRepository) {
+        this(userRepository, "erg");
+    }
+
+    /** Compatibility constructor retained for old embedders. */
+    public OidcPrincipalBridgeFilter(UserRepository userRepository, String configuredTenantId) {
+        this.userRepository = userRepository;
+        this.mfaPolicy = new OidcMfaPolicy();
+        this.configuredTenantId = AuthenticatedTenant.require(configuredTenantId);
     }
 
     @Override
@@ -45,7 +65,13 @@ public class OidcPrincipalBridgeFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof OidcUser oidcUser) {
             String identifier = identifier(oidcUser);
-            String tenantId = SecurityUtils.normalizeTenant(request.getHeader("X-Tenant-ID"));
+            String tenantId = resolveTenant(oidcUser);
+            String requestedTenantId = SecurityUtils.trimToNull(request.getHeader("X-Tenant-ID"));
+            if (requestedTenantId != null && !tenantId.equals(requestedTenantId)) {
+                SecurityContextHolder.clearContext();
+                chain.doFilter(request, response);
+                return;
+            }
             User user = identifier == null ? null : userRepository
                     .findWithDetailsByTenantAndIdentifier(tenantId, identifier, identifier)
                     .orElse(null);
@@ -69,6 +95,23 @@ public class OidcPrincipalBridgeFilter extends OncePerRequestFilter {
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /**
+     * Tenant identity comes from a verified OIDC claim or server configuration. The
+     * legacy request header is accepted only as a consistency check, never as the
+     * source of tenant authorization.
+     */
+    private String resolveTenant(OidcUser oidcUser) {
+        if (oidcUser != null && oidcUser.getClaims() != null) {
+            for (String claimName : List.of("tenant_id", "tenantId", "tenant")) {
+                Object value = oidcUser.getClaims().get(claimName);
+                if (value instanceof String string && !string.isBlank()) {
+                    return AuthenticatedTenant.require(string);
+                }
+            }
+        }
+        return configuredTenantId;
     }
 
     private String identifier(OidcUser oidcUser) {
@@ -100,26 +143,33 @@ public class OidcPrincipalBridgeFilter extends OncePerRequestFilter {
                 }
             }
         }
-        Set<String> portals = new TreeSet<>();
-        permissions.forEach(permission -> {
-            int separator = permission.indexOf('.');
-            if (separator > 0) {
-                String namespace = permission.substring(0, separator);
-                if (Set.of("admin", "crm", "lcms", "lms", "elearning").contains(namespace)) portals.add(namespace);
-            }
-        });
-        if (permissions.contains("*")) {
-            portals.clear();
-            portals.add("*");
-        }
-        return new ErgPrincipal(
+        List<String> derivedPortals = WorkspaceCapabilityMapper.legacyPortalsFor(
+                List.of(), roles, List.copyOf(permissions));
+        return ErgPrincipal.authenticated(
                 user.getId(), sessionId, user.getTenantId(), roles, List.copyOf(permissions), List.copyOf(denied),
-                List.copyOf(portals), user.getAccountType(), permissions.contains("*") ? "admin" : "user",
-                Map.of(
+                derivedPortals, user.getAccountType(), permissions.contains("*") ? "admin" : "user",
+                AccessScopeAssembler.mergeLegacyAttributes(Map.of(
                         "email", user.getEmail() == null ? "" : user.getEmail(),
                         "fullName", user.getFullName() == null ? "" : user.getFullName()
-                )
+                ), AccessScopeSet.legacy(managedEducationUnitIds(user), List.of(), null, null))
         );
+    }
+
+    private List<String> managedEducationUnitIds(User user) {
+        if (user == null || user.getAccessScopes() == null) return List.of();
+        return user.getAccessScopes().stream()
+                .filter(this::appliesToLms)
+                .map(UserAccessScope::getEducationUnitId)
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private boolean appliesToLms(UserAccessScope scope) {
+        String modules = scope.getModules() == null ? "" : scope.getModules().trim().toLowerCase(Locale.ROOT);
+        return modules.isBlank() || modules.equals("*") || modules.contains("lms");
     }
 
     private List<String> roleNames(User user) {

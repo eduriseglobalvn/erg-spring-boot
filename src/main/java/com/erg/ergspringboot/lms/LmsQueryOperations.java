@@ -11,8 +11,15 @@ import org.springframework.stereotype.Service;
 /** Public LMS read boundary for workspace projections. */
 @Service
 public class LmsQueryOperations {
-    private final LmsReadModelService reads;
+    private final LmsReadModelPort reads;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    public LmsQueryOperations(LmsReadModelPort reads) {
+        this.reads = reads;
+    }
+
+    /** Compatibility constructor retained for focused legacy tests. */
+    @Deprecated
     public LmsQueryOperations(LmsReadModelService reads) {
         this.reads = reads;
     }

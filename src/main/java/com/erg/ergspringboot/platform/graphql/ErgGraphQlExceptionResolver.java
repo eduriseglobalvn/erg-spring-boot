@@ -88,7 +88,7 @@ public class ErgGraphQlExceptionResolver extends DataFetcherExceptionResolverAda
             String message,
             int status,
             ErrorClassification classification,
-            List<?> details,
+            List<FieldErrorDetail> details,
             boolean internal
     ) {}
 }

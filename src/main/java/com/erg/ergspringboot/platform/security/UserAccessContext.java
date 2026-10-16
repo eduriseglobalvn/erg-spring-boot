@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.platform.security;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.Arrays;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,8 +12,34 @@ public record UserAccessContext(
         List<String> managedEducationUnitIds,
         List<String> managedClassIds,
         String currentEducationUnitId,
-        String currentClassId
+        String currentClassId,
+        @JsonIgnore AccessScopeSet scopeSet
 ) {
+
+    public UserAccessContext(
+            String userId,
+            String tenantId,
+            List<String> managedEducationUnitIds,
+            List<String> managedClassIds,
+            String currentEducationUnitId,
+            String currentClassId
+    ) {
+        this(userId, tenantId, managedEducationUnitIds, managedClassIds,
+                currentEducationUnitId, currentClassId,
+                AccessScopeSet.legacy(managedEducationUnitIds, managedClassIds,
+                        currentEducationUnitId, currentClassId));
+    }
+
+    public UserAccessContext {
+        scopeSet = scopeSet == null
+                ? AccessScopeSet.legacy(managedEducationUnitIds, managedClassIds,
+                        currentEducationUnitId, currentClassId)
+                : scopeSet;
+        managedEducationUnitIds = scopeSet.managedIds(AccessScopeSet.EDUCATION_UNIT);
+        managedClassIds = scopeSet.managedIds(AccessScopeSet.CLASS);
+        currentEducationUnitId = scopeSet.currentId(AccessScopeSet.EDUCATION_UNIT).orElse(null);
+        currentClassId = scopeSet.currentId(AccessScopeSet.CLASS).orElse(null);
+    }
 
     public static UserAccessContext from(HttpServletRequest request) {
         ErgPrincipal principal = principal();
@@ -22,9 +48,9 @@ public record UserAccessContext(
         if (principal == null || userId == null || tenantId == null) {
             throw new AuthenticationRequiredException();
         }
-        boolean wildcardPrincipal = principal.permissions() != null && principal.permissions().contains("*");
-        List<String> educationUnits = wildcardPrincipal ? List.of("*") : csv(attribute(principal, "managedEducationUnitIds"));
-        List<String> classes = wildcardPrincipal ? List.of("*") : csv(attribute(principal, "managedClassIds"));
+        AccessScopeSet principalScopes = AccessScopeAssembler.from(principal);
+        List<String> educationUnits = principalScopes.managedIds(AccessScopeSet.EDUCATION_UNIT);
+        List<String> classes = principalScopes.managedIds(AccessScopeSet.CLASS);
         String requestedEducationUnitId = first(
                 request.getHeader("X-Current-EducationUnit-ID"),
                 request.getHeader("X-Current-Education-Unit-ID"),
@@ -55,6 +81,10 @@ public record UserAccessContext(
         return !managedClassIds.isEmpty();
     }
 
+    public String scopeFingerprint() {
+        return scopeSet.fingerprint();
+    }
+
     private static ErgPrincipal principal() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null
@@ -63,28 +93,6 @@ public record UserAccessContext(
             return principal;
         }
         return null;
-    }
-
-    private static String attribute(ErgPrincipal principal, String key) {
-        if (principal == null || principal.attributes() == null) {
-            return null;
-        }
-        Object value = principal.attributes().get(key);
-        if (value instanceof List<?> list) {
-            return String.join(",", list.stream().map(String::valueOf).toList());
-        }
-        return value == null ? null : value.toString();
-    }
-
-    private static List<String> csv(String value) {
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(item -> !item.isBlank())
-                .distinct()
-                .toList();
     }
 
     private static String first(String... values) {

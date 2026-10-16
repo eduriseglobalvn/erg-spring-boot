@@ -31,12 +31,19 @@ import org.springframework.stereotype.Service;
 /** Public LMS command facade for the attempt hot path. */
 @Service
 public class LmsOperations {
-    private final LmsRuntimeService legacy;
+    private final LmsRuntimePort legacy;
     private final LmsAssignmentCommandService assignments;
 
-    public LmsOperations(LmsRuntimeService legacy, LmsAssignmentCommandService assignments) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public LmsOperations(LmsRuntimePort legacy, LmsAssignmentCommandService assignments) {
         this.legacy = legacy;
         this.assignments = assignments;
+    }
+
+    /** Compatibility constructor retained for focused legacy adapter tests. */
+    @Deprecated
+    public LmsOperations(LmsRuntimeService legacy, LmsAssignmentCommandService assignments) {
+        this((LmsRuntimePort) legacy, assignments);
     }
 
     public AttemptResponse startAttempt(String studentId, StartAttemptRequest request,

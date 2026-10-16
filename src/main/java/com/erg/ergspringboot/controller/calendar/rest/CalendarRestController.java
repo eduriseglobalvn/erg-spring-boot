@@ -2,6 +2,13 @@ package com.erg.ergspringboot.controller.calendar.rest;
 
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.calendar.CalendarOperations;
+import com.erg.ergspringboot.calendar.authorization.CalendarCreate;
+import com.erg.ergspringboot.calendar.authorization.CalendarDelete;
+import com.erg.ergspringboot.calendar.authorization.CalendarImport;
+import com.erg.ergspringboot.calendar.authorization.CalendarPublish;
+import com.erg.ergspringboot.calendar.authorization.CalendarRead;
+import com.erg.ergspringboot.calendar.authorization.CalendarSelfRead;
+import com.erg.ergspringboot.calendar.authorization.CalendarUpdate;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarExcelImportRequest;
@@ -11,8 +18,10 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.exception.NotImplementedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -50,6 +59,7 @@ public class CalendarRestController {
     }
 
     @GetMapping("/workspace")
+    @CalendarRead
     public ApiResponse<CalendarWorkspaceResponse> workspace(
             @RequestParam String from, @RequestParam String to,
             @RequestParam(required = false) String viewMode,
@@ -62,7 +72,6 @@ public class CalendarRestController {
             @RequestParam(required = false) String tenantId,
             HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         List<String> effectiveSchoolIds = scopeService.requireManagedSchools(principal, schoolIds);
         return ok("Calendar workspace loaded",
@@ -73,6 +82,7 @@ public class CalendarRestController {
     }
 
     @GetMapping("/my-calendar")
+    @CalendarSelfRead
     public ApiResponse<CalendarWorkspaceResponse> myCalendar(
             @RequestParam String from, @RequestParam String to,
             @RequestParam(required = false) String viewMode,
@@ -84,8 +94,6 @@ public class CalendarRestController {
             @RequestParam(required = false) String tenantId,
             HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.read_self", "lms.schedule.read",
-                "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         return ok("My calendar loaded",
                 calendar.teacherWorkspace(
@@ -95,17 +103,17 @@ public class CalendarRestController {
     }
 
     @GetMapping("/events/{eventId}")
+    @CalendarRead
     public ApiResponse<CalendarEventResponse> eventDetail(
             @PathVariable String eventId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
-
         String tenantId = verifiedTenantId(principal, null);
         scopeService.requireEvent(principal, tenantId, eventId);
         return ok("Event loaded", calendar.event(tenantId, eventId), request);
     }
 
     @GetMapping("/batches")
+    @CalendarRead
     public ApiResponse<CalendarBatchPageResponse> batches(
             @RequestParam(required = false) String schoolId,
             @RequestParam(required = false) String status,
@@ -114,7 +122,6 @@ public class CalendarRestController {
             @RequestParam(required = false) String tenantId,
             HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         String effectiveSchoolId = resolveScopedSchoolFilter(principal, schoolId);
         return ok("Batches loaded",
@@ -123,43 +130,43 @@ public class CalendarRestController {
     }
 
     @GetMapping("/batches/{batchId}")
+    @CalendarRead
     public ApiResponse<CalendarBatchDetailResponse> batchDetail(
             @PathVariable String batchId,
             @RequestParam(required = false) String tenantId,
             HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         scopeService.requireBatch(principal, effectiveTenantId, batchId);
         return ok("Batch loaded", calendar.batch(effectiveTenantId, batchId), request);
     }
 
     @PostMapping("/preview")
+    @CalendarCreate
     public ApiResponse<CalendarPreviewPayload> preview(
             @Valid @RequestBody CalendarBulkCreateRequest body, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         requireManagedSchool(principal, body.schoolId());
         return ok("Preview generated", calendar.preview(
                 verifiedTenantId(principal, body.tenantId()), body, principal.userId()), request);
     }
 
     @PostMapping
+    @CalendarCreate
     public ApiResponse<CalendarBulkPayload> create(
             @Valid @RequestBody CalendarBulkCreateRequest body, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         requireManagedSchool(principal, body.schoolId());
         return ok("Calendar created", calendar.create(
                 verifiedTenantId(principal, body.tenantId()), body, principal.userId()), request);
     }
 
     @PutMapping("/events/{eventId}")
+    @CalendarUpdate
     public ApiResponse<CalendarEventPayload> updateEvent(
             @PathVariable String eventId,
             @Valid @RequestBody CalendarEventUpdateRequest body, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, body.tenantId());
         CalendarEventUpdateRequest input = new CalendarEventUpdateRequest(
                 tenantId, eventId, body.roomId(), body.roomName(), body.note());
@@ -168,12 +175,12 @@ public class CalendarRestController {
     }
 
     @DeleteMapping("/events/{eventId}")
+    @CalendarDelete
     public ApiResponse<CalendarDeletePayload> deleteEvent(
             @PathVariable String eventId,
             @RequestParam(required = false) String tenantId,
             HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String effectiveTenantId = verifiedTenantId(principal, tenantId);
         CalendarEventDeleteRequest input = new CalendarEventDeleteRequest(effectiveTenantId, eventId);
         scopeService.requireEvent(principal, effectiveTenantId, eventId);
@@ -181,10 +188,10 @@ public class CalendarRestController {
     }
 
     @PostMapping("/teachers/delete-bulk")
+    @CalendarDelete
     public ApiResponse<CalendarDeletePayload> deleteTeacherSchedule(
             @Valid @RequestBody DeleteTeacherScheduleRequest body, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, body.tenantId());
         List<String> schoolIds = scopeService.requireManagedSchools(principal, body.schoolIds());
         return ok("Teacher schedule cancelled", calendar.deleteTeacherSchedule(
@@ -192,40 +199,40 @@ public class CalendarRestController {
     }
 
     @PostMapping("/batches/{batchId}/publish")
+    @CalendarPublish
     public ApiResponse<CalendarBatchPayload> publishBatch(
             @PathVariable String batchId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
         return ok("Batch published", calendar.publish(tenantId, batchId, principal.userId()), request);
     }
 
     @PostMapping("/batches/{batchId}/cancel")
+    @CalendarDelete
     public ApiResponse<CalendarBatchPayload> cancelBatch(
             @PathVariable String batchId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
         return ok("Batch cancelled", calendar.cancel(tenantId, batchId, principal.userId()), request);
     }
 
     @GetMapping("/rooms")
+    @CalendarRead
     public ApiResponse<List<CalendarRoomOptionResponse>> rooms(
             @RequestParam(required = false) String schoolId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, null);
 
         return ok("Rooms loaded", calendar.rooms(tenantId, schoolId), request);
     }
 
     @PostMapping("/rooms")
+    @CalendarCreate
     public ApiResponse<CalendarRoomOption> createRoom(
             @Valid @RequestBody CreateRoomRequest body, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = verifiedTenantId(principal, body.tenantId());
         requireManagedSchool(principal, body.schoolId());
         return ok("Room created", calendar.createRoom(
@@ -257,19 +264,20 @@ public class CalendarRestController {
      * @return a preview payload with parsed results
      */
     @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @CalendarImport
     public ApiResponse<CalendarPreviewPayload> importExcel(
             @RequestPart("file") MultipartFile file,
             @RequestPart("metadata") String metadata,
             HttpServletRequest request) {
 
         ErgPrincipal principal = getRequiredPrincipal();
-        assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         CalendarExcelImportRequest input = parseImportMetadata(metadata);
         String effectiveTenantId = verifiedTenantId(principal, input.tenantId());
         requireManagedSchool(principal, input.schoolId());
 
-        throw new UnsupportedOperationException(
-                "Excel import not yet implemented. "
+        throw new NotImplementedException(
+                "CALENDAR_EXCEL_IMPORT_NOT_IMPLEMENTED",
+                "Excel import is not yet available. Use the bulk schedule preview/create flow. "
                         + "File received: name=" + file.getOriginalFilename()
                         + ", size=" + file.getSize() + " bytes"
                         + ", schoolId=" + input.schoolId()
@@ -282,8 +290,7 @@ public class CalendarRestController {
     }
 
     private String requestId(HttpServletRequest request) {
-        Object rid = request.getAttribute("requestId");
-        return rid == null ? request.getHeader("X-Request-ID") : rid.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 
     private ErgPrincipal getRequiredPrincipal() {
@@ -296,24 +303,6 @@ public class CalendarRestController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof ErgPrincipal p) return p;
         return null;
-    }
-
-    private void assertPermission(ErgPrincipal principal, String... allowed) {
-        if (!isAllowed(principal, allowed))
-            throw new ForbiddenException("You do not have permission to access this resource.");
-    }
-
-    private boolean isAllowed(ErgPrincipal principal, String... allowedPermissions) {
-        if (principal == null) return false;
-        List<String> denied = principal.deniedPermissions() == null ? List.of() : principal.deniedPermissions();
-        for (String p : allowedPermissions) {
-            if (denied.contains("*") || denied.contains(p)) return false;
-        }
-        List<String> granted = principal.permissions() == null ? List.of() : principal.permissions();
-        for (String p : allowedPermissions) {
-            if (granted.contains("*") || granted.contains(p)) return true;
-        }
-        return false;
     }
 
     private void requireManagedSchool(ErgPrincipal principal, String schoolId) {
@@ -340,11 +329,11 @@ public class CalendarRestController {
     }
 
     private String verifiedTenantId(ErgPrincipal principal, String requested) {
-        String pt = blankToNull(principal == null ? null : principal.tenantId());
+        String pt = AuthenticatedTenant.require(principal == null ? null : principal.tenantId());
         String rq = blankToNull(requested);
-        if (pt != null && rq != null && !pt.equals(rq))
+        if (rq != null && !pt.equals(rq))
             throw new ForbiddenException("Tenant scope does not match the authenticated principal.");
-        return pt != null ? pt : (rq == null ? "erg" : rq);
+        return pt;
     }
 
     private String blankToNull(String value) {

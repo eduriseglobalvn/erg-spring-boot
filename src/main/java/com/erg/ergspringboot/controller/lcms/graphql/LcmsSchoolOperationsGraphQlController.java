@@ -4,7 +4,10 @@ import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.Sc
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.school.SchoolQueryOperations;
+import com.erg.ergspringboot.lcms.authorization.LcmsSchoolRead;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -22,17 +25,21 @@ public class LcmsSchoolOperationsGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "schoolDirectory")
+    @LcmsSchoolRead
     public SchoolDirectoryWorkspace schoolDirectory(@Argument SchoolDirectoryInput input) {
         SchoolDirectoryInput safe = input == null ? SchoolDirectoryInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.school.read", "lms.school.update", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safe.tenantId());
-        List<String> scopes = accessSupport.csv(accessSupport.attribute(principal, "managedEducationUnitIds"));
-        boolean allScope = accessSupport.isWildcardPrincipal(principal) || scopes.contains("*");
+        List<String> scopes = AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.EDUCATION_UNIT);
+        boolean allScope = accessSupport.isWildcardPrincipal(principal)
+                || scopes.contains("*")
+                || accessSupport.isAllowed(principal, "curriculum.manage", "*");
         return queries.directory(tenantId, scopes, allScope, safe.search(), safe.status(), safe.schoolType(), safe.page(), safe.size());
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "schoolOperations")
+    @LcmsSchoolRead
     public SchoolOperationsWorkspace schoolOperations(
             @Argument SchoolOperationsInput input,
             DataFetchingFieldSelectionSet selectionSet) {

@@ -13,7 +13,7 @@ class CalendarScheduleBatchArchitectureTest {
                 "com.erg.ergspringboot.calendar.internal.readmodel.CalendarScheduleBatchQueryUseCase"))
                 .doesNotThrowAnyException();
         String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarReadService.java"));
+                "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarReadUseCase.java"));
         assertThat(legacy).contains("scheduleBatchQueries.list(").contains("scheduleBatchQueries.detail(");
     }
 }

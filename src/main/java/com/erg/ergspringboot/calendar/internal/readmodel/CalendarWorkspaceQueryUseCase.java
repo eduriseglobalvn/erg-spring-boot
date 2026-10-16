@@ -9,12 +9,12 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
+import com.erg.ergspringboot.calendar.CalendarReferenceMaps;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
-import com.erg.ergspringboot.service.calendar.CalendarReadService.ReferenceMaps;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -139,7 +139,7 @@ public final class CalendarWorkspaceQueryUseCase {
         List<CalendarEventTeacher> assignments = loadAssignments(tenantId, filteredEvents);
         Map<String, List<CalendarEventTeacher>> assignmentsByEvent = assignments.stream()
                 .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
-        ReferenceMaps referenceMaps = references.load(tenantId, schoolIds, filteredEvents, assignments);
+        CalendarReferenceMaps referenceMaps = references.load(tenantId, schoolIds, filteredEvents, assignments);
         List<CalendarEventResponse> responses = filteredEvents.stream()
                 .map(event -> eventMapper.map(
                         event, assignmentsByEvent.getOrDefault(event.getId(), List.of()), referenceMaps))
@@ -209,7 +209,7 @@ public final class CalendarWorkspaceQueryUseCase {
 
     @FunctionalInterface
     public interface ReferenceLoader {
-        ReferenceMaps load(String tenantId, List<String> schoolIds,
+        CalendarReferenceMaps load(String tenantId, List<String> schoolIds,
                 List<CalendarEvent> events, List<CalendarEventTeacher> assignments);
     }
 
@@ -222,7 +222,7 @@ public final class CalendarWorkspaceQueryUseCase {
     @FunctionalInterface
     public interface EventMapper {
         CalendarEventResponse map(
-                CalendarEvent event, List<CalendarEventTeacher> teachers, ReferenceMaps references);
+                CalendarEvent event, List<CalendarEventTeacher> teachers, CalendarReferenceMaps references);
     }
 
     @FunctionalInterface
@@ -230,7 +230,7 @@ public final class CalendarWorkspaceQueryUseCase {
         CalendarFilterOptionsResponse map(
                 List<CalendarEvent> events,
                 Map<String, List<CalendarEventTeacher>> assignments,
-                ReferenceMaps references,
+                CalendarReferenceMaps references,
                 String viewMode);
     }
 
@@ -239,7 +239,7 @@ public final class CalendarWorkspaceQueryUseCase {
         List<CalendarLaneSummaryResponse> map(
                 List<CalendarEvent> events,
                 Map<String, List<CalendarEventTeacher>> assignments,
-                ReferenceMaps references,
+                CalendarReferenceMaps references,
                 String viewMode);
     }
 

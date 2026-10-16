@@ -72,7 +72,7 @@ class AuthorizationServiceSecurityTest {
 
     @Test
     void effectivePermissionsRejectsForeignUserMetadataLookup() {
-        when(userRepository.findWithDetailsByIdAndTenantId("foreign-user", "tenant-a"))
+        when(userRepository.findByIdAndTenantId("foreign-user", "tenant-a"))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.effectivePermissions("foreign-user", "tenant-a"))

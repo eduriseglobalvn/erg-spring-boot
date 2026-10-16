@@ -2,6 +2,7 @@ package com.erg.ergspringboot.common.response.auth;
 
 import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
 import java.util.List;
+import java.util.Map;
 
 public final class AuthResponses {
 
@@ -98,5 +99,30 @@ public final class AuthResponses {
     }
 
     public record AuthErrorResponse(String code, String message) {
+    }
+
+    /** Token-free response used by the shared-auth BFF session endpoint. */
+    public record BffSessionResponse(
+            String userId,
+            String tenantId,
+            List<String> roles,
+            List<String> permissions,
+            List<String> deniedPermissions,
+            List<String> portals,
+            List<String> workspaces,
+            String accountType,
+            String accessLevel,
+            Map<String, Object> profile,
+            BffScopeResponse scope
+    ) {
+    }
+
+    public record BffScopeResponse(
+            List<String> managedEducationUnitIds,
+            List<String> managedClassIds,
+            String currentEducationUnitId,
+            String currentClassId,
+            String fingerprint
+    ) {
     }
 }

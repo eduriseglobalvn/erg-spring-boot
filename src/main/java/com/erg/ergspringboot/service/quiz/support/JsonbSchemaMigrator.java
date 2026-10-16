@@ -3,6 +3,7 @@ package com.erg.ergspringboot.service.quiz.support;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
@@ -27,6 +28,43 @@ public final class JsonbSchemaMigrator {
         int fromVersion();
 
         Map<String, Object> apply(Map<String, Object> payload);
+    }
+
+    public enum ReadStatus {
+        ABSENT("absent"),
+        LEGACY_DEFAULTED("legacy_defaulted"),
+        MIGRATED("migrated"),
+        CURRENT("current"),
+        UNSUPPORTED_FUTURE("unsupported_future"),
+        INVALID("invalid");
+
+        private final String metricSuffix;
+
+        ReadStatus(String metricSuffix) {
+            this.metricSuffix = metricSuffix;
+        }
+    }
+
+    /** Result of a tolerant read. A future payload is intentionally unavailable, never downgraded. */
+    public record MigrationReadResult(
+            Map<String, Object> payload,
+            ReadStatus status,
+            int sourceVersion,
+            int targetVersion,
+            String metricLabel
+    ) {
+        public boolean usable() {
+            return switch (status) {
+                case UNSUPPORTED_FUTURE, INVALID -> false;
+                default -> true;
+            };
+        }
+    }
+
+    private static final class UnsupportedFutureVersionException extends IllegalStateException {
+        private UnsupportedFutureVersionException(String message) {
+            super(message);
+        }
     }
 
     private final String blobType;
@@ -55,7 +93,7 @@ public final class JsonbSchemaMigrator {
         }
         int version = readVersion(payload);
         if (version > targetVersion) {
-            throw new IllegalStateException(
+            throw new UnsupportedFutureVersionException(
                     "Blob '" + blobType + "' has schemaVersion " + version
                             + " which is newer than supported target " + targetVersion
                             + " — upgrade the service before reading this data");
@@ -73,6 +111,40 @@ public final class JsonbSchemaMigrator {
         }
         current.put(SCHEMA_VERSION_KEY, targetVersion);
         return current;
+    }
+
+    /**
+     * Reads a durable payload without allowing a future writer to be interpreted as the current
+     * shape. The strict {@link #migrateToLatest(Map)} method remains available for command-time
+     * validation; read paths should use this method and expose {@link MigrationReadResult#metricLabel()}
+     * to their bounded metrics.
+     */
+    public MigrationReadResult readSafely(Map<String, Object> payload) {
+        if (payload == null) {
+            return result(null, ReadStatus.ABSENT, 0);
+        }
+        int sourceVersion;
+        try {
+            sourceVersion = readVersion(payload);
+        } catch (IllegalStateException ex) {
+            return result(null, ReadStatus.INVALID, -1);
+        }
+        try {
+            Map<String, Object> migrated = migrateToLatest(payload);
+            boolean explicit = payload.containsKey(SCHEMA_VERSION_KEY)
+                    && payload.get(SCHEMA_VERSION_KEY) != null
+                    && !payload.get(SCHEMA_VERSION_KEY).toString().trim().isEmpty();
+            ReadStatus status = !explicit
+                    ? ReadStatus.LEGACY_DEFAULTED
+                    : sourceVersion == targetVersion ? ReadStatus.CURRENT : ReadStatus.MIGRATED;
+            return result(migrated, status, sourceVersion);
+        } catch (UnsupportedFutureVersionException ex) {
+            return result(null, ReadStatus.UNSUPPORTED_FUTURE, sourceVersion);
+        }
+    }
+
+    public String blobType() {
+        return blobType;
     }
 
     public int targetVersion() {
@@ -97,6 +169,18 @@ public final class JsonbSchemaMigrator {
             throw new IllegalStateException(
                     "Blob '" + blobType + "' has non-numeric " + SCHEMA_VERSION_KEY + ": " + text, ex);
         }
+    }
+
+    private MigrationReadResult result(Map<String, Object> payload, ReadStatus status, int sourceVersion) {
+        return new MigrationReadResult(payload, status, sourceVersion, targetVersion, metricLabel(status));
+    }
+
+    private String metricLabel(ReadStatus status) {
+        String safeType = blobType.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+        if (safeType.length() > 32) {
+            safeType = safeType.substring(0, 32);
+        }
+        return "erg_jsonb_" + safeType + "_" + status.metricSuffix;
     }
 
     public static final class Builder {

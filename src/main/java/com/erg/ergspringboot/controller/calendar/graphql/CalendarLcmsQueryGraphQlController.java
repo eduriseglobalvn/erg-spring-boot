@@ -10,7 +10,8 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.calendar.CalendarOperations;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
+import com.erg.ergspringboot.calendar.CalendarReadPort;
+import com.erg.ergspringboot.calendar.authorization.CalendarRead;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -37,12 +38,13 @@ public class CalendarLcmsQueryGraphQlController {
 
     /** Compatibility constructor retained for existing focused adapter tests. */
     @Deprecated
-    public CalendarLcmsQueryGraphQlController(CalendarReadService reads,
+    public CalendarLcmsQueryGraphQlController(CalendarReadPort reads,
             GraphQlAccessSupport accessSupport, CalendarScopeService scopeService) {
         this(new CalendarOperations(reads), accessSupport, scopeService);
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "teachingCalendarWorkspace")
+    @CalendarRead
     public CalendarWorkspaceResponse teachingCalendarWorkspace(@Argument CalendarWorkspaceRequest input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
@@ -58,6 +60,7 @@ public class CalendarLcmsQueryGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "teachingScheduleBatches")
+    @CalendarRead
     public CalendarBatchPageResponse teachingScheduleBatches(@Argument TeachingScheduleBatchListRequest input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");
@@ -71,6 +74,7 @@ public class CalendarLcmsQueryGraphQlController {
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "teachingScheduleBatch")
+    @CalendarRead
     public CalendarBatchDetailResponse teachingScheduleBatch(@Argument TeachingScheduleBatchDetailRequest input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.schedule.read", "lms.schedule.manage", "lms.manage", "*");

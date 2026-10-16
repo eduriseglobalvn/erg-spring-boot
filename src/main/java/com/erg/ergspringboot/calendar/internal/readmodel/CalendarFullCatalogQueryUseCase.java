@@ -11,8 +11,6 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarRoomRepository;
 import com.erg.ergspringboot.repository.calendar.projection.CalendarTeacherColorProjection;
@@ -20,6 +18,8 @@ import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.lms.LevelRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.UserAccountProjection;
+import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,7 +47,7 @@ public final class CalendarFullCatalogQueryUseCase {
     private final LevelRepository levelRepository;
     private final EducationUnitRepository educationUnitRepository;
     private final CalendarRoomRepository roomRepository;
-    private final UserRepository userRepository;
+    private final UserDirectoryPort userDirectory;
 
     public CalendarFullCatalogQueryUseCase(
             CalendarEventTeacherRepository eventTeacherRepository,
@@ -56,14 +56,14 @@ public final class CalendarFullCatalogQueryUseCase {
             LevelRepository levelRepository,
             EducationUnitRepository educationUnitRepository,
             CalendarRoomRepository roomRepository,
-            UserRepository userRepository) {
+            UserDirectoryPort userDirectory) {
         this.eventTeacherRepository = eventTeacherRepository;
         this.classroomRepository = classroomRepository;
         this.subjectRepository = subjectRepository;
         this.levelRepository = levelRepository;
         this.educationUnitRepository = educationUnitRepository;
         this.roomRepository = roomRepository;
-        this.userRepository = userRepository;
+        this.userDirectory = userDirectory;
     }
 
     public CalendarCatalogResponse catalog(
@@ -84,7 +84,7 @@ public final class CalendarFullCatalogQueryUseCase {
                         tenantId, STATUS_ACTIVE, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
                 () -> subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(tenantId, STATUS_ACTIVE));
         Map<String, String> teacherColorKeys = findTeacherColorKeys(tenantId, schoolIds, from, to);
-        List<User> scopedTeachers = findTeachers(tenantId, schoolIds);
+        List<UserAccountProjection> scopedTeachers = findTeachers(tenantId, schoolIds);
         List<CalendarRoomOptionResponse> roomOptions = schoolIds == null || schoolIds.isEmpty() ? List.of()
                 : nonNull(roomRepository.findByTenantIdAndSchoolIdInAndStatus(
                         tenantId, schoolIds, STATUS_ACTIVE, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
@@ -127,7 +127,7 @@ public final class CalendarFullCatalogQueryUseCase {
         requireBound(levelOptions, "levels");
 
         Set<String> scopedTeacherIds = scopedTeachers.stream()
-                .map(User::getId)
+                .map(UserAccountProjection::id)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> referencedTeacherIds = new LinkedHashSet<>();
         referencedTeacherIds.addAll(findHomeroomTeacherIds(tenantId, schoolIds));
@@ -136,30 +136,30 @@ public final class CalendarFullCatalogQueryUseCase {
                 .filter(id -> !scopedTeacherIds.contains(id))
                 .toList();
         requireBound(assignmentOnlyTeacherIds, "teachers");
-        List<User> assignmentOnlyTeachers = assignmentOnlyTeacherIds.isEmpty() ? List.of()
-                : userRepository.findAllById(assignmentOnlyTeacherIds);
-        List<User> teachers = new ArrayList<>(scopedTeachers);
+        List<UserAccountProjection> assignmentOnlyTeachers = assignmentOnlyTeacherIds.isEmpty() ? List.of()
+                : userDirectory.findByTenantIdAndIds(tenantId, assignmentOnlyTeacherIds);
+        List<UserAccountProjection> teachers = new ArrayList<>(scopedTeachers);
         teachers.addAll(assignmentOnlyTeachers);
         requireBound(teachers, "teachers");
 
         List<CalendarTeacherOptionResponse> teacherOptions = teachers.stream()
                 .map(teacher -> new CalendarTeacherOptionResponse(
-                        teacher.getId(), teacher.getFullName(), teacherColorKeys.get(teacher.getId())))
+                    teacher.id(), teacher.displayName(), teacherColorKeys.get(teacher.id())))
                 .toList();
         return new CalendarCatalogResponse(
                 schoolOptions, classOptions, teacherOptions, teacherOptions,
                 subjectOptions, levelOptions, roomOptions);
     }
 
-    private List<User> findTeachers(String tenantId, List<String> schoolIds) {
+    private List<UserAccountProjection> findTeachers(String tenantId, List<String> schoolIds) {
         if (schoolIds == null || schoolIds.isEmpty()) {
-            return sortUsers(nonNull(userRepository.findCalendarTeachersByTenant(
+            return sortUsers(nonNull(userDirectory.findCalendarTeachersByTenant(
                     tenantId, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
-                    () -> userRepository.findCalendarTeachersByTenant(tenantId)));
+                    () -> userDirectory.findCalendarTeachersByTenant(tenantId)));
         }
-        return sortUsers(nonNull(userRepository.findCalendarTeachersByTenantAndSchoolIds(
+        return sortUsers(nonNull(userDirectory.findCalendarTeachersByTenantAndSchoolIds(
                 tenantId, schoolIds, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
-                () -> userRepository.findCalendarTeachersByTenantAndSchoolIds(tenantId, schoolIds)));
+                () -> userDirectory.findCalendarTeachersByTenantAndSchoolIds(tenantId, schoolIds)));
     }
 
     private List<String> findHomeroomTeacherIds(String tenantId, List<String> schoolIds) {
@@ -191,24 +191,14 @@ public final class CalendarFullCatalogQueryUseCase {
         return teacherColorKeys;
     }
 
-    private List<User> sortUsers(List<User> users) {
+    private List<UserAccountProjection> sortUsers(List<UserAccountProjection> users) {
         if (users == null || users.isEmpty()) {
             return List.of();
         }
         return users.stream()
-                .filter(user -> user != null && user.getId() != null)
-                .sorted(Comparator.comparing(this::teacherSortLabel, String.CASE_INSENSITIVE_ORDER))
+                .filter(user -> user != null && user.id() != null)
+                .sorted(Comparator.comparing(UserAccountProjection::displayName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-    }
-
-    private String teacherSortLabel(User user) {
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
-            return user.getFullName();
-        }
-        if (user.getEmail() != null && !user.getEmail().isBlank()) {
-            return user.getEmail();
-        }
-        return user.getId();
     }
 
     private void requireBound(Collection<?> options, String section) {

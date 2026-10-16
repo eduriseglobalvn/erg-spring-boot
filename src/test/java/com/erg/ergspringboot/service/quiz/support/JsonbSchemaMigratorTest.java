@@ -98,6 +98,55 @@ class JsonbSchemaMigratorTest {
     }
 
     @Test
+    void safelyMarksFuturePayloadUnavailableWithBoundedMetricLabel() {
+        JsonbSchemaMigrator migrator = JsonbSchemaMigrator.forType("quiz/runtime/package")
+                .step(1, payload -> payload)
+                .build();
+
+        Map<String, Object> future = new LinkedHashMap<>();
+        future.put("schemaVersion", 99);
+
+        JsonbSchemaMigrator.MigrationReadResult result = migrator.readSafely(future);
+
+        assertThat(result.usable()).isFalse();
+        assertThat(result.payload()).isNull();
+        assertThat(result.status()).isEqualTo(JsonbSchemaMigrator.ReadStatus.UNSUPPORTED_FUTURE);
+        assertThat(result.metricLabel()).isEqualTo("erg_jsonb_quiz_runtime_package_unsupported_future");
+        assertThat(result.metricLabel()).hasSizeLessThanOrEqualTo(80);
+    }
+
+    @Test
+    void safelyClassifiesLegacyAndCurrentPayloads() {
+        JsonbSchemaMigrator migrator = JsonbSchemaMigrator.forType("blob")
+                .step(1, payload -> {
+                    Map<String, Object> next = new LinkedHashMap<>(payload);
+                    next.put("migrated", true);
+                    return next;
+                })
+                .build();
+
+        JsonbSchemaMigrator.MigrationReadResult legacy = migrator.readSafely(Map.of("value", 42));
+        JsonbSchemaMigrator.MigrationReadResult current = migrator.readSafely(Map.of("schemaVersion", 2));
+
+        assertThat(legacy.status()).isEqualTo(JsonbSchemaMigrator.ReadStatus.LEGACY_DEFAULTED);
+        assertThat(legacy.payload()).containsEntry("migrated", true);
+        assertThat(current.status()).isEqualTo(JsonbSchemaMigrator.ReadStatus.CURRENT);
+        assertThat(current.usable()).isTrue();
+    }
+
+    @Test
+    void safelyRejectsMalformedVersionWithoutBroadeningTheRead() {
+        JsonbSchemaMigrator migrator = JsonbSchemaMigrator.forType("blob").build();
+
+        JsonbSchemaMigrator.MigrationReadResult result = migrator.readSafely(
+                Map.of("schemaVersion", "not-a-number"));
+
+        assertThat(result.status()).isEqualTo(JsonbSchemaMigrator.ReadStatus.INVALID);
+        assertThat(result.usable()).isFalse();
+        assertThat(result.payload()).isNull();
+    }
+
+    @Test
     void rejectsNonContiguousStepChain() {
         assertThatThrownBy(() -> JsonbSchemaMigrator.forType("blob")
                 .step(1, payload -> payload)

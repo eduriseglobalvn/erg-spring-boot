@@ -37,6 +37,8 @@ public class ReportJob {
     private int progress;
     @Column(nullable = false)
     private int attempts;
+    @Column(length = 16, nullable = false)
+    private String format = "json";
     @Column(name = "available_at", nullable = false)
     private OffsetDateTime availableAt;
     @Column(name = "lease_until")
@@ -49,6 +51,8 @@ public class ReportJob {
     private OffsetDateTime startedAt;
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
+    @Column(name = "expires_at")
+    private OffsetDateTime expiresAt;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -72,6 +76,8 @@ public class ReportJob {
     public void setProgress(int progress) { this.progress = progress; }
     public int getAttempts() { return attempts; }
     public void setAttempts(int attempts) { this.attempts = attempts; }
+    public String getFormat() { return format; }
+    public void setFormat(String format) { this.format = format; }
     public OffsetDateTime getAvailableAt() { return availableAt; }
     public void setAvailableAt(OffsetDateTime availableAt) { this.availableAt = availableAt; }
     public OffsetDateTime getLeaseUntil() { return leaseUntil; }
@@ -84,4 +90,6 @@ public class ReportJob {
     public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
     public OffsetDateTime getCompletedAt() { return completedAt; }
     public void setCompletedAt(OffsetDateTime completedAt) { this.completedAt = completedAt; }
+    public OffsetDateTime getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(OffsetDateTime expiresAt) { this.expiresAt = expiresAt; }
 }

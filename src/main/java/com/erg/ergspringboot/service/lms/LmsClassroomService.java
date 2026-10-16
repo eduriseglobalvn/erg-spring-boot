@@ -18,8 +18,8 @@ public class LmsClassroomService {
         this.repository = repository;
     }
 
-    public Optional<Classroom> findById(String id) {
-        return repository.findById(id);
+    public Optional<Classroom> findByTenantIdAndId(String tenantId, String id) {
+        return repository.findByTenantIdAndId(tenantId, id);
     }
 
     public List<Classroom> findByTenantIdOrderByNameAsc(String tenantId) {

@@ -38,14 +38,14 @@ class LcmsOperationsTest {
         SaveQuestionResponse expected = mock(SaveQuestionResponse.class);
         when(legacy.create("tenant-1", "user-1", request)).thenReturn(expected);
 
-        assertThat(new LcmsOperations(
+        assertThat(new LcmsOperations(LcmsCommandCompatibility.fromServices(
                 legacy,
                 mock(QuizAuthoringService.class),
                 mock(QuizDraftService.class),
                 mock(QuizPublishService.class),
                 mock(MediaService.class),
                 mock(PortableQuizBundleService.class)
-        ).createQuestion("tenant-1", "user-1", request))
+        )).createQuestion("tenant-1", "user-1", request))
                 .isSameAs(expected);
     }
 
@@ -75,8 +75,9 @@ class LcmsOperationsTest {
         when(publishing.fork("tenant-1", "quiz-1", "version-1", "user-1")).thenReturn(forked);
         when(authoring.delete("tenant-1", "quiz-1")).thenReturn(deleted);
 
-        LcmsOperations operations = new LcmsOperations(mock(QuestionBankAuthoringService.class), authoring, drafts, publishing,
-                mock(MediaService.class), mock(PortableQuizBundleService.class));
+        LcmsOperations operations = new LcmsOperations(LcmsCommandCompatibility.fromServices(
+                mock(QuestionBankAuthoringService.class), authoring, drafts, publishing,
+                mock(MediaService.class), mock(PortableQuizBundleService.class)));
 
         assertThat(operations.createQuiz("tenant-1", "user-1", "create-key", createRequest)).isSameAs(created);
         assertThat(operations.saveDraft("tenant-1", "quiz-1", draftRequest)).isSameAs(saved);
@@ -97,9 +98,10 @@ class LcmsOperationsTest {
         MediaCommitResponse committed = mock(MediaCommitResponse.class);
         when(media.presign("tenant-1", "user-1", presignRequest)).thenReturn(presigned);
         when(media.commit("tenant-1", commitRequest)).thenReturn(committed);
-        LcmsOperations operations = new LcmsOperations(mock(QuestionBankAuthoringService.class),
-                mock(QuizAuthoringService.class), mock(QuizDraftService.class), mock(QuizPublishService.class), media,
-                mock(PortableQuizBundleService.class));
+        LcmsOperations operations = new LcmsOperations(LcmsCommandCompatibility.fromServices(
+                mock(QuestionBankAuthoringService.class), mock(QuizAuthoringService.class),
+                mock(QuizDraftService.class), mock(QuizPublishService.class), media,
+                mock(PortableQuizBundleService.class)));
 
         assertThat(operations.presignMedia("tenant-1", "user-1", presignRequest)).isSameAs(presigned);
         assertThat(operations.commitMedia("tenant-1", commitRequest)).isSameAs(committed);

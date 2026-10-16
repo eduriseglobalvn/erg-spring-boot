@@ -23,7 +23,7 @@ import org.hibernate.type.SqlTypes;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class NotificationPreferenceEntity extends BaseEntity {
 
     @Column(name = "tenant_id", length = 64, nullable = false)

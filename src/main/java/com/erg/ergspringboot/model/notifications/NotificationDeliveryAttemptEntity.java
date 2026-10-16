@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class NotificationDeliveryAttemptEntity extends BaseEntity {
 
     @Column(name = "tenant_id", length = 64, nullable = false)
@@ -53,6 +53,12 @@ public class NotificationDeliveryAttemptEntity extends BaseEntity {
 
     @Column(name = "firebase_error_code", length = 120)
     private String firebaseErrorCode;
+
+    @Column(name = "provider_error_code", length = 120)
+    private String providerErrorCode;
+
+    @Column(name = "provider_error_message", length = 500)
+    private String providerErrorMessage;
 
     @Column(length = 32, nullable = false)
     private String status;

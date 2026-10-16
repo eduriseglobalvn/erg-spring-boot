@@ -2,6 +2,7 @@ package com.erg.ergspringboot.service.quiz.publish;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -101,9 +102,16 @@ class QuizPublishServiceTest {
         when(compileService.compile(eq(draft.getSettings()), eq(draft.getTree()), eq(Map.of()), eq(Map.of()))).thenReturn(compiled);
         when(validationService.validate(compiled)).thenReturn(List.of());
         when(quizVersionRepository.findTopByQuizIdAndTenantIdOrderByVersionNumberDesc("quiz-1", "tenant-a")).thenReturn(Optional.empty());
-        when(objectMapper.writeValueAsString(any())).thenReturn("canonical-json");
-        when(packageSigner.contentHash("canonical-json")).thenReturn("sha256:abcdef1234567890");
-        when(packageSigner.sign("canonical-json")).thenReturn("signature-1");
+        when(objectMapper.writeValueAsString(any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = invocation.getArgument(0);
+            return payload.containsKey("runtimeQuiz") ? "legacy-hash-json" : "canonical-package-json";
+        });
+        when(packageSigner.contentHash(anyString())).thenAnswer(invocation ->
+                "canonical-package-json".equals(invocation.getArgument(0))
+                        ? "sha256:abcdef1234567890"
+                        : "sha256:legacy0000000000");
+        when(packageSigner.sign("canonical-package-json")).thenReturn("signature-1");
         when(packageSigner.publicKeyId()).thenReturn("key-1");
         when(assessmentCurriculumBridge.snapshotForQuiz("tenant-a", quiz)).thenReturn(Map.of(
                 "subject", Map.of("id", "subject-1", "label", "IC3"),
@@ -153,6 +161,8 @@ class QuizPublishServiceTest {
 
         assertThat(response.quizVersionId()).isEqualTo("version-1");
         assertThat(response.contentHash()).isEqualTo("sha256:abcdef1234567890");
+        verify(packageSigner).contentHash("canonical-package-json");
+        verify(packageSigner).sign("canonical-package-json");
         verify(runtimeCache).evict("tenant-a:quiz-1");
         verify(quizRepository).save(quiz);
         assertThat(quiz.getCurrentVersionId()).isEqualTo("version-1");

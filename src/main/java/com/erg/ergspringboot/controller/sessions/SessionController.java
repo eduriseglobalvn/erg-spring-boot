@@ -77,12 +77,10 @@ public class SessionController {
                 return principalTenantId.trim();
             }
         }
-        String tenantId = request.getHeader("X-Tenant-ID");
-        return tenantId == null || tenantId.isBlank() ? "erg" : tenantId.trim();
+        throw new UnauthorizedException("verified principal tenant is required");
     }
 
     private String requestId(HttpServletRequest request) {
-        Object requestId = request.getAttribute("requestId");
-        return requestId == null ? request.getHeader("X-Request-ID") : requestId.toString();
+        return com.erg.ergspringboot.platform.web.RequestCorrelation.current(request);
     }
 }
