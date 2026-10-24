@@ -2,7 +2,7 @@
 
 ## Worktree Safety
 
-- Task planning and external task tracking are optional unless the user explicitly requests them.
+- Task planning and external task tracking in `D:/ERG/TASK/ERG_Task_Management_.xlsx` are optional unless the user explicitly requests them.
 - Preserve dirty worktrees and unrelated user changes. Do not reset, discard, stage, commit, push, merge or deploy unless explicitly authorized.
 
 ## Canonical ownership

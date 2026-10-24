@@ -172,6 +172,12 @@ management:
     tags:
       application: ${spring.application.name}
       environment: ${ERG_TELEMETRY_ENVIRONMENT:${APP__ENV:development}}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        graphql.operation.duration: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
   health:
     mongo:
       enabled: ${MANAGEMENT_HEALTH_MONGO_ENABLED:false}

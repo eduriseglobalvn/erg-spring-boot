@@ -53,16 +53,18 @@ public class ApiAccessLogFilter extends OncePerRequestFilter {
             String requestId = toText(request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE));
             String tenantId = firstPresent(principalTenantId(), request.getHeader("X-Tenant-ID"), "erg");
             String userId = firstPresent(principalUserId(), request.getHeader("X-User-ID"), "anonymous");
+            String clientIp = resolveClientIp(request);
 
             log.info(
-                    "api {} {} -> {} ({} ms) [requestId={}, tenantId={}, userId={}]",
+                    "api {} {} -> {} ({} ms) [requestId={}, tenantId={}, userId={}, ip={}]",
                     request.getMethod(),
                     path,
                     response.getStatus(),
                     durationMs,
                     requestId,
                     tenantId,
-                    userId
+                    userId,
+                    clientIp
             );
         }
     }
@@ -73,7 +75,26 @@ public class ApiAccessLogFilter extends OncePerRequestFilter {
         return path.startsWith("/v3/api-docs")
                 || path.startsWith("/scalar")
                 || path.startsWith("/favicon")
-                || path.startsWith("/error");
+                || path.startsWith("/error")
+                || path.equals("/actuator/prometheus")
+                || path.equals("/ready");
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String cfIp = request.getHeader("CF-Connecting-IP");
+        if (cfIp != null && !cfIp.isBlank()) {
+            return cfIp.trim();
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            int commaIdx = forwarded.indexOf(',');
+            return (commaIdx > 0 ? forwarded.substring(0, commaIdx) : forwarded).trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 
     private String maskUriPath(String uri) {
@@ -86,11 +107,7 @@ public class ApiAccessLogFilter extends OncePerRequestFilter {
             if (segment.isBlank()) {
                 continue;
             }
-            if (UUID_PATTERN.matcher(segment).matches()) {
-                segments[i] = ":" + MASKED_VALUE;
-            } else if (NUMERIC_ID_PATTERN.matcher(segment).matches() && segment.length() >= 6) {
-                segments[i] = ":" + MASKED_VALUE;
-            } else if (isSensitivePathToken(segment)) {
+            if (isSensitivePathToken(segment)) {
                 segments[i] = ":" + MASKED_VALUE;
             }
         }

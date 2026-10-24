@@ -40,3 +40,5 @@ build/
 # Load-test output is evidence, not source. Keep only the directory marker.
 load/results/**
 !load/results/.gitkeep
+
+.claude/
