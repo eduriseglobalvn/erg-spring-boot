@@ -47,7 +47,22 @@ class NativeImageBuildContractTest {
         String hints = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/platform/nativeimage/ModulithNativeRuntimeHints.java"));
 
-        assertThat(application).contains("@ImportRuntimeHints(ModulithNativeRuntimeHints.class)");
+        assertThat(application).contains("ModulithNativeRuntimeHints.class");
         assertThat(hints).contains("com.tngtech.archunit.core.importer.ModuleImportPlugin", "INVOKE_PUBLIC_CONSTRUCTORS");
+    }
+
+    @Test
+    void nativeRuntimeRegistersApiResponseRecordComponentsForJacksonSerialization() throws Exception {
+        String application = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/ErgSpringApplication.java"));
+        String hints = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/platform/nativeimage/ApiResponseNativeRuntimeHints.java"));
+
+        assertThat(application).contains("ApiResponseNativeRuntimeHints.class");
+        assertThat(hints)
+                .contains("ApiResponse$TransportError$Code")
+                .contains("ApiResponse$TransportError$Fields")
+                .contains("ApiResponse$TransportError$Conflict")
+                .contains("INVOKE_PUBLIC_METHODS");
     }
 }
