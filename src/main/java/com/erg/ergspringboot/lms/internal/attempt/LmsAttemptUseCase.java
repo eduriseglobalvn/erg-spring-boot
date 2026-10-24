@@ -20,6 +20,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.*;
@@ -27,6 +29,7 @@ import org.springframework.transaction.support.*;
 /** Transactional attempt command boundary. It owns idempotency, attempt rules and grading orchestration. */
 @Service
 public class LmsAttemptUseCase {
+    private static final Logger log = LoggerFactory.getLogger(LmsAttemptUseCase.class);
     private static final List<String> READ_CACHES = List.of("lmsHomeworkWorkspace", "lmsClassWorkspace",
             "lmsAssignmentProgress", "studentDashboard", "quizAssignmentReport", "quizQuestionAnalytics");
     private final LmsClassroomService classrooms;
@@ -108,6 +111,7 @@ public class LmsAttemptUseCase {
             ensureResumePackageMatches(attempt, request);
             attempt.setLastActiveAt(now);
             Attempt saved = attempts.save(attempt);
+            log.info("EXAM_ATTEMPT_RESUME studentId={} attemptId={} quizId={} assignmentId={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId());
             evict();
             AttemptResponse result = response(saved);
             complete(receipt, result, version(saved));
@@ -123,6 +127,7 @@ public class LmsAttemptUseCase {
             Attempt attempt = newAttempt(tenant, persistedStudent, request, assignment, quiz, activePackage, now, key);
             attempt.setLastActiveAt(now);
             Attempt saved = attempts.save(attempt);
+            log.info("EXAM_ATTEMPT_START studentId={} attemptId={} quizId={} assignmentId={} mode={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId(), saved.getMode());
             evict();
             AttemptResponse result = response(saved);
             complete(receipt, result, version(saved));
@@ -139,6 +144,7 @@ public class LmsAttemptUseCase {
      */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public AttemptResponse saveDraft(String id, AttemptDraftRequest request, UserAccessContext access) {
+        log.info("EXAM_ATTEMPT_DRAFT studentId={} attemptId={}", access.userId(), id);
         Attempt attempt = mutable(id, access);
         editable(attempt);
         return response(attempt);
@@ -198,6 +204,7 @@ public class LmsAttemptUseCase {
         else { Quiz quiz = quiz(attempt.getQuizId(), access); score = answers.size(); max = Math.max(1, list(quiz.getQuestionIds()).size()); percent = Math.min(100, score / max * 100); passed = percent >= 50; total = (int) Math.round(max); }
         attempt.setScore(score); attempt.setMaxScore(max); attempt.setPercent(percent); attempt.setPassed(passed); attempt.setSubmittedCount(answers.size()); attempt.setTotalQuestions(total);
         Attempt saved = attempts.save(attempt);
+        log.info("EXAM_ATTEMPT_SUBMIT studentId={} attemptId={} quizId={} assignmentId={} score={}/{} percent={}% passed={}", saved.getStudentId(), saved.getId(), saved.getQuizId(), saved.getAssignmentId(), score, max, percent, passed);
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_submitted", null, null, Map.of("score", score, "percent", percent, "passed", passed), submitted);
         if (request != null) events.recordClientBatch(saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.clientEvents());
         project(saved, answers.size(), total, score, passed, access); evict();

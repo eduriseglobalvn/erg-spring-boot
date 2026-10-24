@@ -41,7 +41,7 @@ class CurriculumTeachingPlanServiceTest {
                 LocalDate.of(2026, 9, 1), List.of(2, 4, 6), 2,
                 "Asia/Ho_Chi_Minh", "active", 3L);
 
-        assertThatThrownBy(() -> service.upsert("school-1", "subject-1", "2026-2027", request, access))
+        assertThatThrownBy(() -> service.upsert("school-1", "subject-1", "2026-2027", request, access, false))
                 .isInstanceOf(CurriculumException.class)
                 .hasMessageContaining("reload before saving");
         verify(settings, never()).save(existing);

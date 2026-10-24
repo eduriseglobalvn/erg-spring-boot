@@ -1,0 +1,85 @@
+groups:
+  - name: erg-hardware-and-upgrade-alerts
+    rules:
+      - alert: HostHighCpuLoad
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU utilization > 80% for 10 minutes"
+          description: "i5-7500 CPU is consistently saturated ({{ $value | printf \"%.1f\" }}%). Evaluate server upgrade to more cores."
+
+      - alert: HostLowMemoryAvailable
+        expr: (node_memory_MemAvailable_bytes / 1024 / 1024) < 1500
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host free memory < 1.5GB"
+          description: "Available RAM is down to {{ $value | printf \"%.0f\" }}MB out of 16GB. Risk of OOM killer. Evaluate RAM upgrade to 32GB+."
+
+      - alert: HostDiskSpaceRunningLow
+        expr: ((node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100) < 15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Root NVMe SSD space < 15% remaining"
+          description: "Disk space on 256GB SSD is running out ({{ $value | printf \"%.1f\" }}% remaining). Trigger log/data purge or upgrade storage."
+
+      - alert: HostHighDiskWait
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.6
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk I/O time > 60%"
+          description: "SSD I/O bottleneck detected. Disk is busy {{ $value | printf \"%.1f\" }} of the time."
+
+  - name: erg-backend-performance-alerts
+    rules:
+      - alert: BackendInstanceDown
+        expr: up{job="erg-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ERG Backend instance is down!"
+          description: "Backend port 1606 /actuator/prometheus is unreachable."
+
+      - alert: BackendHighP95Latency
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket[5m]))) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "REST P95 response latency > 1.0s"
+          description: "P95 response latency is {{ $value | printf \"%.2f\" }}s. Check slow queries and DB pool."
+
+      - alert: BackendHighErrorRate
+        expr: (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 5xx error rate > 5%"
+          description: "Error ratio has reached {{ $value | printf \"%.2f\" }}%."
+
+      - alert: HikariCPPoolSaturated
+        expr: hikaricp_connections_pending > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL connection pool pending queue > 5"
+          description: "HikariCP has queued connection requests. Backend needs larger pool or PostgreSQL tuning."
+
+      - alert: PostgresHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL active connections > 80"
+          description: "Postgres connections close to limit (max 100/120)."

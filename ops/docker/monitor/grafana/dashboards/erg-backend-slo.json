@@ -1,0 +1,152 @@
+{
+  "title": "ERG Backend SLO & Student Activity",
+  "uid": "erg-backend-slo",
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "tags": ["erg", "spring-modulith", "slo", "api", "student"],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "environment",
+        "type": "custom",
+        "options": [
+          {"text": "All", "value": ".*", "selected": true},
+          {"text": "production", "value": "production"},
+          {"text": "development", "value": "development"}
+        ],
+        "current": {"text": "All", "value": ".*"}
+      },
+      {"name": "requestId", "type": "textbox"},
+      {"name": "userId", "type": "textbox"}
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "API Request Throughput by Endpoint (req/s)",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "sum by (method, uri) (rate(http_server_requests_seconds_count[1m]))",
+          "legendFormat": "{{method}} {{uri}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "REST Response Latency p95 by Route",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{environment=~\"$environment\"}[5m]))) or (sum by (uri, method) (rate(http_server_requests_seconds_sum[5m])) / sum by (uri, method) (rate(http_server_requests_seconds_count[5m])))",
+          "legendFormat": "{{method}} {{uri}} (p95)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "HTTP Status Codes (2xx, 4xx, 5xx)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 7},
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count[1m]))",
+          "legendFormat": "HTTP {{status}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "REST Error Ratio (%) [Alert if >1%]",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 7},
+      "targets": [
+        {
+          "expr": "(sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)) * 100",
+          "legendFormat": "5xx Error %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Database HikariCP Pool Pending",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 7},
+      "targets": [
+        {
+          "expr": "max by (pool) (hikaricp_connections_pending)",
+          "legendFormat": "Pending: {{pool}}"
+        },
+        {
+          "expr": "max by (pool) (hikaricp_connections_active)",
+          "legendFormat": "Active: {{pool}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Student Logins Rate (Success vs Failed)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 13},
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(erg_auth_login_count_total[5m]))",
+          "legendFormat": "Login {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Exam / Quiz Submissions Rate",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 13},
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(erg_lms_attempt_submit_seconds_count[5m]))",
+          "legendFormat": "Quiz Submit ({{result}})"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Live Backend Activity Logs (API Calls, Student Logins, Exam Submissions)",
+      "type": "logs",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 19},
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "Loki"},
+          "expr": "{container=\"erg-backend-1\"} !~ \"actuator/prometheus\""
+        }
+      ],
+      "options": {
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

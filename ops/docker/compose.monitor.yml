@@ -1,0 +1,137 @@
+name: erg
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=6GB
+      - --web.enable-lifecycle
+    mem_limit: 512m
+    volumes:
+      - ./monitor/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitor/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - edge
+      - data
+    depends_on:
+      - postgres-exporter
+      - redis-state-exporter
+      - redis-cache-exporter
+
+  loki:
+    image: grafana/loki:3.3.0
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    mem_limit: 384m
+    volumes:
+      - ./monitor/loki/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+    networks:
+      - edge
+
+  promtail:
+    image: grafana/promtail:3.3.0
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    mem_limit: 128m
+    volumes:
+      - ./monitor/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log:ro
+    networks:
+      - edge
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-erg-grafana-password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/server-upgrade-metrics.json
+    mem_limit: 256m
+    volumes:
+      - ./monitor/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitor/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - edge
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    restart: unless-stopped
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    mem_limit: 64m
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    networks:
+      - edge
+    ports:
+      - "127.0.0.1:9100:9100"
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-erg}:${POSTGRES_PASSWORD:-erg-local-password}@postgres:5432/${POSTGRES_DB:-erg}?sslmode=disable
+    mem_limit: 128m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+
+  redis-state-exporter:
+    image: oliver006/redis_exporter:v1.77.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-state:6379
+      REDIS_PASSWORD: ${REDIS_STATE_PASSWORD:-erg-local-redis-state}
+    mem_limit: 64m
+    depends_on:
+      redis-state:
+        condition: service_healthy
+    networks:
+      - data
+
+  redis-cache-exporter:
+    image: oliver006/redis_exporter:v1.77.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-cache:6379
+      REDIS_PASSWORD: ${REDIS_CACHE_PASSWORD:-erg-local-redis-cache}
+    mem_limit: 64m
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+    networks:
+      - data
+
+volumes:
+  prometheus-data:
+  loki-data:
+  grafana-data:

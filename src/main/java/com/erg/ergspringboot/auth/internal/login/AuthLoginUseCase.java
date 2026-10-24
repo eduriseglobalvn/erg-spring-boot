@@ -39,11 +39,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Owns login policy, entitlement resolution, serialized session mutation and token issuance. */
 @Service
 public class AuthLoginUseCase {
+    private static final Logger log = LoggerFactory.getLogger(AuthLoginUseCase.class);
 
     private static final String DEFAULT_TENANT = "erg";
     private static final String STATUS_PENDING = "PENDING";
@@ -266,7 +269,14 @@ public class AuthLoginUseCase {
         attempt.setResult(result);
         attempt.setReason(reason);
         attempt.setCreatedAt(now());
-        attempts.save(attempt);
+                attempts.save(attempt);
+        if ("SUCCESS".equalsIgnoreCase(result)) {
+            log.info("AUTH_LOGIN_SUCCESS user={} email={} ip={} portal={} device={} tenant={}",
+                    userId, email, context.ipAddress(), portal, context.deviceName(), DEFAULT_TENANT);
+        } else {
+            log.warn("AUTH_LOGIN_FAILED user={} email={} ip={} portal={} reason={}",
+                    userId, email, context.ipAddress(), portal, reason);
+        }
         meterRegistry.ifPresent(registry -> registry
                 .counter("erg.auth.login.count", "result", result == null ? "none" : result)
                 .increment());
