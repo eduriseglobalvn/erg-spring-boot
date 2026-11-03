@@ -76,8 +76,24 @@ public class ReportingOperations {
         return jobs.enqueueAssignmentProgress(access.tenantId(), access.userId(), assignmentId, idempotencyKey, safe);
     }
 
+    /**
+     * B8: job status and download are readable by the requester, or by callers with class scope over the
+     * reported assignment; a job id alone (logs, shared URLs) is not a capability.
+     */
     public ReportJobResponse status(UserAccessContext access, String jobId) {
-        return statusReader.get(access.tenantId(), jobId);
+        ReportJobResponse job = statusReader.get(access.tenantId(), jobId);
+        boolean requester = access.userId() != null
+                && jobs.requestedBy(access.tenantId(), jobId).filter(access.userId()::equals).isPresent();
+        if (requester) return job;
+        AssignmentScopeLookup.AssignmentScope assignment = job.aggregateId() == null ? null
+                : assignments.findByTenantIdAndId(access.tenantId(), job.aggregateId())
+                        .filter(item -> access.tenantId().equals(item.tenantId())).orElse(null);
+        String classId = assignment == null ? null : assignment.academicClassId();
+        boolean inScope = assignment != null && (classId == null || classId.isBlank()
+                ? access.managedClassIds().contains("*")
+                : access.canAccessClass(classId));
+        if (!inScope) throw new ForbiddenException("report job is outside the current class scope");
+        return job;
     }
 
     public ReportingResponses.AssignmentProgressReportResponse assignmentProgress(
