@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.audit;
 
+import com.erg.ergspringboot.audit.internal.AuditLegalHoldService;
 import com.erg.ergspringboot.audit.internal.AuditQueryService;
 import com.erg.ergspringboot.audit.internal.AuditWriteService;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
@@ -13,10 +14,17 @@ import org.springframework.stereotype.Service;
 public class AuditOperations {
     private final AuditWriteService writes;
     private final AuditQueryService reads;
+    private final AuditLegalHoldService legalHolds;
 
-    public AuditOperations(AuditWriteService writes, AuditQueryService reads) {
+    public AuditOperations(AuditWriteService writes, AuditQueryService reads, AuditLegalHoldService legalHolds) {
         this.writes = writes;
         this.reads = reads;
+        this.legalHolds = legalHolds;
+    }
+
+    /** Places or releases a legal hold; requires {@code audit.manage} (checked in the service). */
+    public void setLegalHold(UserAccessContext access, String eventId, boolean legalHold, String requestId) {
+        legalHolds.setLegalHold(access, eventId, legalHold, requestId);
     }
 
     public AuditEntry record(AuditRecord record) {

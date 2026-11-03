@@ -33,6 +33,33 @@ class AuditRetentionServiceTest {
     }
 
     @Test
+    void scheduledPurgeUsesNowBecauseRetentionUntilIsAlreadyAbsolute() {
+        AuditEventRepository repository = mock(AuditEventRepository.class);
+        EntityManager entityManager = mock(EntityManager.class);
+        Query query = mock(Query.class);
+        when(entityManager.createNativeQuery(any(String.class))).thenReturn(query);
+        OffsetDateTime before = OffsetDateTime.now().minusSeconds(1);
+
+        new AuditRetentionService(repository, entityManager, 25, 365).runScheduled();
+
+        verify(repository).deleteExpired(org.mockito.ArgumentMatchers.argThat(cutoff ->
+                cutoff.isAfter(before) && !cutoff.isAfter(OffsetDateTime.now())), org.mockito.ArgumentMatchers.eq(25));
+    }
+
+    @Test
+    void futureCutoffIsClampedToNow() {
+        AuditEventRepository repository = mock(AuditEventRepository.class);
+        EntityManager entityManager = mock(EntityManager.class);
+        Query query = mock(Query.class);
+        when(entityManager.createNativeQuery(any(String.class))).thenReturn(query);
+
+        new AuditRetentionService(repository, entityManager, 25, 365).purge(OffsetDateTime.now().plusYears(5));
+
+        verify(repository).deleteExpired(org.mockito.ArgumentMatchers.argThat(cutoff ->
+                !cutoff.isAfter(OffsetDateTime.now())), org.mockito.ArgumentMatchers.eq(25));
+    }
+
+    @Test
     void rejectsUnboundedRetentionConfiguration() {
         assertThatThrownBy(() -> new AuditRetentionService(mock(AuditEventRepository.class), mock(EntityManager.class), 0, 365))
                 .isInstanceOf(IllegalArgumentException.class);

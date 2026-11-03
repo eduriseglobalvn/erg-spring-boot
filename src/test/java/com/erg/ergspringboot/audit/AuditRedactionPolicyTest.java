@@ -27,13 +27,46 @@ class AuditRedactionPolicyTest {
                 .containsEntry("access_token", "[REDACTED]")
                 .containsEntry("safe", "value");
         assertThat(redacted.get("email")).isInstanceOf(String.class)
-                .asString().startsWith("sha256:").doesNotContain("person@example.com");
+                .asString().startsWith("hmac-sha256:").doesNotContain("person@example.com");
         assertThat(redacted.get("phone_number")).isInstanceOf(String.class)
-                .asString().startsWith("sha256:");
+                .asString().startsWith("hmac-sha256:");
         assertThat(redacted.get("nested")).isInstanceOf(Map.class);
         @SuppressWarnings("unchecked")
         Map<String, Object> nested = (Map<String, Object>) redacted.get("nested");
         assertThat(nested).containsEntry("otp", "[REDACTED]").containsKey("userAgent");
+    }
+
+    @Test
+    void pseudonymisesWiderPiiKeysWithAKeyedHash() {
+        Map<String, Object> input = new LinkedHashMap<>();
+        for (String key : List.of("recoveryEmail", "userEmail", "fullName", "name", "dob", "nationalId", "cccd",
+                "clientIp", "remoteAddr", "api_key")) {
+            input.put(key, "Nguyen Van A 0901234567");
+        }
+        input.put("fileName", "report.csv");
+
+        Map<String, Object> redacted = new AuditRedactionPolicy("key-one").redact(input);
+        Map<String, Object> otherKey = new AuditRedactionPolicy("key-two").redact(input);
+
+        assertThat(AuditRedactionPolicy.VERSION).isEqualTo(2);
+        assertThat(redacted.get("api_key")).isEqualTo("[REDACTED]");
+        for (String key : List.of("recoveryEmail", "userEmail", "fullName", "name", "dob", "nationalId", "cccd",
+                "clientIp", "remoteAddr")) {
+            assertThat(redacted.get(key)).as(key).asString().startsWith("hmac-sha256:").doesNotContain("Nguyen");
+            assertThat(redacted.get(key)).as(key).isNotEqualTo(otherKey.get(key));
+        }
+        assertThat(redacted).containsEntry("fileName", "report.csv");
+    }
+
+    @Test
+    void productionRequiresAConfiguredSecret() {
+        org.springframework.mock.env.MockEnvironment prod = new org.springframework.mock.env.MockEnvironment();
+        prod.setActiveProfiles("prod");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new AuditRedactionPolicy("", prod))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(new AuditRedactionPolicy("configured", prod).redact(Map.of("email", "a@b.vn")).get("email"))
+                .asString().startsWith("hmac-sha256:");
     }
 
     @Test
