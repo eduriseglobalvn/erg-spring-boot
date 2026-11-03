@@ -3,6 +3,7 @@ package com.erg.ergspringboot.service.sessions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,8 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
@@ -43,6 +46,8 @@ class SessionServiceTest {
     private ClassroomRepository classroomRepository;
     @Mock
     private UserPermissionOverrideRepository userPermissionOverrideRepository;
+    @Mock
+    private UserRoleAssignmentRepository userRoleAssignmentRepository;
 
     @Test
     void currentBootstrapLoadsOnlyTeacherManagedEducationUnitsForTeacher() {
@@ -196,6 +201,48 @@ class SessionServiceTest {
         user.setStatus("ACTIVE");
         user.setRoles(new LinkedHashSet<>(List.of(role)));
         return user;
+    }
+
+    @Test
+    void currentBootstrapLoadsEducationUnitsFromScopedRoleAssignments() {
+        SessionService service = new SessionService(
+                sessionRepository,
+                educationUnitRepository,
+                classroomRepository,
+                userPermissionOverrideRepository,
+                userRoleAssignmentRepository
+        );
+        User user = userWithRole("u-teacher-2", "role_lms_subject_teacher");
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s2");
+        session.setTenantId("erg");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+
+        UserRoleAssignment assignment = new UserRoleAssignment();
+        assignment.setUserId("u-teacher-2");
+        assignment.setRoleId("role_lms_subject_teacher");
+        assignment.setScopeType("SCHOOL");
+        assignment.setScopeId("school-assigned-1");
+
+        EducationUnit school = educationUnit("school-assigned-1", "THCS Truong Cong Dinh", "SECONDARY", null);
+
+        when(sessionRepository.findWithUserBySessionIdAndTenantId("s2", "erg")).thenReturn(Optional.of(session));
+        when(userRoleAssignmentRepository.findActiveForUser(eq("u-teacher-2"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment));
+        when(educationUnitRepository.findByIdInOrderByNameAsc(any(Collection.class))).thenReturn(List.of(school));
+
+        SessionBootstrapResponse response = service.currentBootstrap(
+                "s2",
+                "erg",
+                new UserAccessContext("u-teacher-2", "erg", List.of(), List.of(), null, null)
+        );
+
+        assertThat(response.manageableUnits()).hasSize(1);
+        assertThat(response.manageableUnits().getFirst().id()).isEqualTo("school-assigned-1");
+        assertThat(response.manageableUnits().getFirst().type()).isEqualTo("school");
+        assertThat(response.currentScope().level()).isEqualTo("school");
+        assertThat(response.currentScope().unitId()).isEqualTo("school-assigned-1");
     }
 
     private EducationUnit educationUnit(String id, String name, String type, String parentId) {

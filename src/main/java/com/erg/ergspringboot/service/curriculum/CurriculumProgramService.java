@@ -28,8 +28,10 @@ public class CurriculumProgramService {
     @Transactional(readOnly = true)
     public CurriculumProgramResponse get(String subjectId, String levelId, String academicYear,
                                          UserAccessContext access) {
+        String cleanSubjectId = normalizeId(subjectId);
+        String cleanLevelId = normalizeId(levelId);
         return programs.findByTenantIdAndSubjectIdAndLevelIdAndAcademicYear(
-                        access.tenantId(), subjectId, levelId, academicYear)
+                        access.tenantId(), cleanSubjectId, cleanLevelId, academicYear)
                 .map(program -> toResponse(program, rows.findByTenantIdAndProgramIdOrderBySortOrderAscPeriodAsc(
                         access.tenantId(), program.getId())))
                 .orElse(null);
@@ -41,16 +43,18 @@ public class CurriculumProgramService {
         if (request == null || request.rows() == null) {
             throw CurriculumException.badRequest("CURRICULUM_PROGRAM_ROWS_REQUIRED", "rows is required");
         }
+        String cleanSubjectId = normalizeId(subjectId);
+        String cleanLevelId = normalizeId(levelId);
         CurriculumProgram program = programs.findByTenantIdAndSubjectIdAndLevelIdAndAcademicYear(
-                        access.tenantId(), subjectId, levelId, academicYear)
+                        access.tenantId(), cleanSubjectId, cleanLevelId, academicYear)
                 .orElseGet(CurriculumProgram::new);
         if (request.expectedVersion() != null && program.getId() != null
                 && !request.expectedVersion().equals(program.getRecordVersion())) {
             throw CurriculumException.conflict("CURRICULUM_PROGRAM_VERSION_CONFLICT", "program was changed by another user");
         }
         program.setTenantId(access.tenantId());
-        program.setSubjectId(subjectId);
-        program.setLevelId(levelId);
+        program.setSubjectId(cleanSubjectId);
+        program.setLevelId(cleanLevelId);
         program.setAcademicYear(academicYear);
         program.setName(request.name() == null || request.name().isBlank() ? "Phân phối chương trình" : request.name().trim());
         program.setStatus(request.status() == null || request.status().isBlank() ? "draft" : request.status().trim());
@@ -58,12 +62,21 @@ public class CurriculumProgramService {
         program.setUpdatedBy(access.userId());
         CurriculumProgram saved = programs.save(program);
         rows.deleteByTenantIdAndProgramId(access.tenantId(), saved.getId());
+        rows.flush();
         List<CurriculumProgramRowRequest> orderedRows = request.rows().stream().sorted(Comparator.comparing(
                         row -> row.period() == null ? Integer.MAX_VALUE : row.period())).toList();
         List<CurriculumProgramRow> savedRows = IntStream.range(0, orderedRows.size())
                 .mapToObj(index -> toRow(orderedRows.get(index), saved, access, index)).toList();
         rows.saveAll(savedRows);
         return toResponse(saved, rows.findByTenantIdAndProgramIdOrderBySortOrderAscPeriodAsc(access.tenantId(), saved.getId()));
+    }
+
+    private static String normalizeId(String id) {
+        if (id == null) return null;
+        if (id.startsWith("category-")) return id.substring("category-".length());
+        if (id.startsWith("level-")) return id.substring("level-".length());
+        if (id.startsWith("subject-")) return id.substring("subject-".length());
+        return id;
     }
 
     private CurriculumProgramRow toRow(CurriculumProgramRowRequest request, CurriculumProgram program,

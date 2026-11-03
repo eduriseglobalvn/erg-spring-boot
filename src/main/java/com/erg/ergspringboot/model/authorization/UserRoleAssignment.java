@@ -18,10 +18,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class UserRoleAssignment extends BaseEntity {
-    @Column(name = "user_id", nullable = false, length = 24)
+    @Column(name = "user_id", nullable = false, length = 36)
     private String userId;
 
-    @Column(name = "role_id", nullable = false, length = 24)
+    @Column(name = "role_id", nullable = false, length = 64)
     private String roleId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,13 +40,13 @@ public class UserRoleAssignment extends BaseEntity {
     @Column(name = "expires_at")
     private OffsetDateTime expiresAt;
 
-    @Column(name = "assigned_by", nullable = false, length = 24)
+    @Column(name = "assigned_by", nullable = false, length = 36)
     private String assignedBy;
 
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
 
-    @Column(name = "revoked_by", length = 24)
+    @Column(name = "revoked_by", length = 36)
     private String revokedBy;
 
     @Column(name = "revoke_reason", length = 500)

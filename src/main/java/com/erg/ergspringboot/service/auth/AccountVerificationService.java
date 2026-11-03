@@ -56,19 +56,32 @@ public class AccountVerificationService {
         return requestRecoveryEmailChallenge(userId, tenantId, requestedEmail, null);
     }
 
+    public static boolean isGoogleEmail(String email) {
+        if (email == null) return false;
+        String normalized = email.trim().toLowerCase();
+        return normalized.endsWith("@gmail.com") || normalized.endsWith("@googlemail.com");
+    }
+
     @Transactional
     public RecoveryEmailChallengeResponse requestRecoveryEmailChallenge(
             String userId, String tenantId, String requestedEmail, AuditContext auditContext
     ) {
         User user = findUser(userId, tenantId);
-        String email = normalizeEmail(requestedEmail);
-        if (email.equalsIgnoreCase(user.getEmail())) {
-            throw failure(HttpStatus.BAD_REQUEST, "RECOVERY_EMAIL_REQUIRED",
-                    "recovery email must differ from primary email");
-        }
-        if (userRepository.existsByRecoveryEmailIgnoreCaseAndIdNot(email, userId)) {
-            throw failure(HttpStatus.CONFLICT, "RECOVERY_EMAIL_CONFLICT",
-                    "recovery email is already used by another account");
+        boolean isGoogleUser = isGoogleEmail(user.getEmail());
+        String email = (isGoogleUser && (requestedEmail == null || requestedEmail.isBlank() || requestedEmail.equalsIgnoreCase(user.getEmail())))
+                ? normalizeEmail(user.getEmail())
+                : normalizeEmail(requestedEmail);
+
+        boolean isSelfGoogleVerification = isGoogleUser && email.equalsIgnoreCase(user.getEmail());
+        if (!isSelfGoogleVerification) {
+            if (email.equalsIgnoreCase(user.getEmail())) {
+                throw failure(HttpStatus.BAD_REQUEST, "RECOVERY_EMAIL_REQUIRED",
+                        "recovery email must differ from primary email");
+            }
+            if (userRepository.existsByRecoveryEmailIgnoreCaseAndIdNot(email, userId)) {
+                throw failure(HttpStatus.CONFLICT, "RECOVERY_EMAIL_CONFLICT",
+                        "recovery email is already used by another account");
+            }
         }
         OffsetDateTime now = OffsetDateTime.now();
         codeRepository.findFirstByUserIdAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(userId, PURPOSE)

@@ -100,14 +100,14 @@ public interface UserRepository extends JpaRepository<User, String> {
                     )
                     from User u
                     where u.tenantId = :tenantId
-                    and (:search is null
-                        or lower(u.email) like lower(concat('%', :search, '%'))
-                        or lower(coalesce(u.fullName, '')) like lower(concat('%', :search, '%'))
-                        or lower(coalesce(u.phone, '')) like lower(concat('%', :search, '%')))
-                    and (:status is null or lower(u.status) = lower(:status))
-                    and (:role is null or exists (
+                    and (cast(:search as string) is null
+                        or lower(u.email) like concat('%', cast(:search as string), '%')
+                        or lower(coalesce(u.fullName, '')) like concat('%', cast(:search as string), '%')
+                        or lower(coalesce(u.phone, '')) like concat('%', cast(:search as string), '%'))
+                    and (cast(:status as string) is null or lower(u.status) = cast(:status as string))
+                    and (cast(:role as string) is null or exists (
                         select 1 from u.roles r
-                        where lower(r.name) = lower(:role)
+                        where lower(r.name) = cast(:role as string)
                     ))
                     order by u.createdAt desc
                     """,
@@ -115,14 +115,14 @@ public interface UserRepository extends JpaRepository<User, String> {
                     select count(u.id)
                     from User u
                     where u.tenantId = :tenantId
-                    and (:search is null
-                        or lower(u.email) like lower(concat('%', :search, '%'))
-                        or lower(coalesce(u.fullName, '')) like lower(concat('%', :search, '%'))
-                        or lower(coalesce(u.phone, '')) like lower(concat('%', :search, '%')))
-                    and (:status is null or lower(u.status) = lower(:status))
-                    and (:role is null or exists (
+                    and (cast(:search as string) is null
+                        or lower(u.email) like concat('%', cast(:search as string), '%')
+                        or lower(coalesce(u.fullName, '')) like concat('%', cast(:search as string), '%')
+                        or lower(coalesce(u.phone, '')) like concat('%', cast(:search as string), '%'))
+                    and (cast(:status as string) is null or lower(u.status) = cast(:status as string))
+                    and (cast(:role as string) is null or exists (
                         select 1 from u.roles r
-                        where lower(r.name) = lower(:role)
+                        where lower(r.name) = cast(:role as string)
                     ))
                     """
     )

@@ -87,11 +87,11 @@ spring:
     properties:
       mail:
         smtp:
-          auth: ${SPRING_MAIL_SMTP_AUTH:${SMTP__AUTH:false}}
+          auth: ${SPRING_MAIL_SMTP_AUTH:${SMTP__AUTH:true}}
           ssl:
-            enable: ${SPRING_MAIL_SSL_ENABLED:${SMTP__SSL:false}}
+            enable: ${SPRING_MAIL_SSL_ENABLED:${SMTP__SSL:true}}
           starttls:
-            enable: ${SPRING_MAIL_STARTTLS_ENABLED:${SMTP__STARTTLS:true}}
+            enable: ${SPRING_MAIL_STARTTLS_ENABLED:${SMTP__STARTTLS:false}}
             required: ${SPRING_MAIL_STARTTLS_REQUIRED:false}
   graphql:
     http:
@@ -204,6 +204,8 @@ logging:
     org.springframework.jdbc.core: ${SPRING_JDBC_LOG_LEVEL:OFF}
 
 erg:
+  mail:
+    from: ${ERG_MAIL_FROM:${SMTP__FROM:${spring.mail.username:noreply@erg.edu.vn}}}
   observability:
     prometheus-public-enabled: ${ERG_OBSERVABILITY_PROMETHEUS_PUBLIC_ENABLED:false}
   webhook:
@@ -417,13 +419,13 @@ erg:
     require-operation-name: ${ERG_GRAPHQL_REQUIRE_OPERATION_NAME:true}
     introspection-enabled: ${ERG_GRAPHQL_INTROSPECTION_ENABLED:false}
     max-query-length: ${ERG_GRAPHQL_MAX_QUERY_LENGTH:20000}
-    max-request-body-bytes: ${ERG_GRAPHQL_MAX_REQUEST_BODY_BYTES:65536}
+    max-request-body-bytes: ${ERG_GRAPHQL_MAX_REQUEST_BODY_BYTES:262144}
     max-depth: ${ERG_GRAPHQL_MAX_DEPTH:8}
     max-complexity: ${ERG_GRAPHQL_MAX_COMPLEXITY:500}
     execution-timeout: ${ERG_GRAPHQL_EXECUTION_TIMEOUT:5s}
     max-aliases: ${ERG_GRAPHQL_MAX_ALIASES:20}
     reject-sensitive-variables: ${ERG_GRAPHQL_REJECT_SENSITIVE_VARIABLES:true}
-    max-variable-array-items: ${ERG_GRAPHQL_MAX_VARIABLE_ARRAY_ITEMS:100}
+    max-variable-array-items: ${ERG_GRAPHQL_MAX_VARIABLE_ARRAY_ITEMS:500}
     rate-limit:
       enabled: ${ERG_GRAPHQL_RATE_LIMIT_ENABLED:true}
       redis-enabled: ${ERG_GRAPHQL_RATE_LIMIT_REDIS_ENABLED:false}

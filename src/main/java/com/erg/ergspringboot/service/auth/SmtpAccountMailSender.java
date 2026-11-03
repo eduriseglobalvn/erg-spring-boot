@@ -1,5 +1,7 @@
 package com.erg.ergspringboot.service.auth;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -8,9 +10,18 @@ import org.springframework.stereotype.Service;
 public class SmtpAccountMailSender implements AccountMailSender {
 
     private final JavaMailSender mailSender;
+    private final String fromAddress;
+
+    @Autowired
+    public SmtpAccountMailSender(
+            JavaMailSender mailSender,
+            @Value("${erg.mail.from:${spring.mail.username:noreply@erg.edu.vn}}") String fromAddress) {
+        this.mailSender = mailSender;
+        this.fromAddress = fromAddress;
+    }
 
     public SmtpAccountMailSender(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
+        this(mailSender, "noreply@erg.edu.vn");
     }
 
     @Override
@@ -30,9 +41,13 @@ public class SmtpAccountMailSender implements AccountMailSender {
 
     private void send(String recipient, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
+        if (fromAddress != null && !fromAddress.isBlank()) {
+            message.setFrom(fromAddress);
+        }
         message.setTo(recipient);
         message.setSubject(subject);
         message.setText(body);
         mailSender.send(message);
     }
 }
+

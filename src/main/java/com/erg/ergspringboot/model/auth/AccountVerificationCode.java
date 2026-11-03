@@ -28,7 +28,7 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class AccountVerificationCode extends BaseEntity {
 
-    @Column(name = "user_id", length = 24, nullable = false)
+    @Column(name = "user_id", length = 36, nullable = false)
     private String userId;
 
     @Column(name = "tenant_id")

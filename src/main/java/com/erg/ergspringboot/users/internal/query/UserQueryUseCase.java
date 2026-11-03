@@ -63,9 +63,9 @@ public class UserQueryUseCase {
         int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
         Page<UserListItemProjection> pageItems = userRepository.findAdminListItems(
                 normalizeTenant(tenantId),
-                trimToNull(search),
-                trimToNull(status),
-                trimToNull(role),
+                trimToLowerCase(search),
+                trimToLowerCase(status),
+                trimToLowerCase(role),
                 PageRequest.of(safePage - 1, safeLimit)
         );
         List<String> userIds = pageItems.getContent().stream()
@@ -205,6 +205,10 @@ public class UserQueryUseCase {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String trimToLowerCase(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private String toIso(OffsetDateTime value) {

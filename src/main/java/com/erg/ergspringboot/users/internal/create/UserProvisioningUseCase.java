@@ -83,7 +83,7 @@ public class UserProvisioningUseCase {
                     .collect(Collectors.joining(","))); return scope;
         }).toList();
         scopes.saveAll(savedScopes);
-        if ("EMAIL_INVITE".equals(delivery)) mail.sendTeacherInvite(email, user.getFullName(), credential);
+        mail.sendTeacherInvite(email, user.getFullName(), credential);
         record(user, audit, "TEACHER_ACCOUNT_PROVISIONED", "Teacher account provisioned", Map.of(),
                 Map.of("status", user.getStatus(), "credentialDelivery", delivery,
                         "roleGroups", requestedRoles, "scopeCount", savedScopes.size()));
@@ -105,7 +105,7 @@ public class UserProvisioningUseCase {
         OffsetDateTime revokedAt = OffsetDateTime.now(ZoneOffset.UTC);
         active.forEach(session -> { session.setRevokedAt(revokedAt); session.setRevokedReason("credential_reset"); });
         if (!active.isEmpty()) sessions.saveAll(active);
-        if ("EMAIL_INVITE".equals(delivery)) mail.sendTeacherInvite(user.getEmail(), user.getFullName(), credential);
+        mail.sendTeacherInvite(user.getEmail(), user.getFullName(), credential);
         record(user, audit, "EMAIL_INVITE".equals(delivery) ? "TEACHER_INVITE_RESENT" : "TEACHER_CREDENTIAL_RESET",
                 "Teacher temporary credential rotated", Map.of("mustChangePassword", previous),
                 Map.of("mustChangePassword", true, "credentialDelivery", delivery, "revokedSessions", active.size()));

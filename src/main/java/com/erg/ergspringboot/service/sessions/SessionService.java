@@ -35,6 +35,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +53,22 @@ public class SessionService {
     private final EducationUnitRepository educationUnitRepository;
     private final ClassroomRepository classroomRepository;
     private final UserPermissionOverrideRepository userPermissionOverrideRepository;
+    private final UserRoleAssignmentRepository userRoleAssignmentRepository;
+
+    @Autowired
+    public SessionService(
+            AuthSessionRepository sessionRepository,
+            EducationUnitRepository educationUnitRepository,
+            ClassroomRepository classroomRepository,
+            UserPermissionOverrideRepository userPermissionOverrideRepository,
+            UserRoleAssignmentRepository userRoleAssignmentRepository
+    ) {
+        this.sessionRepository = sessionRepository;
+        this.educationUnitRepository = educationUnitRepository;
+        this.classroomRepository = classroomRepository;
+        this.userPermissionOverrideRepository = userPermissionOverrideRepository;
+        this.userRoleAssignmentRepository = userRoleAssignmentRepository;
+    }
 
     public SessionService(
             AuthSessionRepository sessionRepository,
@@ -57,10 +76,7 @@ public class SessionService {
             ClassroomRepository classroomRepository,
             UserPermissionOverrideRepository userPermissionOverrideRepository
     ) {
-        this.sessionRepository = sessionRepository;
-        this.educationUnitRepository = educationUnitRepository;
-        this.classroomRepository = classroomRepository;
-        this.userPermissionOverrideRepository = userPermissionOverrideRepository;
+        this(sessionRepository, educationUnitRepository, classroomRepository, userPermissionOverrideRepository, null);
     }
 
     @Transactional(readOnly = true)
@@ -181,6 +197,24 @@ public class SessionService {
             directIds.add(educationUnitId);
             if (isEducationUnitAdminScope(scope, roles)) {
                 educationUnitAdminRootIds.add(educationUnitId);
+            }
+        }
+
+        if (userRoleAssignmentRepository != null && user != null && user.getId() != null) {
+            List<UserRoleAssignment> assignments = userRoleAssignmentRepository.findActiveForUser(
+                    user.getId(), tenantId, OffsetDateTime.now());
+            for (UserRoleAssignment assignment : assignments) {
+                String scopeId = safe(assignment.getScopeId());
+                String scopeType = safe(assignment.getScopeType()).toUpperCase(Locale.ROOT);
+                if (scopeId.isBlank()) {
+                    continue;
+                }
+                if (scopeType.equals("SCHOOL") || scopeType.equals("CENTER") || scopeType.equals("SYSTEM") || scopeType.equals("ORGANIZATION")) {
+                    directIds.add(scopeId);
+                    if (isEducationUnitAdminRole(assignment.getRoleId()) || isEducationUnitAdminRoles(roles)) {
+                        educationUnitAdminRootIds.add(scopeId);
+                    }
+                }
             }
         }
 
@@ -353,11 +387,20 @@ public class SessionService {
 
     private boolean isEducationUnitAdminScope(UserAccessScope scope, List<String> roleNames) {
         String scopedRole = safe(scope.getRole()).toLowerCase(Locale.ROOT);
-        if (scopedRole.contains("center_admin")) {
+        if (scopedRole.contains("center_admin") || scopedRole.contains("school_admin") || scopedRole.contains("principal")) {
             return true;
         }
+        return isEducationUnitAdminRoles(roleNames);
+    }
+
+    private boolean isEducationUnitAdminRole(String roleId) {
+        String role = safe(roleId).toLowerCase(Locale.ROOT);
+        return role.contains("center_admin") || role.contains("school_admin") || role.contains("principal") || role.equals("lms.admin");
+    }
+
+    private boolean isEducationUnitAdminRoles(List<String> roleNames) {
         return roleNames.stream().map(role -> role.toLowerCase(Locale.ROOT)).anyMatch(role ->
-                role.contains("center_admin") || role.equals("lms.admin"));
+                role.contains("center_admin") || role.contains("school_admin") || role.contains("principal") || role.equals("lms.admin"));
     }
 
     private boolean isTeacherLike(List<String> roleNames) {
@@ -410,7 +453,9 @@ public class SessionService {
 
     private String normalizedUnitType(EducationUnit educationUnit) {
         String type = safe(educationUnit.getType()).toLowerCase(Locale.ROOT);
-        if (type.contains("school") || type.contains("campus")) {
+        if (type.contains("school") || type.contains("campus")
+                || type.contains("primary") || type.contains("secondary")
+                || type.contains("high") || type.contains("k12") || type.contains("kindergarten")) {
             return "school";
         }
         if (type.contains("system")) {

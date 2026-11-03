@@ -11,13 +11,13 @@ public class ErgGraphQlProperties {
     private boolean requireOperationName = true;
     private boolean introspectionEnabled = false;
     private int maxQueryLength = 20_000;
-    private int maxRequestBodyBytes = 65_536;
+    private int maxRequestBodyBytes = 262_144;
     private int maxDepth = 8;
     private int maxComplexity = 500;
     private Duration executionTimeout = Duration.ofSeconds(5);
     private int maxAliases = 20;
     private boolean rejectSensitiveVariables = true;
-    private int maxVariableArrayItems = 100;
+    private int maxVariableArrayItems = 500;
     private RateLimit rateLimit = new RateLimit();
 
     public boolean isRequireOperationName() {

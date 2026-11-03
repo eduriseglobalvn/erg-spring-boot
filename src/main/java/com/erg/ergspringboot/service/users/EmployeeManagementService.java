@@ -18,6 +18,7 @@ import com.erg.ergspringboot.model.auth.SecurityEvent;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserItemResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserListResponse;
+import com.erg.ergspringboot.common.request.users.UserRequests.AccessPolicyRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRequest;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
@@ -123,9 +124,17 @@ public class EmployeeManagementService {
         if (profileRepository.existsByTenantIdAndEmployeeCodeIgnoreCase(normalizedTenant, employeeCode)) {
             throw new BadRequestException("employee code already exists in tenant");
         }
+        List<AccessPolicyRequest> userPolicies = request.policies() == null ? List.of() : request.policies().stream()
+                .map(p -> new AccessPolicyRequest(
+                        p.scopeType(),
+                        p.scopeId(),
+                        p.roleGroup(),
+                        List.of("lms")
+                ))
+                .toList();
         UserCreatedResponse account = userService.createUser(new AdminCreateUserRequest(
                 request.primaryEmail(), request.fullName(), request.phone(), request.recoveryEmail(),
-                request.roleGroupIds(), List.of(), request.credentialDelivery()), auditContext);
+                request.roleGroupIds(), userPolicies, request.credentialDelivery()), auditContext);
         request.policies().forEach(policy -> scopedRoleAssignmentService.assign(
                 account.user().id(),
                 normalizedTenant,
