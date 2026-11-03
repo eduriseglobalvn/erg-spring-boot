@@ -34,6 +34,9 @@ erg:
   auth:
     bff-enabled: true
     local-login-enabled: false
+    # Last day legacy BFF portal aliases (lcms, lms, elearning) are accepted; afterwards 410.
+    # Canonical portals (admin, teacher, student, crm) are never sunset.
+    legacy-portal-sunset: ${ERG_AUTH_LEGACY_PORTAL_SUNSET:2026-10-31}
   http:
     cors:
       # Browser/PWA BFF clients are explicit origins. Override with the deployment

@@ -20,7 +20,9 @@ class OidcBffControllerTest {
     @Test
     void sanitizesPortalAndLocalReturnPath() {
         assertThat(OidcBffController.sanitizePortal("LCMS")).isEqualTo("lcms");
-        assertThat(OidcBffController.sanitizePortal("google")).isEqualTo("lms");
+        assertThat(OidcBffController.sanitizePortal("google")).isEqualTo("teacher");
+        assertThat(OidcBffController.sanitizePortal("Student")).isEqualTo("student");
+        assertThat(OidcBffController.sanitizePortal(null)).isEqualTo("teacher");
         assertThat(OidcBffController.sanitizeReturnTo("/quiz/123?tab=edit")).isEqualTo("/quiz/123?tab=edit");
         assertThat(OidcBffController.sanitizeReturnTo("https://evil.example/steal")).isEqualTo("/");
         assertThat(OidcBffController.sanitizeReturnTo("//evil.example/steal")).isEqualTo("/");
@@ -103,5 +105,32 @@ class OidcBffControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.GONE);
         assertThat(response.getHeaders().getFirst("Deprecation")).isEqualTo("true");
         assertThat(session.getAttribute(OidcBffController.PORTAL_SESSION_KEY)).isNull();
+    }
+
+    @Test
+    void canonicalPortalsAndDefaultKeepWorkingAfterLegacySunset() {
+        OidcBffController controller = new OidcBffController(
+                Clock.fixed(Instant.parse("2026-11-03T00:00:00Z"), ZoneOffset.UTC));
+
+        for (String portal : List.of("teacher", "student", "admin", "crm", OidcBffController.DEFAULT_PORTAL)) {
+            MockHttpSession session = new MockHttpSession();
+            var response = controller.login(portal, "/", session);
+
+            assertThat(response.getStatusCode()).as(portal).isEqualTo(HttpStatus.FOUND);
+            assertThat(response.getHeaders().getFirst("Deprecation")).as(portal).isNull();
+            assertThat(session.getAttribute(OidcBffController.PORTAL_SESSION_KEY)).isEqualTo(portal);
+        }
+    }
+
+    @Test
+    void configuredSunsetExtendsLegacyAliases() {
+        OidcBffController controller = new OidcBffController(
+                Clock.fixed(Instant.parse("2026-11-03T00:00:00Z"), ZoneOffset.UTC),
+                java.time.LocalDate.of(2027, 3, 31));
+
+        var response = controller.login("lms", "/", new MockHttpSession());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FOUND);
+        assertThat(response.getHeaders().getFirst("Sunset")).isEqualTo("Wed, 31 Mar 2027 23:59:59 GMT");
     }
 }
