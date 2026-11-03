@@ -13,6 +13,7 @@ import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.auth.SecurityEvent;
 import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.platform.security.EffectivePermissionResolver;
 import com.erg.ergspringboot.platform.security.ErgAuthProperties;
 import com.erg.ergspringboot.repository.auth.AuthLoginAttemptRepository;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
@@ -313,47 +314,12 @@ public class AuthLoginUseCase {
     }
 
     private List<String> effectivePermissions(User user) {
-        Set<String> permissions = new TreeSet<>();
-        if (user.getRoles() != null) {
-            user.getRoles().stream()
-                    .filter(java.util.Objects::nonNull)
-                    .flatMap(role -> role.getPermissions() == null
-                            ? java.util.stream.Stream.empty() : role.getPermissions().stream())
-                    .map(permission -> permission == null ? null : trimToNull(permission.getName()))
-                    .filter(java.util.Objects::nonNull)
-                    .forEach(permissions::add);
-        }
-        if (roleAssignments != null && user.getId() != null) {
-            roleAssignments.findActiveForUser(
-                            user.getId(), firstNonBlank(user.getTenantId(), DEFAULT_TENANT), now())
-                    .stream()
-                    .map(UserRoleAssignment::getRole)
-                    .filter(java.util.Objects::nonNull)
-                    .flatMap(role -> role.getPermissions() == null
-                            ? java.util.stream.Stream.empty() : role.getPermissions().stream())
-                    .map(permission -> permission == null ? null : trimToNull(permission.getName()))
-                    .filter(java.util.Objects::nonNull)
-                    .forEach(permissions::add);
-        }
-        if (user.getPermissionOverrides() != null) {
-            user.getPermissionOverrides().stream()
-                    .filter(java.util.Objects::nonNull)
-                    .filter(override -> override.getExpiresAt() == null || override.getExpiresAt().isAfter(now()))
-                    .forEach(override -> {
-                        String permission = trimToNull(override.getPermission());
-                        if (permission == null) {
-                            return;
-                        }
-                        if ("deny".equalsIgnoreCase(override.getGrantType())) {
-                            permissions.remove(permission);
-                        } else if ("grant".equalsIgnoreCase(override.getGrantType())) {
-                            permissions.add(permission);
-                        }
-                    });
-        }
-        return List.copyOf(permissions);
+        List<UserRoleAssignment> assignments = roleAssignments == null || user.getId() == null
+                ? List.of()
+                : roleAssignments.findActiveForUser(
+                        user.getId(), firstNonBlank(user.getTenantId(), DEFAULT_TENANT), now());
+        return EffectivePermissionResolver.resolve(user, assignments, now()).granted();
     }
-
     private List<String> entitledPortals(List<String> permissions, List<String> roles) {
         if (permissions.contains("*")) {
             return List.of("*");

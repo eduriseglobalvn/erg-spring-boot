@@ -37,6 +37,8 @@ import java.util.Objects;
 import java.util.Set;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.EffectivePermissionResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +50,8 @@ public class SessionService {
     private static final String DEFAULT_TENANT = "erg";
     private static final int MAX_BOOTSTRAP_UNITS = 500;
     private static final int MAX_BOOTSTRAP_CLASSES = 500;
+    private static final Set<String> EDUCATION_UNIT_ADMIN_ROLES = Set.of(
+            "center_admin", "school_admin", "principal", "lms.admin");
 
     private final AuthSessionRepository sessionRepository;
     private final EducationUnitRepository educationUnitRepository;
@@ -68,15 +72,6 @@ public class SessionService {
         this.classroomRepository = classroomRepository;
         this.userPermissionOverrideRepository = userPermissionOverrideRepository;
         this.userRoleAssignmentRepository = userRoleAssignmentRepository;
-    }
-
-    public SessionService(
-            AuthSessionRepository sessionRepository,
-            EducationUnitRepository educationUnitRepository,
-            ClassroomRepository classroomRepository,
-            UserPermissionOverrideRepository userPermissionOverrideRepository
-    ) {
-        this(sessionRepository, educationUnitRepository, classroomRepository, userPermissionOverrideRepository, null);
     }
 
     @Transactional(readOnly = true)
@@ -200,7 +195,7 @@ public class SessionService {
             }
         }
 
-        if (userRoleAssignmentRepository != null && user != null && user.getId() != null) {
+        if (user != null && user.getId() != null) {
             List<UserRoleAssignment> assignments = userRoleAssignmentRepository.findActiveForUser(
                     user.getId(), tenantId, OffsetDateTime.now());
             for (UserRoleAssignment assignment : assignments) {
@@ -209,9 +204,9 @@ public class SessionService {
                 if (scopeId.isBlank()) {
                     continue;
                 }
-                if (scopeType.equals("SCHOOL") || scopeType.equals("CENTER") || scopeType.equals("SYSTEM") || scopeType.equals("ORGANIZATION")) {
+                if (AccessScopeAssembler.isEducationUnitScopeType(scopeType)) {
                     directIds.add(scopeId);
-                    if (isEducationUnitAdminRole(assignment.getRoleId()) || isEducationUnitAdminRoles(roles)) {
+                    if (isEducationUnitAdminRole(assignment) || isEducationUnitAdminRoles(roles)) {
                         educationUnitAdminRootIds.add(scopeId);
                     }
                 }
@@ -330,47 +325,13 @@ public class SessionService {
     }
 
     private PermissionEnvelope permissionEnvelope(User user) {
-        Set<String> granted = new LinkedHashSet<>();
-        Set<String> denied = new LinkedHashSet<>();
-        if (user.getRoles() != null) {
-            for (Role role : user.getRoles()) {
-                if (role.getPermissions() == null) {
-                    continue;
-                }
-                for (Permission permission : role.getPermissions()) {
-                    if (permission != null && permission.getName() != null && !permission.getName().isBlank()) {
-                        granted.add(permission.getName().trim());
-                    }
-                }
-            }
-        }
         Collection<UserPermissionOverride> overrides = user.getPermissionOverrides() == null
                 ? userPermissionOverrideRepository.findByUserId(user.getId())
                 : user.getPermissionOverrides();
-        for (UserPermissionOverride override : overrides) {
-            if (override == null || override.getPermission() == null || override.getPermission().isBlank()) {
-                continue;
-            }
-            if (override.getExpiresAt() != null && override.getExpiresAt().isBefore(OffsetDateTime.now())) {
-                continue;
-            }
-            String permission = override.getPermission().trim();
-            if (isGrantOverride(override)) {
-                granted.add(permission);
-                denied.remove(permission);
-            } else {
-                denied.add(permission);
-                granted.remove(permission);
-            }
-        }
-        return new PermissionEnvelope(List.copyOf(granted), List.copyOf(denied));
+        EffectivePermissionResolver.Result resolved =
+                EffectivePermissionResolver.resolve(user.getRoles(), overrides, List.of(), OffsetDateTime.now());
+        return new PermissionEnvelope(resolved.granted(), resolved.denied());
     }
-
-    private boolean isGrantOverride(UserPermissionOverride override) {
-        String grantType = safe(override.getGrantType()).toLowerCase(Locale.ROOT);
-        return grantType.isBlank() || grantType.equals("grant") || grantType.equals("allow");
-    }
-
     private boolean appliesToLms(UserAccessScope scope) {
         String modules = safe(scope.getModules()).toLowerCase(Locale.ROOT);
         return modules.isBlank() || modules.equals("*") || modules.contains("lms");
@@ -386,21 +347,21 @@ public class SessionService {
     }
 
     private boolean isEducationUnitAdminScope(UserAccessScope scope, List<String> roleNames) {
-        String scopedRole = safe(scope.getRole()).toLowerCase(Locale.ROOT);
-        if (scopedRole.contains("center_admin") || scopedRole.contains("school_admin") || scopedRole.contains("principal")) {
-            return true;
-        }
-        return isEducationUnitAdminRoles(roleNames);
+        return isEducationUnitAdminRoleName(scope.getRole()) || isEducationUnitAdminRoles(roleNames);
     }
 
-    private boolean isEducationUnitAdminRole(String roleId) {
-        String role = safe(roleId).toLowerCase(Locale.ROOT);
-        return role.contains("center_admin") || role.contains("school_admin") || role.contains("principal") || role.equals("lms.admin");
+    private boolean isEducationUnitAdminRole(UserRoleAssignment assignment) {
+        String roleName = assignment.getRole() == null ? null : assignment.getRole().getName();
+        return isEducationUnitAdminRoleName(roleName) || isEducationUnitAdminRoleName(assignment.getRoleId());
     }
 
     private boolean isEducationUnitAdminRoles(List<String> roleNames) {
-        return roleNames.stream().map(role -> role.toLowerCase(Locale.ROOT)).anyMatch(role ->
-                role.contains("center_admin") || role.contains("school_admin") || role.contains("principal") || role.equals("lms.admin"));
+        return roleNames.stream().anyMatch(this::isEducationUnitAdminRoleName);
+    }
+
+    /** Exact role names only: "vice_principal" or "school_admin_assistant" must not inherit unit-admin scope. */
+    private boolean isEducationUnitAdminRoleName(String roleName) {
+        return EDUCATION_UNIT_ADMIN_ROLES.contains(safe(roleName).trim().toLowerCase(Locale.ROOT));
     }
 
     private boolean isTeacherLike(List<String> roleNames) {

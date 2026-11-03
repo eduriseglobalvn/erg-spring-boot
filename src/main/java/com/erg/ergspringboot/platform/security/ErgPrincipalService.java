@@ -193,8 +193,9 @@ public class ErgPrincipalService {
         User user = session.getUser();
         List<UserRoleAssignment> assignments = activeAssignments(user);
         List<String> roles = roles(user, assignments);
-        PermissionEnvelope permissions = permissions(user);
-        permissions = permissions.withAssignments(assignments);
+        EffectivePermissionResolver.Result resolved =
+                EffectivePermissionResolver.resolve(user, assignments, OffsetDateTime.now());
+        PermissionEnvelope permissions = new PermissionEnvelope(resolved.granted(), resolved.denied());
         List<String> managedEducationUnitIds = managedEducationUnitIds(user, permissions, assignments);
         return ErgPrincipal.authenticated(
                 user.getId(),
@@ -244,42 +245,6 @@ public class ErgPrincipalService {
         return List.copyOf(names);
     }
 
-    private PermissionEnvelope permissions(User user) {
-        Set<String> granted = new LinkedHashSet<>();
-        Set<String> denied = new LinkedHashSet<>();
-        if (user != null && user.getRoles() != null) {
-            for (Role role : user.getRoles()) {
-                if (role.getPermissions() == null) {
-                    continue;
-                }
-                for (Permission permission : role.getPermissions()) {
-                    if (permission != null && permission.getName() != null && !permission.getName().isBlank()) {
-                        granted.add(permission.getName().trim().toLowerCase(Locale.ROOT));
-                    }
-                }
-            }
-        }
-        if (user != null && user.getPermissionOverrides() != null) {
-            for (UserPermissionOverride override : user.getPermissionOverrides()) {
-                if (override.getPermission() == null || override.getPermission().isBlank()) {
-                    continue;
-                }
-                if (override.getExpiresAt() != null && override.getExpiresAt().isBefore(OffsetDateTime.now())) {
-                    continue;
-                }
-                String permission = override.getPermission().trim().toLowerCase(Locale.ROOT);
-                if (isGrant(override.getGrantType())) {
-                    granted.add(permission);
-                    denied.remove(permission);
-                } else {
-                    denied.add(permission);
-                    granted.remove(permission);
-                }
-            }
-        }
-        return new PermissionEnvelope(List.copyOf(granted), List.copyOf(denied));
-    }
-
     private List<UserRoleAssignment> activeAssignments(User user) {
         if (userRoleAssignmentRepository == null || user == null || user.getId() == null) return List.of();
         return userRoleAssignmentRepository.findActiveForUser(
@@ -320,7 +285,7 @@ public class ErgPrincipalService {
                     .forEach(managedIds::add);
         }
         assignments.stream()
-                .filter(assignment -> Set.of("CENTER", "SCHOOL").contains(assignment.getScopeType()))
+                .filter(assignment -> AccessScopeAssembler.isEducationUnitScopeType(assignment.getScopeType()))
                 .map(UserRoleAssignment::getScopeId)
                 .filter(scopeId -> scopeId != null && !scopeId.isBlank())
                 .map(String::trim)
@@ -333,29 +298,10 @@ public class ErgPrincipalService {
         return modules.isBlank() || modules.equals("*") || modules.contains("lms");
     }
 
-    private boolean isGrant(String grantType) {
-        return grantType == null || grantType.isBlank()
-                || "grant".equalsIgnoreCase(grantType)
-                || "allow".equalsIgnoreCase(grantType);
-    }
-
     private String blankToDefault(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private record PermissionEnvelope(List<String> granted, List<String> denied) {
-        PermissionEnvelope withAssignments(List<UserRoleAssignment> assignments) {
-            if (assignments == null || assignments.isEmpty()) return this;
-            Set<String> nextGranted = new LinkedHashSet<>(granted);
-            Set<String> nextDenied = new LinkedHashSet<>(denied);
-            assignments.stream().map(UserRoleAssignment::getRole).filter(java.util.Objects::nonNull)
-                    .flatMap(role -> role.getPermissions() == null ? java.util.stream.Stream.empty() : role.getPermissions().stream())
-                    .map(Permission::getName).filter(name -> name != null && !name.isBlank())
-                    .map(name -> name.trim().toLowerCase(Locale.ROOT)).forEach(permission -> {
-                        nextGranted.add(permission);
-                        nextDenied.remove(permission);
-                    });
-            return new PermissionEnvelope(List.copyOf(nextGranted), List.copyOf(nextDenied));
-        }
     }
 }
