@@ -134,10 +134,7 @@ class ModulePublicApiContractTest {
                 .doesNotContain("service.quiz", "service.lcms");
         // The deprecated LmsRuntimeService pass-through bean was removed; LmsOperations uses the port directly.
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java")).doesNotExist();
-        assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java")))
-                .contains("@Deprecated", "LmsReadModelPort operations")
-                .doesNotContain(".internal.");
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java")).doesNotExist();
         assertThat(Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/reporting/ReportJobService.java")))
                 .contains("@Deprecated", "ReportJobPort operations")

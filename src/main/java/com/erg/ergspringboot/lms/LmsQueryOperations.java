@@ -4,7 +4,6 @@ import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.Clas
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.AssignmentProgressWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.StudentGroupWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.TeacherHomeworkWorkspaceResponse;
-import com.erg.ergspringboot.service.lms.readmodel.LmsReadModelService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -13,14 +12,7 @@ import org.springframework.stereotype.Service;
 public class LmsQueryOperations {
     private final LmsReadModelPort reads;
 
-    @org.springframework.beans.factory.annotation.Autowired
     public LmsQueryOperations(LmsReadModelPort reads) {
-        this.reads = reads;
-    }
-
-    /** Compatibility constructor retained for focused legacy tests. */
-    @Deprecated
-    public LmsQueryOperations(LmsReadModelService reads) {
         this.reads = reads;
     }
 

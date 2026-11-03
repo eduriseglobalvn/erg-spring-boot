@@ -46,7 +46,7 @@ class LmsClassWorkspaceQueryCountIntegrationTest {
     }
 
     @Autowired
-    private LmsReadModelService service;
+    private com.erg.ergspringboot.lms.LmsReadModelPort service;
 
     @Autowired
     private EntityManager entityManager;

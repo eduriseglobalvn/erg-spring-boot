@@ -26,13 +26,6 @@ public class LmsTeacherHomeworkReadUseCase {
     @Autowired
     public LmsTeacherHomeworkReadUseCase(LmsAssignmentQueryPort assignments, AssignmentResourceRepository resources,
             ClassroomRepository classrooms, LmsAttemptQueryPort attempts, StudentRepository students){this.assignments=assignments;this.resources=resources;this.classrooms=classrooms;this.attempts=attempts;this.students=students;}
-    /** Compatibility constructor retained for direct legacy callers. */
-    @Deprecated
-    public LmsTeacherHomeworkReadUseCase(AssignmentRepository assignments, AssignmentResourceRepository resources,
-            ClassroomRepository classrooms, AttemptRepository attempts, StudentRepository students){
-        this(new JpaLmsAssignmentQueryAdapter(assignments), resources, classrooms,
-                new JpaLmsAttemptQueryAdapter(attempts), students);
-    }
     @Cacheable(cacheNames="lmsHomeworkWorkspace",key="{#tenantId, #teacherId, #status, #page, #size}",unless="#result == null")
     public TeacherHomeworkWorkspaceResponse query(String tenantId,String teacherId,String status,Integer page,Integer size){
         String tenant=require(tenantId,"tenantId"),teacher=require(teacherId,"teacherId");Pageable pageable=PageRequest.of(page==null||page<0?0:page,size==null||size<1?20:Math.min(size,50));String normalized=LmsStatePolicy.assignmentFilter(status);

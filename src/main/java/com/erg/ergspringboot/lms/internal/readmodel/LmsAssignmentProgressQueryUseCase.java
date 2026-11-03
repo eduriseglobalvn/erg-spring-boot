@@ -27,12 +27,6 @@ public class LmsAssignmentProgressQueryUseCase {
     public LmsAssignmentProgressQueryUseCase(LmsAttemptQueryPort attempts, LmsAssignmentQueryPort assignments,
             AssignmentResourceRepository resources) { this.attempts = attempts; this.assignments = assignments; this.resources = resources; }
 
-    /** Compatibility constructor retained for direct legacy callers. */
-    @Deprecated
-    public LmsAssignmentProgressQueryUseCase(AttemptRepository attempts, AssignmentRepository assignments,
-            AssignmentResourceRepository resources) {
-        this(new JpaLmsAttemptQueryAdapter(attempts), new JpaLmsAssignmentQueryAdapter(assignments), resources);
-    }
     public AssignmentProgressProjection summary(String tenantId, String assignmentId) {
         return attempts.summarizeAssignmentProgress(tenantId, assignmentId);
     }

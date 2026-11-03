@@ -12,6 +12,8 @@ import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.Clas
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.AssignmentProgressWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.StudentGroupWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.TeacherHomeworkWorkspaceResponse;
+import com.erg.ergspringboot.lms.LmsReadModelPort;
+import com.erg.ergspringboot.lms.internal.readmodel.*;
 import com.erg.ergspringboot.model.lms.StudentGroup;
 import com.erg.ergspringboot.model.lms.StudentGroupMember;
 import com.erg.ergspringboot.platform.concurrency.ErgReadTaskExecutor;
@@ -54,7 +56,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class LmsReadModelServiceTest {
@@ -80,22 +81,21 @@ class LmsReadModelServiceTest {
     @Mock
     private StudentGroupMemberRepository studentGroupMemberRepository;
 
-    private LmsReadModelService service;
+    private LmsReadModelPort service;
     private ErgReadTaskExecutor readTaskExecutor;
 
     @BeforeEach
     void setUp() {
         readTaskExecutor = new ErgReadTaskExecutor(4, 4, 32, Duration.ofSeconds(1));
-        service = new LmsReadModelService(
-                assignmentRepository,
-                assignmentResourceRepository,
-                attemptRepository,
-                classroomRepository,
-                studentRepository,
-                studentGroupRepository,
-                studentGroupMemberRepository,
-                readTaskExecutor
-        );
+        var attempts = new JpaLmsAttemptQueryAdapter(attemptRepository);
+        var assignments = new JpaLmsAssignmentQueryAdapter(assignmentRepository);
+        service = new LmsReadModelUseCase(
+                new LmsStudentGroupReadUseCase(studentGroupRepository, studentGroupMemberRepository),
+                new LmsAssignmentProgressQueryUseCase(attempts, assignments, assignmentResourceRepository),
+                new LmsClassWorkspaceReadUseCase(classroomRepository, studentRepository, assignmentRepository,
+                        assignmentResourceRepository, attemptRepository),
+                new LmsTeacherHomeworkReadUseCase(assignments, assignmentResourceRepository,
+                        classroomRepository, attempts, studentRepository));
     }
 
     @AfterEach
@@ -104,14 +104,11 @@ class LmsReadModelServiceTest {
     }
 
     @Test
-    void readModelServiceIsReadOnlyAndDelegatesAggregateProgressQuery() {
-        Transactional transactional = LmsReadModelService.class.getAnnotation(Transactional.class);
+    void readModelDelegatesAggregateProgressQuery() {
         AssignmentProgressProjection expected = new AssignmentProgressProjection(2L, 1L, 0L);
 
         when(attemptRepository.summarizeAssignmentProgress("erg", "assignment-1")).thenReturn(expected);
 
-        assertThat(transactional).isNotNull();
-        assertThat(transactional.readOnly()).isTrue();
         assertThat(service.assignmentProgress("erg", "assignment-1")).isSameAs(expected);
         verify(attemptRepository).summarizeAssignmentProgress("erg", "assignment-1");
     }
