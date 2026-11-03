@@ -312,47 +312,29 @@ enum QuestionKindCompiler {
         return result.isEmpty() ? null : result;
     }
 
-    @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> textBlankAnswers(Object value) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> map) {
-                    Map<String, Object> blank = (Map<String, Object>) map;
-                    if (blank.get("id") != null && blank.get("correctAnswers") != null) {
-                        result.add(Map.of("id", blank.get("id"), "answers", blank.get("correctAnswers")));
-                    }
-                }
-            }
-        }
-        return result.isEmpty() ? null : result;
+        return idAnswers(value, "correctAnswers", false);
     }
 
-    @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> inlineBlankAnswers(Object value) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> map) {
-                    Map<String, Object> blank = (Map<String, Object>) map;
-                    if (blank.get("id") != null && blank.get("correctOptionId") != null) {
-                        result.add(Map.of("id", blank.get("id"), "answers", List.of(blank.get("correctOptionId"))));
-                    }
-                }
-            }
-        }
-        return result.isEmpty() ? null : result;
+        return idAnswers(value, "correctOptionId", true);
     }
 
-    @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> wordSlotAnswers(Object value) {
+        return idAnswers(value, "correctWordId", true);
+    }
+
+    /** {@code [{id, answers}]} for items carrying both an id and the answer field; single answers are listed. */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> idAnswers(Object value, String answerField, boolean singleAnswer) {
         List<Map<String, Object>> result = new ArrayList<>();
         if (value instanceof List<?> list) {
             for (Object item : list) {
                 if (item instanceof Map<?, ?> map) {
-                    Map<String, Object> slot = (Map<String, Object>) map;
-                    if (slot.get("id") != null && slot.get("correctWordId") != null) {
-                        result.add(Map.of("id", slot.get("id"), "answers", List.of(slot.get("correctWordId"))));
+                    Map<String, Object> entry = (Map<String, Object>) map;
+                    Object answer = entry.get(answerField);
+                    if (entry.get("id") != null && answer != null) {
+                        result.add(Map.of("id", entry.get("id"), "answers", singleAnswer ? List.of(answer) : answer));
                     }
                 }
             }
