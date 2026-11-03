@@ -25,6 +25,7 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssi
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsAssignmentCommandService;
+import com.erg.ergspringboot.lms.internal.core.StudentGroupCommands;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -33,10 +34,12 @@ import org.springframework.stereotype.Service;
 public class LmsOperations {
     private final LmsRuntimePort legacy;
     private final LmsAssignmentCommandService assignments;
+    private final StudentGroupCommands groups;
 
-    public LmsOperations(LmsRuntimePort legacy, LmsAssignmentCommandService assignments) {
+    public LmsOperations(LmsRuntimePort legacy, LmsAssignmentCommandService assignments, StudentGroupCommands groups) {
         this.legacy = legacy;
         this.assignments = assignments;
+        this.groups = groups;
     }
 
     public AttemptResponse startAttempt(String studentId, StartAttemptRequest request,
@@ -73,15 +76,15 @@ public class LmsOperations {
     }
 
     public StudentGroupResponse createStudentGroup(String tenantId, String userId, StudentGroupRequest request) {
-        return assignments.createGroup(tenantId, userId, request);
+        return groups.createGroup(tenantId, userId, request);
     }
 
     public StudentGroupResponse updateStudentGroup(String tenantId, String groupId, StudentGroupRequest request) {
-        return assignments.updateGroup(tenantId, groupId, request);
+        return groups.updateGroup(tenantId, groupId, request);
     }
 
     public void deleteStudentGroup(String tenantId, String groupId) {
-        assignments.deleteGroup(tenantId, groupId);
+        groups.deleteGroup(tenantId, groupId);
     }
 
     public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access,

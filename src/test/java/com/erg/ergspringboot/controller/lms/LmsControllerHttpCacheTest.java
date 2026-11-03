@@ -49,7 +49,8 @@ class LmsControllerHttpCacheTest {
         when(runtimeService.getQuizPackage(eq("quiz-1"), org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(packageResponse());
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new LmsController(
                 new com.erg.ergspringboot.lms.LmsOperations(runtimeService,
-                        org.mockito.Mockito.mock(com.erg.ergspringboot.lms.internal.core.LmsAssignmentCommandService.class))))
+                        org.mockito.Mockito.mock(com.erg.ergspringboot.lms.internal.core.LmsAssignmentCommandService.class),
+                        org.mockito.Mockito.mock(com.erg.ergspringboot.lms.internal.core.StudentGroupCommands.class))))
                 .build();
 
         String eTag = mockMvc.perform(get("/api/v1/lms/quizzes/quiz-1/package")
