@@ -18,9 +18,11 @@ class LmsQueryBoundaryTest {
 
     @Test
     void homeworkWorkspaceControllerDependsOnQueryFacadeAndAccessAdapter() {
+        // N8: the shared assignment policy is the only additional collaborator.
         assertThat(LmsHomeworkWorkspaceGraphQlController.class.getConstructors())
                 .singleElement()
                 .satisfies(constructor -> assertThat(constructor.getParameterTypes())
-                        .containsExactly(LmsQueryOperations.class, GraphQlAccessSupport.class));
+                        .containsExactly(LmsQueryOperations.class, GraphQlAccessSupport.class,
+                                LmsAssignmentAccessPolicy.class));
     }
 }
