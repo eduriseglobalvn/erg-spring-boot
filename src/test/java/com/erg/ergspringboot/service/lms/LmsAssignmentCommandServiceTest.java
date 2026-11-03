@@ -28,7 +28,6 @@ import com.erg.ergspringboot.repository.lms.AssignmentRecipientRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
 import com.erg.ergspringboot.repository.lms.StudentGroupMemberRepository;
-import com.erg.ergspringboot.repository.lms.StudentGroupRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
 import java.util.List;
@@ -52,7 +51,6 @@ class LmsAssignmentCommandServiceTest {
     @Mock private AssignmentRepository assignmentRepository;
     @Mock private AssignmentResourceRepository resourceRepository;
     @Mock private AssignmentRecipientRepository recipientRepository;
-    @Mock private StudentGroupRepository studentGroupRepository;
     @Mock private StudentGroupMemberRepository studentGroupMemberRepository;
     @Mock private StudentRepository studentRepository;
     @Mock private QuizVersionRepository quizVersionRepository;
@@ -78,7 +76,7 @@ class LmsAssignmentCommandServiceTest {
                 org.mockito.Mockito.mock(com.erg.ergspringboot.lms.LmsCallerPermissions.class));
         service = new LmsAssignmentCommandService(
                 assignmentRepository, resourceRepository, recipientRepository,
-                studentGroupRepository, studentGroupMemberRepository, studentRepository, quizVersionRepository,
+                studentGroupMemberRepository, studentRepository, quizVersionRepository,
                 new com.erg.ergspringboot.lms.LmsReadCacheInvalidator(cacheManager, (com.erg.ergspringboot.platform.cache.CacheInvalidationService) null),
                 policy, (com.erg.ergspringboot.platform.sync.LmsSyncOperationService) null, event -> { });
         when(classrooms.findByTenantIdAndId(eq("tenant-a"), anyString())).thenAnswer(invocation -> {

@@ -51,7 +51,25 @@ class LmsStatePolicyTest {
         }
         String dashboard = java.nio.file.Files.readString(java.nio.file.Path.of(
                 "src/main/java/com/erg/ergspringboot/service/elearning/readmodel/StudentDashboardReadService.java"));
-        assertThat(dashboard).contains("LmsStatePolicy.attemptIsCompleted");
+        // SQ-20: the dashboard delegates its pending-action rule here instead of re-implementing it.
+        assertThat(dashboard).contains("LmsStatePolicy.assignmentIsPendingAction");
+        String policy = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/com/erg/ergspringboot/lms/LmsStatePolicy.java"));
+        assertThat(policy).contains("return attemptStatus == null || !attemptIsCompleted(attemptStatus);");
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("active", "needs_review")).isFalse();
+    }
+
+    @Test
+    void learnerPendingActionAndStatusRules() {
+        assertThat(LmsStatePolicy.assignmentIsPendingAction(" Active ", null)).isTrue();
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("active", " ")).isTrue();
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("active", "in_progress")).isTrue();
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("active", "Graded")).isFalse();
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("archived", null)).isFalse();
+        assertThat(LmsStatePolicy.assignmentIsPendingAction(null, null)).isFalse();
+        assertThat(LmsStatePolicy.learnerAssignmentStatus("active", " needs_review ")).isEqualTo("needs_review");
+        assertThat(LmsStatePolicy.learnerAssignmentStatus(" active ", null)).isEqualTo("active");
+        assertThat(LmsStatePolicy.learnerAssignmentStatus(" ", " ")).isEqualTo("assigned");
     }
 
     @Test
