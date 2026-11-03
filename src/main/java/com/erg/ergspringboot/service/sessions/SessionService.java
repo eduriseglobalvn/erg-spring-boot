@@ -179,7 +179,7 @@ public class SessionService {
 
     private List<EducationUnit> scopedEducationUnits(User user, List<String> roles, String tenantId) {
         List<UserAccessScope> scopes = accessScopes(user).stream()
-                .filter(this::appliesToLms)
+                .filter(AccessScopeAssembler::appliesToLms)
                 .toList();
         Set<String> directIds = new LinkedHashSet<>();
         Set<String> educationUnitAdminRootIds = new LinkedHashSet<>();
@@ -332,11 +332,6 @@ public class SessionService {
                 EffectivePermissionResolver.resolve(user.getRoles(), overrides, List.of(), OffsetDateTime.now());
         return new PermissionEnvelope(resolved.granted(), resolved.denied());
     }
-    private boolean appliesToLms(UserAccessScope scope) {
-        String modules = safe(scope.getModules()).toLowerCase(Locale.ROOT);
-        return modules.isBlank() || modules.equals("*") || modules.contains("lms");
-    }
-
     private List<UserAccessScope> accessScopes(User user) {
         if (user.getAccessScopes() == null || user.getAccessScopes().isEmpty()) {
             return List.of();

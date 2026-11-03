@@ -100,6 +100,8 @@ class TypedConfigurationContractTest {
                 + Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/auth/internal/login/AuthLoginUseCase.java"))
                 + Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/auth/internal/login/SessionIssuer.java"))
+                + Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/auth/AuthLoginRateLimiter.java"));
 
         assertThat(source).doesNotContain("@Value(\"${erg.module-events")

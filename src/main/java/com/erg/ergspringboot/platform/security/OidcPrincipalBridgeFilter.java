@@ -201,18 +201,13 @@ public class OidcPrincipalBridgeFilter extends OncePerRequestFilter {
     private List<String> managedEducationUnitIds(User user) {
         if (user == null || user.getAccessScopes() == null) return List.of();
         return user.getAccessScopes().stream()
-                .filter(this::appliesToLms)
+                .filter(AccessScopeAssembler::appliesToLms)
                 .map(UserAccessScope::getEducationUnitId)
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .distinct()
                 .sorted()
                 .toList();
-    }
-
-    private boolean appliesToLms(UserAccessScope scope) {
-        String modules = scope.getModules() == null ? "" : scope.getModules().trim().toLowerCase(Locale.ROOT);
-        return modules.isBlank() || modules.equals("*") || modules.contains("lms");
     }
 
     private List<String> roleNames(User user) {

@@ -2,6 +2,7 @@ package com.erg.ergspringboot.platform.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.erg.ergspringboot.model.organization.UserAccessScope;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -49,5 +50,21 @@ class AccessScopeAssemblerTest {
                 "managedClassIds", List.of("class-1"),
                 "currentEducationUnitId", "unit-1",
                 "currentClassId", "class-1"));
+    }
+
+    @Test
+    void legacyAccessScopeAppliesToLmsOnlyWhenUnrestrictedWildcardOrNamingLms() {
+        assertThat(AccessScopeAssembler.appliesToLms(scopeWithModules(null))).isTrue();
+        assertThat(AccessScopeAssembler.appliesToLms(scopeWithModules("  "))).isTrue();
+        assertThat(AccessScopeAssembler.appliesToLms(scopeWithModules(" * "))).isTrue();
+        assertThat(AccessScopeAssembler.appliesToLms(scopeWithModules("crm, LMS"))).isTrue();
+        assertThat(AccessScopeAssembler.appliesToLms(scopeWithModules("crm"))).isFalse();
+        assertThat(AccessScopeAssembler.appliesToLms(scopeWithModules("crm,elearning"))).isFalse();
+    }
+
+    private static UserAccessScope scopeWithModules(String modules) {
+        UserAccessScope scope = new UserAccessScope();
+        scope.setModules(modules);
+        return scope;
     }
 }
