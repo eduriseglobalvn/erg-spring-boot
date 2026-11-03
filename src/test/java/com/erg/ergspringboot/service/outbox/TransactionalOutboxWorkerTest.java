@@ -79,7 +79,9 @@ class TransactionalOutboxWorkerTest {
         event.setPayload(Map.of("recipientCiphertext", cipher.encrypt("teacher@example.com"), "fullName", "Teacher",
                 "secret", cipher.encrypt("secret")));
         when(repository.findDueForUpdate(any(), any(Integer.class))).thenReturn(List.of(event));
-        when(repository.findById("event-1")).thenReturn(Optional.of(event));
+        when(repository.renewLease(eq("event-1"), eq(TransactionalOutboxWorker.WORKER_ID), any())).thenReturn(1);
+        when(repository.findLeasedForUpdate("event-1", TransactionalOutboxWorker.WORKER_ID))
+                .thenReturn(Optional.of(event));
         TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
                 repository, smtp, cipher, new ImmediateTransactionManager());
 
