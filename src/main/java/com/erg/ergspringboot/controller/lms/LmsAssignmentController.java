@@ -49,7 +49,7 @@ public class LmsAssignmentController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Assignment created",
-                operations.createAssignment(access.tenantId(), access.userId(), idempotencyKey, body), request);
+                operations.createAssignment(access, idempotencyKey, body), request);
     }
 
     @PatchMapping("/api/v1/lms/assignments/{assignmentId}")
@@ -60,7 +60,7 @@ public class LmsAssignmentController {
             HttpServletRequest request
     ) {
         UserAccessContext access = UserAccessContext.from(request);
-        operations.updateAssignment(access.tenantId(), assignmentId, body);
+        operations.updateAssignment(access, assignmentId, body);
         return ok("Assignment updated", null, request);
     }
 
@@ -73,14 +73,14 @@ public class LmsAssignmentController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Recipients updated",
-                operations.updateAssignmentRecipients(access.tenantId(), assignmentId, body), request);
+                operations.updateAssignmentRecipients(access, assignmentId, body), request);
     }
 
     @DeleteMapping("/api/v1/lms/assignments/{assignmentId}")
     @LmsAssignmentDelete
     public ApiResponse<Void> delete(@PathVariable String assignmentId, HttpServletRequest request) {
         UserAccessContext access = UserAccessContext.from(request);
-        operations.deleteAssignment(access.tenantId(), assignmentId);
+        operations.deleteAssignment(access, assignmentId);
         return ok("Assignment deleted", null, request);
     }
 

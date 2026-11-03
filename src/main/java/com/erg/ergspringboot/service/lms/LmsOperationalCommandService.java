@@ -20,6 +20,7 @@ import com.erg.ergspringboot.repository.lms.StudentEnrollmentRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
@@ -48,6 +49,7 @@ public class LmsOperationalCommandService {
     private final StudentEnrollmentRepository enrollments;
     private final EducationUnitRepository schools;
     private final UserActivityRepository activities;
+    private final UserRepository users;
 
     public LmsOperationalCommandService(
             ClassroomRepository classrooms,
@@ -55,7 +57,9 @@ public class LmsOperationalCommandService {
             SubjectRepository subjects,
             StudentEnrollmentRepository enrollments,
             EducationUnitRepository schools,
-            UserActivityRepository activities) {
+            UserActivityRepository activities,
+            UserRepository users) {
+        this.users = users;
         this.classrooms = classrooms;
         this.students = students;
         this.subjects = subjects;
@@ -145,6 +149,7 @@ public class LmsOperationalCommandService {
         student.setSchoolId(schoolId);
         student.setAcademicClassId(classroom == null ? null : classroom.getId());
         applyStudent(student, request);
+        linkAuthUser(access, student, request.authUserId());
         student.setStudentCode(code);
         student.setFullName(required(request.fullName(), "Student name"));
         student.setStatus(status(request.status(), "ENROLLED"));
@@ -172,6 +177,7 @@ public class LmsOperationalCommandService {
             throw new ConflictException("Move the student through the enrollment command.");
         }
         applyStudent(student, request);
+        linkAuthUser(access, student, request.authUserId());
         if (request.status() != null) student.setStatus(status(request.status(), student.getStatus()));
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_UPDATED", saved.getId(), Map.of("schoolId", schoolId));
@@ -368,6 +374,22 @@ public class LmsOperationalCommandService {
         if (!Objects.equals(requested, actual == null ? 0L : actual)) {
             throw new ConflictException(resource + " has been updated by another request.");
         }
+    }
+
+    /**
+     * B2: links the LMS student to its login account so learner flows can resolve Student by authUserId.
+     * The account must exist in the caller's tenant and must not already be linked to another student.
+     */
+    private void linkAuthUser(UserAccessContext access, Student student, String requestedUserId) {
+        String authUserId = trim(requestedUserId);
+        if (authUserId == null || authUserId.equals(student.getAuthUserId())) return;
+        if (users.findByIdAndTenantId(authUserId, access.tenantId()).isEmpty()) {
+            throw new BadRequestException("Login account does not exist in this tenant.");
+        }
+        students.findFirstByTenantIdAndAuthUserId(access.tenantId(), authUserId)
+                .filter(existing -> !existing.getId().equals(student.getId()))
+                .ifPresent(existing -> { throw new ConflictException("Login account is already linked to another student."); });
+        student.setAuthUserId(authUserId);
     }
 
     private void applyStudent(Student student, CreateStudentRequest request) {

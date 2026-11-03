@@ -54,22 +54,22 @@ public class LmsOperations {
         return legacy.gradeManualAnswer(attemptId, questionId, request, access);
     }
 
-    public CreateAssignmentResponse createAssignment(String tenantId, String userId, String idempotencyKey,
+    public CreateAssignmentResponse createAssignment(UserAccessContext access, String idempotencyKey,
             CreateAssignmentRequest request) {
-        return assignments.create(tenantId, userId, idempotencyKey, request);
+        return assignments.create(access, idempotencyKey, request);
     }
 
-    public void updateAssignment(String tenantId, String assignmentId, UpdateAssignmentRequest request) {
-        assignments.updateAssignment(tenantId, assignmentId, request);
+    public void updateAssignment(UserAccessContext access, String assignmentId, UpdateAssignmentRequest request) {
+        assignments.updateAssignment(access, assignmentId, request);
     }
 
-    public CreateAssignmentResponse updateAssignmentRecipients(String tenantId, String assignmentId,
+    public CreateAssignmentResponse updateAssignmentRecipients(UserAccessContext access, String assignmentId,
             UpdateRecipientsRequest request) {
-        return assignments.updateRecipients(tenantId, assignmentId, request);
+        return assignments.updateRecipients(access, assignmentId, request);
     }
 
-    public void deleteAssignment(String tenantId, String assignmentId) {
-        assignments.delete(tenantId, assignmentId);
+    public void deleteAssignment(UserAccessContext access, String assignmentId) {
+        assignments.delete(access, assignmentId);
     }
 
     public StudentGroupResponse createStudentGroup(String tenantId, String userId, StudentGroupRequest request) {
