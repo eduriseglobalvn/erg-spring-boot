@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.service.auth;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -12,16 +11,12 @@ public class SmtpAccountMailSender implements AccountMailSender {
     private final JavaMailSender mailSender;
     private final String fromAddress;
 
-    @Autowired
+    /** The sender fallback chain (ERG_MAIL_FROM, SMTP__FROM, spring.mail.username) lives in application.yml. */
     public SmtpAccountMailSender(
             JavaMailSender mailSender,
-            @Value("${erg.mail.from:${spring.mail.username:noreply@erg.edu.vn}}") String fromAddress) {
+            @Value("${erg.mail.from:noreply@erg.edu.vn}") String fromAddress) {
         this.mailSender = mailSender;
         this.fromAddress = fromAddress;
-    }
-
-    public SmtpAccountMailSender(JavaMailSender mailSender) {
-        this(mailSender, "noreply@erg.edu.vn");
     }
 
     @Override
