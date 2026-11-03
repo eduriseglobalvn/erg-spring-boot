@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.platform.security;
 
+import com.erg.ergspringboot.model.organization.UserAccessScope;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -28,6 +29,16 @@ public final class AccessScopeAssembler {
     public static boolean isEducationUnitScopeType(String scopeType) {
         return scopeType != null
                 && EDUCATION_UNIT_SCOPE_TYPES.contains(scopeType.trim().toUpperCase(java.util.Locale.ROOT));
+    }
+
+    /**
+     * The one rule for whether a legacy access scope grants LMS reach: no module list, the
+     * {@code *} wildcard, or a list naming {@code lms}. Shared by ErgPrincipalService,
+     * OidcPrincipalBridgeFilter and session bootstrap (SessionService).
+     */
+    public static boolean appliesToLms(UserAccessScope scope) {
+        String modules = scope.getModules() == null ? "" : scope.getModules().trim().toLowerCase(java.util.Locale.ROOT);
+        return modules.isBlank() || modules.equals("*") || modules.contains("lms");
     }
 
     public static AccessScopeSet from(ErgPrincipal principal) {

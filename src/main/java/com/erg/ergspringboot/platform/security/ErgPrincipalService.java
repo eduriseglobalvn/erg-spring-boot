@@ -5,7 +5,6 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
-import com.erg.ergspringboot.model.organization.UserAccessScope;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
@@ -13,7 +12,6 @@ import com.erg.ergspringboot.service.auth.AuthTokenService;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -280,7 +278,7 @@ public class ErgPrincipalService {
         if (user != null && user.getAccessScopes() != null) {
             user.getAccessScopes().stream()
                     .filter(scope -> scope.getEducationUnitId() != null && !scope.getEducationUnitId().isBlank())
-                    .filter(this::appliesToLms)
+                    .filter(AccessScopeAssembler::appliesToLms)
                     .map(scope -> scope.getEducationUnitId().trim())
                     .forEach(managedIds::add);
         }
@@ -291,11 +289,6 @@ public class ErgPrincipalService {
                 .map(String::trim)
                 .forEach(managedIds::add);
         return List.copyOf(managedIds);
-    }
-
-    private boolean appliesToLms(UserAccessScope scope) {
-        String modules = scope.getModules() == null ? "" : scope.getModules().trim().toLowerCase(Locale.ROOT);
-        return modules.isBlank() || modules.equals("*") || modules.contains("lms");
     }
 
     private String blankToDefault(String value, String fallback) {
