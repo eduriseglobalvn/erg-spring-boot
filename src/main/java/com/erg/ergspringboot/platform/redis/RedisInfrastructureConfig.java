@@ -13,12 +13,10 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(ErgRedisProperties.class)
 @ImportRuntimeHints(RedisNativeRuntimeHints.class)
-@EnableScheduling
 public class RedisInfrastructureConfig {
 
     @Bean(name = {"redisConnectionFactory", "stateRedisConnectionFactory"})

@@ -488,9 +488,6 @@ spring:
   config:
     activate:
       on-profile: test
-  task:
-    scheduling:
-      enabled: false
   autoconfigure:
     exclude:
       - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
@@ -514,6 +511,9 @@ spring:
     hibernate:
       ddl-auto: validate
 erg:
+  # No @Scheduled workers in tests: they write to the shared DB and skew query counts.
+  scheduling:
+    enabled: false
   process-local:
     enabled: true
   quiz:

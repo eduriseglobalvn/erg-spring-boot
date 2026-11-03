@@ -13,11 +13,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
-@EnableScheduling
 @ImportRuntimeHints(FirebaseNotificationRuntimeHints.class)
 public class FirebaseNotificationConfiguration {
 
