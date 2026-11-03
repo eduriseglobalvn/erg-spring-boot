@@ -1,14 +1,24 @@
 package com.erg.ergspringboot.service.crm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.erg.ergspringboot.authorization.AuthorizationOperations;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolPerformanceResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolSummaryResponse;
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.model.crm.CrmSchoolContact;
 import com.erg.ergspringboot.model.crm.CrmSchoolDeal;
 import com.erg.ergspringboot.model.crm.CrmSchoolProfile;
 import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.crm.CrmSchoolContactRepository;
 import com.erg.ergspringboot.repository.crm.CrmSchoolDealRepository;
 import com.erg.ergspringboot.repository.crm.CrmSchoolProfileRepository;
@@ -16,10 +26,15 @@ import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @ExtendWith(MockitoExtension.class)
 class CrmSchoolServiceTest {
@@ -32,22 +47,31 @@ class CrmSchoolServiceTest {
     private CrmSchoolDealRepository dealRepository;
     @Mock
     private CrmSchoolContactRepository contactRepository;
+    @Mock
+    private AuthorizationOperations authorization;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void listsSignedSchoolsForSeoWithPrimaryContactAndReferrer() {
-        CrmSchoolService service = new CrmSchoolService(educationUnitRepository, profileRepository, dealRepository, contactRepository);
+        CrmSchoolService service = service();
         EducationUnit school = school("sch_binh_an", "THCS Binh An", "signed");
         CrmSchoolDeal deal = deal("deal_1", "sch_binh_an", "seo_1", "signed", new BigDecimal("50000000"));
         CrmSchoolProfile profile = profile("sch_binh_an", "ref_1", "Nguyen Gioi Thieu", "0901000000");
         CrmSchoolContact contact = contact("sch_binh_an", "principal", "Tran Hieu Truong", "0902000000", true);
 
-        when(dealRepository.findByOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc("seo_1", "signed"))
+        when(dealRepository.findByTenantIdAndOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc("tenant-a", "seo_1", "signed"))
                 .thenReturn(List.of(deal));
-        when(educationUnitRepository.findByIdInOrderByNameAsc(List.of("sch_binh_an"))).thenReturn(List.of(school));
-        when(profileRepository.findBySchoolIdIn(List.of("sch_binh_an"))).thenReturn(List.of(profile));
-        when(contactRepository.findBySchoolIdInOrderByIsPrimaryDescCreatedAtAsc(List.of("sch_binh_an"))).thenReturn(List.of(contact));
+        when(educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(eq("tenant-a"), eq(List.of("sch_binh_an")), any(Pageable.class)))
+                .thenReturn(List.of(school));
+        when(profileRepository.findByTenantIdAndSchoolIdIn("tenant-a", List.of("sch_binh_an"))).thenReturn(List.of(profile));
+        when(contactRepository.findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc("tenant-a", List.of("sch_binh_an")))
+                .thenReturn(List.of(contact));
 
-        List<CrmSchoolSummaryResponse> response = service.signedSchoolsBySeo("seo_1");
+        List<CrmSchoolSummaryResponse> response = service.schoolsBySeo(access("seo_1", List.of("*")), "seo_1", true);
 
         assertThat(response).hasSize(1);
         assertThat(response.getFirst().schoolId()).isEqualTo("sch_binh_an");
@@ -57,18 +81,52 @@ class CrmSchoolServiceTest {
     }
 
     @Test
-    void calculatesSeoConversionAndRevenueFromDeals() {
-        CrmSchoolService service = new CrmSchoolService(educationUnitRepository, profileRepository, dealRepository, contactRepository);
+    void seoStaffCannotReadAnotherSeoPipelineWithoutAnalyticsPermission() {
+        CrmSchoolService service = service();
+        authenticate("seo_1");
+        when(authorization.isAllowed(any(), eq("crm.analytics.read"), eq(null), eq("tenant-a"))).thenReturn(false);
+
+        assertThatThrownBy(() -> service.schoolsBySeo(access("seo_1", List.of("*")), "seo_2", true))
+                .isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(dealRepository);
+    }
+
+    @Test
+    void analyticsReaderSeesOnlySchoolsInsideTenantAndManagedScope() {
+        CrmSchoolService service = service();
+        authenticate("lead_1");
+        when(authorization.isAllowed(any(), eq("crm.analytics.read"), eq(null), eq("tenant-a"))).thenReturn(true);
+        when(dealRepository.findByTenantIdAndOwnerUserIdOrderByCreatedAtDesc("tenant-a", "seo_2")).thenReturn(List.of(
+                deal("deal_1", "school-in-scope", "seo_2", "proposal", BigDecimal.ZERO),
+                deal("deal_2", "school-out-of-scope", "seo_2", "signed", BigDecimal.TEN)));
+        when(educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(eq("tenant-a"), eq(List.of("school-in-scope")), any(Pageable.class)))
+                .thenReturn(List.of(school("school-in-scope", "In scope", "active")));
+        when(profileRepository.findByTenantIdAndSchoolIdIn("tenant-a", List.of("school-in-scope"))).thenReturn(List.of());
+        when(contactRepository.findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc("tenant-a", List.of("school-in-scope")))
+                .thenReturn(List.of());
+
+        List<CrmSchoolSummaryResponse> response =
+                service.schoolsBySeo(access("lead_1", List.of("school-in-scope")), "seo_2", false);
+
+        assertThat(response).extracting(CrmSchoolSummaryResponse::schoolId).containsExactly("school-in-scope");
+        verify(dealRepository, never()).findByTenantIdAndOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc(any(), any(), any());
+    }
+
+    @Test
+    void calculatesSeoConversionAndRevenueFromDealsInScope() {
+        CrmSchoolService service = service();
         OffsetDateTime from = OffsetDateTime.parse("2026-01-01T00:00:00Z");
         OffsetDateTime to = OffsetDateTime.parse("2026-05-26T00:00:00Z");
-        when(dealRepository.findByOwnerUserIdAndCreatedAtBetween("seo_1", from, to)).thenReturn(List.of(
+        when(dealRepository.findByTenantIdAndOwnerUserIdAndCreatedAtBetween("tenant-a", "seo_1", from, to)).thenReturn(List.of(
                 deal("deal_1", "sch_1", "seo_1", "signed", new BigDecimal("50000000")),
                 deal("deal_2", "sch_2", "seo_1", "lost", BigDecimal.ZERO),
                 deal("deal_3", "sch_3", "seo_1", "negotiating", BigDecimal.ZERO),
-                deal("deal_4", "sch_4", "seo_1", "signed", new BigDecimal("70000000"))
+                deal("deal_4", "sch_4", "seo_1", "signed", new BigDecimal("70000000")),
+                deal("deal_5", "sch_foreign", "seo_1", "signed", new BigDecimal("90000000"))
         ));
 
-        CrmSchoolPerformanceResponse response = service.performance("seo_1", from, to);
+        CrmSchoolPerformanceResponse response = service.performance(
+                access("seo_1", List.of("sch_1", "sch_2", "sch_3", "sch_4")), "seo_1", from, to);
 
         assertThat(response.totalSchools()).isEqualTo(4);
         assertThat(response.signedSchools()).isEqualTo(2);
@@ -77,6 +135,21 @@ class CrmSchoolServiceTest {
         assertThat(response.conversionRate()).isEqualByComparingTo("0.50");
         assertThat(response.signedRevenue()).isEqualByComparingTo("120000000");
         assertThat(response.averageDealValue()).isEqualByComparingTo("60000000");
+    }
+
+    private CrmSchoolService service() {
+        return new CrmSchoolService(educationUnitRepository, profileRepository, dealRepository, contactRepository, authorization);
+    }
+
+    private UserAccessContext access(String userId, List<String> units) {
+        return new UserAccessContext(userId, "tenant-a", units, List.of(), null, null);
+    }
+
+    private void authenticate(String userId) {
+        ErgPrincipal principal = ErgPrincipal.authenticated(userId, "session", "tenant-a", List.of(), List.of(),
+                List.of(), List.of(), "staff", null, Map.of());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of()));
     }
 
     private EducationUnit school(String id, String name, String status) {
@@ -91,6 +164,7 @@ class CrmSchoolServiceTest {
     private CrmSchoolDeal deal(String id, String schoolId, String ownerUserId, String stage, BigDecimal revenue) {
         CrmSchoolDeal deal = new CrmSchoolDeal();
         deal.setId(id);
+        deal.setTenantId("tenant-a");
         deal.setSchoolId(schoolId);
         deal.setOwnerUserId(ownerUserId);
         deal.setStage(stage);

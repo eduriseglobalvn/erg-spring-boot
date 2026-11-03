@@ -29,6 +29,9 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class CrmSchoolActivity extends BaseEntity {
 
+    @Column(name = "tenant_id", length = 36, nullable = false)
+    private String tenantId;
+
     @Column(name = "school_id", length = 36, nullable = false)
     private String schoolId;
 

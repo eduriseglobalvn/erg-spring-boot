@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolListResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolPerformanceResponse;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.crm.CrmOperations;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,11 +26,11 @@ public class CrmSchoolController {
     @GetMapping("/seo/{seoId}/schools")
     public ApiResponse<CrmSchoolListResponse> schoolsBySeo(
             @PathVariable String seoId,
-            @RequestParam(defaultValue = "false") boolean signed,
+            @RequestParam(defaultValue = "true") boolean signed,
             HttpServletRequest request
     ) {
         CrmSchoolListResponse data = new CrmSchoolListResponse(
-                signed ? crmSchoolService.signedSchoolsBySeo(seoId) : crmSchoolService.signedSchoolsBySeo(seoId)
+                crmSchoolService.schoolsBySeo(UserAccessContext.from(request), seoId, signed)
         );
         return ok("CRM schools loaded", data, request);
     }
@@ -41,7 +42,8 @@ public class CrmSchoolController {
             @RequestParam OffsetDateTime to,
             HttpServletRequest request
     ) {
-        return ok("CRM SEO performance loaded", crmSchoolService.performance(seoId, from, to), request);
+        return ok("CRM SEO performance loaded",
+                crmSchoolService.performance(UserAccessContext.from(request), seoId, from, to), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {

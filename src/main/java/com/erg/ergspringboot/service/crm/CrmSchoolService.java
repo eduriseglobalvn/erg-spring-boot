@@ -1,13 +1,17 @@
 package com.erg.ergspringboot.service.crm;
 
+import com.erg.ergspringboot.authorization.AuthorizationOperations;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolPerformanceResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolSummaryResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.SchoolContactResponse;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.SchoolReferrerResponse;
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.model.crm.CrmSchoolContact;
 import com.erg.ergspringboot.model.crm.CrmSchoolDeal;
 import com.erg.ergspringboot.model.crm.CrmSchoolProfile;
 import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.crm.CrmSchoolContactRepository;
 import com.erg.ergspringboot.repository.crm.CrmSchoolDealRepository;
 import com.erg.ergspringboot.repository.crm.CrmSchoolDealRepository.DealPerformanceAggregate;
@@ -23,6 +27,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CrmSchoolService {
 
+    static final String ANALYTICS_PERMISSION = "crm.analytics.read";
     private static final String SIGNED = "signed";
     private static final String LOST = "lost";
 
@@ -38,35 +46,64 @@ public class CrmSchoolService {
     private final CrmSchoolProfileRepository profileRepository;
     private final CrmSchoolDealRepository dealRepository;
     private final CrmSchoolContactRepository contactRepository;
+    private final AuthorizationOperations authorization;
 
     public CrmSchoolService(
             EducationUnitRepository educationUnitRepository,
             CrmSchoolProfileRepository profileRepository,
             CrmSchoolDealRepository dealRepository,
-            CrmSchoolContactRepository contactRepository
+            CrmSchoolContactRepository contactRepository,
+            AuthorizationOperations authorization
     ) {
         this.educationUnitRepository = educationUnitRepository;
         this.profileRepository = profileRepository;
         this.dealRepository = dealRepository;
         this.contactRepository = contactRepository;
+        this.authorization = authorization;
     }
 
+    /**
+     * Lists schools from the SEO's pipeline. Reading another SEO's pipeline needs
+     * {@code crm.analytics.read}; results are always restricted to the caller's tenant
+     * and education-unit scope.
+     */
     @Transactional(readOnly = true)
-    public List<CrmSchoolSummaryResponse> signedSchoolsBySeo(String seoUserId) {
-        List<CrmSchoolDeal> deals = dealRepository.findByOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc(seoUserId, SIGNED);
+    public List<CrmSchoolSummaryResponse> schoolsBySeo(UserAccessContext access, String seoUserId, boolean signedOnly) {
+        requireSeoAccess(access, seoUserId);
+        String tenantId = access.tenantId();
+        List<CrmSchoolDeal> deals = (signedOnly
+                ? dealRepository.findByTenantIdAndOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc(tenantId, seoUserId, SIGNED)
+                : dealRepository.findByTenantIdAndOwnerUserIdOrderByCreatedAtDesc(tenantId, seoUserId))
+                .stream()
+                .filter(deal -> access.canAccessEducationUnit(deal.getSchoolId()))
+                .toList();
         List<String> schoolIds = deals.stream().map(CrmSchoolDeal::getSchoolId).distinct().toList();
-        Map<String, EducationUnit> educationUnits = byId(educationUnitRepository.findByIdInOrderByNameAsc(schoolIds), EducationUnit::getId);
-        Map<String, CrmSchoolProfile> profiles = byId(profileRepository.findBySchoolIdIn(schoolIds), CrmSchoolProfile::getSchoolId);
-        Map<String, CrmSchoolContact> primaryContacts = primaryContacts(schoolIds);
+        if (schoolIds.isEmpty()) {
+            return List.of();
+        }
+        Map<String, EducationUnit> educationUnits = byId(
+                educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(tenantId, schoolIds, PageRequest.of(0, schoolIds.size())),
+                EducationUnit::getId);
+        Map<String, CrmSchoolProfile> profiles = byId(
+                profileRepository.findByTenantIdAndSchoolIdIn(tenantId, schoolIds), CrmSchoolProfile::getSchoolId);
+        Map<String, CrmSchoolContact> primaryContacts = primaryContacts(tenantId, schoolIds);
 
         return deals.stream()
+                .filter(deal -> educationUnits.containsKey(deal.getSchoolId()))
                 .map(deal -> summary(deal, educationUnits.get(deal.getSchoolId()), profiles.get(deal.getSchoolId()), primaryContacts.get(deal.getSchoolId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public CrmSchoolPerformanceResponse performance(String seoUserId, OffsetDateTime from, OffsetDateTime to) {
-        DealPerformanceAggregate aggregate = dealRepository.aggregatePerformance(seoUserId, from, to);
+    public CrmSchoolPerformanceResponse performance(
+            UserAccessContext access, String seoUserId, OffsetDateTime from, OffsetDateTime to
+    ) {
+        requireSeoAccess(access, seoUserId);
+        String tenantId = access.tenantId();
+        boolean tenantWideScope = access.managedEducationUnitIds().contains("*");
+        DealPerformanceAggregate aggregate = tenantWideScope
+                ? dealRepository.aggregatePerformance(tenantId, seoUserId, from, to)
+                : null;
         if (aggregate != null) {
             long total = value(aggregate.getTotalCount());
             long signed = value(aggregate.getSignedCount());
@@ -81,7 +118,10 @@ public class CrmSchoolService {
                     : revenue.divide(BigDecimal.valueOf(signed), 2, RoundingMode.HALF_UP).stripTrailingZeros();
             return new CrmSchoolPerformanceResponse(total, signed, lost, inProgress, conversion, revenue, average);
         }
-        List<CrmSchoolDeal> deals = dealRepository.findByOwnerUserIdAndCreatedAtBetween(seoUserId, from, to);
+        List<CrmSchoolDeal> deals = dealRepository.findByTenantIdAndOwnerUserIdAndCreatedAtBetween(tenantId, seoUserId, from, to)
+                .stream()
+                .filter(deal -> access.canAccessEducationUnit(deal.getSchoolId()))
+                .toList();
         long total = deals.size();
         long signed = deals.stream().filter(deal -> stageIs(deal, SIGNED)).count();
         long lost = deals.stream().filter(deal -> stageIs(deal, LOST)).count();
@@ -99,6 +139,20 @@ public class CrmSchoolService {
                 : revenue.divide(BigDecimal.valueOf(signed), 2, RoundingMode.HALF_UP).stripTrailingZeros();
 
         return new CrmSchoolPerformanceResponse(total, signed, lost, inProgress, conversion, revenue, average);
+    }
+
+    private void requireSeoAccess(UserAccessContext access, String seoUserId) {
+        if (access.userId().equals(seoUserId)) {
+            return;
+        }
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean allowed = authentication != null
+                && authentication.getPrincipal() instanceof ErgPrincipal principal
+                && access.userId().equals(principal.userId())
+                && authorization.isAllowed(principal, ANALYTICS_PERMISSION, null, access.tenantId());
+        if (!allowed) {
+            throw new ForbiddenException("missing permission " + ANALYTICS_PERMISSION + " to read another SEO pipeline");
+        }
     }
 
     private long value(Long value) {
@@ -143,9 +197,10 @@ public class CrmSchoolService {
         );
     }
 
-    private Map<String, CrmSchoolContact> primaryContacts(Collection<String> schoolIds) {
+    private Map<String, CrmSchoolContact> primaryContacts(String tenantId, Collection<String> schoolIds) {
         Map<String, CrmSchoolContact> contacts = new LinkedHashMap<>();
-        for (CrmSchoolContact contact : contactRepository.findBySchoolIdInOrderByIsPrimaryDescCreatedAtAsc(schoolIds)) {
+        for (CrmSchoolContact contact : contactRepository
+                .findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc(tenantId, schoolIds)) {
             contacts.putIfAbsent(contact.getSchoolId(), contact);
         }
         return contacts;
