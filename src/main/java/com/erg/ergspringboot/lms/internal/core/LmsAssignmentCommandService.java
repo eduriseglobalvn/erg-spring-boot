@@ -7,19 +7,18 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.Assignment
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssignmentResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.lms.Assignment;
 import com.erg.ergspringboot.model.lms.AssignmentRecipient;
 import com.erg.ergspringboot.model.lms.AssignmentResource;
 import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.model.lms.StudentGroupMember;
 import com.erg.ergspringboot.model.quiz.version.QuizVersion;
+import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.repository.lms.AssignmentRecipientRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
@@ -27,18 +26,15 @@ import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
 import com.erg.ergspringboot.repository.lms.StudentGroupMemberRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
-import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,15 +53,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(value = "postgresTransactionManager")
 public class LmsAssignmentCommandService {
 
-    private static final String MODE_CLASS = "class";
-    private static final String MODE_GROUP = "group";
-    private static final String MODE_STUDENTS = "students";
     private static final String STATUS_ACTIVE = "active";
     private final AssignmentRepository assignmentRepository;
     private final AssignmentResourceRepository resourceRepository;
     private final AssignmentRecipientRepository recipientRepository;
-    private final StudentGroupMemberRepository studentGroupMemberRepository;
-    private final StudentRepository studentRepository;
+    private final AssignmentRecipientResolver recipients;
     private final QuizVersionRepository quizVersionRepository;
     private final LmsReadCacheInvalidator caches;
     private final LmsAssignmentAccessPolicy policy;
@@ -106,8 +98,7 @@ public class LmsAssignmentCommandService {
         this.assignmentRepository = assignmentRepository;
         this.resourceRepository = resourceRepository;
         this.recipientRepository = recipientRepository;
-        this.studentGroupMemberRepository = studentGroupMemberRepository;
-        this.studentRepository = studentRepository;
+        this.recipients = new AssignmentRecipientResolver(studentRepository, studentGroupMemberRepository);
         this.quizVersionRepository = quizVersionRepository;
         this.caches = caches;
         this.policy = policy;
@@ -135,14 +126,14 @@ public class LmsAssignmentCommandService {
             }
         }
 
-        String mode = normalizeMode(request.recipientMode());
+        String mode = this.recipients.normalizeMode(request.recipientMode());
         if (blankToNull(request.classId()) != null) policy.ensureClassScope(tenantId, request.classId().trim(), access);
-        List<Student> recipients = resolveRecipients(tenantId, mode, request.classId(), request.groupId(), request.studentIds());
+        List<Student> recipients = this.recipients.resolveRecipients(tenantId, mode, request.classId(), request.groupId(), request.studentIds());
         if (recipients.isEmpty()) {
             throw new BadRequestException("assignment resolved to zero recipients");
         }
         ensureRecipientScope(tenantId, recipients, access);
-        String primaryClassId = primaryClassId(mode, request.classId(), recipients);
+        String primaryClassId = this.recipients.primaryClassId(mode, request.classId(), recipients);
 
         Assignment assignment = new Assignment();
         assignment.setTenantId(tenantId);
@@ -178,9 +169,9 @@ public class LmsAssignmentCommandService {
         String tenantId = AuthenticatedTenant.require(access.tenantId());
         Assignment assignment = requireAssignment(tenantId, assignmentId);
         policy.ensureManagedScope(assignment, access);
-        String mode = normalizeMode(request == null ? null : request.recipientMode());
+        String mode = this.recipients.normalizeMode(request == null ? null : request.recipientMode());
         if (request != null && blankToNull(request.classId()) != null) policy.ensureClassScope(tenantId, request.classId().trim(), access);
-        List<Student> recipients = resolveRecipients(
+        List<Student> recipients = this.recipients.resolveRecipients(
                 tenantId, mode,
                 request == null ? null : request.classId(),
                 request == null ? null : request.groupId(),
@@ -190,7 +181,7 @@ public class LmsAssignmentCommandService {
         }
         ensureRecipientScope(tenantId, recipients, access);
         recipientRepository.deleteByAssignmentId(assignmentId);
-        String primaryClassId = primaryClassId(mode, request == null ? null : request.classId(), recipients);
+        String primaryClassId = this.recipients.primaryClassId(mode, request == null ? null : request.classId(), recipients);
         persistRecipients(tenantId, assignmentId, primaryClassId, mode, recipients);
 
         assignment.setRecipientMode(mode);
@@ -305,62 +296,6 @@ public class LmsAssignmentCommandService {
         if (!rows.isEmpty()) recipientRepository.saveAll(rows);
     }
 
-    private List<Student> resolveRecipients(String tenantId, String mode, String classId, String groupId, List<String> studentIds) {
-        return switch (mode) {
-            case MODE_CLASS -> {
-                String resolvedClass = blankToNull(classId);
-                if (resolvedClass == null) {
-                    throw new BadRequestException("classId is required for class recipient mode");
-                }
-                yield studentRepository.findByTenantIdAndAcademicClassIdOrderByFullNameAsc(tenantId, resolvedClass);
-            }
-            case MODE_GROUP -> {
-                String resolvedGroup = blankToNull(groupId);
-                if (resolvedGroup == null) {
-                    throw new BadRequestException("groupId is required for group recipient mode");
-                }
-                Set<String> memberIds = new LinkedHashSet<>(
-                        studentGroupMemberRepository.findByGroupIdAndTenantId(resolvedGroup, tenantId).stream()
-                                .map(StudentGroupMember::getStudentId)
-                                .toList());
-                yield findStudentsByIds(tenantId, memberIds);
-            }
-            case MODE_STUDENTS -> {
-                if (studentIds == null || studentIds.isEmpty()) {
-                    throw new BadRequestException("studentIds is required for students recipient mode");
-                }
-                yield findStudentsByIds(tenantId, new LinkedHashSet<>(studentIds));
-            }
-            default -> throw new BadRequestException("unknown recipient mode: " + mode);
-        };
-    }
-
-    private List<Student> findStudentsByIds(String tenantId, Set<String> ids) {
-        Map<String, Student> byId = new LinkedHashMap<>();
-        studentRepository.findByTenantIdAndIdIn(tenantId, ids).forEach(student -> byId.put(student.getId(), student));
-        // Preserve request order and drop unknown/other-tenant ids.
-        List<Student> ordered = new ArrayList<>();
-        for (String id : ids) {
-            Student student = byId.get(id);
-            if (student != null) {
-                ordered.add(student);
-            }
-        }
-        return ordered;
-    }
-
-    private String primaryClassId(String mode, String classId, List<Student> recipients) {
-        String resolved = blankToNull(classId);
-        if (resolved != null) {
-            return resolved;
-        }
-        return recipients.stream()
-                .map(Student::getAcademicClassId)
-                .filter(id -> id != null && !id.isBlank())
-                .findFirst()
-                .orElseThrow(() -> new BadRequestException("cannot resolve a primary class for the assignment"));
-    }
-
     private CreateAssignmentResponse describe(Assignment assignment) {
         List<AssignmentResourceResponse> resources = toResourceResponses(
                 resourceRepository.findByAssignmentIdOrderByOrderIndexAsc(assignment.getId()));
@@ -384,18 +319,6 @@ public class LmsAssignmentCommandService {
             throw new ResourceNotFoundException("assignment not found");
         }
         return assignment;
-    }
-
-    private String normalizeMode(String mode) {
-        String value = blankToNull(mode);
-        if (value == null) {
-            return MODE_CLASS;
-        }
-        String normalized = value.toLowerCase(Locale.ROOT);
-        if (!normalized.equals(MODE_CLASS) && !normalized.equals(MODE_GROUP) && !normalized.equals(MODE_STUDENTS)) {
-            throw new BadRequestException("recipientMode must be 'class', 'group' or 'students'");
-        }
-        return normalized;
     }
 
     private String blankToNull(String value) {
