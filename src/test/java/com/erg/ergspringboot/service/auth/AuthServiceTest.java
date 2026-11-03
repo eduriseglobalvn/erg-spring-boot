@@ -678,7 +678,12 @@ class AuthServiceTest {
     @Test
     void ipSecurityStatusCountsFailedAttemptsForIpAndEmail() {
         when(loginAttemptRepository.countByIpAddressAndResultIn(eq("10.0.0.1"), any())).thenReturn(1L);
-        when(loginAttemptRepository.countByAttemptedEmailIgnoreCaseAndResultIn(eq("active@example.com"), any())).thenReturn(1L);
+        AuthLoginAttempt ownTenant = failedAttempt("erg");
+        AuthLoginAttempt otherTenant = failedAttempt("tenant-b");
+        when(loginAttemptRepository.findByAttemptedEmailIgnoreCaseOrderByCreatedAtDesc(
+                eq("active@example.com"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(List.of(ownTenant, otherTenant));
+        authenticate(List.of("operations.manage"));
 
         IpSecurityStatusResponse response = authService.ipSecurityStatus(
                 "active@example.com",
@@ -691,6 +696,36 @@ class AuthServiceTest {
         assertEquals(1L, response.failedAttemptsIp());
         assertEquals(1L, response.failedAttemptsEmail());
         assertEquals(5, response.threshold());
+    }
+
+    @Test
+    void ipSecurityStatusForAnotherEmailRequiresOperationsPermission() {
+        authenticate(List.of("lms.class.read"));
+
+        assertThrows(com.erg.ergspringboot.exception.ForbiddenException.class, () -> authService.ipSecurityStatus(
+                "admin@example.com", new AuthClientContext("10.0.0.1", "JUnit", null, null, null)));
+        assertNotNull(authService.ipSecurityStatus(null, new AuthClientContext("10.0.0.1", "JUnit", null, null, null)));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private void authenticate(List<String> permissions) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        new com.erg.ergspringboot.platform.security.ErgPrincipal("ops-1", "s-1", "erg",
+                                List.of("staff"), permissions, List.of(), List.of(), "staff", "user", java.util.Map.of()),
+                        null, List.of()));
+    }
+
+    private AuthLoginAttempt failedAttempt(String tenantId) {
+        AuthLoginAttempt attempt = new AuthLoginAttempt();
+        attempt.setTenantId(tenantId);
+        attempt.setResult("FAILED");
+        attempt.setCreatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC).minusDays(1));
+        return attempt;
     }
 
     private User activeUser(String id, String email, String rawPassword) {
