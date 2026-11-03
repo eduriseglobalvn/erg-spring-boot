@@ -23,3 +23,11 @@ The PostgreSQL integration test uses a non-superuser role and proves that quiz-d
 be read or inserted across tenants. This is a DB-level guard in addition to REST/GraphQL boundary
 checks. Legacy tables are not considered RLS-complete until their own policy and integration proof
 are added.
+
+## Startup guard (prod)
+
+In the `prod` profile `RuntimeDatabaseRoleGuard` (`config/persistence`) queries `pg_roles`/`pg_class`
+for the datasource user and refuses to start when it is SUPERUSER, has BYPASSRLS, or owns (directly or
+through role membership) any `public` table. Fix the credentials rather than disabling the guard; the
+`ERG_PERSISTENCE_RUNTIME_ROLE_GUARD_ENABLED=false` bypass is an incident-only escape hatch. Newer tenant
+tables (V92-V96, V111) also use `FORCE ROW LEVEL SECURITY`. See `postgres-migration-preflight.md`.
