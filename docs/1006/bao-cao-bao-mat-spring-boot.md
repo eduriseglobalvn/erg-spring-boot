@@ -48,9 +48,9 @@ Hệ thống tạo `ErgPrincipal` với quyền super-admin chỉ từ headers �
 **Mức ảnh hưởng:** Database, JWT, API keys, Object Storage  
 
 **Mô tả:** File `.env` chứa live credentials cho toàn bộ hạ tầng production:
-- **PostgreSQL:** `avnadmin` / `REDACTED_DB_PASSWORD` trên `aivencloud.com:21590`
-- **MongoDB Atlas:** `erg` / `Dev.erg.edu.vn` trên `mongodb.net`
-- **Redis/Valkey:** `default` / `REDACTED_REDIS_PASSWORD` trên `aivencloud.com:21591`
+- **PostgreSQL:** `<DB_ADMIN_USER>` / `REDACTED_DB_PASSWORD` trên `<MANAGED_POSTGRES_HOST>:<PORT>`
+- **MongoDB Atlas:** `<MONGODB_USER>` / `REDACTED_MONGODB_PASSWORD` trên `<MONGODB_ATLAS_HOST>`
+- **Redis/Valkey:** `<REDIS_USER>` / `REDACTED_REDIS_PASSWORD` trên `<MANAGED_REDIS_HOST>:<PORT>`
 - **JWT Secret:** `REDACTED_JWT_SECRET` (ký token truy cập)
 - **Groq API Key:** `REDACTED_GROQ_API_KEY`
 - **HuggingFace API Key:** `REDACTED_HUGGINGFACE_API_KEY`
