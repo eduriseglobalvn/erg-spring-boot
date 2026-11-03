@@ -86,7 +86,7 @@ class RelationalModelMappingTest {
     void postgresCoreRelationshipsMirrorGormForeignKeys() throws NoSuchFieldException {
         assertManyToOne(AuthSession.class, "userId", "user", "user_id", false);
         assertManyToOne(AuthLoginAttempt.class, "userId", "user", "user_id", true);
-        assertManyToOne(UserActivity.class, "userId", "user", "user_id", false);
+        assertManyToOne(UserActivity.class, "userId", "user", "user_id", true);
         assertManyToOne(UserActivity.class, "targetUserId", "targetUser", "target_user_id", true);
         assertManyToOne(UserPermissionOverride.class, "userId", "user", "user_id", false);
         assertManyToOne(UserPermissionOverride.class, "permission", "permissionRef", "permission", false);

@@ -5,6 +5,8 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 public final class ErgTieredCache implements Cache {
 
@@ -160,6 +162,16 @@ public final class ErgTieredCache implements Cache {
             return;
         }
         clearLocal(tenant);
+        // A reader between this clear and the commit can re-fill L1 with pre-commit data that the
+        // post-commit generation bump never reaches (L1 keys carry no generation), so clear again then.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    clearLocal(tenant);
+                }
+            });
+        }
         if (invalidations == null) {
             generations.increment(tenant, descriptor.name());
         } else {

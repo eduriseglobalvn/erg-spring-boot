@@ -14,6 +14,18 @@ import org.junit.jupiter.api.Test;
 class CrmSchoolModelMappingTest {
 
     @Test
+    void typedJsonbRowsReadRowsWrittenByOlderReleases() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var rows = mapper.readValue("""
+                [{"id":"a","label":"A","done":true,"legacyKey":1},{"id":"b"}]
+                """, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<CrmDealLines.ChecklistItem>>() { });
+
+        assertThat(rows).containsExactly(
+                new CrmDealLines.ChecklistItem("a", "A", true),
+                new CrmDealLines.ChecklistItem("b", null, null));
+    }
+
+    @Test
     void educationUnitRemainsTheSingleSchoolMasterWithCrmOwnershipMetadata() throws NoSuchFieldException {
         assertThat(EducationUnit.class.getAnnotation(Table.class).name()).isEqualTo("education_units");
         assertField(EducationUnit.class, "ownerUserId", "owner_user_id", String.class);

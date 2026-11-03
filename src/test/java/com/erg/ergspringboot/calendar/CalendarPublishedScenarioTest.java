@@ -34,6 +34,9 @@ class CalendarPublishedScenarioTest {
 
     @MockitoBean CalendarPublishedBatchProjection calendar;
     @MockitoBean NotificationCommandService notifications;
+    // Collaborators of the LMS learning-event consumer, which lives in the same module.
+    @MockitoBean com.erg.ergspringboot.lms.LmsNotificationProjection lmsAudience;
+    @MockitoBean com.erg.ergspringboot.service.notifications.LmsNotificationEventPublisher lmsNotifications;
     // The scenario isolates the notifications event consumer. Public REST
     // facades are still compatibility adapters over the legacy services, so
     // their collaborators are mocked instead of widening the standalone

@@ -8,7 +8,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -45,7 +44,7 @@ public class CrmHandover extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "checklist", nullable = false, columnDefinition = "jsonb")
-    private List<Map<String, Object>> checklist = new ArrayList<>();
+    private List<CrmDealLines.ChecklistItem> checklist = new ArrayList<>();
 
     @Column(name = "idempotency_key", length = 192)
     private String idempotencyKey;

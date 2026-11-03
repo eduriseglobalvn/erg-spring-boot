@@ -19,6 +19,7 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.model.crm.CrmDealLines;
 import com.erg.ergspringboot.model.crm.CrmHandover;
 import com.erg.ergspringboot.model.crm.CrmSchoolActivity;
 import com.erg.ergspringboot.model.crm.CrmSchoolContact;
@@ -258,7 +259,7 @@ public class CrmWorkspaceService {
         List<HandoverChecklistItem> checklist =
                 verifiedChecklist(access.tenantId(), profile.getSchoolId(), request.checklist());
         handover.setStatus(isReady(checklist) ? "ready" : "draft");
-        handover.setChecklist(checklist.stream().map(this::checklistMap).toList());
+        handover.setChecklist(checklist.stream().map(this::checklistRow).toList());
         handover.setIdempotencyKey(key);
         return handoverResponse(handoverRepository.save(handover));
     }
@@ -285,7 +286,7 @@ public class CrmWorkspaceService {
         if (!isReady(checklist)) {
             throw new BadRequestException("CRM handover checklist is not ready for approval");
         }
-        handover.setChecklist(checklist.stream().map(this::checklistMap).toList());
+        handover.setChecklist(checklist.stream().map(this::checklistRow).toList());
         handover.setStatus("approved");
         CrmSchoolProfile profile = profile(access, handover.getLeadId());
         profile.setLeadStatus("active");
@@ -321,8 +322,8 @@ public class CrmWorkspaceService {
         deal.setAcademicYear(academicYear.trim());
         deal.setContractTerm(contractTerm.trim());
         deal.setStartMonth(startMonth.trim());
-        deal.setRevenueLines(revenues.stream().map(this::revenueMap).toList());
-        deal.setCostLines(costs.stream().map(this::costMap).toList());
+        deal.setRevenueLines(revenues.stream().map(this::revenueRow).toList());
+        deal.setCostLines(costs.stream().map(this::costRow).toList());
         deal.setExpectedRevenue(revenues.stream().map(this::netRevenue).reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 
@@ -378,51 +379,37 @@ public class CrmWorkspaceService {
         return contacts;
     }
 
-    private Map<String, Object> revenueMap(RevenueLine line) {
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("id", line.id());
-        value.put("program", line.program());
-        value.put("packageName", line.packageName());
-        value.put("classCount", line.classCount());
-        value.put("studentsPerClass", line.studentsPerClass());
-        value.put("pricePerStudent", line.pricePerStudent());
-        value.put("discountRate", line.discountRate());
-        value.put("durationMonths", line.durationMonths());
-        return value;
+    private CrmDealLines.RevenueLine revenueRow(RevenueLine line) {
+        return new CrmDealLines.RevenueLine(line.id(), line.program(), line.packageName(), line.classCount(),
+                line.studentsPerClass(), line.pricePerStudent(), line.discountRate(), line.durationMonths());
     }
 
-    private Map<String, Object> costMap(CostLine line) {
-        Map<String, Object> value = new LinkedHashMap<>();
-        value.put("id", line.id());
-        value.put("category", line.category());
-        value.put("description", line.description());
-        value.put("quantity", line.quantity());
-        value.put("unitCost", line.unitCost());
-        value.put("durationMonths", line.durationMonths());
-        value.put("requiredForHandover", line.requiredForHandover());
-        return value;
+    private CrmDealLines.CostLine costRow(CostLine line) {
+        return new CrmDealLines.CostLine(line.id(), line.category(), line.description(), line.quantity(),
+                line.unitCost(), line.durationMonths(), line.requiredForHandover());
     }
 
-    private List<RevenueLine> revenueLines(List<Map<String, Object>> values) {
-        return safe(values).stream().map(value -> new RevenueLine(
-                string(value, "id"), string(value, "program"), string(value, "packageName"), integer(value, "classCount"),
-                integer(value, "studentsPerClass"), decimal(value, "pricePerStudent"), decimal(value, "discountRate"),
-                integer(value, "durationMonths"))).toList();
+    private CrmDealLines.ChecklistItem checklistRow(HandoverChecklistItem item) {
+        return new CrmDealLines.ChecklistItem(item.id(), item.label(), item.done());
     }
 
-    private List<CostLine> costLines(List<Map<String, Object>> values) {
-        return safe(values).stream().map(value -> new CostLine(
-                string(value, "id"), string(value, "category"), string(value, "description"), integer(value, "quantity"),
-                decimal(value, "unitCost"), integer(value, "durationMonths"), bool(value, "requiredForHandover"))).toList();
+    private List<RevenueLine> revenueLines(List<CrmDealLines.RevenueLine> rows) {
+        return safe(rows).stream().map(row -> new RevenueLine(
+                text(row.id()), text(row.program()), text(row.packageName()), value(row.classCount()),
+                value(row.studentsPerClass()), amount(row.pricePerStudent()), amount(row.discountRate()),
+                value(row.durationMonths()))).toList();
     }
 
-    private Map<String, Object> checklistMap(HandoverChecklistItem item) {
-        return Map.of("id", item.id(), "label", item.label(), "done", item.done());
+    private List<CostLine> costLines(List<CrmDealLines.CostLine> rows) {
+        return safe(rows).stream().map(row -> new CostLine(
+                text(row.id()), text(row.category()), text(row.description()), value(row.quantity()),
+                amount(row.unitCost()), value(row.durationMonths()), Boolean.TRUE.equals(row.requiredForHandover())))
+                .toList();
     }
 
-    private List<HandoverChecklistItem> checklistItems(List<Map<String, Object>> values) {
-        return safe(values).stream()
-                .map(value -> new HandoverChecklistItem(string(value, "id"), string(value, "label"), bool(value, "done")))
+    private List<HandoverChecklistItem> checklistItems(List<CrmDealLines.ChecklistItem> rows) {
+        return safe(rows).stream()
+                .map(row -> new HandoverChecklistItem(text(row.id()), text(row.label()), Boolean.TRUE.equals(row.done())))
                 .toList();
     }
 
@@ -513,23 +500,11 @@ public class CrmWorkspaceService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private String string(Map<String, Object> value, String key) {
-        Object item = value.get(key);
-        return item == null ? "" : item.toString();
+    private String text(String value) {
+        return value == null ? "" : value;
     }
 
-    private int integer(Map<String, Object> value, String key) {
-        Object item = value.get(key);
-        return item instanceof Number number ? number.intValue() : Integer.parseInt(item.toString());
-    }
-
-    private BigDecimal decimal(Map<String, Object> value, String key) {
-        Object item = value.get(key);
-        return item instanceof BigDecimal decimal ? decimal : new BigDecimal(item.toString());
-    }
-
-    private boolean bool(Map<String, Object> value, String key) {
-        Object item = value.get(key);
-        return item instanceof Boolean bool ? bool : Boolean.parseBoolean(String.valueOf(item));
+    private BigDecimal amount(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

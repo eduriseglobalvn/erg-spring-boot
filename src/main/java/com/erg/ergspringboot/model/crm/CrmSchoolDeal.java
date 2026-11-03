@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -80,11 +79,11 @@ public class CrmSchoolDeal extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "revenue_lines", nullable = false, columnDefinition = "jsonb")
-    private List<Map<String, Object>> revenueLines = new ArrayList<>();
+    private List<CrmDealLines.RevenueLine> revenueLines = new ArrayList<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "cost_lines", nullable = false, columnDefinition = "jsonb")
-    private List<Map<String, Object>> costLines = new ArrayList<>();
+    private List<CrmDealLines.CostLine> costLines = new ArrayList<>();
 
     @Column(name = "idempotency_key", length = 192)
     private String idempotencyKey;

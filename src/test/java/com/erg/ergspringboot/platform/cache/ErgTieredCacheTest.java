@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.json.JsonMapper;
 
 class ErgTieredCacheTest {
@@ -41,6 +43,23 @@ class ErgTieredCacheTest {
         })).isEqualTo("database-value");
         assertThat(fixture.cache.get("student-1", String.class)).isEqualTo("database-value");
         assertThat(loads).hasValue(1);
+    }
+
+    @Test
+    void clearInsideTransactionDropsL1EntriesRefilledBeforeCommit() {
+        Fixture fixture = new Fixture();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            fixture.cache.clear();
+            fixture.cache.put("student-1", "pre-commit-value");
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+
+            assertThat(((com.github.benmanes.caffeine.cache.Cache<?, ?>) fixture.cache.getNativeCache()).asMap())
+                    .isEmpty();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     private static final class Fixture {
