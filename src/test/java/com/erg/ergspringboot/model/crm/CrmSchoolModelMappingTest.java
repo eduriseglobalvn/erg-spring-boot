@@ -18,11 +18,11 @@ class CrmSchoolModelMappingTest {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var rows = mapper.readValue("""
                 [{"id":"a","label":"A","done":true,"legacyKey":1},{"id":"b"}]
-                """, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<CrmDealLines.ChecklistItem>>() { });
+                """, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<CrmSchoolDeal.ChecklistItem>>() { });
 
         assertThat(rows).containsExactly(
-                new CrmDealLines.ChecklistItem("a", "A", true),
-                new CrmDealLines.ChecklistItem("b", null, null));
+                new CrmSchoolDeal.ChecklistItem("a", "A", true),
+                new CrmSchoolDeal.ChecklistItem("b", null, null));
     }
 
     @Test

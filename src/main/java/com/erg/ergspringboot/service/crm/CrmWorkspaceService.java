@@ -20,7 +20,6 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.crm.CrmDealLines;
 import com.erg.ergspringboot.model.crm.CrmHandover;
 import com.erg.ergspringboot.model.crm.CrmSchoolActivity;
 import com.erg.ergspringboot.model.crm.CrmSchoolContact;
@@ -395,35 +394,35 @@ public class CrmWorkspaceService {
         return contacts;
     }
 
-    private CrmDealLines.RevenueLine revenueRow(RevenueLine line) {
-        return new CrmDealLines.RevenueLine(line.id(), line.program(), line.packageName(), line.classCount(),
+    private CrmSchoolDeal.RevenueLine revenueRow(RevenueLine line) {
+        return new CrmSchoolDeal.RevenueLine(line.id(), line.program(), line.packageName(), line.classCount(),
                 line.studentsPerClass(), line.pricePerStudent(), line.discountRate(), line.durationMonths());
     }
 
-    private CrmDealLines.CostLine costRow(CostLine line) {
-        return new CrmDealLines.CostLine(line.id(), line.category(), line.description(), line.quantity(),
+    private CrmSchoolDeal.CostLine costRow(CostLine line) {
+        return new CrmSchoolDeal.CostLine(line.id(), line.category(), line.description(), line.quantity(),
                 line.unitCost(), line.durationMonths(), line.requiredForHandover());
     }
 
-    private CrmDealLines.ChecklistItem checklistRow(HandoverChecklistItem item) {
-        return new CrmDealLines.ChecklistItem(item.id(), item.label(), item.done());
+    private CrmSchoolDeal.ChecklistItem checklistRow(HandoverChecklistItem item) {
+        return new CrmSchoolDeal.ChecklistItem(item.id(), item.label(), item.done());
     }
 
-    private List<RevenueLine> revenueLines(List<CrmDealLines.RevenueLine> rows) {
+    private List<RevenueLine> revenueLines(List<CrmSchoolDeal.RevenueLine> rows) {
         return safe(rows).stream().map(row -> new RevenueLine(
                 text(row.id()), text(row.program()), text(row.packageName()), value(row.classCount()),
                 value(row.studentsPerClass()), amount(row.pricePerStudent()), amount(row.discountRate()),
                 value(row.durationMonths()))).toList();
     }
 
-    private List<CostLine> costLines(List<CrmDealLines.CostLine> rows) {
+    private List<CostLine> costLines(List<CrmSchoolDeal.CostLine> rows) {
         return safe(rows).stream().map(row -> new CostLine(
                 text(row.id()), text(row.category()), text(row.description()), value(row.quantity()),
                 amount(row.unitCost()), value(row.durationMonths()), Boolean.TRUE.equals(row.requiredForHandover())))
                 .toList();
     }
 
-    private List<HandoverChecklistItem> checklistItems(List<CrmDealLines.ChecklistItem> rows) {
+    private List<HandoverChecklistItem> checklistItems(List<CrmSchoolDeal.ChecklistItem> rows) {
         return safe(rows).stream()
                 .map(row -> new HandoverChecklistItem(text(row.id()), text(row.label()), Boolean.TRUE.equals(row.done())))
                 .toList();

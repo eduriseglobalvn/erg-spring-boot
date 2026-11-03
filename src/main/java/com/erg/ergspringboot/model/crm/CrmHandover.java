@@ -44,7 +44,7 @@ public class CrmHandover extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "checklist", nullable = false, columnDefinition = "jsonb")
-    private List<CrmDealLines.ChecklistItem> checklist = new ArrayList<>();
+    private List<CrmSchoolDeal.ChecklistItem> checklist = new ArrayList<>();
 
     @Column(name = "idempotency_key", length = 192)
     private String idempotencyKey;

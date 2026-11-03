@@ -19,7 +19,6 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.crm.CrmDealLines;
 import com.erg.ergspringboot.model.crm.CrmHandover;
 import com.erg.ergspringboot.model.crm.CrmSchoolActivity;
 import com.erg.ergspringboot.model.crm.CrmSchoolDeal;
@@ -195,8 +194,8 @@ class CrmWorkspaceServiceTest {
         CrmWorkspaceService service = service();
         CrmHandover handover = handover("seo-1", "ready");
         handover.setChecklist(new ArrayList<>(List.of(
-                new CrmDealLines.ChecklistItem("a", "A", true),
-                new CrmDealLines.ChecklistItem("b", "B", false))));
+                new CrmSchoolDeal.ChecklistItem("a", "A", true),
+                new CrmSchoolDeal.ChecklistItem("b", "B", false))));
         stubHandover(handover);
         authenticate("manager-1", true);
 
@@ -247,7 +246,7 @@ class CrmWorkspaceServiceTest {
         handover.setOpportunityId("deal-1");
         handover.setRequestedBy(requestedBy);
         handover.setStatus(status);
-        handover.setChecklist(new ArrayList<>(List.of(new CrmDealLines.ChecklistItem("contract", "Contract", true))));
+        handover.setChecklist(new ArrayList<>(List.of(new CrmSchoolDeal.ChecklistItem("contract", "Contract", true))));
         return handover;
     }
 

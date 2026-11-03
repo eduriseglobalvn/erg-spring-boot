@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -79,11 +80,11 @@ public class CrmSchoolDeal extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "revenue_lines", nullable = false, columnDefinition = "jsonb")
-    private List<CrmDealLines.RevenueLine> revenueLines = new ArrayList<>();
+    private List<RevenueLine> revenueLines = new ArrayList<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "cost_lines", nullable = false, columnDefinition = "jsonb")
-    private List<CrmDealLines.CostLine> costLines = new ArrayList<>();
+    private List<CostLine> costLines = new ArrayList<>();
 
     @Column(name = "idempotency_key", length = 192)
     private String idempotencyKey;
@@ -91,4 +92,34 @@ public class CrmSchoolDeal extends BaseEntity {
     @Version
     @Column(name = "version", nullable = false)
     private long version;
+
+    // Typed jsonb rows; boxed components and ignored unknown keys keep rows from older releases loadable.
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record RevenueLine(
+            String id,
+            String program,
+            String packageName,
+            Integer classCount,
+            Integer studentsPerClass,
+            BigDecimal pricePerStudent,
+            BigDecimal discountRate,
+            Integer durationMonths
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CostLine(
+            String id,
+            String category,
+            String description,
+            Integer quantity,
+            BigDecimal unitCost,
+            Integer durationMonths,
+            Boolean requiredForHandover
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ChecklistItem(String id, String label, Boolean done) {
+    }
 }
