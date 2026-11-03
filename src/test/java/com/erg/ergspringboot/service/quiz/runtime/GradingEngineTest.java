@@ -76,6 +76,17 @@ class GradingEngineTest {
     }
 
     @Test
+    void shortAnswerComparesUnicodeNfcAndCollapsesInnerWhitespace() {
+        // "Ha Noi" with Vietnamese diacritics typed as combining marks (NFD) must match the composed (NFC) key.
+        String composed = "Hà Nội";
+        String decomposed = java.text.Normalizer.normalize("Hà  Nội", java.text.Normalizer.Form.NFD);
+        assertThat(decomposed).isNotEqualTo(composed);
+        Map<String, Object> key = Map.of("correctAnswers", List.of(composed));
+        GradeResult result = engine.grade("short_answer", Map.of("text", decomposed), key, TEN);
+        assertThat(result.correct()).isTrue();
+    }
+
+    @Test
     void numericWithinTolerance() {
         Map<String, Object> key = Map.of("value", 3.14, "tolerance", 0.01);
         assertThat(engine.grade("numeric", Map.of("value", 3.15), key, TEN).correct()).isTrue();

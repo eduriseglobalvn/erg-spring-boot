@@ -13,6 +13,8 @@ public interface AssignmentRecipientRepository extends JpaRepository<AssignmentR
 
     Optional<AssignmentRecipient> findByAssignmentIdAndStudentId(String assignmentId, String studentId);
 
+    Optional<AssignmentRecipient> findFirstByTenantIdAndAssignmentIdAndStudentId(String tenantId, String assignmentId, String studentId);
+
     long countByAssignmentId(String assignmentId);
 
     void deleteByAssignmentId(String assignmentId);

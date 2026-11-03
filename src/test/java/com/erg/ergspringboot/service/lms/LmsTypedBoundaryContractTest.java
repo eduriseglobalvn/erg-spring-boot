@@ -10,9 +10,9 @@ import org.junit.jupiter.api.Test;
 class LmsTypedBoundaryContractTest {
     @Test
     void educationAndClassQueriesDoNotExposeMapPayloads() throws Exception {
-        Method education = LmsRuntimeService.class.getMethod("listEducationUnits",
+        Method education = com.erg.ergspringboot.lms.LmsRuntimePort.class.getMethod("listEducationUnits",
                 com.erg.ergspringboot.platform.security.UserAccessContext.class);
-        Method classes = LmsRuntimeService.class.getMethod("listClassesBySchool", String.class,
+        Method classes = com.erg.ergspringboot.lms.LmsRuntimePort.class.getMethod("listClassesBySchool", String.class,
                 com.erg.ergspringboot.platform.security.UserAccessContext.class);
 
         assertThat(education.getReturnType()).isEqualTo(EducationUnitListResponse.class);

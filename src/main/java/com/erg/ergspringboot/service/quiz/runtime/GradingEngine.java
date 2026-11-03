@@ -325,7 +325,10 @@ public class GradingEngine {
     }
 
     private String normalizeText(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        if (value == null) return "";
+        // NFC so composed/decomposed Vietnamese diacritics compare equal; collapse internal whitespace runs.
+        String composed = java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFC);
+        return composed.strip().replaceAll("(?U)\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     private Object firstNonNull(Object... values) {

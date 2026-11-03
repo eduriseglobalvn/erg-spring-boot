@@ -25,6 +25,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
 
     List<Assignment> findByTenantIdOrderByCreatedAtDesc(String tenantId);
 
+    List<Assignment> findByTenantIdAndQuizId(String tenantId, String quizId);
+
     @Query(value = """
             select matched.*
             from (

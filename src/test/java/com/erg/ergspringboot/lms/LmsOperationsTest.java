@@ -7,13 +7,12 @@ import static org.mockito.Mockito.when;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StartAttemptRequest;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.lms.LmsRuntimeService;
 import org.junit.jupiter.api.Test;
 
 class LmsOperationsTest {
     @Test
     void delegatesIdempotentAttemptStartThroughModuleBoundary() {
-        LmsRuntimeService legacy = mock(LmsRuntimeService.class);
+        LmsRuntimePort legacy = mock(LmsRuntimePort.class);
         StartAttemptRequest request = mock(StartAttemptRequest.class);
         UserAccessContext access = mock(UserAccessContext.class);
         AttemptResponse expected = mock(AttemptResponse.class);

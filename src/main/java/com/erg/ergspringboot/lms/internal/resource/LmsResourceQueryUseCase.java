@@ -1,7 +1,13 @@
 package com.erg.ergspringboot.lms.internal.resource;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
+import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
+import com.erg.ergspringboot.lms.LmsCallerPermissions;
+import com.erg.ergspringboot.lms.LmsStatePolicy;
+import com.erg.ergspringboot.model.lms.Assignment;
 import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.lms.LmsQuizService;
 import com.erg.ergspringboot.service.quiz.runtime.QuizRuntimePackageService;
@@ -10,21 +16,67 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 
-/** Read-only quiz resource boundary; published packages are preferred over legacy embedded blobs. */
+/**
+ * Read-only quiz resource boundary; published packages are preferred over legacy embedded blobs.
+ *
+ * <p>Authoring readers ({@code lms.quiz.read}) see the active package. Learners ({@code lms.quiz.play} only)
+ * must be a recipient of a visible assignment that distributes the quiz, receive the version pinned by that
+ * assignment, and never receive the answer key unless the assignment explicitly allows offline grading.
+ */
 @Service
 public class LmsResourceQueryUseCase {
+    private static final String[] AUTHORING_READ = {"lms.quiz.read", "*"};
     private final LmsQuizService quizzes;
     private final QuizRuntimePackageService packages;
+    private final LmsAssignmentAccessPolicy policy;
+    private final LmsCallerPermissions permissions;
 
-    public LmsResourceQueryUseCase(LmsQuizService quizzes, QuizRuntimePackageService packages) {
-        this.quizzes = quizzes; this.packages = packages;
+    public LmsResourceQueryUseCase(LmsQuizService quizzes, QuizRuntimePackageService packages,
+            LmsAssignmentAccessPolicy policy, LmsCallerPermissions permissions) {
+        this.quizzes = quizzes; this.packages = packages; this.policy = policy; this.permissions = permissions;
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
-        Quiz quiz = quizzes.findByTenantIdAndId(tenant(access.tenantId()), quizId)
+        return getQuizPackage(quizId, null, access);
+    }
+
+    public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) {
+        String tenant = tenant(access.tenantId());
+        Quiz quiz = quizzes.findByTenantIdAndId(tenant, quizId)
                 .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
-        QuizPackageResponse published = packages.activePackage(tenant(access.tenantId()), quizId).orElse(null);
-        if (published != null) return published;
+        if (permissions.hasAny(AUTHORING_READ)) {
+            QuizPackageResponse published = packages.activePackage(tenant, quizId).orElse(null);
+            return published != null ? published : legacy(quiz);
+        }
+        return learnerPackage(tenant, quiz, blank(assignmentId), access);
+    }
+
+    public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return getQuizPackage(quizId, access).quiz(); }
+
+    private QuizPackageResponse learnerPackage(String tenant, Quiz quiz, String assignmentId, UserAccessContext access) {
+        Student learner = policy.learner(tenant, access.userId()).orElse(null);
+        if (assignmentId == null) {
+            if (!policy.isAssignedQuiz(tenant, quiz.getId(), learner, access.userId())) {
+                throw new ForbiddenException("quiz is not assigned to the authenticated learner");
+            }
+            QuizPackageResponse published = packages.activePackage(tenant, quiz.getId()).orElse(null);
+            return published != null ? QuizRuntimePackageService.withoutAnswerKey(published) : legacy(quiz);
+        }
+        Assignment assignment = policy.assignment(tenant, assignmentId);
+        var assigned = policy.assignedQuiz(assignment, quiz.getId())
+                .orElseThrow(() -> new ForbiddenException("quiz is not assigned to the authenticated learner"));
+        if (!LmsStatePolicy.assignmentIsVisible(assignment.getStatus())
+                || !policy.isRecipient(assignment, learner, access.userId())) {
+            throw new ForbiddenException("quiz is not assigned to the authenticated learner");
+        }
+        QuizPackageResponse published = (assigned.quizVersionId() == null
+                ? packages.activePackage(tenant, quiz.getId())
+                : packages.packageForVersion(tenant, quiz.getId(), assigned.quizVersionId())).orElse(null);
+        if (published == null) return legacy(quiz);
+        return assignment.isOfflineAllowed() ? published : QuizRuntimePackageService.withoutAnswerKey(published);
+    }
+
+    private QuizPackageResponse legacy(Quiz quiz) {
         QuizResponse response = new QuizResponse(quiz.getId(),
                 quiz.getScope() == null ? new ContentScope("global", null) : new ContentScope(quiz.getScope().getType(), quiz.getScope().getSchoolId()),
                 quiz.getTitle(), quiz.getKind(), quiz.getSubjectId(), quiz.getLevelId(), list(quiz.getTopicIds()),
@@ -35,8 +87,8 @@ public class LmsResourceQueryUseCase {
         return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail, Map.of());
     }
 
-    public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return getQuizPackage(quizId, access).quiz(); }
     private String tenant(String value) { return AuthenticatedTenant.require(value); }
+    private String blank(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private <T> List<T> list(List<T> value) { return value == null ? List.of() : value; }
     private <K,V> Map<K,V> map(Map<K,V> value) { return value == null ? Map.of() : value; }
 }

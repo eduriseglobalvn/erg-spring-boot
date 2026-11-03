@@ -50,5 +50,7 @@ public interface AssignmentResourceRepository extends JpaRepository<AssignmentRe
 
     List<AssignmentResource> findByTenantIdAndQuizId(String tenantId, String quizId);
 
+    java.util.Optional<AssignmentResource> findByTenantIdAndAssignmentIdAndQuizId(String tenantId, String assignmentId, String quizId);
+
     void deleteByAssignmentId(String assignmentId);
 }

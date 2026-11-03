@@ -128,6 +128,10 @@ public class Attempt {
     @Column(name = "submit_idempotency_key")
     private String submitIdempotencyKey;
 
+    /** True when the submission was accepted inside the grace window or the attempt was auto-closed. */
+    @Column(name = "late", nullable = false)
+    private boolean late;
+
     /** Optimistic concurrency guard for draft/submit races. */
     @jakarta.persistence.Version
     @Column(name = "record_version", nullable = false)

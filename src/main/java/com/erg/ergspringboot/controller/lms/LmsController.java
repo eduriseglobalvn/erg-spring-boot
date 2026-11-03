@@ -6,6 +6,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptDraftRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ManualGradeRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSubmitResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
@@ -24,6 +25,8 @@ import com.erg.ergspringboot.lms.authorization.LmsAssignmentReadSelf;
 import com.erg.ergspringboot.lms.authorization.LmsAssignmentProgressRead;
 import com.erg.ergspringboot.lms.authorization.LmsClassRead;
 import com.erg.ergspringboot.lms.authorization.LmsGradeRead;
+import com.erg.ergspringboot.lms.authorization.LmsAttemptGrade;
+import com.erg.ergspringboot.lms.authorization.LmsQuizPackageRead;
 import com.erg.ergspringboot.lms.authorization.LmsQuizRead;
 import com.erg.ergspringboot.lms.authorization.LmsSubmit;
 import jakarta.servlet.http.HttpServletRequest;
@@ -82,9 +85,10 @@ public class LmsController {
     }
 
     @GetMapping("/quizzes/{quizId}/package")
-    @LmsQuizRead
-    public ResponseEntity<ApiResponse<QuizPackageResponse>> quizPackage(@PathVariable String quizId, HttpServletRequest request) {
-        QuizPackageResponse data = lms.getQuizPackage(quizId, UserAccessContext.from(request));
+    @LmsQuizPackageRead
+    public ResponseEntity<ApiResponse<QuizPackageResponse>> quizPackage(@PathVariable String quizId,
+            @RequestParam(required = false) String assignmentId, HttpServletRequest request) {
+        QuizPackageResponse data = lms.getQuizPackage(quizId, assignmentId, UserAccessContext.from(request));
         String eTag = packageETag(data);
         CacheControl cacheControl = CacheControl.maxAge(Duration.ofMinutes(5)).cachePrivate().mustRevalidate();
         if (matchesETag(request.getHeader(HttpHeaders.IF_NONE_MATCH), eTag)) {
@@ -185,6 +189,17 @@ public class LmsController {
                 ? body
                 : body.withIdempotencyKey(idempotencyKey);
         return ok("Attempt submitted", lms.submitAttempt(attemptId, effectiveBody, UserAccessContext.from(request)), request);
+    }
+
+    @PostMapping("/attempts/{attemptId}/answers/{questionId}/grade")
+    @LmsAttemptGrade
+    public ApiResponse<AttemptResponse> gradeAnswer(
+            @PathVariable String attemptId,
+            @PathVariable String questionId,
+            @Valid @RequestBody ManualGradeRequest body,
+            HttpServletRequest request
+    ) {
+        return ok("Answer graded", lms.gradeManualAnswer(attemptId, questionId, body, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/quizzes/{quizId}/students")
