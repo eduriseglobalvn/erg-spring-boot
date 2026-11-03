@@ -66,6 +66,8 @@ public class QuestionBankDemoBootstrapSeedService {
         upsertSubject("ic3-gs6", "IC3 GS6", "ic3-gs6");
         upsertSubject("python", "Python", "python");
         upsertSubject("mos", "MOS", "mos");
+        upsertSubject("scratch", "Scratch", "scratch");
+        upsertSubject("tin-hoc-tre", "Tin hoc tre", "tin-hoc-tre");
         deactivateLegacyDemoSubjects();
 
         upsertLevel("ic3-l1", "ic3-gs6", "Level 1", "ic3-l1", 1);
@@ -76,6 +78,8 @@ public class QuestionBankDemoBootstrapSeedService {
         upsertLevel("mos-word", "mos", "Word Associate", "mos-word", 1);
         upsertLevel("mos-excel", "mos", "Excel Associate", "mos-excel", 2);
         upsertLevel("mos-powerpoint", "mos", "PowerPoint Associate", "mos-powerpoint", 3);
+        upsertLevel("scratch-intro", "scratch", "Thieu nhi", "scratch-intro", 1);
+        upsertLevel("tht-bang-a", "tin-hoc-tre", "Doi tuyen", "tht-bang-a", 1);
 
         seedIc3Topics("ic3-l1", List.of(
                 "Thiet bi va he dieu hanh", "Quan ly tep", "Go phim va nhap lieu", "Internet an toan",
@@ -94,6 +98,8 @@ public class QuestionBankDemoBootstrapSeedService {
         seedTopics("mos-word", List.of("Dinh dang van ban", "Bang va hinh anh", "Tham chieu va mail merge", "On tap Word"));
         seedTopics("mos-excel", List.of("Cong thuc co ban", "Bang du lieu", "Bieu do", "On tap Excel"));
         seedTopics("mos-powerpoint", List.of("Bo cuc slide", "Transition va animation", "Trinh chieu", "On tap PowerPoint"));
+        seedTopics("scratch-intro", List.of("Lam quen khoi lenh", "Chuyen dong va am thanh", "Su kien va dieu khien", "Du an me cung"));
+        seedTopics("tht-bang-a", List.of("Tu duy thuat toan", "Day so va uoc so", "Hinh hoc va do hoa", "Mini contest"));
     }
 
     private void seedIc3Topics(String levelId, List<String> labels) {
@@ -115,44 +121,69 @@ public class QuestionBankDemoBootstrapSeedService {
 
     private void seedQuestions() {
         upsertQuestion("qb-ic3-001", "ic3-gs6", "ic3-l1", "ic3-l1-topic-1", "multiple-choice", "core", "ready",
-                "Thiet bi nao dung de nhap du lieu chu vao may tinh?", "Ban phim", 62, 18, 3);
-        upsertQuestion("qb-ic3-002", "ic3-gs6", "ic3-l1", "ic3-l1-topic-2", "multiple-choice", "core", "ready",
-                "Khi muon doi ten mot tep, thao tac nao la phu hop nhat?", "Rename", 69, 23, 4);
-        upsertQuestion("qb-ic3-003", "ic3-gs6", "ic3-l1", "ic3-l1-topic-4", "multiple-choice", "stretch", "ready",
-                "Dau hieu nao cho thay mot website dang dung ket noi an toan?", "Bieu tuong o khoa va HTTPS", 76, 28, 5);
-        upsertQuestion("qb-ic3-004", "ic3-gs6", "ic3-l1", "ic3-l1-topic-6", "multiple-choice", "core", "reviewing",
-                "Trong Word, tinh nang nao giup can deu hai le doan van?", "Justify", 83, 33, 6);
-        upsertQuestion("qb-ic3-005", "ic3-gs6", "ic3-l2", "ic3-l2-topic-1", "multiple-choice", "stretch", "ready",
-                "Trong Word, muc luc tu dong thuong dua vao thanh phan nao?", "Heading styles", 90, 38, 7);
-        upsertQuestion("qb-ic3-006", "ic3-gs6", "ic3-l2", "ic3-l2-topic-2", "multiple-choice", "core", "ready",
-                "Trong Excel, o A1 chua 10 va A2 chua 15. Cong thuc nao tinh tong hai o?", "=SUM(A1:A2)", 64, 43, 8);
-        upsertQuestion("qb-ic3-007", "ic3-gs6", "ic3-l2", "ic3-l2-topic-3", "multiple-choice", "core", "ready",
-                "Ham nao dung de tim gia tri lon nhat trong mot vung du lieu Excel?", "MAX", 71, 48, 9);
-        upsertQuestion("qb-ic3-008", "ic3-gs6", "ic3-l2", "ic3-l2-topic-5", "multiple-response", "stretch", "pilot",
-                "Khi lam viec nhom online, hanh vi nao giup giam nham lan phien ban tai lieu?",
-                "Dat ten phien ban ro rang; binh luan thay vi ghi de", 78, 53, 3);
-        upsertQuestion("qb-ic3-009", "ic3-gs6", "ic3-l3", "ic3-l3-topic-1", "multiple-choice", "core", "ready",
-                "Yeu to nao lam mat khau manh hon?", "Dai, co chu hoa, chu thuong, so va ky tu dac biet", 85, 58, 4);
-        upsertQuestion("qb-ic3-010", "ic3-gs6", "ic3-l3", "ic3-l3-topic-2", "multiple-choice", "core", "ready",
-                "Bieu do cot phu hop nhat khi can lam gi?", "So sanh cac nhom du lieu", 92, 63, 5);
-        upsertQuestion("qb-ic3-011", "ic3-gs6", "ic3-l3", "ic3-l3-topic-3", "sequence", "challenge", "ready",
-                "Sap xep cac buoc: xac dinh bai toan, viet thuat toan, chay thu, sua loi.",
-                "Xac dinh bai toan -> viet thuat toan -> chay thu -> sua loi", 66, 68, 6);
-        upsertQuestion("qb-ic3-012", "ic3-gs6", "ic3-l3", "ic3-l3-topic-6", "multiple-choice", "challenge", "reviewing",
-                "Mot bai kiem tra mo phong IC3 nen uu tien dieu gi?",
-                "Do dung nang luc theo tung muc tieu ky nang", 73, 73, 7);
+                "Thiết bị nào sau đây dùng để nhập dữ liệu chữ và số vào máy tính?", "Bàn phím (Keyboard)", 62, 18, 3);
+        upsertQuestion("qb-ic3-002", "ic3-gs6", "ic3-l1", "ic3-l1-topic-1", "multiple-choice", "stretch", "ready",
+                "Cổng kết nối nào truyền tải đồng thời cả tín hiệu hình ảnh và âm thanh kỹ thuật số chất lượng cao?", "Cổng HDMI", 69, 23, 4);
+        upsertQuestion("qb-ic3-003", "ic3-gs6", "ic3-l1", "ic3-l1-topic-2", "multiple-choice", "core", "ready",
+                "Phím tắt nào dùng để sao chép (Copy) tệp hoặc thư mục trong File Explorer?", "Ctrl + C", 76, 28, 5);
+        upsertQuestion("qb-ic3-004", "ic3-gs6", "ic3-l1", "ic3-l1-topic-2", "multiple-choice", "stretch", "ready",
+                "Đuôi mở rộng .docx cho biết đây là định dạng tệp của ứng dụng nào?", "Microsoft Word", 83, 33, 6);
+        upsertQuestion("qb-ic3-005", "ic3-gs6", "ic3-l1", "ic3-l1-topic-4", "multiple-choice", "core", "ready",
+                "Khi lướt web, biểu tượng ổ khóa cạnh thanh địa chỉ (HTTPS) biểu thị điều gì?", "Kết nối đã được mã hóa an toàn", 90, 38, 7);
+        upsertQuestion("qb-ic3-006", "ic3-gs6", "ic3-l1", "ic3-l1-topic-4", "multiple-choice", "challenge", "ready",
+                "Hành vi nào giúp bảo vệ thông tin cá nhân tốt nhất khi sử dụng mạng Wi-Fi công cộng?", "Không đăng nhập tài khoản ngân hàng và sử dụng VPN", 64, 43, 8);
+        upsertQuestion("qb-ic3-007", "ic3-gs6", "ic3-l1", "ic3-l1-topic-6", "multiple-choice", "core", "ready",
+                "Để in đậm đoạn văn bản đã chọn trong Word, em nhấn tổ hợp phím nào?", "Ctrl + B", 71, 48, 9);
+        upsertQuestion("qb-ic3-008", "ic3-gs6", "ic3-l2", "ic3-l2-topic-1", "multiple-choice", "stretch", "ready",
+                "Trong Word, mục lục tự động thường dựa vào thành phần nào?", "Heading styles", 78, 53, 3);
+        upsertQuestion("qb-ic3-009", "ic3-gs6", "ic3-l2", "ic3-l2-topic-2", "multiple-choice", "core", "ready",
+                "Trong Excel, ô A1 chứa 10 và A2 chứa 15. Công thức nào tính tổng hai ô?", "=SUM(A1:A2)", 85, 58, 4);
+        upsertQuestion("qb-ic3-010", "ic3-gs6", "ic3-l2", "ic3-l2-topic-3", "multiple-choice", "core", "ready",
+                "Trong Excel, công thức nào tính trung bình cộng của các ô từ B2 đến B10?", "=AVERAGE(B2:B10)", 92, 63, 5);
+        upsertQuestion("qb-ic3-011", "ic3-gs6", "ic3-l2", "ic3-l2-topic-3", "multiple-choice", "stretch", "ready",
+                "Khi sao chép công thức sang ô khác, tham chiếu tuyệt đối $A$1 sẽ thay đổi như thế nào?", "Giữ nguyên không thay đổi", 66, 68, 6);
+        upsertQuestion("qb-ic3-012", "ic3-gs6", "ic3-l2", "ic3-l2-topic-4", "multiple-choice", "core", "ready",
+                "Chức năng Transition trong PowerPoint dùng để thiết lập hiệu ứng cho đối tượng nào?", "Chuyển đổi giữa các trang slide", 73, 73, 7);
+        upsertQuestion("qb-ic3-013", "ic3-gs6", "ic3-l2", "ic3-l2-topic-5", "multiple-choice", "stretch", "ready",
+                "Khi cùng chỉnh sửa tài liệu trên Google Docs, tính năng nào giúp trao đổi ý kiến mà không sửa trực tiếp vào bài?", "Tính năng Bình luận (Comment)", 80, 78, 8);
+        upsertQuestion("qb-ic3-014", "ic3-gs6", "ic3-l3", "ic3-l3-topic-1", "multiple-choice", "core", "ready",
+                "Xác thực 2 yếu tố (2FA) bảo vệ tài khoản bằng cách nào?", "Yêu cầu mật khẩu và mã OTP gửi qua điện thoại", 87, 83, 9);
+        upsertQuestion("qb-ic3-015", "ic3-gs6", "ic3-l3", "ic3-l3-topic-2", "multiple-choice", "stretch", "ready",
+                "Dạng biểu đồ nào thích hợp nhất để thể hiện tỉ lệ phần trăm cơ cấu học sinh của các khối lớp?", "Biểu đồ tròn (Pie chart)", 94, 88, 3);
+        upsertQuestion("qb-ic3-016", "ic3-gs6", "ic3-l3", "ic3-l3-topic-3", "multiple-choice", "challenge", "ready",
+                "Thứ tự chuẩn để giải quyết một bài toán lập trình máy tính là gì?", "Xác định bài toán → Thiết kế thuật toán → Viết mã → Kiểm thử", 68, 93, 4);
+        upsertQuestion("qb-ic3-017", "ic3-gs6", "ic3-l3", "ic3-l3-topic-6", "multiple-choice", "challenge", "reviewing",
+                "Một bài kiểm tra mô phỏng IC3 nên ưu tiên điều gì?", "Đo đúng năng lực theo từng mục tiêu kỹ năng", 75, 98, 5);
         upsertQuestion("qb-python-001", "python", "python-foundation", "python-foundation-topic-1", "multiple-choice", "core", "ready",
                 "Kieu du lieu nao phu hop de luu gia tri dung/sai trong Python?", "bool", 82, 22, 5);
         upsertQuestion("qb-python-002", "python", "python-foundation", "python-foundation-topic-2", "multiple-choice", "core", "ready",
                 "Cau lenh nao dung de kiem tra dieu kien trong Python?", "if", 76, 28, 5);
         upsertQuestion("qb-python-003", "python", "python-intermediate", "python-intermediate-topic-1", "multiple-choice", "stretch", "ready",
                 "Nhung cau truc nao co the luu nhieu gia tri trong Python?", "list; dictionary", 88, 23, 5);
+        upsertQuestion("qb-python-004", "python", "python-foundation", "python-foundation-topic-3", "multiple-choice", "core", "ready",
+                "Cú pháp vòng lặp for i in range(1, 10) sẽ lặp bao nhiêu lần?", "9 lần", 85, 22, 5);
+        upsertQuestion("qb-python-005", "python", "python-foundation", "python-foundation-topic-4", "multiple-choice", "core", "ready",
+                "Từ khóa nào trong Python dùng để định nghĩa một hàm mới?", "def", 90, 25, 5);
         upsertQuestion("qb-mos-001", "mos", "mos-word", "mos-word-topic-1", "multiple-choice", "core", "ready",
                 "Trong Microsoft Word, cong cu nao dung de ap dung nhanh bo dinh dang tieu de?", "Styles", 91, 26, 5);
         upsertQuestion("qb-mos-002", "mos", "mos-excel", "mos-excel-topic-1", "multiple-choice", "core", "ready",
                 "Trong Excel, cong thuc nao tinh tong vung A1 den A5?", "=SUM(A1:A5)", 84, 31, 6);
         upsertQuestion("qb-mos-003", "mos", "mos-powerpoint", "mos-powerpoint-topic-1", "multiple-choice", "stretch", "ready",
                 "Trong PowerPoint, Slide Master giup lam gi?", "Quan ly bo cuc va dinh dang chung", 79, 19, 4);
+        upsertQuestion("qb-mos-004", "mos", "mos-excel", "mos-excel-topic-3", "multiple-choice", "stretch", "ready",
+                "Loại biểu đồ nào trong Excel thể hiện xu hướng thay đổi dữ liệu theo thời gian tốt nhất?", "Biểu đồ đường (Line chart)", 82, 34, 5);
+        upsertQuestion("qb-scratch-001", "scratch", "scratch-intro", "scratch-intro-topic-1", "multiple-choice", "core", "ready",
+                "Khối lệnh nào trong Scratch dùng để bắt đầu chạy chương trình khi bấm lá cờ xanh?", "Khối sự kiện Khi bấm cờ xanh", 95, 30, 5);
+        upsertQuestion("qb-scratch-002", "scratch", "scratch-intro", "scratch-intro-topic-2", "multiple-choice", "core", "ready",
+                "Để nhân vật di chuyển 10 bước về phía trước, ta sử dụng khối lệnh nào?", "Khối lệnh move 10 steps", 92, 27, 5);
+        upsertQuestion("qb-scratch-003", "scratch", "scratch-intro", "scratch-intro-topic-4", "multiple-choice", "stretch", "ready",
+                "Làm thế nào để phát hiện nhân vật chạm vào tường mê cung trong Scratch?", "Khối lệnh cảm biến Touching color", 80, 32, 5);
+        upsertQuestion("qb-tht-001", "tin-hoc-tre", "tht-bang-a", "tht-bang-a-topic-1", "multiple-choice", "stretch", "ready",
+                "Thuật toán tìm kiếm nhị phân yêu cầu dãy số đầu vào phải thỏa mãn điều kiện gì?", "Dãy số đã được sắp xếp tăng dần", 75, 26, 5);
+        upsertQuestion("qb-tht-002", "tin-hoc-tre", "tht-bang-a", "tht-bang-a-topic-2", "multiple-choice", "core", "ready",
+                "Số nguyên dương lớn hơn 1 chỉ có đúng hai ước số là 1 và chính nó được gọi là gì?", "Số nguyên tố", 88, 23, 5);
+        upsertQuestion("qb-tht-003", "tin-hoc-tre", "tht-bang-a", "tht-bang-a-topic-4", "multiple-choice", "challenge", "ready",
+                "Độ phức tạp thời gian O(log N) thường xuất hiện trong thuật toán nào?", "Tìm kiếm nhị phân", 70, 22, 5);
         seedEditorSampleQuestions();
     }
 
