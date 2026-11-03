@@ -42,3 +42,9 @@ load/results/**
 !load/results/.gitkeep
 
 .claude/
+
+# Database dumps and agent runtime output must never be committed
+backups/*.sql
+backups/*.dump
+.codex-runtime/
+tmp-*.log
