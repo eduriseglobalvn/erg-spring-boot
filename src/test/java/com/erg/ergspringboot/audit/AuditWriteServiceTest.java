@@ -60,7 +60,7 @@ class AuditWriteServiceTest {
 
         assertThat(saved.getId()).isEqualTo("audit-1");
         assertThat(saved.getDetails()).containsEntry("password", "[REDACTED]");
-        assertThat(saved.getDetails().get("email")).asString().startsWith("sha256:");
+        assertThat(saved.getDetails().get("email")).asString().startsWith("hmac-sha256:");
         assertThat(saved.getEventHash()).hasSize(64).matches("[0-9a-f]{64}");
         verify(events).publishEvent(any(AuditRecorded.class));
     }

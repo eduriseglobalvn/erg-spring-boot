@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CrmReferralRepository extends JpaRepository<CrmReferral, String> {
 
-    List<CrmReferral> findBySchoolIdOrderByCreatedAtAsc(String schoolId);
+    List<CrmReferral> findByTenantIdAndSchoolIdOrderByCreatedAtAsc(String tenantId, String schoolId);
 }

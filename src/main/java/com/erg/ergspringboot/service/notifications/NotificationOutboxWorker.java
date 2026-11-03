@@ -33,7 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class NotificationOutboxWorker {
 
-    private static final String WORKER_ID = "erg-spring";
+    /** Unique per JVM so lease ownership checks distinguish instances (C15). */
+    static final String WORKER_ID = workerId();
 
     private final NotificationOutboxRepository outboxRepository;
     private final NotificationMessageRepository messageRepository;
@@ -87,6 +88,11 @@ public class NotificationOutboxWorker {
         int retried = 0;
         int dead = 0;
         for (NotificationOutboxEntity outbox : due) {
+            // Extend the lease per item: a slow provider must not let another instance reclaim and
+            // double-send rows that are still queued in this batch.
+            if (outboxRepository.renewLease(outbox.getId(), WORKER_ID, OffsetDateTime.now()) == 0) {
+                continue;
+            }
             SendResult result = send(outbox);
             DispatchStatus status = recordResult(outbox.getId(), result);
             if (status == DispatchStatus.SENT) {
@@ -151,9 +157,22 @@ public class NotificationOutboxWorker {
     }
 
     private DispatchStatus recordResult(String outboxId, SendResult result) {
-        return transactionTemplate.execute(status -> outboxRepository.findById(outboxId)
+        // Record only while the lease is still ours; otherwise another instance owns the row now.
+        return transactionTemplate.execute(status -> outboxRepository.findLeasedForUpdate(outboxId, WORKER_ID)
                 .map(outbox -> applyResult(outbox, result))
-                .orElse(DispatchStatus.DEAD));
+                .orElse(DispatchStatus.LEASE_LOST));
+    }
+
+    private static String workerId() {
+        String host;
+        try {
+            host = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (java.net.UnknownHostException | SecurityException exception) {
+            host = "unknown-host";
+        }
+        // notification_outbox.locked_by is varchar(80): keep the UUID, trim the host.
+        String safeHost = host.length() <= 43 ? host : host.substring(0, 43);
+        return safeHost + ":" + java.util.UUID.randomUUID();
     }
 
     private DispatchStatus applyResult(NotificationOutboxEntity outbox, SendResult result) {
@@ -287,6 +306,7 @@ public class NotificationOutboxWorker {
         SENT,
         FAILED,
         RETRIED,
-        DEAD
+        DEAD,
+        LEASE_LOST
     }
 }

@@ -75,12 +75,12 @@ public class CrmOperations {
         return workspace.approveHandover(access, handoverId, request);
     }
 
-    public List<CrmSchoolSummaryResponse> signedSchoolsBySeo(String seoUserId) {
-        return schoolReads.signedSchoolsBySeo(seoUserId);
+    public List<CrmSchoolSummaryResponse> schoolsBySeo(UserAccessContext access, String seoUserId, boolean signedOnly) {
+        return schoolReads.schoolsBySeo(access, seoUserId, signedOnly);
     }
 
     public CrmSchoolPerformanceResponse performance(
-            String seoUserId, OffsetDateTime from, OffsetDateTime to) {
-        return schoolReads.performance(seoUserId, from, to);
+            UserAccessContext access, String seoUserId, OffsetDateTime from, OffsetDateTime to) {
+        return schoolReads.performance(access, seoUserId, from, to);
     }
 }

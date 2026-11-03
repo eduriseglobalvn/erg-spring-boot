@@ -7,5 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CrmSchoolContactRepository extends JpaRepository<CrmSchoolContact, String> {
 
-    List<CrmSchoolContact> findBySchoolIdInOrderByIsPrimaryDescCreatedAtAsc(Collection<String> schoolIds);
+    List<CrmSchoolContact> findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc(
+            String tenantId, Collection<String> schoolIds);
 }

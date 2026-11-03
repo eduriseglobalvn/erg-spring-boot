@@ -20,6 +20,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class TransactionalOutboxWorker {
     private static final int BATCH_SIZE = 50;
     private static final int MAX_ATTEMPTS = 8;
+    private static final Duration LEASE = Duration.ofSeconds(60);
+    /** Per-instance lease owner (host:UUID), stored in outbox_events.locked_by (V133). */
+    static final String WORKER_ID = workerId();
     private final OutboxEventRepository repository;
     private final SmtpAccountMailSender smtp;
     private final OutboxPayloadCipher cipher;
@@ -46,18 +49,44 @@ public class TransactionalOutboxWorker {
             due = transaction.execute(status -> {
                 OffsetDateTime now = OffsetDateTime.now();
                 List<OutboxEvent> events = repository.findDueForUpdate(now, BATCH_SIZE);
-                OffsetDateTime lease = now.plus(Duration.ofSeconds(60));
+                OffsetDateTime lease = now.plus(LEASE);
                 events.forEach(event -> {
                     event.setStatus("processing");
                     event.setLeaseUntil(lease);
                 });
-                if (!events.isEmpty()) repository.saveAll(events);
+                if (!events.isEmpty()) {
+                    repository.saveAll(events);
+                    repository.flush();
+                    repository.markLockedBy(events.stream().map(OutboxEvent::getId).toList(), WORKER_ID);
+                }
                 return events;
             });
         }
         if (due == null) return 0;
-        for (OutboxEvent event : due) dispatch(event);
+        for (OutboxEvent event : due) {
+            if (renewLease(event)) dispatch(event);
+        }
         return due.size();
+    }
+
+    /** Re-arms the lease per item so a slow batch is never reclaimed and re-sent by another instance (C15). */
+    private boolean renewLease(OutboxEvent event) {
+        try (TenantContext.Scope ignored = TenantContext.scope(
+                TenantContext.of(event.getTenantId(), null, "system"))) {
+            Integer renewed = transaction.execute(status ->
+                    repository.renewLease(event.getId(), WORKER_ID, OffsetDateTime.now().plus(LEASE)));
+            return renewed != null && renewed > 0;
+        }
+    }
+
+    private static String workerId() {
+        String host;
+        try {
+            host = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (java.net.UnknownHostException | SecurityException exception) {
+            host = "unknown-host";
+        }
+        return (host.length() <= 59 ? host : host.substring(0, 59)) + ":" + java.util.UUID.randomUUID();
     }
 
     private void dispatch(OutboxEvent event) {
@@ -80,7 +109,8 @@ public class TransactionalOutboxWorker {
     }
 
     private void transition(String id, boolean success, String error) {
-        transaction.executeWithoutResult(status -> repository.findById(id).ifPresent(event -> {
+        // Only the current lease owner may record the outcome; a lost lease means another instance owns it.
+        transaction.executeWithoutResult(status -> repository.findLeasedForUpdate(id, WORKER_ID).ifPresent(event -> {
             event.setAttempts(event.getAttempts() + 1);
             event.setLeaseUntil(null);
             event.setLastError(error == null ? null : error.substring(0, Math.min(1000, error.length())));

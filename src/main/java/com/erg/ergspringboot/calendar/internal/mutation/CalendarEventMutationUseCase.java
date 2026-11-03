@@ -7,14 +7,18 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarTeacherAssignmentResponse;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.service.calendar.CalendarExpansionService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -27,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CalendarEventMutationUseCase {
 
-    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final ZoneId VIETNAM_ZONE = CalendarExpansionService.VIETNAM_ZONE;
+    private static final int MAX_TEACHER_DELETE_RANGE_YEARS = 1;
     private static final String DRAFT = "DRAFT";
     private static final String PUBLISHED = "PUBLISHED";
     private static final String CANCELLED = "CANCELLED";
@@ -73,8 +78,14 @@ public class CalendarEventMutationUseCase {
             String dateFrom,
             String dateTo,
             String actorId) {
-        LocalDate fromDate = LocalDate.parse(dateFrom);
-        LocalDate toDate = LocalDate.parse(dateTo);
+        LocalDate fromDate = requiredDate(dateFrom, "dateFrom");
+        LocalDate toDate = requiredDate(dateTo, "dateTo");
+        if (fromDate.isAfter(toDate)) {
+            throw new BadRequestException("dateFrom must not be after dateTo");
+        }
+        if (toDate.isAfter(fromDate.plusYears(MAX_TEACHER_DELETE_RANGE_YEARS))) {
+            throw new BadRequestException("Teacher schedule delete range must not exceed one year");
+        }
         OffsetDateTime from = fromDate.atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
         OffsetDateTime to = toDate.plusDays(1).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
 
@@ -94,7 +105,18 @@ public class CalendarEventMutationUseCase {
 
     private CalendarEvent findEvent(String eventId) {
         return events.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found: " + eventId));
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found: " + eventId));
+    }
+
+    private static LocalDate requiredDate(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new BadRequestException(field + " is required");
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException error) {
+            throw new BadRequestException(field + " must be an ISO date (yyyy-MM-dd)");
+        }
     }
 
     private void assertTenant(String actualTenantId, String expectedTenantId) {

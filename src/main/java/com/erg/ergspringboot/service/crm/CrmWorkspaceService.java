@@ -25,6 +25,8 @@ import com.erg.ergspringboot.model.crm.CrmSchoolContact;
 import com.erg.ergspringboot.model.crm.CrmSchoolDeal;
 import com.erg.ergspringboot.model.crm.CrmSchoolProfile;
 import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.authorization.AuthorizationOperations;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.crm.CrmHandoverRepository;
 import com.erg.ergspringboot.repository.crm.CrmSchoolActivityRepository;
@@ -43,6 +45,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +60,7 @@ public class CrmWorkspaceService {
     private static final Set<String> OPPORTUNITY_STAGES = Set.of(
             "discovery", "proposal", "pnl_review", "contracting", "handover", "active");
     private static final Set<String> FOLLOW_UP_TYPES = Set.of("call", "meeting", "proposal", "contract", "handover");
+    static final String HANDOVER_APPROVE_PERMISSION = "crm.handover.approve";
 
     private final EducationUnitRepository unitRepository;
     private final CrmSchoolProfileRepository profileRepository;
@@ -63,6 +68,7 @@ public class CrmWorkspaceService {
     private final CrmSchoolDealRepository dealRepository;
     private final CrmSchoolActivityRepository activityRepository;
     private final CrmHandoverRepository handoverRepository;
+    private final AuthorizationOperations authorization;
 
     public CrmWorkspaceService(
             EducationUnitRepository unitRepository,
@@ -70,7 +76,8 @@ public class CrmWorkspaceService {
             CrmSchoolContactRepository contactRepository,
             CrmSchoolDealRepository dealRepository,
             CrmSchoolActivityRepository activityRepository,
-            CrmHandoverRepository handoverRepository
+            CrmHandoverRepository handoverRepository,
+            AuthorizationOperations authorization
     ) {
         this.unitRepository = unitRepository;
         this.profileRepository = profileRepository;
@@ -78,6 +85,7 @@ public class CrmWorkspaceService {
         this.dealRepository = dealRepository;
         this.activityRepository = activityRepository;
         this.handoverRepository = handoverRepository;
+        this.authorization = authorization;
     }
 
     @Transactional(readOnly = true)
@@ -91,22 +99,25 @@ public class CrmWorkspaceService {
             return new WorkspaceResponse(List.of(), List.of(), List.of(), List.of());
         }
 
-        List<CrmSchoolProfile> profiles = profileRepository.findBySchoolIdIn(schoolIds);
+        String tenantId = access.tenantId();
+        List<CrmSchoolProfile> profiles = profileRepository.findByTenantIdAndSchoolIdIn(tenantId, schoolIds);
         Map<String, EducationUnit> unitsById = index(units, EducationUnit::getId);
-        Map<String, CrmSchoolContact> contactsBySchool = primaryContacts(schoolIds);
+        Map<String, CrmSchoolContact> contactsBySchool = primaryContacts(tenantId, schoolIds);
         Map<String, CrmSchoolProfile> profilesBySchool = index(profiles, CrmSchoolProfile::getSchoolId);
 
         List<LeadResponse> leads = profiles.stream()
                 .map(profile -> leadResponse(profile, unitsById.get(profile.getSchoolId()), contactsBySchool.get(profile.getSchoolId())))
                 .toList();
-        List<OpportunityResponse> opportunities = dealRepository.findBySchoolIdInOrderByCreatedAtDesc(schoolIds).stream()
+        List<OpportunityResponse> opportunities = dealRepository
+                .findByTenantIdAndSchoolIdInOrderByCreatedAtDesc(tenantId, schoolIds).stream()
                 .map(deal -> opportunityResponse(deal, profilesBySchool.get(deal.getSchoolId())))
                 .toList();
-        List<FollowUpResponse> followUps = activityRepository.findBySchoolIdInOrderByDueAtAsc(schoolIds).stream()
+        List<FollowUpResponse> followUps = activityRepository
+                .findByTenantIdAndSchoolIdInOrderByDueAtAsc(tenantId, schoolIds).stream()
                 .map(activity -> followUpResponse(activity, profilesBySchool.get(activity.getSchoolId())))
                 .toList();
         List<HandoverResponse> handovers = handoverRepository
-                .findByTenantIdAndSchoolIdInOrderByCreatedAtDesc(access.tenantId(), schoolIds).stream()
+                .findByTenantIdAndSchoolIdInOrderByCreatedAtDesc(tenantId, schoolIds).stream()
                 .map(this::handoverResponse)
                 .toList();
         return new WorkspaceResponse(leads, opportunities, followUps, handovers);
@@ -114,13 +125,14 @@ public class CrmWorkspaceService {
 
     @Transactional
     public LeadResponse updateLeadStatus(UserAccessContext access, String leadId, UpdateLeadStatusRequest request) {
-        CrmSchoolProfile profile = profile(leadId);
+        CrmSchoolProfile profile = profile(access, leadId);
         EducationUnit unit = requireSchool(access, profile.getSchoolId());
         checkVersion(request.expectedVersion(), profile.getVersion());
         profile.setLeadStatus(enumValue(request.status(), LEAD_STATUSES, "lead status"));
         profile.setLastTouchAt(OffsetDateTime.now());
         CrmSchoolProfile saved = profileRepository.save(profile);
-        CrmSchoolContact contact = primaryContacts(List.of(profile.getSchoolId())).get(profile.getSchoolId());
+        CrmSchoolContact contact = primaryContacts(access.tenantId(), List.of(profile.getSchoolId()))
+                .get(profile.getSchoolId());
         return leadResponse(saved, unit, contact);
     }
 
@@ -128,10 +140,11 @@ public class CrmWorkspaceService {
     public OpportunityResponse createOpportunity(
             UserAccessContext access, String idempotencyKey, CreateOpportunityRequest request
     ) {
-        CrmSchoolProfile profile = profile(request.leadId());
+        CrmSchoolProfile profile = profile(access, request.leadId());
         requireSchool(access, profile.getSchoolId());
         String key = requiredIdempotencyKey(idempotencyKey);
-        CrmSchoolDeal existing = dealRepository.findByOwnerUserIdAndIdempotencyKey(access.userId(), key).orElse(null);
+        CrmSchoolDeal existing = dealRepository
+                .findByTenantIdAndOwnerUserIdAndIdempotencyKey(access.tenantId(), access.userId(), key).orElse(null);
         if (existing != null) {
             if (!existing.getSchoolId().equals(profile.getSchoolId())) {
                 throw new ConflictException("Idempotency key was already used for another CRM opportunity");
@@ -140,6 +153,7 @@ public class CrmWorkspaceService {
         }
 
         CrmSchoolDeal deal = new CrmSchoolDeal();
+        deal.setTenantId(access.tenantId());
         deal.setSchoolId(profile.getSchoolId());
         deal.setOwnerUserId(access.userId());
         deal.setIdempotencyKey(key);
@@ -152,11 +166,11 @@ public class CrmWorkspaceService {
     public OpportunityResponse updateOpportunity(
             UserAccessContext access, String opportunityId, UpdateOpportunityRequest request
     ) {
-        CrmSchoolDeal deal = dealRepository.findById(opportunityId)
+        CrmSchoolDeal deal = dealRepository.findByIdAndTenantId(opportunityId, access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM opportunity not found"));
         requireSchool(access, deal.getSchoolId());
         checkVersion(request.expectedVersion(), deal.getVersion());
-        CrmSchoolProfile profile = profileRepository.findFirstBySchoolId(deal.getSchoolId())
+        CrmSchoolProfile profile = profileRepository.findFirstByTenantIdAndSchoolId(access.tenantId(), deal.getSchoolId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM lead not found"));
         applyOpportunity(deal, request.stage(), deal.getCode(), request.academicYear(), request.contractTerm(),
                 request.startMonth(), request.revenueLines(), request.costLines());
@@ -167,10 +181,11 @@ public class CrmWorkspaceService {
     public FollowUpResponse createFollowUp(
             UserAccessContext access, String idempotencyKey, CreateFollowUpRequest request
     ) {
-        CrmSchoolProfile profile = profile(request.leadId());
+        CrmSchoolProfile profile = profile(access, request.leadId());
         requireSchool(access, profile.getSchoolId());
         String key = requiredIdempotencyKey(idempotencyKey);
-        CrmSchoolActivity existing = activityRepository.findByActorUserIdAndIdempotencyKey(access.userId(), key).orElse(null);
+        CrmSchoolActivity existing = activityRepository
+                .findByTenantIdAndActorUserIdAndIdempotencyKey(access.tenantId(), access.userId(), key).orElse(null);
         if (existing != null) {
             if (!existing.getSchoolId().equals(profile.getSchoolId())) {
                 throw new ConflictException("Idempotency key was already used for another CRM follow-up");
@@ -179,13 +194,14 @@ public class CrmWorkspaceService {
         }
 
         if (request.opportunityId() != null && !request.opportunityId().isBlank()) {
-            CrmSchoolDeal deal = dealRepository.findById(request.opportunityId())
+            CrmSchoolDeal deal = dealRepository.findByIdAndTenantId(request.opportunityId(), access.tenantId())
                     .orElseThrow(() -> new ResourceNotFoundException("CRM opportunity not found"));
             if (!deal.getSchoolId().equals(profile.getSchoolId())) {
                 throw new BadRequestException("CRM opportunity does not belong to the lead");
             }
         }
         CrmSchoolActivity activity = new CrmSchoolActivity();
+        activity.setTenantId(access.tenantId());
         activity.setSchoolId(profile.getSchoolId());
         activity.setDealId(blankToNull(request.opportunityId()));
         activity.setActorUserId(access.userId());
@@ -202,12 +218,12 @@ public class CrmWorkspaceService {
     public FollowUpResponse updateFollowUpCompletion(
             UserAccessContext access, String followUpId, UpdateFollowUpCompletionRequest request
     ) {
-        CrmSchoolActivity activity = activityRepository.findById(followUpId)
+        CrmSchoolActivity activity = activityRepository.findByIdAndTenantId(followUpId, access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM follow-up not found"));
         requireSchool(access, activity.getSchoolId());
         checkVersion(request.expectedVersion(), activity.getVersion());
         activity.setDone(request.done());
-        CrmSchoolProfile profile = profileRepository.findFirstBySchoolId(activity.getSchoolId())
+        CrmSchoolProfile profile = profileRepository.findFirstByTenantIdAndSchoolId(access.tenantId(), activity.getSchoolId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM lead not found"));
         return followUpResponse(activityRepository.save(activity), profile);
     }
@@ -216,9 +232,9 @@ public class CrmWorkspaceService {
     public HandoverResponse createHandover(
             UserAccessContext access, String idempotencyKey, CreateHandoverRequest request
     ) {
-        CrmSchoolProfile profile = profile(request.leadId());
+        CrmSchoolProfile profile = profile(access, request.leadId());
         requireSchool(access, profile.getSchoolId());
-        CrmSchoolDeal deal = dealRepository.findById(request.opportunityId())
+        CrmSchoolDeal deal = dealRepository.findByIdAndTenantId(request.opportunityId(), access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM opportunity not found"));
         if (!deal.getSchoolId().equals(profile.getSchoolId())) {
             throw new BadRequestException("CRM opportunity does not belong to the lead");
@@ -239,8 +255,10 @@ public class CrmWorkspaceService {
         handover.setLeadId(profile.getId());
         handover.setOpportunityId(deal.getId());
         handover.setRequestedBy(access.userId());
-        handover.setStatus(isReady(request.checklist()) ? "ready" : "draft");
-        handover.setChecklist(request.checklist().stream().map(this::checklistMap).toList());
+        List<HandoverChecklistItem> checklist =
+                verifiedChecklist(access.tenantId(), profile.getSchoolId(), request.checklist());
+        handover.setStatus(isReady(checklist) ? "ready" : "draft");
+        handover.setChecklist(checklist.stream().map(this::checklistMap).toList());
         handover.setIdempotencyKey(key);
         return handoverResponse(handoverRepository.save(handover));
     }
@@ -252,24 +270,36 @@ public class CrmWorkspaceService {
         CrmHandover handover = handoverRepository.findByIdAndTenantId(handoverId, access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM handover not found"));
         requireSchool(access, handover.getSchoolId());
+        if (!currentPrincipalHas(access, HANDOVER_APPROVE_PERMISSION)) {
+            throw new ForbiddenException("missing permission " + HANDOVER_APPROVE_PERMISSION);
+        }
+        if (access.userId().equals(handover.getRequestedBy())) {
+            throw new ForbiddenException("CRM handover requester cannot approve their own handover");
+        }
         checkVersion(request.expectedVersion(), handover.getVersion());
-        if (!isReady(checklistItems(handover.getChecklist()))) {
+        if (!"ready".equals(handover.getStatus())) {
+            throw new ConflictException("Only ready CRM handovers can be approved");
+        }
+        List<HandoverChecklistItem> checklist = verifiedChecklist(
+                access.tenantId(), handover.getSchoolId(), checklistItems(handover.getChecklist()));
+        if (!isReady(checklist)) {
             throw new BadRequestException("CRM handover checklist is not ready for approval");
         }
+        handover.setChecklist(checklist.stream().map(this::checklistMap).toList());
         handover.setStatus("approved");
-        CrmSchoolProfile profile = profile(handover.getLeadId());
+        CrmSchoolProfile profile = profile(access, handover.getLeadId());
         profile.setLeadStatus("active");
         profile.setLastTouchAt(OffsetDateTime.now());
         profileRepository.save(profile);
-        CrmSchoolDeal deal = dealRepository.findById(handover.getOpportunityId())
+        CrmSchoolDeal deal = dealRepository.findByIdAndTenantId(handover.getOpportunityId(), access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM opportunity not found"));
         deal.setStage("active");
         dealRepository.save(deal);
         return handoverResponse(handoverRepository.save(handover));
     }
 
-    private CrmSchoolProfile profile(String id) {
-        return profileRepository.findById(id)
+    private CrmSchoolProfile profile(UserAccessContext access, String id) {
+        return profileRepository.findByIdAndTenantId(id, access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM lead not found"));
     }
 
@@ -339,9 +369,10 @@ public class CrmWorkspaceService {
         );
     }
 
-    private Map<String, CrmSchoolContact> primaryContacts(Collection<String> schoolIds) {
+    private Map<String, CrmSchoolContact> primaryContacts(String tenantId, Collection<String> schoolIds) {
         Map<String, CrmSchoolContact> contacts = new LinkedHashMap<>();
-        for (CrmSchoolContact contact : contactRepository.findBySchoolIdInOrderByIsPrimaryDescCreatedAtAsc(schoolIds)) {
+        for (CrmSchoolContact contact : contactRepository
+                .findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc(tenantId, schoolIds)) {
             contacts.putIfAbsent(contact.getSchoolId(), contact);
         }
         return contacts;
@@ -399,8 +430,42 @@ public class CrmWorkspaceService {
         if (checklist == null || checklist.isEmpty()) {
             return false;
         }
-        long done = checklist.stream().filter(HandoverChecklistItem::done).count();
-        return done >= checklist.size() - 1L;
+        return checklist.stream().allMatch(HandoverChecklistItem::done);
+    }
+
+    /**
+     * Client-declared {@code done} flags are not trusted where the server holds the evidence:
+     * a checklist item whose id names a follow-up of the same school takes that follow-up's
+     * completion state.
+     */
+    private List<HandoverChecklistItem> verifiedChecklist(
+            String tenantId, String schoolId, List<HandoverChecklistItem> checklist
+    ) {
+        List<HandoverChecklistItem> items = safe(checklist);
+        List<String> ids = items.stream()
+                .map(HandoverChecklistItem::id)
+                .filter(id -> id != null && !id.isBlank())
+                .toList();
+        if (ids.isEmpty()) {
+            return items;
+        }
+        Map<String, Boolean> followUps = activityRepository.findByTenantIdAndSchoolIdAndIdIn(tenantId, schoolId, ids)
+                .stream()
+                .collect(Collectors.toMap(CrmSchoolActivity::getId,
+                        activity -> Boolean.TRUE.equals(activity.getDone()), (left, right) -> left));
+        return items.stream()
+                .map(item -> followUps.containsKey(item.id())
+                        ? new HandoverChecklistItem(item.id(), item.label(), followUps.get(item.id()))
+                        : item)
+                .toList();
+    }
+
+    private boolean currentPrincipalHas(UserAccessContext access, String permission) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null
+                && authentication.getPrincipal() instanceof ErgPrincipal principal
+                && access.userId().equals(principal.userId())
+                && authorization.isAllowed(principal, permission, null, access.tenantId());
     }
 
     private void checkVersion(Long expected, long actual) {

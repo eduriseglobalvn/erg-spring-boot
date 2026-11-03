@@ -4,12 +4,14 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationEntity;
 import com.erg.ergspringboot.model.notifications.NotificationMessageEntity;
 import com.erg.ergspringboot.model.notifications.NotificationOutboxEntity;
+import com.erg.ergspringboot.model.notifications.NotificationPreferenceEntity;
 import com.erg.ergspringboot.model.notifications.NotificationRecipientEntity;
 import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationMessageRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.repository.notifications.NotificationPreferenceRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationRecipientRepository;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
@@ -41,6 +43,7 @@ public class NotificationCommandService {
     private final NotificationPushProperties properties;
     private final NotificationTokenCipher tokenCipher;
     private final NotificationMetrics metrics;
+    private final NotificationPreferenceRepository preferenceRepository;
 
     public NotificationCommandService(
             NotificationMessageRepository messageRepository,
@@ -49,7 +52,8 @@ public class NotificationCommandService {
             NotificationOutboxRepository outboxRepository,
             NotificationPushProperties properties,
             NotificationTokenCipher tokenCipher,
-            NotificationMetrics metrics
+            NotificationMetrics metrics,
+            NotificationPreferenceRepository preferenceRepository
     ) {
         this.messageRepository = messageRepository;
         this.recipientRepository = recipientRepository;
@@ -58,6 +62,7 @@ public class NotificationCommandService {
         this.properties = properties;
         this.tokenCipher = tokenCipher;
         this.metrics = metrics;
+        this.preferenceRepository = preferenceRepository;
     }
 
     @Transactional
@@ -97,13 +102,25 @@ public class NotificationCommandService {
         int recipientCount = 0;
         int outboxCount = 0;
         String portal = firstText(command.portal(), "lms");
+        // Per-user, per-event-type opt-outs: inbox opt-out drops the recipient row, push
+        // opt-out drops that user's device outbox rows. Absent preference means enabled.
+        Set<String> inboxDisabled = new java.util.HashSet<>();
+        Set<String> pushDisabled = new java.util.HashSet<>();
+        if (!userIds.isEmpty()) {
+            for (NotificationPreferenceEntity preference : preferenceRepository
+                    .findByTenantIdAndPortalAndEventTypeAndUserIdIn(
+                            command.tenantId(), portal, savedMessage.getEventType(), userIds)) {
+                if (Boolean.FALSE.equals(preference.getInboxEnabled())) inboxDisabled.add(preference.getUserId());
+                if (Boolean.FALSE.equals(preference.getPushEnabled())) pushDisabled.add(preference.getUserId());
+            }
+        }
         List<String> existingUserIds = userIds.isEmpty()
                 ? List.of()
                 : recipientRepository.findExistingUserIds(command.tenantId(), savedMessage.getId(), portal, userIds);
         java.util.Set<String> existing = new java.util.HashSet<>(existingUserIds);
         List<NotificationRecipientEntity> newRecipients = new ArrayList<>();
         for (String userId : userIds) {
-            if (!existing.contains(userId)) {
+            if (!existing.contains(userId) && !inboxDisabled.contains(userId)) {
                 NotificationRecipientEntity recipient = new NotificationRecipientEntity();
                 recipient.setTenantId(command.tenantId());
                 recipient.setNotificationId(savedMessage.getId());
@@ -123,6 +140,7 @@ public class NotificationCommandService {
                     deviceRepository.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(
                             command.tenantId(), userIds, portal);
             for (NotificationDeviceRegistrationEntity device : devices) {
+                if (pushDisabled.contains(device.getUserId())) continue;
                 NotificationOutboxEntity outbox = outboxForDevice(savedMessage, command, device);
                 if (outbox != null) outboxes.add(outbox);
             }

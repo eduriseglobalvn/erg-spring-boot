@@ -47,7 +47,7 @@ class AuditQueryServiceTest {
         AuditPage page = new AuditQueryService(repository, redaction).query(access, AuditQuery.defaults());
 
         assertThat(page.items()).hasSize(1);
-        assertThat(page.items().getFirst().details().get("email")).asString().startsWith("sha256:");
+        assertThat(page.items().getFirst().details().get("email")).asString().startsWith("hmac-sha256:");
         ArgumentCaptor<List<String>> units = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<List<String>> classes = ArgumentCaptor.forClass(List.class);
         verify(repository).search(eq("tenant-a"), any(), any(), any(), any(), any(), any(), eq(false), units.capture(), classes.capture(), any());

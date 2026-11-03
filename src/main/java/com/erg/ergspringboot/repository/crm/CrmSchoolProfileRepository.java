@@ -8,7 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CrmSchoolProfileRepository extends JpaRepository<CrmSchoolProfile, String> {
 
-    Optional<CrmSchoolProfile> findFirstBySchoolId(String schoolId);
+    Optional<CrmSchoolProfile> findByIdAndTenantId(String id, String tenantId);
 
-    List<CrmSchoolProfile> findBySchoolIdIn(Collection<String> schoolIds);
+    Optional<CrmSchoolProfile> findFirstByTenantIdAndSchoolId(String tenantId, String schoolId);
+
+    List<CrmSchoolProfile> findByTenantIdAndSchoolIdIn(String tenantId, Collection<String> schoolIds);
 }

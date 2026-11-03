@@ -177,34 +177,50 @@ public class CalendarBulkCreateUseCase {
                     List.of(), List.of()));
         }
 
+        // Teacher conflicts span schools, so a per-school lock alone lets two schools import
+        // overlapping lessons for a shared teacher concurrently.
+        List<String> teacherIds = allAssignments.stream()
+                .map(CalendarEventTeacher::getTeacherUserId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
+        for (String teacherId : teacherIds) {
+            if (!attemptAdvisoryLock(teacherLockId(tenantId, teacherId))) {
+                throw new ConflictException("Another bulk schedule operation is in progress for a teacher in this payload.");
+            }
+        }
+
         List<CalendarConflictResponse> conflicts = conflictService.detectConflicts(
                 tenantId, allEvents, allAssignments, clientRowIdByEventId);
         List<CalendarConflictResponse> errorConflicts = conflicts.stream()
                 .filter(conflict -> "ERROR".equals(conflict.severity())).toList();
+        // Decide everything before cancelling anything: existing lessons are only cancelled
+        // when this batch is certain to be created in the same transaction.
+        List<String> eventIdsToCancel = List.of();
         if (!errorConflicts.isEmpty()) {
-            if ("DELETE_CONFLICTING".equals(input.resolveMode())) {
-                ResolveResult result = conflictService.resolveConflictsByDeletion(
-                        tenantId, errorConflicts, resolveManagedSchoolIds());
-                if (!result.eventIdsToDelete().isEmpty()) {
-                    eventRepository.updateStatusBatch(
-                            tenantId, new ArrayList<>(result.eventIdsToDelete()),
-                            CANCELLED, userId, OffsetDateTime.now());
-                }
-                Set<String> resolvedIds = result.resolvedConflicts().stream()
-                        .map(CalendarConflictResponse::existingEventId).collect(Collectors.toSet());
-                List<CalendarConflictResponse> remaining = errorConflicts.stream()
-                        .filter(conflict -> !resolvedIds.contains(conflict.existingEventId())).toList();
-                if (!remaining.isEmpty()) {
-                    return new CalendarBulkPayload(null, 0, 0, 0, rowResults, remaining);
-                }
-            } else {
+            if (!"DELETE_CONFLICTING".equals(input.resolveMode())) {
                 return new CalendarBulkPayload(null, 0, 0, 0, rowResults, conflicts);
             }
+            ResolveResult result = conflictService.resolveConflictsByDeletion(
+                    tenantId, errorConflicts, resolveManagedSchoolIds());
+            Set<String> resolvedIds = result.resolvedConflicts().stream()
+                    .map(CalendarConflictResponse::existingEventId).collect(Collectors.toSet());
+            List<CalendarConflictResponse> remaining = errorConflicts.stream()
+                    .filter(conflict -> !resolvedIds.contains(conflict.existingEventId())).toList();
+            if (!remaining.isEmpty()) {
+                return new CalendarBulkPayload(null, 0, 0, 0, rowResults, remaining);
+            }
+            eventIdsToCancel = new ArrayList<>(result.eventIdsToDelete());
         }
 
         boolean hasWarnings = conflicts.stream().anyMatch(conflict -> "WARNING".equals(conflict.severity()));
         if (hasWarnings && !input.overrideConflicts()) {
             return new CalendarBulkPayload(null, 0, 0, 0, rowResults, conflicts);
+        }
+
+        if (!eventIdsToCancel.isEmpty()) {
+            eventRepository.updateStatusBatch(tenantId, eventIdsToCancel, CANCELLED, userId, OffsetDateTime.now());
         }
 
         CalendarBatch batch = new CalendarBatch();
@@ -284,15 +300,23 @@ public class CalendarBulkCreateUseCase {
     }
 
     private boolean attemptAdvisoryLock(String tenantId, String schoolId) {
+        return attemptAdvisoryLock((long) (tenantId.hashCode() * 31L + schoolId.hashCode()));
+    }
+
+    /** Teacher locks live in their own key space (high word) so they never alias school locks. */
+    static long teacherLockId(String tenantId, String teacherUserId) {
+        int hash = ("calendar-teacher|" + tenantId + "|" + teacherUserId).hashCode();
+        return (0x43414C54L << 32) | (hash & 0xFFFFFFFFL);
+    }
+
+    private boolean attemptAdvisoryLock(long lockId) {
         try {
-            long lockId = (long) (tenantId.hashCode() * 31L + schoolId.hashCode());
             Query query = require(entityManagers, "entity manager")
                     .createNativeQuery("SELECT pg_try_advisory_xact_lock(:lockId)");
             query.setParameter("lockId", lockId);
             return Boolean.TRUE.equals(query.getSingleResult());
         } catch (Exception error) {
-            log.warn("Failed to acquire advisory lock for tenant={} school={}: {}",
-                    tenantId, schoolId, error.getMessage());
+            log.warn("Failed to acquire calendar advisory lock {}: {}", lockId, error.getMessage());
             return false;
         }
     }

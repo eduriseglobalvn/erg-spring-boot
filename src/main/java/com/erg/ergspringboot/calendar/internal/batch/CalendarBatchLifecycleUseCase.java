@@ -2,10 +2,15 @@ package com.erg.ergspringboot.calendar.internal.batch;
 
 import com.erg.ergspringboot.calendar.CalendarBatchPublished;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarBatchPayload;
+import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
+import com.erg.ergspringboot.exception.ConflictException;
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.calendar.CalendarBatch;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
+import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
+import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.service.calendar.CalendarConflictService;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -25,6 +30,7 @@ public class CalendarBatchLifecycleUseCase {
 
     private final CalendarBatchRepository batches;
     private final CalendarEventRepository events;
+    private final CalendarEventTeacherRepository eventTeachers;
     private final ObjectProvider<CalendarConflictService> conflictProvider;
     private final CalendarConflictService compatibilityConflicts;
     private final ApplicationEventPublisher eventPublisher;
@@ -33,10 +39,12 @@ public class CalendarBatchLifecycleUseCase {
     public CalendarBatchLifecycleUseCase(
             CalendarBatchRepository batches,
             CalendarEventRepository events,
+            CalendarEventTeacherRepository eventTeachers,
             ObjectProvider<CalendarConflictService> conflictProvider,
             ApplicationEventPublisher eventPublisher) {
         this.batches = batches;
         this.events = events;
+        this.eventTeachers = eventTeachers;
         this.conflictProvider = conflictProvider;
         this.compatibilityConflicts = null;
         this.eventPublisher = eventPublisher;
@@ -46,10 +54,12 @@ public class CalendarBatchLifecycleUseCase {
     public CalendarBatchLifecycleUseCase(
             CalendarBatchRepository batches,
             CalendarEventRepository events,
+            CalendarEventTeacherRepository eventTeachers,
             CalendarConflictService conflicts,
             ApplicationEventPublisher eventPublisher) {
         this.batches = batches;
         this.events = events;
+        this.eventTeachers = eventTeachers;
         this.conflictProvider = null;
         this.compatibilityConflicts = conflicts;
         this.eventPublisher = eventPublisher;
@@ -59,13 +69,27 @@ public class CalendarBatchLifecycleUseCase {
     public CalendarBatchPayload publish(String tenantId, String batchId, String actorId) {
         CalendarBatch batch = findBatch(tenantId, batchId);
         if (!DRAFT.equals(batch.getStatus())) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Cannot publish batch " + batchId + " with status: " + batch.getStatus());
         }
 
-        List<CalendarEvent> batchEvents = events.findByTenantIdAndBatchId(tenantId, batchId);
-        if (batchEvents.isEmpty()) {
-            throw new IllegalStateException("Cannot publish an empty batch: " + batchId);
+        // Only DRAFT events are published: events cancelled since the batch was drafted
+        // (DELETE_CONFLICTING from another batch, single-event delete) must stay cancelled.
+        List<CalendarEvent> draftEvents = events.findByTenantIdAndBatchId(tenantId, batchId).stream()
+                .filter(event -> DRAFT.equals(event.getStatus()))
+                .toList();
+        if (draftEvents.isEmpty()) {
+            throw new ConflictException("Cannot publish a batch without draft events: " + batchId);
+        }
+        List<String> eventIds = draftEvents.stream().map(CalendarEvent::getId).toList();
+        List<CalendarEventTeacher> assignments = eventTeachers.findByTenantIdAndEventIdIn(tenantId, eventIds);
+        List<CalendarConflictResponse> blocking = conflictService()
+                .detectConflicts(tenantId, draftEvents, assignments).stream()
+                .filter(conflict -> "ERROR".equals(conflict.severity()))
+                .toList();
+        if (!blocking.isEmpty()) {
+            throw new ConflictException("Cannot publish batch " + batchId + ": " + blocking.size()
+                    + " schedule conflict(s) appeared since it was drafted.");
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -74,8 +98,7 @@ public class CalendarBatchLifecycleUseCase {
         batch.setPublishedAt(now);
         batches.save(batch);
 
-        List<String> eventIds = batchEvents.stream().map(CalendarEvent::getId).toList();
-        int affected = events.updateStatusBatch(tenantId, eventIds, PUBLISHED, actorId, now);
+        int affected = events.updateStatusBatchFromStatus(tenantId, eventIds, DRAFT, PUBLISHED, actorId, now);
         conflictService().markConflictsResolved(batch.getTenantId(), batchId, actorId);
         eventPublisher.publishEvent(new CalendarBatchPublished(
                 "schedule-published:" + batchId, tenantId, batchId, actorId, now, 1));
@@ -86,7 +109,7 @@ public class CalendarBatchLifecycleUseCase {
     public CalendarBatchPayload cancel(String tenantId, String batchId, String actorId) {
         CalendarBatch batch = findBatch(tenantId, batchId);
         if (CANCELLED.equals(batch.getStatus())) {
-            throw new IllegalStateException("Batch is already cancelled: " + batchId);
+            throw new ConflictException("Batch is already cancelled: " + batchId);
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -102,7 +125,7 @@ public class CalendarBatchLifecycleUseCase {
 
     private CalendarBatch findBatch(String tenantId, String batchId) {
         return batches.findByTenantIdAndId(tenantId, batchId)
-                .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+                .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + batchId));
     }
 
     private CalendarConflictService conflictService() {

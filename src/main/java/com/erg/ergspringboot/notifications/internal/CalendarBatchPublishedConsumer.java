@@ -38,7 +38,7 @@ public class CalendarBatchPublishedConsumer {
                 "Lich giang day cho " + batch.schoolId() + " da duoc xuat ban voi "
                         + batch.sessionCount() + " buoi hoc.",
                 "/calendar", "normal", "lms", batch.teacherIds(), null,
-                Map.of("batchId", event.batchId(), "eventType", "SCHEDULE_PUBLISHED",
-                        "eventId", event.eventId())));
+                // eventType is reserved: NotificationCommandService adds it from the command itself.
+                Map.of("batchId", event.batchId(), "eventId", event.eventId())));
     }
 }

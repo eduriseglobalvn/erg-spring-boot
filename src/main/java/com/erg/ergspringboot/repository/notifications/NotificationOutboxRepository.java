@@ -96,6 +96,38 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
     )
     List<NotificationOutboxEntity> findDeadForUpdateByTenant(String tenantId, int limit);
 
+    /**
+     * Refreshes this worker's lease right before a send so a long batch never lets another instance
+     * reclaim a row that is about to be delivered. Returns 0 when the lease was lost.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+            value = """
+                    update notification_outbox
+                    set locked_at = :now
+                    where id = :id
+                      and locked_by = :workerId
+                      and status = 'processing'
+                    """,
+            nativeQuery = true
+    )
+    int renewLease(String id, String workerId, OffsetDateTime now);
+
+    /** Loads a row for result recording only while this worker still owns its lease. */
+    @Query(
+            value = """
+                    select *
+                    from notification_outbox
+                    where id = :id
+                      and locked_by = :workerId
+                      and status = 'processing'
+                    for update
+                    """,
+            nativeQuery = true
+    )
+    java.util.Optional<NotificationOutboxEntity> findLeasedForUpdate(String id, String workerId);
+
     long countByStatus(String status);
 
     long countByTenantIdAndStatus(String tenantId, String status);

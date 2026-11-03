@@ -58,4 +58,14 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, String> 
              )
             """, nativeQuery = true)
     int deleteExpired(@Param("cutoff") OffsetDateTime cutoff, @Param("limit") int limit);
+
+    /** The only permitted mutation (V134 trigger): toggling legal_hold within the caller's tenant. */
+    @Modifying
+    @Query(value = """
+            update audit_events
+               set legal_hold = :legalHold, updated_at = now()
+             where tenant_id = :tenantId and id = :id
+            """, nativeQuery = true)
+    int updateLegalHold(@Param("tenantId") String tenantId, @Param("id") String id,
+            @Param("legalHold") boolean legalHold);
 }
