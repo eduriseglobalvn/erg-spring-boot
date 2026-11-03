@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.core;
 
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.repository.lms.StudentRepository;

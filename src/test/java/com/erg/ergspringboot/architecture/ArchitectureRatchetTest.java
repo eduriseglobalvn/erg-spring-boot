@@ -136,6 +136,23 @@ class ArchitectureRatchetTest {
         assertThat(unsafe).isEmpty();
     }
 
+    @Test
+    void migratedLegacyPackagesStayRemoved() throws IOException {
+        // SQ-17 slice 1: service/lms now lives in lms/internal; nothing may reach back to the old package.
+        assertThat(SOURCE_ROOT.resolve("service/lms")).doesNotExist();
+        List<Path> offenders = new ArrayList<>();
+        try (Stream<Path> files = javaFiles(SOURCE_ROOT)) {
+            files.forEach(path -> {
+                try {
+                    if (Files.readString(path).contains("com.erg.ergspringboot.service.lms")) offenders.add(path);
+                } catch (IOException exception) {
+                    throw new IllegalStateException(exception);
+                }
+            });
+        }
+        assertThat(offenders).isEmpty();
+    }
+
     private Set<String> discoverExternalInternalImports() throws IOException {
         Set<String> moduleNames = new LinkedHashSet<>();
         try (Stream<Path> packageDescriptors = Files.walk(SOURCE_ROOT, 2)) {

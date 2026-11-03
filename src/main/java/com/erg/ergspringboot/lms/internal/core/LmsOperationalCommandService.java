@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.core;
 
 import static com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.*;
 import static com.erg.ergspringboot.common.response.lms.LmsOperationalResponses.*;

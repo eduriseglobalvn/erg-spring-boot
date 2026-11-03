@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.seed;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

@@ -5,7 +5,7 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.service.lms.LmsClassroomService;
+import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.Cacheable;

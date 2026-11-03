@@ -1,10 +1,14 @@
 package com.erg.ergspringboot.lms.internal.readmodel;
 
+import com.erg.ergspringboot.lms.internal.core.LmsAssignmentService;
+import com.erg.ergspringboot.lms.internal.core.LmsAttemptService;
+import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;
+import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
+import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.model.lms.*;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.service.lms.*;
 import java.util.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

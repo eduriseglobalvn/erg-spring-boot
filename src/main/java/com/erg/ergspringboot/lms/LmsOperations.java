@@ -24,7 +24,7 @@ import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.UpdateRecipi
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssignmentResponse;
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.lms.LmsAssignmentCommandService;
+import com.erg.ergspringboot.lms.internal.core.LmsAssignmentCommandService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 

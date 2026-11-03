@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.core;
 
 import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.CreateAssignmentRequest;
 import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.StudentGroupRequest;

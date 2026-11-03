@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.seed;
 
 import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;

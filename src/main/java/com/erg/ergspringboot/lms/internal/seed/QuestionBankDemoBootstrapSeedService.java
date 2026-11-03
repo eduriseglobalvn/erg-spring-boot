@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.seed;
 
 import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Question;

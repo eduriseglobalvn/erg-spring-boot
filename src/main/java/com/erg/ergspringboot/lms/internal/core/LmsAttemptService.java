@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.core;
 
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.model.lms.Attempt;

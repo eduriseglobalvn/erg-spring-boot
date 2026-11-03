@@ -1,5 +1,8 @@
 package com.erg.ergspringboot.lms.internal.attempt;
 
+import com.erg.ergspringboot.lms.internal.core.LmsAttemptService;
+import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
+import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.exception.*;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
@@ -12,7 +15,6 @@ import com.erg.ergspringboot.model.lms.AttemptAnswer;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.service.lms.*;
 import com.erg.ergspringboot.service.quiz.runtime.*;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.utils.IdGenerator;

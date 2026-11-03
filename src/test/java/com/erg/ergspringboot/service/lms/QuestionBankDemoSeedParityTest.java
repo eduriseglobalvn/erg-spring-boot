@@ -1,5 +1,7 @@
 package com.erg.ergspringboot.service.lms;
 
+import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoBootstrapSeedService;
+import com.erg.ergspringboot.lms.internal.seed.QuizDemoBootstrapSeedService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -176,8 +178,9 @@ class QuestionBankDemoSeedParityTest {
                 "com",
                 "erg",
                 "ergspringboot",
-                "service",
                 "lms",
+                "internal",
+                "seed",
                 fileName
         ));
     }

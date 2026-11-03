@@ -1,5 +1,9 @@
 package com.erg.ergspringboot.service.lms;
 
+import com.erg.ergspringboot.lms.internal.core.LmsAssignmentService;
+import com.erg.ergspringboot.lms.internal.core.LmsAttemptService;
+import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;
+import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;

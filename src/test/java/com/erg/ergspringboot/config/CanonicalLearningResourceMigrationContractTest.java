@@ -49,7 +49,7 @@ class CanonicalLearningResourceMigrationContractTest {
     @Test
     void runtimeSeedServicesDoNotRecreateLegacyLearningResourceNames() throws IOException {
         String accountSeedService = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/lms/LmsAccountBootstrapSeedService.java"
+                "src/main/java/com/erg/ergspringboot/lms/internal/seed/LmsAccountBootstrapSeedService.java"
         ));
 
         assertThat(accountSeedService)

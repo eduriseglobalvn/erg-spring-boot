@@ -2,15 +2,15 @@ package com.erg.ergspringboot.reporting.internal;
 
 import com.erg.ergspringboot.model.lms.Assignment;
 import com.erg.ergspringboot.reporting.AssignmentScopeLookup;
-import com.erg.ergspringboot.service.lms.LmsAssignmentService;
+import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 @Component
 class AssignmentScopeLookupAdapter implements AssignmentScopeLookup {
-    private final LmsAssignmentService assignments;
+    private final AssignmentRepository assignments;
 
-    AssignmentScopeLookupAdapter(LmsAssignmentService assignments) {
+    AssignmentScopeLookupAdapter(AssignmentRepository assignments) {
         this.assignments = assignments;
     }
 

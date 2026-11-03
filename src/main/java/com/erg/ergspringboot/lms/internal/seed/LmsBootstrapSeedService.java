@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lms;
+package com.erg.ergspringboot.lms.internal.seed;
 
 import org.springframework.stereotype.Service;
 

@@ -1,5 +1,9 @@
 package com.erg.ergspringboot.service.lms;
 
+import com.erg.ergspringboot.lms.internal.core.LmsAssignmentCommandService;
+import com.erg.ergspringboot.lms.internal.core.LmsAssignmentService;
+import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;
+import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;

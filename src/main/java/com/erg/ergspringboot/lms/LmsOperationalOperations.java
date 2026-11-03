@@ -4,7 +4,7 @@ import static com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.*;
 import static com.erg.ergspringboot.common.response.lms.LmsOperationalResponses.*;
 
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.lms.LmsOperationalCommandService;
+import com.erg.ergspringboot.lms.internal.core.LmsOperationalCommandService;
 import org.springframework.stereotype.Service;
 
 /** Public LMS boundary for school-directory write commands. */

@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.service.lms;
 
+import com.erg.ergspringboot.lms.internal.core.LmsOperationalCommandService;
 import static com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

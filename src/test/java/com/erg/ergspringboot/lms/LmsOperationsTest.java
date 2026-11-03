@@ -18,7 +18,7 @@ class LmsOperationsTest {
         AttemptResponse expected = mock(AttemptResponse.class);
         when(legacy.startAttempt("student-1", request, "idem-1", access)).thenReturn(expected);
 
-        assertThat(new LmsOperations(legacy, mock(com.erg.ergspringboot.service.lms.LmsAssignmentCommandService.class))
+        assertThat(new LmsOperations(legacy, mock(com.erg.ergspringboot.lms.internal.core.LmsAssignmentCommandService.class))
                 .startAttempt("student-1", request, "idem-1", access))
                 .isSameAs(expected);
     }
