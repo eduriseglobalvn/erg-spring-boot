@@ -41,9 +41,11 @@ public class FirebaseHttpV1PushSender implements FirebasePushSender {
 
     @Override
     public SendResult sendToFid(FirebasePushPayload payload, String firebaseInstallationId) {
+        // invalidTarget=true: the worker disables the FID-only device instead of dead-lettering
+        // one row per notification forever.
         return SendResult.failure(
                 false,
-                false,
+                true,
                 0,
                 "FID_TARGET_UNSUPPORTED",
                 "HTTP v1 FID targeting is not enabled; send registrationToken compatibility from the client.",

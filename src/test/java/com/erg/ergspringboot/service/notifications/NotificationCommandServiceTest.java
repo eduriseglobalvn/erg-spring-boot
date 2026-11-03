@@ -1,12 +1,16 @@
 package com.erg.ergspringboot.service.notifications;
 
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationEntity;
 import com.erg.ergspringboot.model.notifications.NotificationMessageEntity;
 import com.erg.ergspringboot.model.notifications.NotificationOutboxEntity;
+import com.erg.ergspringboot.model.notifications.NotificationPreferenceEntity;
+import com.erg.ergspringboot.model.notifications.NotificationRecipientEntity;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationMessageRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.repository.notifications.NotificationPreferenceRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationRecipientRepository;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +45,9 @@ class NotificationCommandServiceTest {
 
     @Mock
     private NotificationMetrics metrics;
+
+    @Mock
+    private NotificationPreferenceRepository preferenceRepository;
 
     @Test
     void enqueueRejectsTopicOutsideTenantNamespace() {
@@ -103,8 +111,62 @@ class NotificationCommandServiceTest {
                 outboxRepository,
                 new NotificationPushProperties(),
                 new NotificationTokenCipher(new NotificationPushProperties()),
-                metrics
+                metrics,
+                preferenceRepository
         );
+    }
+
+    @Test
+    void enqueueHonoursPerEventTypeInboxAndPushOptOuts() {
+        when(messageRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            NotificationMessageEntity message = invocation.getArgument(0);
+            message.setId("notification-1");
+            return message;
+        });
+        when(preferenceRepository.findByTenantIdAndPortalAndEventTypeAndUserIdIn(
+                eq("tenant_a"), eq("lms"), eq("SCHEDULE_PUBLISHED"), any()))
+                .thenReturn(List.of(
+                        preference("inbox-off", false, true),
+                        preference("push-off", true, false)));
+        when(deviceRepository.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq("tenant_a"), any(), eq("lms")))
+                .thenReturn(List.of(device("device-inbox-off", "inbox-off"), device("device-push-off", "push-off")));
+
+        NotificationCommandResult result = service().enqueue(command(
+                List.of("inbox-off", "push-off"), null, Map.of()));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<NotificationRecipientEntity>> recipients = ArgumentCaptor.forClass(List.class);
+        verify(recipientRepository).saveAll(recipients.capture());
+        assertThat(recipients.getValue()).extracting(NotificationRecipientEntity::getUserId).containsExactly("push-off");
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<NotificationOutboxEntity>> outboxes = ArgumentCaptor.forClass(List.class);
+        verify(outboxRepository).saveAll(outboxes.capture());
+        assertThat(outboxes.getValue()).singleElement()
+                .satisfies(outbox -> assertThat(outbox.getPayload()).containsEntry("deviceRegistrationId", "device-inbox-off"));
+        assertThat(result.recipientCount()).isEqualTo(1);
+        assertThat(result.outboxCount()).isEqualTo(1);
+    }
+
+    private NotificationPreferenceEntity preference(String userId, boolean inbox, boolean push) {
+        NotificationPreferenceEntity preference = new NotificationPreferenceEntity();
+        preference.setTenantId("tenant_a");
+        preference.setUserId(userId);
+        preference.setPortal("lms");
+        preference.setEventType("SCHEDULE_PUBLISHED");
+        preference.setInboxEnabled(inbox);
+        preference.setPushEnabled(push);
+        return preference;
+    }
+
+    private NotificationDeviceRegistrationEntity device(String id, String userId) {
+        NotificationDeviceRegistrationEntity device = new NotificationDeviceRegistrationEntity();
+        device.setId(id);
+        device.setTenantId("tenant_a");
+        device.setUserId(userId);
+        device.setPortal("lms");
+        device.setRegistrationToken("token-" + id);
+        device.setEnabled(true);
+        return device;
     }
 
     private NotificationCommand command(List<String> userIds, String topicName, Map<String, String> data) {

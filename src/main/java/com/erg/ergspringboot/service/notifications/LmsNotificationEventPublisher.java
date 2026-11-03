@@ -22,9 +22,12 @@ import java.util.Map;
  *   <li>{@code ASSIGNMENT_OVERDUE} (scheduled-job placeholder)</li>
  *   <li>{@code ATTEMPT_SUBMITTED}</li>
  *   <li>{@code SUPPORT_NEEDED_LOW_SCORE}</li>
- *   <li>{@code TEACHER_SCHEDULE_ASSIGNED} — already implemented in
- *       {@code TeachingScheduleCommandService}</li>
  * </ul>
+ *
+ * <p><b>Not wired yet (C10/SQ-16):</b> no production caller invokes this publisher; LMS
+ * command services must publish AFTER_COMMIT domain events that a notifications listener
+ * maps onto these methods. Teaching-schedule notifications are delivered by
+ * {@code CalendarBatchPublishedConsumer} as {@code SCHEDULE_PUBLISHED}.</p>
  */
 @Service
 public class LmsNotificationEventPublisher {

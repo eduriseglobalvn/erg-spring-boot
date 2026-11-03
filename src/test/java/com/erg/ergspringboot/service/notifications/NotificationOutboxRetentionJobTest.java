@@ -40,6 +40,23 @@ class NotificationOutboxRetentionJobTest {
     }
 
     @Test
+    void purgeRunsInMaintenanceTenantScopeSoRlsDoesNotHideRows() {
+        NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
+        java.util.concurrent.atomic.AtomicBoolean maintenance = new java.util.concurrent.atomic.AtomicBoolean();
+        when(repository.deleteTerminalOlderThan(argThat(java.util.Objects::nonNull), eq(1000))).thenAnswer(invocation -> {
+            com.erg.ergspringboot.platform.security.TenantContext current =
+                    com.erg.ergspringboot.platform.security.TenantContext.current();
+            maintenance.set(current != null && current.isMaintenance());
+            return 0;
+        });
+
+        new NotificationOutboxRetentionJob(repository, true, 90, 1000).purgeExpiredTerminal();
+
+        org.assertj.core.api.Assertions.assertThat(maintenance).isTrue();
+        org.assertj.core.api.Assertions.assertThat(com.erg.ergspringboot.platform.security.TenantContext.current()).isNull();
+    }
+
+    @Test
     void skipsPurgeWhenDisabled() {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
 
