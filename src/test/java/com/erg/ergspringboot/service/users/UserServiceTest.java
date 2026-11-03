@@ -587,7 +587,7 @@ class UserServiceTest {
     }
 
     @Test
-    void bulkDeleteRemovesAllTenantUsers() {
+    void bulkDeleteSoftDeletesAllTenantUsers() {
         User userOne = user("user-1");
         User userTwo = user("user-2");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(userOne));
@@ -596,7 +596,9 @@ class UserServiceTest {
         var response = userService.bulkDelete("erg", new BulkDeleteRequest(List.of("user-1", "user-2")));
 
         assertEquals(2, response.modifiedCount());
-        verify(userRepository).deleteAll(List.of(userOne, userTwo));
+        verify(userRepository).saveAll(List.of(userOne, userTwo));
+        assertEquals("DELETED", userOne.getStatus());
+        assertEquals("DELETED", userTwo.getStatus());
     }
 
     @Test

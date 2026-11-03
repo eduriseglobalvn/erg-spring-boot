@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserLifecycleUseCase {
     private static final String DEFAULT_TENANT = "erg";
+    static final String STATUS_DELETED = "DELETED";
     private final UserRepository users; private final AuthSessionRepository sessions;
     private final UserActivityRepository activities;
     public UserLifecycleUseCase(UserRepository users, AuthSessionRepository sessions, UserActivityRepository activities) {
@@ -43,15 +44,27 @@ public class UserLifecycleUseCase {
         user.setStatus(status); users.save(user); revokeIfLocked(user,tenant(tenantId),status);
         record(user,audit,Map.of("status",previous),Map.of("status",status)); return response(user);
     }
-    @Transactional public BulkOperationResponse delete(String userId,String tenantId){users.delete(find(userId,tenantId));return new BulkOperationResponse(1);}
+    /** Soft delete: keeps the row and its audit trail, disables the account and anonymises its PII. */
+    @Transactional public BulkOperationResponse delete(String userId,String tenantId){
+        softDelete(List.of(find(userId,tenantId)),tenant(tenantId));return new BulkOperationResponse(1);}
     @Transactional public BulkOperationResponse bulkStatus(String tenantId,BulkStatusRequest request){
         String status=status(request.status()); List<User> found=findAll(request.userIds(),tenantId);
         found.forEach(user->user.setStatus(status)); users.saveAll(found); String t=tenant(tenantId);
         found.forEach(user->revokeIfLocked(user,t,status)); return new BulkOperationResponse(found.size()); }
     @Transactional public BulkOperationResponse bulkDelete(String tenantId,BulkDeleteRequest request){
-        List<User> found=findAll(request.userIds(),tenantId); users.deleteAll(found); return new BulkOperationResponse(found.size()); }
+        List<User> found=findAll(request.userIds(),tenantId); softDelete(found,tenant(tenantId)); return new BulkOperationResponse(found.size()); }
+    private void softDelete(List<User> found,String tenant){
+        found.forEach(UserLifecycleUseCase::anonymise); users.saveAll(found);
+        found.forEach(user->revokeIfLocked(user,tenant,STATUS_DELETED)); }
+    static void anonymise(User u){
+        u.setStatus(STATUS_DELETED); u.setEmail("deleted-"+u.getId()+"@deleted.invalid"); u.setUsername(null);
+        u.setPasswordHash(null); u.setFullName("Deleted user"); u.setAvatarUrl(null); u.setPhone(null); u.setBio(null);
+        u.setGender(null); u.setDateOfBirth(null); u.setAddress(null); u.setCity(null); u.setDistrict(null);
+        u.setJobTitle(null); u.setRegion(null); u.setSocialLinks(null); u.setExtendedProfile(null);
+        u.setRecoveryEmail(null); u.setRecoveryEmailVerified(false); u.setMustChangePassword(false);
+        u.setAuthzVersion((u.getAuthzVersion()==null?1L:u.getAuthzVersion())+1); }
     private void revokeIfLocked(User user,String tenant,String status){
-        if(!List.of("BLOCKED","BANNED","INACTIVE").contains(status))return;
+        if(!List.of("BLOCKED","BANNED","INACTIVE",STATUS_DELETED).contains(status))return;
         List<AuthSession> active=sessions.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(),tenant); if(active.isEmpty())return;
         OffsetDateTime at=OffsetDateTime.now(ZoneOffset.UTC); String reason="status_changed_"+status.toLowerCase();
         active.forEach(s->{s.setRevokedAt(at);s.setRevokedReason(reason);});sessions.saveAll(active);}
@@ -63,6 +76,7 @@ public class UserLifecycleUseCase {
         a.setDescription("Employee account status changed");a.setMetadata(Map.of("before",before,"after",after));
         a.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));activities.save(a);}
     private User find(String id,String tenant){return users.findByIdAndTenantId(id,tenant(tenant))
+            .filter(u->!STATUS_DELETED.equalsIgnoreCase(u.getStatus()))
             .orElseThrow(()->new ResourceNotFoundException("user not found"));}
     private List<User> findAll(List<String> ids,String tenant){return ids.stream().map(id->find(id,tenant)).toList();}
     private String status(String value){String s=value.trim().toUpperCase();

@@ -21,7 +21,7 @@ public class UserRoleAssignment extends BaseEntity {
     @Column(name = "user_id", nullable = false, length = 36)
     private String userId;
 
-    @Column(name = "role_id", nullable = false, length = 64)
+    @Column(name = "role_id", nullable = false, length = 36)
     private String roleId;
 
     @ManyToOne(fetch = FetchType.LAZY)

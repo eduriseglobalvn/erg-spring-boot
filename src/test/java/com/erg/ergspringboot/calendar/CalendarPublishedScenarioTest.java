@@ -25,7 +25,7 @@ import org.springframework.test.context.jdbc.Sql;
         mode = ApplicationModuleTest.BootstrapMode.STANDALONE,
         verifyAutomatically = false)
 @ActiveProfiles("test")
-@Sql(scripts = "classpath:db/migration/V73__spring_modulith_event_publication.sql")
+@Sql(scripts = "classpath:db/fixtures/h2_spring_modulith_event_publication.sql")
 class CalendarPublishedScenarioTest {
 
     static {

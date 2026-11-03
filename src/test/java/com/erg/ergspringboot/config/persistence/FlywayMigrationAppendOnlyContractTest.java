@@ -24,6 +24,7 @@ class FlywayMigrationAppendOnlyContractTest {
 
     private static final Path MIGRATION_DIR = Path.of("src/main/resources/db/migration/postgres");
     private static final Pattern VERSIONED = Pattern.compile("^V(\\d+)__.+\\.sql$");
+    private static final List<Integer> HISTORICAL_GAP = List.of(104, 105);
 
     @Test
     void versionedMigrationsAreUniqueGapFreeAndForwardOnly() throws IOException {
@@ -44,9 +45,17 @@ class FlywayMigrationAppendOnlyContractTest {
 
         assertThat(all).as("duplicate migration version detected").doesNotHaveDuplicates();
         assertThat(versions.first()).as("versions must start at 1").isEqualTo(1);
-        assertThat(versions.last())
-                .as("versions must be gap-free from 1..N")
-                .isEqualTo(versions.size());
+        // V104/V105 were never committed (numbers skipped before V106 shipped). The gap is frozen:
+        // it may not grow, and those numbers must not be reused now that later versions are applied.
+        TreeSet<Integer> missing = new TreeSet<>();
+        for (int version = 1; version <= versions.last(); version++) {
+            if (!versions.contains(version)) {
+                missing.add(version);
+            }
+        }
+        assertThat(missing)
+                .as("versions must be gap-free from 1..N apart from the frozen historical gap")
+                .containsExactlyElementsOf(HISTORICAL_GAP);
     }
 
     @Test
