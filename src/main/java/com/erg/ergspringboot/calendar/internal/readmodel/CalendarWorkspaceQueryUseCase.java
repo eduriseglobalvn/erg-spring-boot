@@ -15,6 +15,7 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.service.calendar.CalendarExpansionService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
 /** Owns LCMS, teacher and student Calendar workspace query orchestration. */
 public final class CalendarWorkspaceQueryUseCase {
 
-    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final ZoneId VIETNAM_ZONE = CalendarExpansionService.VIETNAM_ZONE;
     private static final List<String> DEFAULT_STATUSES = List.of("DRAFT", "PUBLISHED");
     private static final String FILTER_SENTINEL = "__none__";
     private static final int MAX_WORKSPACE_DAYS = 31;

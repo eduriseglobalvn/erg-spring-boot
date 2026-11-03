@@ -161,4 +161,16 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("status") String status,
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
+
+    /** Transitions only rows still in {@code fromStatus}, so a concurrent cancel is never undone. */
+    @Modifying
+    @Query("UPDATE CalendarEvent e SET e.status = :status, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt " +
+           "WHERE e.tenantId = :tenantId AND e.id IN :ids AND e.status = :fromStatus")
+    int updateStatusBatchFromStatus(
+            @Param("tenantId") String tenantId,
+            @Param("ids") List<String> ids,
+            @Param("fromStatus") String fromStatus,
+            @Param("status") String status,
+            @Param("updatedBy") String updatedBy,
+            @Param("updatedAt") OffsetDateTime updatedAt);
 }

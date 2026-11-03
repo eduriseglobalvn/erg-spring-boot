@@ -32,7 +32,9 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarPreviewPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOption;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.calendar.CalendarBatch;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
@@ -618,10 +620,67 @@ class CalendarCommandServiceTest {
             assertEquals(1, payload.conflicts().size());
             assertEquals("CLASS_TIME_CONFLICT", payload.conflicts().get(0).code());
 
-            verify(eventRepository).updateStatusBatch(
-                    eq(TENANT_ID), eq(List.of("existing-evt-1")), eq("CANCELLED"), eq(USER_ID), any());
+            // B7: nothing may be cancelled when the replacement batch is not created.
+            verify(eventRepository, never()).updateStatusBatch(
+                    anyString(), anyList(), anyString(), anyString(), any());
             verify(batchRepository, never()).save(any());
             verify(eventRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        void shouldNotCancelExistingLessonsWhenUnapprovedWarningsBlockTheBatch() {
+            CalendarBulkCreateRequest input = createBulkRequest("DELETE_CONFLICTING");
+            CalendarBulkRowRequest row = input.rows().get(0);
+            when(batchRepository.findByTenantIdAndIdempotencyKey(TENANT_ID, IDEMPOTENCY_KEY))
+                    .thenReturn(Optional.empty());
+            mockLockQuery(true);
+            mockReferenceData();
+            when(validationService.validateRows(eq(input), any()))
+                    .thenReturn(List.of(new RowValidationResult("row-1", true, List.of(), List.of())));
+            when(expansionService.expand(eq(row), anyString(), eq(TENANT_ID), eq(SCHOOL_ID),
+                    eq(USER_ID), eq(LocalDate.parse(APPLY_FROM)), eq(1), any()))
+                    .thenReturn(new ExpansionResult(List.of(createEvent(EVENT_ID)),
+                            List.of(createTeacherAssignment(EVENT_ID, "teacher-1", "MAIN"))));
+            CalendarConflictResponse teacherConflict = new CalendarConflictResponse(
+                    "TEACHER_TIME_CONFLICT", "ERROR", "row-1", "existing-evt-1", "Teacher conflict");
+            CalendarConflictResponse roomWarning = new CalendarConflictResponse(
+                    "ROOM_TIME_CONFLICT", "WARNING", "row-1", "existing-evt-9", "Room conflict");
+            when(conflictService.detectConflicts(eq(TENANT_ID), anyList(), anyList(), anyMap()))
+                    .thenReturn(List.of(teacherConflict, roomWarning));
+            when(conflictService.resolveConflictsByDeletion(eq(TENANT_ID), anyList(), eq(List.of())))
+                    .thenReturn(new ResolveResult(List.of(teacherConflict), Set.of("existing-evt-1")));
+
+            CalendarBulkPayload payload = service.create(TENANT_ID, input, USER_ID);
+
+            assertNull(payload.batchId());
+            verify(eventRepository, never()).updateStatusBatch(
+                    anyString(), anyList(), anyString(), anyString(), any());
+            verify(batchRepository, never()).save(any());
+        }
+
+        @Test
+        void shouldRejectWhenAnotherImportHoldsASharedTeacherLock() {
+            CalendarBulkCreateRequest input = createBulkRequest("REJECT");
+            CalendarBulkRowRequest row = input.rows().get(0);
+            when(batchRepository.findByTenantIdAndIdempotencyKey(TENANT_ID, IDEMPOTENCY_KEY))
+                    .thenReturn(Optional.empty());
+            Query lockQuery = mock(Query.class);
+            when(entityManager.createNativeQuery(anyString())).thenReturn(lockQuery);
+            when(lockQuery.setParameter(anyString(), any())).thenReturn(lockQuery);
+            when(lockQuery.getSingleResult()).thenReturn(true, false);
+            mockReferenceData();
+            when(validationService.validateRows(eq(input), any()))
+                    .thenReturn(List.of(new RowValidationResult("row-1", true, List.of(), List.of())));
+            when(expansionService.expand(eq(row), anyString(), eq(TENANT_ID), eq(SCHOOL_ID),
+                    eq(USER_ID), eq(LocalDate.parse(APPLY_FROM)), eq(1), any()))
+                    .thenReturn(new ExpansionResult(List.of(createEvent(EVENT_ID)),
+                            List.of(createTeacherAssignment(EVENT_ID, "teacher-1", "MAIN"))));
+
+            assertThrows(ConflictException.class, () -> service.create(TENANT_ID, input, USER_ID));
+
+            verify(lockQuery, org.mockito.Mockito.times(2)).getSingleResult();
+            verify(conflictService, never()).detectConflicts(anyString(), anyList(), anyList(), anyMap());
+            verify(batchRepository, never()).save(any());
         }
     }
 
@@ -642,8 +701,8 @@ class CalendarCommandServiceTest {
             when(eventRepository.findByTenantIdAndBatchId(TENANT_ID, BATCH_ID))
                     .thenReturn(List.of(event));
 
-            when(eventRepository.updateStatusBatch(
-                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("PUBLISHED"), eq(USER_ID), any()))
+            when(eventRepository.updateStatusBatchFromStatus(
+                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("DRAFT"), eq("PUBLISHED"), eq(USER_ID), any()))
                     .thenReturn(1);
 
             CalendarBatchPayload payload = service.publishBatch(TENANT_ID, BATCH_ID, USER_ID);
@@ -657,8 +716,8 @@ class CalendarCommandServiceTest {
             assertEquals(USER_ID, batch.getPublishedBy());
             assertNotNull(batch.getPublishedAt());
 
-            verify(eventRepository).updateStatusBatch(
-                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("PUBLISHED"), eq(USER_ID), any());
+            verify(eventRepository).updateStatusBatchFromStatus(
+                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("DRAFT"), eq("PUBLISHED"), eq(USER_ID), any());
             ArgumentCaptor<Object> publishedEvent = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher).publishEvent(publishedEvent.capture());
             assertTrue(publishedEvent.getValue() instanceof CalendarBatchPublished);
@@ -671,13 +730,47 @@ class CalendarCommandServiceTest {
         }
 
         @Test
+        void shouldNotRevivePreviouslyCancelledEventsWhenPublishing() {
+            CalendarBatch batch = createBatch("DRAFT");
+            CalendarEvent draft = createEvent(EVENT_ID);
+            CalendarEvent cancelled = createEvent("event-cancelled");
+            cancelled.setStatus("CANCELLED");
+            when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID)).thenReturn(Optional.of(batch));
+            when(eventRepository.findByTenantIdAndBatchId(TENANT_ID, BATCH_ID)).thenReturn(List.of(draft, cancelled));
+            when(eventRepository.updateStatusBatchFromStatus(
+                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("DRAFT"), eq("PUBLISHED"), eq(USER_ID), any()))
+                    .thenReturn(1);
+
+            CalendarBatchPayload payload = service.publishBatch(TENANT_ID, BATCH_ID, USER_ID);
+
+            assertEquals(1, payload.affectedEventCount());
+            verify(eventRepository, never()).updateStatusBatch(anyString(), anyList(), anyString(), anyString(), any());
+            verify(conflictService).detectConflicts(eq(TENANT_ID), eq(List.of(draft)), anyList());
+        }
+
+        @Test
+        void shouldRejectPublishingWhenANewBlockingConflictAppeared() {
+            CalendarBatch batch = createBatch("DRAFT");
+            when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID)).thenReturn(Optional.of(batch));
+            when(eventRepository.findByTenantIdAndBatchId(TENANT_ID, BATCH_ID)).thenReturn(List.of(createEvent(EVENT_ID)));
+            when(conflictService.detectConflicts(eq(TENANT_ID), anyList(), anyList())).thenReturn(List.of(
+                    new CalendarConflictResponse("TEACHER_TIME_CONFLICT", "ERROR", EVENT_ID, "other-evt", "Teacher conflict")));
+
+            assertThrows(ConflictException.class, () -> service.publishBatch(TENANT_ID, BATCH_ID, USER_ID));
+
+            assertEquals("DRAFT", batch.getStatus());
+            verify(batchRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
         void shouldRejectPublishingAnEmptyBatch() {
             when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID))
                     .thenReturn(Optional.of(createBatch("DRAFT")));
             when(eventRepository.findByTenantIdAndBatchId(TENANT_ID, BATCH_ID))
                     .thenReturn(List.of());
 
-            assertThrows(IllegalStateException.class,
+            assertThrows(ConflictException.class,
                     () -> service.publishBatch(TENANT_ID, BATCH_ID, USER_ID));
 
             verify(batchRepository, never()).save(any());
@@ -687,7 +780,7 @@ class CalendarCommandServiceTest {
         void shouldThrowWhenBatchNotFound() {
             when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(ResourceNotFoundException.class,
                     () -> service.publishBatch(TENANT_ID, BATCH_ID, USER_ID));
         }
 
@@ -696,7 +789,7 @@ class CalendarCommandServiceTest {
             when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID))
                     .thenReturn(Optional.of(createBatch("CANCELLED")));
 
-            assertThrows(IllegalStateException.class,
+            assertThrows(ConflictException.class,
                     () -> service.cancelBatch(TENANT_ID, BATCH_ID, USER_ID));
 
             verify(batchRepository, never()).save(any());
@@ -707,7 +800,7 @@ class CalendarCommandServiceTest {
             when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID))
                     .thenReturn(Optional.of(createBatch("PUBLISHED")));
 
-            assertThrows(IllegalStateException.class,
+            assertThrows(ConflictException.class,
                     () -> service.publishBatch(TENANT_ID, BATCH_ID, USER_ID));
         }
     }
@@ -746,7 +839,7 @@ class CalendarCommandServiceTest {
         void shouldThrowWhenBatchNotFound() {
             when(batchRepository.findByTenantIdAndId(TENANT_ID, BATCH_ID)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(ResourceNotFoundException.class,
                     () -> service.cancelBatch(TENANT_ID, BATCH_ID, USER_ID));
         }
     }
@@ -808,7 +901,7 @@ class CalendarCommandServiceTest {
             CalendarEventUpdateRequest request = new CalendarEventUpdateRequest(
                     TENANT_ID, EVENT_ID, "room-200", null, null);
 
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(ResourceNotFoundException.class,
                     () -> service.updateEvent(TENANT_ID, request, USER_ID));
         }
     }
@@ -843,7 +936,7 @@ class CalendarCommandServiceTest {
 
             CalendarEventDeleteRequest request = new CalendarEventDeleteRequest(TENANT_ID, EVENT_ID);
 
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(ResourceNotFoundException.class,
                     () -> service.deleteEvent(TENANT_ID, request, USER_ID));
         }
     }
@@ -898,6 +991,24 @@ class CalendarCommandServiceTest {
             assertTrue(payload.deleted());
             assertEquals(0, payload.affectedEventCount());
 
+            verify(eventRepository, never())
+                    .updateStatusBatch(anyString(), anyList(), anyString(), anyString(), any());
+        }
+
+        @Test
+        void shouldRejectMissingReversedOrUnboundedDateRanges() {
+            assertThrows(BadRequestException.class, () -> service.deleteTeacherSchedule(
+                    TENANT_ID, "teacher-1", List.of(SCHOOL_ID), null, "2026-06-21", USER_ID));
+            assertThrows(BadRequestException.class, () -> service.deleteTeacherSchedule(
+                    TENANT_ID, "teacher-1", List.of(SCHOOL_ID), "2026-06-15", " ", USER_ID));
+            assertThrows(BadRequestException.class, () -> service.deleteTeacherSchedule(
+                    TENANT_ID, "teacher-1", List.of(SCHOOL_ID), "15/06/2026", "2026-06-21", USER_ID));
+            assertThrows(BadRequestException.class, () -> service.deleteTeacherSchedule(
+                    TENANT_ID, "teacher-1", List.of(SCHOOL_ID), "2026-06-21", "2026-06-15", USER_ID));
+            assertThrows(BadRequestException.class, () -> service.deleteTeacherSchedule(
+                    TENANT_ID, "teacher-1", List.of(SCHOOL_ID), "2000-01-01", "2100-01-01", USER_ID));
+
+            verifyNoInteractions(eventTeacherRepository);
             verify(eventRepository, never())
                     .updateStatusBatch(anyString(), anyList(), anyString(), anyString(), any());
         }

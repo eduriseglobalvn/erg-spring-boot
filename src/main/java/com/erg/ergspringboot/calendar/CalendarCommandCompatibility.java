@@ -41,7 +41,8 @@ public final class CalendarCommandCompatibility {
                 classroomRepository, subjectRepository, levelRepository, userRepository,
                 roomRepository, educationUnitRepository);
         return new CalendarCommandUseCase(
-                new CalendarBatchLifecycleUseCase(batchRepository, eventRepository, conflictService, eventPublisher),
+                new CalendarBatchLifecycleUseCase(
+                        batchRepository, eventRepository, eventTeacherRepository, conflictService, eventPublisher),
                 new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository),
                 new CalendarRoomCommandUseCase(roomRepository),
                 new CalendarBulkPreviewUseCase(inputNormalizer, refs, validationService, expansionService, conflictService),
