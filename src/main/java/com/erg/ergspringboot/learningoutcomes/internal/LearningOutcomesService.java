@@ -403,8 +403,11 @@ public class LearningOutcomesService implements LearningOutcomesPort {
         String tenant = tenant(access);
         String learner = required(learnerId, "learnerId", 96);
         ensureLearnerAccess(access, learner);
-        return attainments.findTop100ByTenantIdAndLearnerIdOrderByAchievedAtDesc(tenant, learner).stream()
-                .filter(value -> visibleAttainment(access, tenant, value))
+        List<CompetencyAttainment> rows = attainments.findTop100ByTenantIdAndLearnerIdOrderByAchievedAtDesc(tenant, learner);
+        // SQ-10: one batched path lookup instead of one query per attainment.
+        Map<String, LearningPath> pathById = pathsById(tenant, rows.stream().map(CompetencyAttainment::getLearningPathId).toList());
+        return rows.stream()
+                .filter(value -> visibleAttainment(access, pathById, value))
                 .map(this::attainmentResponse).toList();
     }
 
@@ -606,8 +609,10 @@ public class LearningOutcomesService implements LearningOutcomesPort {
         String tenant = tenant(access);
         String learner = required(learnerId, "learnerId", 96);
         ensureLearnerAccess(access, learner);
-        return certificates.findTop100ByTenantIdAndLearnerIdOrderByIssuedAtDesc(tenant, learner).stream()
-                .filter(value -> visibleCertificate(access, tenant, value))
+        List<OutcomeCertificate> rows = certificates.findTop100ByTenantIdAndLearnerIdOrderByIssuedAtDesc(tenant, learner);
+        Map<String, LearningPath> pathById = pathsById(tenant, rows.stream().map(OutcomeCertificate::getLearningPathId).toList());
+        return rows.stream()
+                .filter(value -> visibleCertificate(access, pathById, value))
                 .map(this::certificateResponse).toList();
     }
 
@@ -725,13 +730,22 @@ public class LearningOutcomesService implements LearningOutcomesPort {
                 node.getContentKind(), node.getSortOrder(), node.isRequired(), node.getCreatedAt());
     }
 
-    private boolean visibleAttainment(UserAccessContext access, String tenant, CompetencyAttainment attainment) {
+    private Map<String, LearningPath> pathsById(String tenant, List<String> ids) {
+        List<String> distinct = ids.stream().map(this::trimToNull).filter(java.util.Objects::nonNull).distinct().toList();
+        if (distinct.isEmpty()) return Map.of();
+        Map<String, LearningPath> byId = new java.util.HashMap<>();
+        paths.findAllById(distinct).forEach(path -> {
+            if (tenant.equals(path.getTenantId())) byId.put(path.getId(), path);
+        });
+        return byId;
+    }
+
+    private boolean visibleAttainment(UserAccessContext access, Map<String, LearningPath> pathById, CompetencyAttainment attainment) {
         if (!access.canAccessClass(trimToNull(attainment.getClassId()))) return false;
         String pathId = trimToNull(attainment.getLearningPathId());
         if (pathId == null) return true;
-        Optional<LearningPath> path = paths.findByTenantIdAndId(tenant, pathId);
-        if (path.isEmpty()) return false;
-        LearningPath value = path.get();
+        LearningPath value = pathById.get(pathId);
+        if (value == null) return false;
         if (!access.canAccessEducationUnit(trimToNull(value.getEducationUnitId()))
                 || !access.canAccessClass(trimToNull(value.getClassId()))) return false;
         String pathClassId = trimToNull(value.getClassId());
@@ -739,8 +753,9 @@ public class LearningOutcomesService implements LearningOutcomesPort {
         return pathClassId == null || recordClassId == null || pathClassId.equals(recordClassId);
     }
 
-    private boolean visibleCertificate(UserAccessContext access, String tenant, OutcomeCertificate certificate) {
-        LearningPath path = paths.findByTenantIdAndId(tenant, certificate.getLearningPathId()).orElse(null);
+    private boolean visibleCertificate(UserAccessContext access, Map<String, LearningPath> pathById, OutcomeCertificate certificate) {
+        String pathId = trimToNull(certificate.getLearningPathId());
+        LearningPath path = pathId == null ? null : pathById.get(pathId);
         return path != null
                 && access.canAccessEducationUnit(trimToNull(path.getEducationUnitId()))
                 && access.canAccessClass(trimToNull(path.getClassId()));
