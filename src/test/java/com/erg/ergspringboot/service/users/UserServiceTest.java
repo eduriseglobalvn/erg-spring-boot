@@ -651,6 +651,7 @@ class UserServiceTest {
         permission.setName("users.read");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
         when(permissionRepository.findByNameInIgnoreCase(List.of("users.read"))).thenReturn(List.of(permission));
+        authenticate(tenantAdmin());
 
         PermissionOverrideResponse response = userService.assignPermissions(
                 "user-1",
@@ -671,6 +672,39 @@ class UserServiceTest {
                 "permission-1",
                 "USER_PERMISSIONS_CHANGED",
                 new UserService.AuditContext("user-1", null, null, null));
+    }
+
+    @Test
+    void tenantAdminCannotGrantWildcardPermissionToSelfOrOthers() {
+        Permission wildcard = new Permission();
+        wildcard.setId("perm_all");
+        wildcard.setName("*");
+        when(userRepository.findByIdAndTenantId("admin-1", "erg")).thenReturn(Optional.of(user("admin-1")));
+        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user("user-1")));
+        when(permissionRepository.findByNameInIgnoreCase(List.of("*"))).thenReturn(List.of(wildcard));
+        authenticate(tenantAdmin());
+
+        assertThrows(ForbiddenException.class, () -> userService.assignPermissions(
+                "admin-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null)));
+        assertThrows(ForbiddenException.class, () -> userService.assignPermissions(
+                "user-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null)));
+        org.mockito.Mockito.verify(permissionOverrideRepository, org.mockito.Mockito.never()).deleteByUserId(any());
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private ErgPrincipal tenantAdmin() {
+        return new ErgPrincipal("admin-1", "s-1", "erg", List.of("user_admin"),
+                List.of("*", "users.manage", "rbac.role.assign"), List.of(), List.of(), "staff", "admin", Map.of());
+    }
+
+    private void authenticate(ErgPrincipal principal) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        principal, null, List.of()));
     }
 
     private User user(String id) {

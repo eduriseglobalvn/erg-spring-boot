@@ -79,10 +79,11 @@ public class ErgPolicyService {
         );
     }
 
+    /** A bare {@code *} grant is universal only for a platform-wide principal; denies keep full matching. */
     private boolean matchesAny(ErgPrincipal principal, List<String> permissions, String required) {
-        return permissions.stream().anyMatch(permission ->
-                capabilityPolicy.isPermissionWildcardAllowed(principal, permission)
-                        || matches(permission, required));
+        return permissions.stream().anyMatch(permission -> "*".equals(permission)
+                ? capabilityPolicy.isPermissionWildcardAllowed(principal, permission)
+                : matches(permission, required));
     }
 
     private boolean matchesAny(List<String> permissions, String required) {
