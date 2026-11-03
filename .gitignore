@@ -44,7 +44,6 @@ load/results/**
 .claude/
 
 # Database dumps and agent runtime output must never be committed
-backups/*.sql
-backups/*.dump
+backups/
 .codex-runtime/
 tmp-*.log
