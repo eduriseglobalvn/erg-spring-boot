@@ -17,7 +17,16 @@ import com.erg.ergspringboot.learningoutcomes.LearningOutcomesRequests.IssueCert
 import com.erg.ergspringboot.learningoutcomes.LearningOutcomesRequests.PublishLearningPathRequest;
 import com.erg.ergspringboot.learningoutcomes.LearningOutcomesRequests.RevokeCertificateRequest;
 import com.erg.ergspringboot.learningoutcomes.OutcomeCertificateIssued;
+import com.erg.ergspringboot.learningoutcomes.internal.AttainmentRecorder;
+import com.erg.ergspringboot.learningoutcomes.internal.CertificateService;
+import com.erg.ergspringboot.learningoutcomes.internal.CompetencyCatalog;
+import com.erg.ergspringboot.learningoutcomes.internal.CompletionEvaluator;
 import com.erg.ergspringboot.learningoutcomes.internal.LearningOutcomesService;
+import com.erg.ergspringboot.learningoutcomes.internal.LearningPathCommands;
+import com.erg.ergspringboot.learningoutcomes.internal.LearningPathLookup;
+import com.erg.ergspringboot.learningoutcomes.internal.OutcomeAuditTrail;
+import com.erg.ergspringboot.learningoutcomes.internal.OutcomeReceiptStore;
+import com.erg.ergspringboot.learningoutcomes.internal.OutcomeVisibilityPolicy;
 import com.erg.ergspringboot.model.learningoutcomes.LearningOutcomeCommandReceipt;
 import com.erg.ergspringboot.model.learningoutcomes.Competency;
 import com.erg.ergspringboot.model.learningoutcomes.LearningPathCompletion;
@@ -66,8 +75,16 @@ class LearningOutcomesServiceTest {
     @BeforeEach
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
-        service = new LearningOutcomesService(paths, nodes, completions, competencies, attainments, certificates,
-                receipts, events, audit);
+        LearningPathLookup lookup = new LearningPathLookup(paths);
+        OutcomeVisibilityPolicy visibility = new OutcomeVisibilityPolicy();
+        OutcomeReceiptStore receiptStore = new OutcomeReceiptStore(receipts);
+        OutcomeAuditTrail auditTrail = new OutcomeAuditTrail(audit);
+        service = new LearningOutcomesService(
+                new LearningPathCommands(paths, nodes, lookup, visibility, receiptStore, auditTrail, events),
+                new CompetencyCatalog(competencies, visibility, receiptStore, auditTrail),
+                new AttainmentRecorder(competencies, attainments, lookup, visibility, receiptStore, auditTrail, events),
+                new CompletionEvaluator(nodes, completions, lookup, visibility, receiptStore, auditTrail, events),
+                new CertificateService(certificates, completions, lookup, visibility, receiptStore, auditTrail, events));
         access = new UserAccessContext("user-1", "tenant-1", List.of("*"), List.of("*"), null, null);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 ErgPrincipal.authenticated("user-1", "session", "tenant-1", List.of("teacher"),
@@ -439,6 +456,32 @@ class LearningOutcomesServiceTest {
         when(certificates.findByTenantIdAndVerificationId("tenant-1", "verify-1"))
                 .thenReturn(Optional.of(certificate));
         assertThat(service.verifyCertificate(access, "verify-1").status()).isEqualTo("REVOKED");
+    }
+
+    @Test
+    void everyUseCaseOwnsItsPostgresTransactionAfterTheFacadeSplit() {
+        // SQ-20: the facade no longer opens transactions, so each delegate must keep the original boundary.
+        java.util.Set<String> readOnly = java.util.Set.of("paths", "path", "competency", "competencies",
+                "attainments", "completions", "verifyCertificate", "certificates");
+        java.util.Set<String> seen = new java.util.TreeSet<>();
+        for (Class<?> type : List.of(LearningPathCommands.class, CompetencyCatalog.class, AttainmentRecorder.class,
+                CompletionEvaluator.class, CertificateService.class)) {
+            for (java.lang.reflect.Method method : type.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) continue;
+                var transactional = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+                assertThat(transactional).as(type.getSimpleName() + "." + method.getName()).isNotNull();
+                String manager = transactional.transactionManager().isEmpty()
+                        ? transactional.value() : transactional.transactionManager();
+                assertThat(manager).isEqualTo("postgresTransactionManager");
+                assertThat(transactional.readOnly()).as(method.getName()).isEqualTo(readOnly.contains(method.getName()));
+                assertThat(transactional.propagation())
+                        .isEqualTo(org.springframework.transaction.annotation.Propagation.REQUIRED);
+                seen.add(method.getName());
+            }
+        }
+        java.util.Set<String> portMethods = new java.util.TreeSet<>();
+        for (java.lang.reflect.Method method : LearningOutcomesPort.class.getMethods()) portMethods.add(method.getName());
+        assertThat(seen).isEqualTo(portMethods);
     }
 
     private LearningPathNode node(String contentRefId, boolean required, int sortOrder) {
