@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
 /**
  * Fixed-window rate limiter for GraphQL requests.
  *
- * <p>Each unique (tenant, user, operation) triple gets its own bucket. Buckets
+ * <p>Each caller (tenant, user) gets one bucket shared by all operations; the operation part of
+ * the key is a constant because operationName is client-chosen. Buckets
  * expire automatically after 60 seconds of inactivity, preventing unbounded
  * memory growth. The maximum number of buckets is capped at 20,000.</p>
  *

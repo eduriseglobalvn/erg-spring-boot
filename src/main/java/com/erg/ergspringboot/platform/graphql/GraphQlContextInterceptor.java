@@ -18,11 +18,14 @@ public class GraphQlContextInterceptor implements WebGraphQlInterceptor {
     private final GraphQlRequestContextFactory contextFactory;
     private final ErgGraphQlProperties properties;
     private final MeterRegistry meterRegistry;
+    private final GraphQlOperationMetricTag operationTag;
 
     public GraphQlContextInterceptor(GraphQlRequestContextFactory contextFactory, ErgGraphQlProperties properties, MeterRegistry meterRegistry) {
         this.contextFactory = contextFactory;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
+        this.operationTag = new GraphQlOperationMetricTag(
+                properties.getMetricOperationNames(), properties.getMaxMetricOperations());
     }
 
     @Override
@@ -34,18 +37,19 @@ public class GraphQlContextInterceptor implements WebGraphQlInterceptor {
         );
 
         String operationName = context.operationName() != null ? context.operationName() : "unknown";
+        String operationTagValue = operationTag.tagFor(context.operationName());
         Timer.Sample sample = Timer.start(meterRegistry);
 
         return chain.next(request).timeout(properties.getExecutionTimeout())
                 .doOnSuccess(response -> {
                     sample.stop(Timer.builder("graphql.operation.duration")
-                            .tag("operation", operationName)
+                            .tag("operation", operationTagValue)
                             .tag("result", "success")
                             .register(meterRegistry));
                 })
                 .doOnError(error -> {
                     sample.stop(Timer.builder("graphql.operation.duration")
-                            .tag("operation", operationName)
+                            .tag("operation", operationTagValue)
                             .tag("result", "error")
                             .register(meterRegistry));
                     log.warn("GraphQL operation '{}' failed: {}", operationName, error.getMessage());

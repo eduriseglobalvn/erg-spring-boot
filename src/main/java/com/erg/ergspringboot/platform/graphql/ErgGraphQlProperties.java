@@ -19,6 +19,25 @@ public class ErgGraphQlProperties {
     private boolean rejectSensitiveVariables = true;
     private int maxVariableArrayItems = 100;
     private RateLimit rateLimit = new RateLimit();
+    /** Operation names reported as the {@code operation} metric tag; empty admits the first {@link #maxMetricOperations}. */
+    private java.util.Set<String> metricOperationNames = java.util.Set.of();
+    private int maxMetricOperations = 100;
+
+    public java.util.Set<String> getMetricOperationNames() {
+        return metricOperationNames;
+    }
+
+    public void setMetricOperationNames(java.util.Set<String> metricOperationNames) {
+        this.metricOperationNames = metricOperationNames == null ? java.util.Set.of() : java.util.Set.copyOf(metricOperationNames);
+    }
+
+    public int getMaxMetricOperations() {
+        return maxMetricOperations;
+    }
+
+    public void setMaxMetricOperations(int maxMetricOperations) {
+        this.maxMetricOperations = maxMetricOperations;
+    }
 
     public boolean isRequireOperationName() {
         return requireOperationName;
