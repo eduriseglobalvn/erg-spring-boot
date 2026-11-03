@@ -11,6 +11,7 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardSummaryResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardViewerResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.lms.StudentEnrollment;
@@ -145,6 +146,7 @@ public class StudentDashboardReadService {
                 ? null
                 : assignmentRepository.summarizeStudentDashboardAssignments(
                         safeScope.tenantId(), academicClassId, studentId);
+        // Legacy counts still run when the account has no Student row (studentId == null), so they stay (SQ-20).
         long activeAssignmentCount = assignmentCounts == null
                 ? legacyActiveAssignmentCount(safeScope, academicClassId, studentId)
                 : nullToZero(assignmentCounts.activeAssignmentCount());
@@ -430,20 +432,11 @@ public class StudentDashboardReadService {
     }
 
     private boolean isPendingAction(StudentDashboardAssignmentProjection projection) {
-        if (!"active".equalsIgnoreCase(blankToNull(projection.status()))) {
-            return false;
-        }
-        String attemptStatus = blankToNull(projection.latestAttemptStatus());
-        // needs_review counts as handed in, exactly like the attempt-limit rule (LmsStatePolicy).
-        return attemptStatus == null || !com.erg.ergspringboot.lms.LmsStatePolicy.attemptIsCompleted(attemptStatus);
+        return LmsStatePolicy.assignmentIsPendingAction(projection.status(), projection.latestAttemptStatus());
     }
 
     private String assignmentStatus(StudentDashboardAssignmentProjection projection) {
-        String attemptStatus = blankToNull(projection.latestAttemptStatus());
-        if (attemptStatus != null) {
-            return attemptStatus;
-        }
-        return first(projection.status(), "assigned");
+        return LmsStatePolicy.learnerAssignmentStatus(projection.status(), projection.latestAttemptStatus());
     }
 
     private String inferCourseStatus(List<StudentDashboardAssignmentProjection> assignments) {

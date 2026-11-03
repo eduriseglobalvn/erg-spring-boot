@@ -44,6 +44,28 @@ public final class LmsStatePolicy {
         return COMPLETED_ATTEMPT_STATES.contains(normalizeState(raw));
     }
 
+    /**
+     * Learner "next action": an {@code active} assignment whose latest attempt is missing or not handed in yet.
+     * {@code needs_review} counts as handed in, exactly like the attempt-limit rule.
+     */
+    public static boolean assignmentIsPendingAction(String assignmentStatus, String latestAttemptStatus) {
+        if (!"active".equalsIgnoreCase(blankToNull(assignmentStatus))) {
+            return false;
+        }
+        String attemptStatus = blankToNull(latestAttemptStatus);
+        return attemptStatus == null || !attemptIsCompleted(attemptStatus);
+    }
+
+    /** Learner-facing assignment status: the latest attempt state, else the assignment state, else {@code assigned}. */
+    public static String learnerAssignmentStatus(String assignmentStatus, String latestAttemptStatus) {
+        String attemptStatus = blankToNull(latestAttemptStatus);
+        if (attemptStatus != null) {
+            return attemptStatus;
+        }
+        String status = blankToNull(assignmentStatus);
+        return status == null ? "assigned" : status;
+    }
+
     public static String gradedAttemptState() {
         return "graded";
     }
@@ -98,6 +120,10 @@ public final class LmsStatePolicy {
         if (raw == null) return "";
         String normalized = raw.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
         return "over_due".equals(normalized) ? "overdue" : normalized;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static String normalize(String raw, Set<String> allowed, String aggregate) {
