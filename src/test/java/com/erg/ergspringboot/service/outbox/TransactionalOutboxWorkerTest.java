@@ -2,7 +2,11 @@ package com.erg.ergspringboot.service.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.model.outbox.OutboxEvent;
@@ -53,7 +57,8 @@ class TransactionalOutboxWorkerTest {
     void transientProviderFailureMovesEventToRetryWithLeaseCleared() {
         OutboxEvent event = event();
         when(repository.findDueForUpdate(any(), any(Integer.class))).thenReturn(List.of(event));
-        when(repository.findById("event-1")).thenReturn(Optional.of(event));
+        when(repository.renewLease(eq("event-1"), eq(TransactionalOutboxWorker.WORKER_ID), any())).thenReturn(1);
+        when(repository.findLeasedForUpdate("event-1", TransactionalOutboxWorker.WORKER_ID)).thenReturn(Optional.of(event));
         doThrow(new IllegalStateException("smtp timeout"))
                 .when(smtp).sendTeacherInvite("teacher@example.com", "Teacher", "secret");
         TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
@@ -65,6 +70,37 @@ class TransactionalOutboxWorkerTest {
         assertThat(event.getAttempts()).isEqualTo(1);
         assertThat(event.getLeaseUntil()).isNull();
         assertThat(event.getLastError()).contains("smtp timeout");
+    }
+
+    @Test
+    void claimStampsPerInstanceOwnerAndSkipsRowsWhoseLeaseWasReclaimed() {
+        OutboxEvent event = event();
+        when(repository.findDueForUpdate(any(), any(Integer.class))).thenReturn(List.of(event));
+        when(repository.renewLease(eq("event-1"), eq(TransactionalOutboxWorker.WORKER_ID), any())).thenReturn(0);
+        TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
+                repository, smtp, new OutboxPayloadCipher("test-key"), new ImmediateTransactionManager());
+
+        worker.runDueBatch();
+
+        assertThat(TransactionalOutboxWorker.WORKER_ID).isNotBlank().contains(":").hasSizeLessThanOrEqualTo(96);
+        verify(repository).markLockedBy(List.of("event-1"), TransactionalOutboxWorker.WORKER_ID);
+        verifyNoInteractions(smtp);
+        verify(repository, never()).findLeasedForUpdate(any(), any());
+    }
+
+    @Test
+    void resultIsNotRecordedAfterLosingTheLease() {
+        OutboxEvent event = event();
+        when(repository.findDueForUpdate(any(), any(Integer.class))).thenReturn(List.of(event));
+        when(repository.renewLease(eq("event-1"), eq(TransactionalOutboxWorker.WORKER_ID), any())).thenReturn(1);
+        when(repository.findLeasedForUpdate("event-1", TransactionalOutboxWorker.WORKER_ID)).thenReturn(Optional.empty());
+        TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
+                repository, smtp, new OutboxPayloadCipher("test-key"), new ImmediateTransactionManager());
+
+        worker.runDueBatch();
+
+        assertThat(event.getAttempts()).isZero();
+        verify(repository, never()).save(any());
     }
 
     private OutboxEvent event() {
