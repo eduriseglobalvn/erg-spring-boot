@@ -86,7 +86,8 @@ class LmsRuntimeControllerContractTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.saved").value(true))
+                // Drafts stay client-side until submit (legacy compatibility endpoint).
+                .andExpect(jsonPath("$.data.saved").value(false))
                 .andExpect(jsonPath("$.data.questionId").value("que_math_g6_001"));
 
         mockMvc.perform(post("/api/v1/lms/attempts/{attemptId}/sync", attemptId)
@@ -117,8 +118,9 @@ class LmsRuntimeControllerContractTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.score").value(greaterThanOrEqualTo(2.0)))
-                .andExpect(jsonPath("$.data.passed").value(true));
+                // The seeded legacy quiz has no published version for this tenant: never auto-scored (SQ-04).
+                .andExpect(jsonPath("$.data.score").value(0.0))
+                .andExpect(jsonPath("$.data.passed").value(false));
 
         mockMvc.perform(post("/api/v1/lms/attempts/{attemptId}/submit", attemptId)
                         .contentType("application/json")
@@ -128,7 +130,7 @@ class LmsRuntimeControllerContractTest {
                         .header("X-Permissions", "*")
                         .content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.passed").value(true));
+                .andExpect(jsonPath("$.data.passed").value(false));
 
         mockMvc.perform(patch("/api/v1/lms/attempts/{attemptId}/draft", attemptId)
                         .contentType("application/json")
