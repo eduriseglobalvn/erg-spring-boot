@@ -13,7 +13,9 @@ import java.util.Map;
  * Each method accepts the relevant domain event parameters, builds a
  * {@link NotificationCommand}, and delegates to
  * {@link NotificationCommandService#enqueue(NotificationCommand)}.
- * Failures are logged as warnings and never propagated.
+ * Event-driven methods ({@code assignmentCreated}, {@code attemptSubmitted}, {@code supportNeededLowScore})
+ * take the module event id as idempotency key and let failures propagate so the event is redelivered;
+ * the scheduled-job placeholders log failures and never propagate.
  *
  * Event types map to §9 Event Catalog V1:
  * <ul>
@@ -24,10 +26,9 @@ import java.util.Map;
  *   <li>{@code SUPPORT_NEEDED_LOW_SCORE}</li>
  * </ul>
  *
- * <p><b>Not wired yet (C10/SQ-16):</b> no production caller invokes this publisher; LMS
- * command services must publish AFTER_COMMIT domain events that a notifications listener
- * maps onto these methods. Teaching-schedule notifications are delivered by
- * {@code CalendarBatchPublishedConsumer} as {@code SCHEDULE_PUBLISHED}.</p>
+ * <p>{@code LmsLearningEventConsumer} maps {@code LmsAssignmentCreated} and {@code LmsAttemptSubmitted}
+ * onto these methods; the due-soon/overdue jobs are not built yet. Teaching-schedule notifications are
+ * delivered by {@code CalendarBatchPublishedConsumer} as {@code SCHEDULE_PUBLISHED}.</p>
  */
 @Service
 public class LmsNotificationEventPublisher {
@@ -55,6 +56,7 @@ public class LmsNotificationEventPublisher {
      * @param createdBy       user ID of the creator
      */
     public void assignmentCreated(
+            String idempotencyKey,
             String tenantId,
             String assignmentId,
             String assignmentTitle,
@@ -65,34 +67,29 @@ public class LmsNotificationEventPublisher {
         if (studentUserIds == null || studentUserIds.isEmpty()) {
             return;
         }
-        try {
-            String title = "Bai tap moi: " + safeLabel(assignmentTitle);
-            String bodyPreview = "Co bai tap moi duoc tao trong lop. Vui long kiem tra va hoan thanh dung han.";
+        String title = "Bai tap moi: " + safeLabel(assignmentTitle);
+        String bodyPreview = "Co bai tap moi duoc tao trong lop. Vui long kiem tra va hoan thanh dung han.";
 
-            NotificationCommand command = new NotificationCommand(
-                    tenantId,
-                    createdBy,
-                    null,                           // idempotencyKey
-                    "ASSIGNMENT_CREATED",
-                    "assignment",
-                    assignmentId,
-                    title,
-                    bodyPreview,
-                    null,                           // actionUrl
-                    "normal",
-                    "lms",
-                    studentUserIds,
-                    null,                           // topicName
-                    Map.of("assignmentId", assignmentId, "classId", classId)
-            );
+        NotificationCommand command = new NotificationCommand(
+                tenantId,
+                createdBy,
+                idempotencyKey,
+                "ASSIGNMENT_CREATED",
+                "assignment",
+                assignmentId,
+                title,
+                bodyPreview,
+                null,                           // actionUrl
+                "normal",
+                "lms",
+                studentUserIds,
+                null,                           // topicName
+                Map.of("assignmentId", assignmentId, "classId", classId)
+        );
 
-            notificationCommandService.enqueue(command);
-            log.info("ASSIGNMENT_CREATED notification enqueued for assignment {} targeting {} students",
-                    assignmentId, studentUserIds.size());
-        } catch (Exception e) {
-            log.warn("Failed to emit ASSIGNMENT_CREATED notification for assignment {}: {}",
-                    assignmentId, e.getMessage());
-        }
+        notificationCommandService.enqueue(command);
+        log.info("ASSIGNMENT_CREATED notification enqueued for assignment {} targeting {} students",
+                assignmentId, studentUserIds.size());
     }
 
     // -------------------------------------------------------------------------
@@ -221,6 +218,7 @@ public class LmsNotificationEventPublisher {
      * @param teacherUserIds  user IDs of the teachers to notify
      */
     public void attemptSubmitted(
+            String idempotencyKey,
             String tenantId,
             String assignmentId,
             String assignmentTitle,
@@ -232,39 +230,34 @@ public class LmsNotificationEventPublisher {
         if (teacherUserIds == null || teacherUserIds.isEmpty()) {
             return;
         }
-        try {
-            String title = "Bai lam da duoc nop: " + safeLabel(assignmentTitle);
-            String bodyPreview = "Hoc sinh " + safeLabel(studentName)
-                    + " da nop bai cho \"" + safeLabel(assignmentTitle) + "\".";
+        String title = "Bai lam da duoc nop: " + safeLabel(assignmentTitle);
+        String bodyPreview = "Hoc sinh " + safeLabel(studentName)
+                + " da nop bai cho \"" + safeLabel(assignmentTitle) + "\".";
 
-            NotificationCommand command = new NotificationCommand(
-                    tenantId,
-                    studentId,
-                    null,                           // idempotencyKey
-                    "ATTEMPT_SUBMITTED",
-                    "attempt",
-                    attemptId,
-                    title,
-                    bodyPreview,
-                    null,                           // actionUrl
-                    "normal",
-                    "lms",
-                    teacherUserIds,
-                    null,                           // topicName
-                    Map.of(
-                            "assignmentId", assignmentId,
-                            "attemptId", attemptId,
-                            "studentId", studentId
-                    )
-            );
+        NotificationCommand command = new NotificationCommand(
+                tenantId,
+                studentId,
+                idempotencyKey,
+                "ATTEMPT_SUBMITTED",
+                "attempt",
+                attemptId,
+                title,
+                bodyPreview,
+                null,                           // actionUrl
+                "normal",
+                "lms",
+                teacherUserIds,
+                null,                           // topicName
+                Map.of(
+                        "assignmentId", assignmentId,
+                        "attemptId", attemptId,
+                        "studentId", studentId
+                )
+        );
 
-            notificationCommandService.enqueue(command);
-            log.info("ATTEMPT_SUBMITTED notification enqueued for attempt {} from student {}",
-                    attemptId, studentId);
-        } catch (Exception e) {
-            log.warn("Failed to emit ATTEMPT_SUBMITTED notification for attempt {}: {}",
-                    attemptId, e.getMessage());
-        }
+        notificationCommandService.enqueue(command);
+        log.info("ATTEMPT_SUBMITTED notification enqueued for attempt {} from student {}",
+                attemptId, studentId);
     }
 
     // -------------------------------------------------------------------------
@@ -286,6 +279,7 @@ public class LmsNotificationEventPublisher {
      * @param recipientUserIds user IDs of teachers / support staff to notify
      */
     public void supportNeededLowScore(
+            String idempotencyKey,
             String tenantId,
             String assignmentId,
             String assignmentTitle,
@@ -299,42 +293,37 @@ public class LmsNotificationEventPublisher {
         if (recipientUserIds == null || recipientUserIds.isEmpty()) {
             return;
         }
-        try {
-            String title = "Can ho tro: " + safeLabel(studentName) + " - " + safeLabel(assignmentTitle);
-            String bodyPreview = "Hoc sinh " + safeLabel(studentName)
-                    + " dat diem thap (" + formatScore(score) + "/" + formatScore(maxScore)
-                    + ") cho bai tap \"" + safeLabel(assignmentTitle) + "\". Vui long xem xet ho tro.";
+        String title = "Can ho tro: " + safeLabel(studentName) + " - " + safeLabel(assignmentTitle);
+        String bodyPreview = "Hoc sinh " + safeLabel(studentName)
+                + " dat diem thap (" + formatScore(score) + "/" + formatScore(maxScore)
+                + ") cho bai tap \"" + safeLabel(assignmentTitle) + "\". Vui long xem xet ho tro.";
 
-            NotificationCommand command = new NotificationCommand(
-                    tenantId,
-                    studentId,
-                    null,                           // idempotencyKey
-                    "SUPPORT_NEEDED_LOW_SCORE",
-                    "attempt",
-                    attemptId,
-                    title,
-                    bodyPreview,
-                    null,                           // actionUrl
-                    "high",
-                    "lms",
-                    recipientUserIds,
-                    null,                           // topicName
-                    Map.of(
-                            "assignmentId", assignmentId,
-                            "attemptId", attemptId,
-                            "studentId", studentId,
-                            "score", String.valueOf(score),
-                            "maxScore", String.valueOf(maxScore)
-                    )
-            );
+        NotificationCommand command = new NotificationCommand(
+                tenantId,
+                studentId,
+                idempotencyKey,
+                "SUPPORT_NEEDED_LOW_SCORE",
+                "attempt",
+                attemptId,
+                title,
+                bodyPreview,
+                null,                           // actionUrl
+                "high",
+                "lms",
+                recipientUserIds,
+                null,                           // topicName
+                Map.of(
+                        "assignmentId", assignmentId,
+                        "attemptId", attemptId,
+                        "studentId", studentId,
+                        "score", String.valueOf(score),
+                        "maxScore", String.valueOf(maxScore)
+                )
+        );
 
-            notificationCommandService.enqueue(command);
-            log.info("SUPPORT_NEEDED_LOW_SCORE notification enqueued for attempt {} student {} score {}/{}",
-                    attemptId, studentId, formatScore(score), formatScore(maxScore));
-        } catch (Exception e) {
-            log.warn("Failed to emit SUPPORT_NEEDED_LOW_SCORE notification for attempt {}: {}",
-                    attemptId, e.getMessage());
-        }
+        notificationCommandService.enqueue(command);
+        log.info("SUPPORT_NEEDED_LOW_SCORE notification enqueued for attempt {} student {} score {}/{}",
+                attemptId, studentId, formatScore(score), formatScore(maxScore));
     }
 
     // -------------------------------------------------------------------------

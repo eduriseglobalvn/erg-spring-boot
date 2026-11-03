@@ -29,11 +29,11 @@ public class UserActivity {
     @Column(name = "id", length = 36, nullable = false, updatable = false)
     private String id;
 
-    @Column(name = "user_id", length = 36, nullable = false)
+    @Column(name = "user_id", length = 36)
     private String userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false, insertable = false, updatable = false)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", insertable = false, updatable = false)
     private User user;
 
     @Column(name = "tenant_id", nullable = false)

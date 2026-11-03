@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Notifications",
-        allowedDependencies = {"calendar"})
+        allowedDependencies = {"calendar", "lms"})
 package com.erg.ergspringboot.notifications;

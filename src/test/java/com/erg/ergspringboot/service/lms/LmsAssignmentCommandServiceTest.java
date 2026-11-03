@@ -76,7 +76,7 @@ class LmsAssignmentCommandServiceTest {
                 assignmentRepository, resourceRepository, recipientRepository,
                 studentGroupRepository, studentGroupMemberRepository, studentRepository, quizVersionRepository,
                 new com.erg.ergspringboot.lms.LmsReadCacheInvalidator(cacheManager, (com.erg.ergspringboot.platform.cache.CacheInvalidationService) null),
-                policy, (com.erg.ergspringboot.platform.sync.LmsSyncOperationService) null);
+                policy, (com.erg.ergspringboot.platform.sync.LmsSyncOperationService) null, event -> { });
         when(classrooms.findByTenantIdAndId(eq("tenant-a"), anyString())).thenAnswer(invocation -> {
             com.erg.ergspringboot.model.lms.Classroom classroom = new com.erg.ergspringboot.model.lms.Classroom();
             classroom.setId(invocation.getArgument(1));

@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.exception.*;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy.AssignedQuiz;
+import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.model.lms.*;
@@ -23,6 +24,7 @@ import java.util.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -46,15 +48,16 @@ public class LmsAttemptUseCase {
     private final Clock clock;
     private final Duration submitGrace;
     private final LmsSyncOperationService sync;
+    private final ApplicationEventPublisher publisher;
 
     @Autowired
     public LmsAttemptUseCase(LmsAssignmentAccessPolicy policy, LmsQuizService quizzes, LmsAttemptService attempts,
             LmsStudentService students, QuizRuntimePackageService packages, QuizAttemptGradingService grading,
             AttemptEventRecorder events, LmsReadCacheInvalidator caches, ObjectProvider<MeterRegistry> meterRegistry,
-            ObjectProvider<LmsSyncOperationService> sync,
+            ObjectProvider<LmsSyncOperationService> sync, ApplicationEventPublisher publisher,
             @Value("${erg.lms.attempt.submit-grace-seconds:90}") long submitGraceSeconds) {
         this(policy, quizzes, attempts, students, packages, grading, events, caches,
-                meterRegistry.getIfAvailable(), sync.getIfAvailable(), Clock.systemUTC(),
+                meterRegistry.getIfAvailable(), sync.getIfAvailable(), publisher, Clock.systemUTC(),
                 Duration.ofSeconds(Math.max(0, submitGraceSeconds)));
     }
 
@@ -62,11 +65,12 @@ public class LmsAttemptUseCase {
     public LmsAttemptUseCase(LmsAssignmentAccessPolicy policy, LmsQuizService quizzes, LmsAttemptService attempts,
             LmsStudentService students, QuizRuntimePackageService packages, QuizAttemptGradingService grading,
             AttemptEventRecorder events, LmsReadCacheInvalidator caches, MeterRegistry meterRegistry,
-            LmsSyncOperationService sync, Clock clock, Duration submitGrace) {
+            LmsSyncOperationService sync, ApplicationEventPublisher publisher, Clock clock, Duration submitGrace) {
         this.policy = policy; this.quizzes = quizzes; this.attempts = attempts; this.students = students;
         this.packages = packages; this.grading = grading; this.events = events; this.caches = caches;
         this.meterRegistry = meterRegistry;
         this.sync = sync;
+        this.publisher = publisher;
         this.clock = clock == null ? Clock.systemUTC() : clock;
         this.submitGrace = submitGrace == null ? Duration.ZERO : submitGrace;
     }
@@ -201,6 +205,9 @@ public class LmsAttemptUseCase {
         if (request != null) events.recordClientBatch(saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.clientEvents());
         projectAfterCommit(saved, owned.assignment(), tenant);
         caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        publisher.publishEvent(new LmsAttemptSubmitted("attempt-submitted:" + saved.getId(), tenant, saved.getId(),
+                saved.getAssignmentId(), saved.getStudentId(), saved.getStatus(), score.score(), score.max(), score.passed(),
+                submitted));
         if (sample != null) sample.stop(meterRegistry.timer("erg.lms.attempt.submit", "result", score.passed() ? "passed" : "failed"));
         AttemptSubmitResponse result = new AttemptSubmitResponse(score.score(), score.max(), score.percent(), score.passed());
         complete(receipt, result, version(saved));

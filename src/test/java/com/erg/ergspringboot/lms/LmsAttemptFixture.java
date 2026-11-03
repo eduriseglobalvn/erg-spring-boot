@@ -59,6 +59,6 @@ public final class LmsAttemptFixture {
 
     public LmsAttemptUseCase useCase(Clock clock, Duration grace, LmsSyncOperationService sync) {
         return new LmsAttemptUseCase(policy, quizzes, attempts, students, packages, grading, events,
-                new LmsReadCacheInvalidator(caches, (CacheInvalidationService) null), null, sync, clock, grace);
+                new LmsReadCacheInvalidator(caches, (CacheInvalidationService) null), null, sync, event -> { }, clock, grace);
     }
 }

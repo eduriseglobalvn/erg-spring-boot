@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.service.notifications;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -40,7 +41,7 @@ class LmsNotificationEventPublisherTest {
     @Test
     void assignmentCreated_enqueuesCommandWithCorrectArgs() {
         List<String> studentUserIds = List.of("stu-1", "stu-2");
-        publisher.assignmentCreated(TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, CLASS_ID, studentUserIds, CREATED_BY);
+        publisher.assignmentCreated("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, CLASS_ID, studentUserIds, CREATED_BY);
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();
         assertThat(cmd.tenantId()).isEqualTo(TENANT_ID);
@@ -50,6 +51,7 @@ class LmsNotificationEventPublisherTest {
         assertThat(cmd.priority()).isEqualTo("normal");
         assertThat(cmd.portal()).isEqualTo("lms");
         assertThat(cmd.createdBy()).isEqualTo(CREATED_BY);
+        assertThat(cmd.idempotencyKey()).isEqualTo("evt-1");
         assertThat(cmd.userIds()).isEqualTo(studentUserIds);
         assertThat(cmd.title()).contains("Bai tap moi");
         assertThat(cmd.data()).containsKeys("assignmentId", "classId");
@@ -57,15 +59,15 @@ class LmsNotificationEventPublisherTest {
 
     @Test
     void assignmentCreated_doesNotEnqueueWhenStudentIdsIsEmpty() {
-        publisher.assignmentCreated(TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, CLASS_ID, List.of(), CREATED_BY);
+        publisher.assignmentCreated("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, CLASS_ID, List.of(), CREATED_BY);
         verify(notificationCommandService, never()).enqueue(any());
     }
 
     @Test
-    void assignmentCreated_catchesException() {
+    void assignmentCreated_propagatesFailureSoTheModuleEventIsRedelivered() {
         doThrow(new RuntimeException("simulated failure")).when(notificationCommandService).enqueue(any());
-        publisher.assignmentCreated(TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, CLASS_ID, List.of("stu-1"), CREATED_BY);
-        verify(notificationCommandService).enqueue(any());
+        assertThatThrownBy(() -> publisher.assignmentCreated("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE,
+                CLASS_ID, List.of("stu-1"), CREATED_BY)).hasMessage("simulated failure");
     }
 
     @Test
@@ -91,7 +93,7 @@ class LmsNotificationEventPublisherTest {
 
     @Test
     void attemptSubmitted_enqueuesCommandWithCorrectArgs() {
-        publisher.attemptSubmitted(TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, ATTEMPT_ID,
+        publisher.attemptSubmitted("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, ATTEMPT_ID,
                 STUDENT_ID, STUDENT_NAME, List.of("teacher-1"));
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();
@@ -104,7 +106,7 @@ class LmsNotificationEventPublisherTest {
 
     @Test
     void supportNeededLowScore_enqueuesCommandWithCorrectArgs() {
-        publisher.supportNeededLowScore(TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, ATTEMPT_ID,
+        publisher.supportNeededLowScore("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, ATTEMPT_ID,
                 STUDENT_ID, STUDENT_NAME, 30.0, 100.0, List.of("teacher-1"));
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();

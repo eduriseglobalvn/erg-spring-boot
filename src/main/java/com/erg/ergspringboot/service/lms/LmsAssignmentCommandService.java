@@ -10,6 +10,7 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGro
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
+import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
@@ -43,6 +44,7 @@ import java.util.Set;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +76,7 @@ public class LmsAssignmentCommandService {
     private final LmsReadCacheInvalidator caches;
     private final LmsAssignmentAccessPolicy policy;
     private final LmsSyncOperationService sync;
+    private final ApplicationEventPublisher events;
 
     @Autowired
     public LmsAssignmentCommandService(
@@ -86,11 +89,12 @@ public class LmsAssignmentCommandService {
             QuizVersionRepository quizVersionRepository,
             LmsReadCacheInvalidator caches,
             LmsAssignmentAccessPolicy policy,
-            ObjectProvider<LmsSyncOperationService> sync
+            ObjectProvider<LmsSyncOperationService> sync,
+            ApplicationEventPublisher events
     ) {
         this(assignmentRepository, resourceRepository, recipientRepository, studentGroupRepository,
                 studentGroupMemberRepository, studentRepository, quizVersionRepository, caches, policy,
-                sync == null ? null : sync.getIfAvailable());
+                sync == null ? null : sync.getIfAvailable(), events);
     }
 
     /** Explicit wiring; {@code sync} is optional (null disables durable idempotency receipts). */
@@ -104,7 +108,8 @@ public class LmsAssignmentCommandService {
             QuizVersionRepository quizVersionRepository,
             LmsReadCacheInvalidator caches,
             LmsAssignmentAccessPolicy policy,
-            LmsSyncOperationService sync
+            LmsSyncOperationService sync,
+            ApplicationEventPublisher events
     ) {
         this.assignmentRepository = assignmentRepository;
         this.resourceRepository = resourceRepository;
@@ -116,6 +121,7 @@ public class LmsAssignmentCommandService {
         this.caches = caches;
         this.policy = policy;
         this.sync = sync;
+        this.events = events;
     }
 
     public CreateAssignmentResponse create(UserAccessContext access, String idempotencyKey, CreateAssignmentRequest request) {
@@ -169,6 +175,8 @@ public class LmsAssignmentCommandService {
         List<AssignmentResource> resources = persistResources(tenantId, saved.getId(), request.quizIds());
         persistRecipients(tenantId, saved.getId(), primaryClassId, mode, recipients);
         caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+        events.publishEvent(new LmsAssignmentCreated("assignment-created:" + saved.getId(), tenantId, saved.getId(),
+                userId, OffsetDateTime.now(ZoneOffset.UTC)));
 
         CreateAssignmentResponse result = new CreateAssignmentResponse(saved.getId(), recipients.size(), toResourceResponses(resources));
         if (receipt != null) sync.complete(receipt, result, saved.getRecordVersion() == null ? 0L : saved.getRecordVersion());
