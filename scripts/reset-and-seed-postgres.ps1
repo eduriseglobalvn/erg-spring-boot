@@ -3,10 +3,13 @@ param(
     [string]$Confirmation = $env:CONFIRM_RESET_POSTGRES_DB,
     [string]$FlywayVersion = "11.14.1",
     [switch]$SkipSeed,
-    [switch]$SkipVerify
+    [switch]$SkipVerify,
+    # Exact host name of a non-local target that is approved for reset. Local hosts need nothing.
+    [string]$AllowRemoteHost
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "postgres-target-guard.ps1")
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
@@ -83,8 +86,14 @@ if ($Confirmation -ne "I_UNDERSTAND_THIS_DELETES_DATA") {
 Import-DotEnvFile -Path $EnvFile
 
 $databaseUrl = Require-Env "SPRING_DATASOURCE_URL"
-$databaseUser = Require-Env "SPRING_DATASOURCE_USERNAME"
-$databasePassword = [Environment]::GetEnvironmentVariable("SPRING_DATASOURCE_PASSWORD", "Process")
+Assert-LocalPostgresTarget -DatabaseUrl $databaseUrl -AllowRemoteHost $AllowRemoteHost | Out-Null
+# Clean/migrate need the schema owner; the runtime role (SPRING_DATASOURCE_USERNAME) cannot drop tables.
+$databaseUser = [Environment]::GetEnvironmentVariable("SPRING_FLYWAY_USER", "Process")
+$databasePassword = [Environment]::GetEnvironmentVariable("SPRING_FLYWAY_PASSWORD", "Process")
+if ([string]::IsNullOrWhiteSpace($databaseUser)) {
+    $databaseUser = Require-Env "SPRING_DATASOURCE_USERNAME"
+    $databasePassword = [Environment]::GetEnvironmentVariable("SPRING_DATASOURCE_PASSWORD", "Process")
+}
 
 Write-Host "Target PostgreSQL schema: $(Describe-JdbcTarget $databaseUrl) / schema public"
 Write-Host "Step 1/4: Flyway clean will drop every object in schema public."
@@ -112,6 +121,8 @@ Invoke-Maven @(
     "-Dflyway.schemas=public",
     "-Dflyway.baselineOnMigrate=true",
     "-Dflyway.baselineVersion=0",
+    # V114 uses CREATE INDEX CONCURRENTLY; Flyway's transactional lock would deadlock on it.
+    "-Dflyway.postgresql.transactional.lock=false",
     "-Dflyway.table=flyway_schema_history"
 )
 

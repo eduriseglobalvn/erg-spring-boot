@@ -3,10 +3,13 @@ param(
     [string]$DatabaseUrl = $env:SPRING_DATASOURCE_URL,
     [string]$Username = $env:SPRING_DATASOURCE_USERNAME,
     [string]$Password = $env:SPRING_DATASOURCE_PASSWORD,
-    [string]$Confirmation = $env:CONFIRM_RESET_POSTGRES_DB
+    [string]$Confirmation = $env:CONFIRM_RESET_POSTGRES_DB,
+    # Exact host name of a non-local target that is approved for reset. Local hosts need nothing.
+    [string]$AllowRemoteHost
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "postgres-target-guard.ps1")
 
 if ($Confirmation -ne "I_UNDERSTAND_THIS_DELETES_DATA") {
     throw "Refusing to reset PostgreSQL DB. Set CONFIRM_RESET_POSTGRES_DB=I_UNDERSTAND_THIS_DELETES_DATA."
@@ -15,6 +18,8 @@ if ($Confirmation -ne "I_UNDERSTAND_THIS_DELETES_DATA") {
 if ([string]::IsNullOrWhiteSpace($DatabaseUrl)) {
     throw "SPRING_DATASOURCE_URL is required."
 }
+
+Assert-LocalPostgresTarget -DatabaseUrl $DatabaseUrl -AllowRemoteHost $AllowRemoteHost | Out-Null
 
 if (-not (Get-Command pg_dump -ErrorAction SilentlyContinue)) {
     throw "pg_dump was not found on PATH."

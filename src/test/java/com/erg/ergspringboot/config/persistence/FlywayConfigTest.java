@@ -51,6 +51,19 @@ class FlywayConfigTest {
     }
 
     @Test
+    void productionNeverBaselinesUnlessExplicitlyAllowed() {
+        MockEnvironment production = new MockEnvironment()
+                .withProperty("spring.flyway.baseline-on-migrate", "true");
+        production.setActiveProfiles("prod");
+        assertThat(FlywayConfig.baselineOnMigrate(production)).isFalse();
+
+        production.setProperty(FlywayConfig.PROD_BASELINE_OVERRIDE, "true");
+        assertThat(FlywayConfig.baselineOnMigrate(production)).isTrue();
+
+        assertThat(FlywayConfig.baselineOnMigrate(new MockEnvironment())).isTrue();
+    }
+
+    @Test
     void flywayCanUseMigrationOwnerCredentialsSeparateFromRuntimeDatasource() throws Exception {
         Method method = FlywayConfig.class.getDeclaredMethod(
                 "migrationDataSource",

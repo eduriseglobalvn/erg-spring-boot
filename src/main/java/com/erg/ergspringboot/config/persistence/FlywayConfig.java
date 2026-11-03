@@ -3,6 +3,7 @@ package com.erg.ergspringboot.config.persistence;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Map;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties;
@@ -30,10 +31,38 @@ public class FlywayConfig {
         return Flyway.configure()
                 .dataSource(migrationDataSource(properties, environment))
                 .locations(resolveMigrationLocation(environment))
-                .baselineOnMigrate(true)
+                .baselineOnMigrate(baselineOnMigrate(environment))
                 .baselineVersion("0")
                 .table("flyway_schema_history")
+                .configuration(SESSION_LEVEL_LOCK)
                 .load();
+    }
+
+    /**
+     * Flyway's default PostgreSQL lock is a transaction-level advisory lock held in an open
+     * transaction, which makes {@code CREATE INDEX CONCURRENTLY} migrations (V114) wait on Flyway
+     * itself forever. A session-level lock keeps migrations serialized without that self-deadlock.
+     * Every Flyway runner (app, upgrade test, reset script) must use it.
+     */
+    static final Map<String, String> SESSION_LEVEL_LOCK = Map.of("flyway.postgresql.transactional.lock", "false");
+
+    /** One-time legacy onboarding switch for prod (env {@code ERG_FLYWAY_ALLOW_BASELINE_ON_MIGRATE=true}). */
+    static final String PROD_BASELINE_OVERRIDE = "erg.flyway.allow-baseline-on-migrate";
+
+    /**
+     * Baselining a non-empty schema that has no {@code flyway_schema_history} (wrong database,
+     * data-only restore) would replay V1..Vn, including destructive cleanup migrations, over real
+     * data. Prod therefore never baselines unless an operator opts in explicitly for one run.
+     */
+    static boolean baselineOnMigrate(Environment environment) {
+        if (!isProduction(environment)) {
+            return true;
+        }
+        return environment.getProperty(PROD_BASELINE_OVERRIDE, Boolean.class, false);
+    }
+
+    private static boolean isProduction(Environment environment) {
+        return Arrays.asList(environment.getActiveProfiles()).contains("prod");
     }
 
     private DataSource migrationDataSource(DataSourceProperties properties, Environment environment) {
@@ -57,7 +86,7 @@ public class FlywayConfig {
     }
 
     private String resolveMigrationLocation(Environment environment) {
-        boolean productionProfile = Arrays.asList(environment.getActiveProfiles()).contains("prod");
+        boolean productionProfile = isProduction(environment);
         if (!productionProfile && Files.isDirectory(SOURCE_MIGRATION_LOCATION)) {
             return "filesystem:" + SOURCE_MIGRATION_LOCATION
                     .toAbsolutePath()
