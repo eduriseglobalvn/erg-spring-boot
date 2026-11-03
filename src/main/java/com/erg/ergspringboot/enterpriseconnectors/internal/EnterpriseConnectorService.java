@@ -44,8 +44,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -64,6 +69,10 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
     private static final String DEPROVISION = "DEPROVISION";
     private static final String PREVIEW = "PREVIEW";
     private static final String SUCCEEDED = "SUCCEEDED";
+    /** Claimed run whose provider call is in flight (V135); replays of the same key return it. */
+    private static final String RUNNING = "RUNNING";
+    private static final String FAILED = "FAILED";
+    private static final String RETRYABLE_FAILED = "RETRYABLE_FAILED";
     private static final int MAX_RETRIES = 3;
     private static final int MAX_SAMPLE_IDS = 20;
 
@@ -73,6 +82,7 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
     private final EnterpriseConnectorProviderRegistry registry;
     private final ApplicationEventPublisher events;
     private final AuditOperations audit;
+    private final TransactionTemplate transaction;
 
     @Autowired
     public EnterpriseConnectorService(
@@ -81,13 +91,15 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
             EnterpriseConnectorCommandReceiptRepository receipts,
             EnterpriseConnectorProviderRegistry registry,
             ApplicationEventPublisher events,
-            AuditOperations audit) {
+            AuditOperations audit,
+            @Qualifier("postgresTransactionManager") PlatformTransactionManager transactionManager) {
         this.connectors = connectors;
         this.runs = runs;
         this.receipts = receipts;
         this.registry = registry;
         this.events = events;
         this.audit = audit;
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
     @Override
@@ -153,138 +165,216 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         return connectorResponse(findConnector(tenant, required(connectorId, "connectorId", 96)));
     }
 
+    /*
+     * Provider-backed commands follow claim -> call -> record (SQ-08/C2): a short transaction
+     * replays or claims a RUNNING run plus its idempotency receipt, the provider is called with
+     * no database transaction or connection held, and a second short transaction records the
+     * outcome. Replays of a key whose provider call is still in flight return the RUNNING run.
+     */
+
     @Override
-    @Transactional("postgresTransactionManager")
     public SyncPreviewResponse dryRun(UserAccessContext access, String connectorId, RunRequest request,
                                       String idempotencyKey, String correlationId) {
         String tenant = tenant(access);
         ensureSync();
         RunRequest safe = Objects.requireNonNull(request, "request");
-        EnterpriseConnector connector = findConnector(tenant, required(connectorId, "connectorId", 96));
-        assertVersion(connector, safe.expectedVersion());
-        EnterpriseConnectorProviderPort provider = provider(connector);
+        String connectorRef = required(connectorId, "connectorId", 96);
         String key = key(idempotencyKey);
-        String hash = EnterpriseConnectorPolicy.sha256("DRY_RUN\u001f" + connector.getId() + "\u001f"
+        String hash = EnterpriseConnectorPolicy.sha256("DRY_RUN\u001f" + connectorRef + "\u001f"
                 + safe.expectedVersion() + "\u001f" + optional(safe.cursor(), 96));
-        EnterpriseConnectorCommandReceipt replay = begin(tenant, DRY_RUN, key, hash);
-        if (replay != null) return previewResponse(findRun(tenant, replay.getAggregateId()));
-        EnterpriseConnectorProviderPort.PreviewResult result = provider.preview(descriptor(connector), safe.cursor());
-        EnterpriseConnectorRun run = newRun(connector, DRY_RUN, PREVIEW, access.userId());
-        run.setProcessed(result.additions() + result.updates() + result.removals());
-        run.setCreatedCount(result.additions());
-        run.setUpdatedCount(result.updates());
-        run.setFailedCount(0);
-        run.setSampleExternalIds(joinSample(result.sampleExternalIds()));
-        EnterpriseConnectorRun saved = runs.saveAndFlush(run);
-        saveReceipt(tenant, DRY_RUN, key, hash, "ENTERPRISE_CONNECTOR_RUN", saved.getId());
-        audit(access, "ENTERPRISE_CONNECTOR_DRY_RUN", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
-                Map.of("connectorId", connector.getId(), "total", run.getProcessed()));
-        return previewResponse(saved);
+        Claim claim = claim(tenant, DRY_RUN, key, hash, () -> {
+            EnterpriseConnector connector = findConnector(tenant, connectorRef);
+            assertVersion(connector, safe.expectedVersion());
+            return new Claim(connector, runs.saveAndFlush(newRun(connector, DRY_RUN, RUNNING, access.userId())), false);
+        });
+        if (claim.replay()) return previewResponse(claim.run());
+        EnterpriseConnectorProviderPort.PreviewResult result;
+        try {
+            result = provider(claim.connector()).preview(descriptor(claim.connector()), safe.cursor());
+        } catch (RuntimeException failure) {
+            return previewResponse(recordProviderFailure(tenant, claim.run().getId()));
+        }
+        return transaction.execute(status -> {
+            EnterpriseConnectorRun run = findRun(tenant, claim.run().getId());
+            run.setStatus(PREVIEW);
+            run.setProcessed(result.additions() + result.updates() + result.removals());
+            run.setCreatedCount(result.additions());
+            run.setUpdatedCount(result.updates());
+            run.setFailedCount(0);
+            run.setSampleExternalIds(joinSample(result.sampleExternalIds()));
+            EnterpriseConnectorRun saved = runs.saveAndFlush(run);
+            audit(access, "ENTERPRISE_CONNECTOR_DRY_RUN", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
+                    Map.of("connectorId", claim.connector().getId(), "total", saved.getProcessed()));
+            return previewResponse(saved);
+        });
     }
 
     @Override
-    @Transactional("postgresTransactionManager")
     public SyncRunResponse sync(UserAccessContext access, String connectorId, RunRequest request,
                                 String idempotencyKey, String correlationId) {
         String tenant = tenant(access);
         ensureSync();
         RunRequest safe = Objects.requireNonNull(request, "request");
-        EnterpriseConnector connector = findConnector(tenant, required(connectorId, "connectorId", 96));
-        assertVersion(connector, safe.expectedVersion());
+        String connectorRef = required(connectorId, "connectorId", 96);
         String key = key(idempotencyKey);
-        String hash = EnterpriseConnectorPolicy.sha256("SYNC\u001f" + connector.getId() + "\u001f"
+        String hash = EnterpriseConnectorPolicy.sha256("SYNC\u001f" + connectorRef + "\u001f"
                 + safe.expectedVersion() + "\u001f" + optional(safe.cursor(), 96));
-        EnterpriseConnectorCommandReceipt replay = begin(tenant, SYNC, key, hash);
-        if (replay != null) return syncResponse(findRun(tenant, replay.getAggregateId()));
-        EnterpriseConnectorProviderPort.SyncResult result = provider(connector).sync(descriptor(connector), safe.cursor());
-        EnterpriseConnectorRun run = newRun(connector, SYNC, result.status(), access.userId());
-        apply(run, result);
-        EnterpriseConnectorRun saved = runs.saveAndFlush(run);
-        saveReceipt(tenant, SYNC, key, hash, "ENTERPRISE_CONNECTOR_RUN", saved.getId());
-        publishSync(access, connector, saved, correlationId);
-        audit(access, "ENTERPRISE_CONNECTOR_SYNC", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
-                Map.of("connectorId", connector.getId(), "processed", run.getProcessed(), "failed", run.getFailedCount()));
-        return syncResponse(saved);
+        Claim claim = claim(tenant, SYNC, key, hash, () -> {
+            EnterpriseConnector connector = findConnector(tenant, connectorRef);
+            assertVersion(connector, safe.expectedVersion());
+            return new Claim(connector, runs.saveAndFlush(newRun(connector, SYNC, RUNNING, access.userId())), false);
+        });
+        if (claim.replay()) return syncResponse(claim.run());
+        return syncResponse(callAndRecordSync(access, tenant, claim, safe.cursor(), correlationId, key,
+                "ENTERPRISE_CONNECTOR_SYNC"));
     }
 
+    /**
+     * Retries a failed run by creating a new RETRY run linked through {@code parent_run_id}; the
+     * failed run keeps its own counters (N4). The idempotency replay is checked before any state
+     * check, so a lost response is replayed instead of returning 409 (N4). The retry counter is the
+     * parent's count + 1 and never comes from the adapter, so MAX_RETRIES is enforced (C2).
+     */
     @Override
-    @Transactional("postgresTransactionManager")
     public SyncRunResponse retry(UserAccessContext access, String connectorId, String runId, RetryRequest request,
                                  String idempotencyKey, String correlationId) {
         String tenant = tenant(access);
         ensureSync();
         RetryRequest safe = Objects.requireNonNull(request, "request");
-        EnterpriseConnector connector = findConnector(tenant, required(connectorId, "connectorId", 96));
-        EnterpriseConnectorRun run = findRun(tenant, required(runId, "runId", 96));
-        if (!connector.getId().equals(run.getConnectorId())) throw new ResourceNotFoundException("connector run not found");
-        if (!"FAILED".equals(run.getStatus()) && !"RETRYABLE_FAILED".equals(run.getStatus())) {
-            throw new ConflictException("only failed connector runs can be retried");
-        }
-        if ((run.getRetryCount() == null ? 0 : run.getRetryCount()) >= MAX_RETRIES) {
-            throw new ConflictException("connector retry limit reached");
-        }
-        if (safe.expectedVersion() == null || safe.expectedVersion() != version(run)) {
-            throw new ConflictException("connector run changed; reload before retry");
-        }
+        String connectorRef = required(connectorId, "connectorId", 96);
+        String runRef = required(runId, "runId", 96);
         String key = key(idempotencyKey);
-        String hash = EnterpriseConnectorPolicy.sha256("RETRY\u001f" + connector.getId() + "\u001f" + run.getId()
+        String hash = EnterpriseConnectorPolicy.sha256("RETRY\u001f" + connectorRef + "\u001f" + runRef
                 + "\u001f" + safe.expectedVersion());
-        EnterpriseConnectorCommandReceipt replay = begin(tenant, RETRY, key, hash);
-        if (replay != null) return syncResponse(findRun(tenant, replay.getAggregateId()));
-        EnterpriseConnectorProviderPort.SyncResult result = provider(connector).sync(descriptor(connector), null);
-        apply(run, result);
-        run.setMode(RETRY);
-        run.setRetryCount((run.getRetryCount() == null ? 0 : run.getRetryCount()) + 1);
-        EnterpriseConnectorRun saved = runs.saveAndFlush(run);
-        saveReceipt(tenant, RETRY, key, hash, "ENTERPRISE_CONNECTOR_RUN", saved.getId());
-        publishSync(access, connector, saved, correlationId);
-        audit(access, "ENTERPRISE_CONNECTOR_RETRY", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
-                Map.of("connectorId", connector.getId(), "retryCount", saved.getRetryCount()));
-        return syncResponse(saved);
+        Claim claim = claim(tenant, RETRY, key, hash, () -> {
+            EnterpriseConnector connector = findConnector(tenant, connectorRef);
+            EnterpriseConnectorRun parent = findRun(tenant, runRef);
+            if (!connector.getId().equals(parent.getConnectorId())) {
+                throw new ResourceNotFoundException("connector run not found");
+            }
+            if (!FAILED.equals(parent.getStatus()) && !RETRYABLE_FAILED.equals(parent.getStatus())) {
+                throw new ConflictException("only failed connector runs can be retried");
+            }
+            int previous = parent.getRetryCount() == null ? 0 : parent.getRetryCount();
+            if (previous >= MAX_RETRIES) {
+                throw new ConflictException("connector retry limit reached");
+            }
+            if (safe.expectedVersion() == null || safe.expectedVersion() != version(parent)) {
+                throw new ConflictException("connector run changed; reload before retry");
+            }
+            EnterpriseConnectorRun retry = newRun(connector, RETRY, RUNNING, access.userId());
+            retry.setParentRunId(parent.getId());
+            retry.setRetryCount(previous + 1);
+            return new Claim(connector, runs.saveAndFlush(retry), false);
+        });
+        if (claim.replay()) return syncResponse(claim.run());
+        return syncResponse(callAndRecordSync(access, tenant, claim, null, correlationId, key,
+                "ENTERPRISE_CONNECTOR_RETRY"));
     }
 
     @Override
-    @Transactional("postgresTransactionManager")
     public DeprovisionResponse deprovision(UserAccessContext access, String connectorId, DeprovisionRequest request,
                                            String idempotencyKey, String correlationId) {
         String tenant = tenant(access);
         ensureSync();
         DeprovisionRequest safe = Objects.requireNonNull(request, "request");
-        EnterpriseConnector connector = findConnector(tenant, required(connectorId, "connectorId", 96));
-        assertVersion(connector, safe.expectedVersion());
+        String connectorRef = required(connectorId, "connectorId", 96);
         List<String> externalIds = ids(safe.externalIds());
         String reason = required(safe.reason(), "reason", 255);
         String key = key(idempotencyKey);
-        String hash = EnterpriseConnectorPolicy.sha256("DEPROVISION\u001f" + connector.getId() + "\u001f"
+        String hash = EnterpriseConnectorPolicy.sha256("DEPROVISION\u001f" + connectorRef + "\u001f"
                 + safe.expectedVersion() + "\u001f" + String.join("\u001e", externalIds) + "\u001f" + reason);
-        EnterpriseConnectorCommandReceipt replay = begin(tenant, DEPROVISION, key, hash);
-        if (replay != null) return deprovisionResponse(findRun(tenant, replay.getAggregateId()));
-        EnterpriseConnectorProviderPort.DeprovisionResult result = provider(connector)
-                .deprovision(descriptor(connector), externalIds);
-        EnterpriseConnectorRun run = newRun(connector, DEPROVISION, result.status(), access.userId());
-        run.setProcessed(externalIds.size());
-        run.setCreatedCount(result.deprovisioned());
-        run.setUpdatedCount(0);
-        run.setFailedCount(result.skipped());
-        run.setSampleExternalIds(joinSample(externalIds));
-        EnterpriseConnectorRun saved = runs.saveAndFlush(run);
-        saveReceipt(tenant, DEPROVISION, key, hash, "ENTERPRISE_CONNECTOR_RUN", saved.getId());
-        String eventId = IdGenerator.newId();
-        publish(new com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorDeprovisioned(eventId, tenant,
-                connector.getId(), saved.getId(), access.userId(), version(saved), externalIds.size(),
-                result.deprovisioned(), result.skipped(), now(), 1, correlation(correlationId, eventId),
-                correlation(correlationId, eventId)));
-        audit(access, "ENTERPRISE_CONNECTOR_DEPROVISION", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
-                Map.of("connectorId", connector.getId(), "requested", externalIds.size(), "reason", reason));
-        return deprovisionResponse(saved);
+        Claim claim = claim(tenant, DEPROVISION, key, hash, () -> {
+            EnterpriseConnector connector = findConnector(tenant, connectorRef);
+            assertVersion(connector, safe.expectedVersion());
+            return new Claim(connector, runs.saveAndFlush(newRun(connector, DEPROVISION, RUNNING, access.userId())), false);
+        });
+        if (claim.replay()) return deprovisionResponse(claim.run());
+        EnterpriseConnectorProviderPort.DeprovisionResult result;
+        try {
+            result = provider(claim.connector()).deprovision(descriptor(claim.connector()), externalIds);
+        } catch (RuntimeException failure) {
+            return deprovisionResponse(recordProviderFailure(tenant, claim.run().getId()));
+        }
+        return transaction.execute(status -> {
+            EnterpriseConnectorRun run = findRun(tenant, claim.run().getId());
+            run.setStatus(required(result.status(), "status", 32).toUpperCase(Locale.ROOT));
+            run.setProcessed(externalIds.size());
+            run.setCreatedCount(result.deprovisioned());
+            run.setUpdatedCount(0);
+            run.setFailedCount(result.skipped());
+            run.setSampleExternalIds(joinSample(externalIds));
+            EnterpriseConnectorRun saved = runs.saveAndFlush(run);
+            String eventId = IdGenerator.newId();
+            publish(new com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorDeprovisioned(eventId, tenant,
+                    claim.connector().getId(), saved.getId(), access.userId(), version(saved), externalIds.size(),
+                    result.deprovisioned(), result.skipped(), now(), 1, correlation(correlationId, eventId),
+                    correlation(correlationId, eventId)));
+            audit(access, "ENTERPRISE_CONNECTOR_DEPROVISION", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
+                    Map.of("connectorId", claim.connector().getId(), "requested", externalIds.size(), "reason", reason));
+            return deprovisionResponse(saved);
+        });
     }
 
+    private record Claim(EnterpriseConnector connector, EnterpriseConnectorRun run, boolean replay) {
+    }
+
+    /** Short transaction: replay an existing receipt, or create the RUNNING run and its receipt. */
+    private Claim claim(String tenant, String operation, String key, String hash, Supplier<Claim> create) {
+        try {
+            return transaction.execute(status -> {
+                EnterpriseConnectorCommandReceipt replay = begin(tenant, operation, key, hash);
+                if (replay != null) return new Claim(null, findRun(tenant, replay.getAggregateId()), true);
+                Claim created = create.get();
+                saveReceipt(tenant, operation, key, hash, "ENTERPRISE_CONNECTOR_RUN", created.run().getId());
+                return created;
+            });
+        } catch (DataIntegrityViolationException duplicate) {
+            // A concurrent request claimed the same key (receipt) or the same parent run (retry).
+            return transaction.execute(status -> {
+                EnterpriseConnectorCommandReceipt replay = begin(tenant, operation, key, hash);
+                if (replay == null) throw new ConflictException("connector run is already being processed");
+                return new Claim(null, findRun(tenant, replay.getAggregateId()), true);
+            });
+        }
+    }
+
+    private EnterpriseConnectorRun callAndRecordSync(UserAccessContext access, String tenant, Claim claim,
+                                                     String cursor, String correlationId, String key, String action) {
+        EnterpriseConnectorProviderPort.SyncResult result;
+        try {
+            result = provider(claim.connector()).sync(descriptor(claim.connector()), cursor);
+        } catch (RuntimeException failure) {
+            return recordProviderFailure(tenant, claim.run().getId());
+        }
+        return transaction.execute(status -> {
+            EnterpriseConnectorRun run = findRun(tenant, claim.run().getId());
+            apply(run, result);
+            EnterpriseConnectorRun saved = runs.saveAndFlush(run);
+            publishSync(access, claim.connector(), saved, correlationId);
+            audit(access, action, "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
+                    Map.of("connectorId", claim.connector().getId(), "processed", saved.getProcessed(),
+                            "failed", saved.getFailedCount(), "retryCount", saved.getRetryCount()));
+            return saved;
+        });
+    }
+
+    /** A provider exception leaves a retryable failed run instead of a stuck RUNNING row. */
+    private EnterpriseConnectorRun recordProviderFailure(String tenant, String runId) {
+        return transaction.execute(status -> {
+            EnterpriseConnectorRun run = findRun(tenant, runId);
+            run.setStatus(RETRYABLE_FAILED);
+            run.setErrorCode("PROVIDER_ERROR");
+            return runs.saveAndFlush(run);
+        });
+    }
+
+    /** Applies provider counters; the retry counter is owned by this service, never by the adapter (C2). */
     private void apply(EnterpriseConnectorRun run, EnterpriseConnectorProviderPort.SyncResult result) {
         run.setProcessed(Math.max(0, result.processed()));
         run.setCreatedCount(Math.max(0, result.created()));
         run.setUpdatedCount(Math.max(0, result.updated()));
         run.setFailedCount(Math.max(0, result.failed()));
-        run.setRetryCount(Math.max(0, result.retryCount()));
         run.setStatus(required(result.status(), "status", 32).toUpperCase(Locale.ROOT));
         run.setErrorCode(optional(result.errorCode(), 96));
     }
