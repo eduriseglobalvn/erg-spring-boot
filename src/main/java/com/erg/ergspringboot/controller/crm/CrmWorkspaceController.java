@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -37,8 +38,12 @@ public class CrmWorkspaceController {
     }
 
     @GetMapping("/workspace")
-    public ApiResponse<WorkspaceResponse> workspace(HttpServletRequest request) {
-        return ok("CRM workspace loaded", service.workspace(UserAccessContext.from(request)), request);
+    public ApiResponse<WorkspaceResponse> workspace(
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "500") int size,
+            HttpServletRequest request
+    ) {
+        return ok("CRM workspace loaded", service.workspace(UserAccessContext.from(request), page, size), request);
     }
 
     @PatchMapping("/leads/{leadId}/status")

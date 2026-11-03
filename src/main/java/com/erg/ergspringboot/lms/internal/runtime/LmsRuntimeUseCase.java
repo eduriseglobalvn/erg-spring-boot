@@ -41,6 +41,7 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
     @Override public AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access) { return attempts.gradeManualAnswer(attemptId, questionId, request, access); }
     @Override public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) { return students.assignmentProgress(assignmentId, access); }
     @Override public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) { return students.quizStudents(quizId, access); }
+    @Override public com.erg.ergspringboot.common.response.PageResponse<AttemptResponse> quizStudentsPage(String quizId, UserAccessContext access, int page, int size) { return students.quizStudentsPage(quizId, access, page, size); }
     @Override public EducationUnitListResponse listEducationUnits(UserAccessContext access) { return classrooms.listEducationUnits(access); }
     @Override public ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access) { return classrooms.listClassesBySchool(schoolId, access); }
 }

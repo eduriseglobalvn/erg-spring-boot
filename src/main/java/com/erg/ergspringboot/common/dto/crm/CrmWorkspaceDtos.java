@@ -21,8 +21,13 @@ public final class CrmWorkspaceDtos {
             List<LeadResponse> leads,
             List<OpportunityResponse> opportunities,
             List<FollowUpResponse> followUps,
-            List<HandoverResponse> handovers
+            List<HandoverResponse> handovers,
+            WorkspacePage page
     ) {
+    }
+
+    /** Page over the schools in scope; leads, opportunities, follow-ups and handovers belong to those schools. */
+    public record WorkspacePage(int page, int size, long totalSchools, boolean hasMore) {
     }
 
     public record LeadResponse(

@@ -191,6 +191,63 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
             Pageable pageable
     );
 
+    /**
+     * Paged roster with the caller's class/education-unit scope applied in SQL, so a page is never cut
+     * before filtering. Mirrors the in-memory rule: an assignment without a class is visible to every reviewer.
+     */
+    @Query(value = """
+            select new com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection(
+                attempt.id,
+                attempt.assignmentId,
+                attempt.quizId,
+                attempt.studentId,
+                attempt.status,
+                attempt.score,
+                attempt.maxScore,
+                attempt.percent,
+                attempt.passed,
+                attempt.startedAt,
+                attempt.submittedAt,
+                attempt.updatedAt
+            )
+            from Attempt attempt
+            join Assignment assignment
+              on assignment.id = attempt.assignmentId and assignment.tenantId = attempt.tenantId
+            left join Classroom classroom
+              on classroom.id = assignment.academicClassId and classroom.tenantId = attempt.tenantId
+            where attempt.tenantId = :tenantId
+              and attempt.quizId = :quizId
+              and (coalesce(assignment.academicClassId, '') = ''
+                   or (classroom.id is not null
+                       and (:allClasses = true or assignment.academicClassId in :classIds)
+                       and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
+                            or classroom.schoolId in :unitIds)))
+            order by attempt.updatedAt desc, attempt.id desc
+            """, countQuery = """
+            select count(attempt.id)
+            from Attempt attempt
+            join Assignment assignment
+              on assignment.id = attempt.assignmentId and assignment.tenantId = attempt.tenantId
+            left join Classroom classroom
+              on classroom.id = assignment.academicClassId and classroom.tenantId = attempt.tenantId
+            where attempt.tenantId = :tenantId
+              and attempt.quizId = :quizId
+              and (coalesce(assignment.academicClassId, '') = ''
+                   or (classroom.id is not null
+                       and (:allClasses = true or assignment.academicClassId in :classIds)
+                       and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
+                            or classroom.schoolId in :unitIds)))
+            """)
+    Page<AttemptSummaryProjection> findScopedQuizAttemptSummaries(
+            @Param("tenantId") String tenantId,
+            @Param("quizId") String quizId,
+            @Param("allClasses") boolean allClasses,
+            @Param("classIds") Collection<String> classIds,
+            @Param("allUnits") boolean allUnits,
+            @Param("unitIds") Collection<String> unitIds,
+            Pageable pageable
+    );
+
     @Query("""
             select new com.erg.ergspringboot.repository.lms.projection.AttemptScoreProjection(
                 attempt.id,

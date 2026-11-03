@@ -21,6 +21,9 @@ public interface LmsRuntimePort {
     AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access);
     AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access);
     List<AttemptResponse> quizStudents(String quizId, UserAccessContext access);
+
+    com.erg.ergspringboot.common.response.PageResponse<AttemptResponse> quizStudentsPage(
+            String quizId, UserAccessContext access, int page, int size);
     EducationUnitListResponse listEducationUnits(UserAccessContext access);
     ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access);
 }

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 /** Student assignment and score projections; never mutates LMS operational aggregates. */
 @Service
 public class LmsStudentReadModelUseCase {
+    private static final List<String> NO_SCOPE = List.of("__no-scope__");
     private final LmsClassroomService classrooms;
     private final LmsAssignmentService assignments;
     private final LmsAttemptService attempts;
@@ -80,6 +81,23 @@ public class LmsStudentReadModelUseCase {
             Assignment assignment = byId.get(item.assignmentId());
             return assignment != null && allowed(assignment.getAcademicClassId(), access, classes);
         }).map(this::attemptSummary).toList();
+    }
+
+    public com.erg.ergspringboot.common.response.PageResponse<AttemptResponse> quizStudentsPage(
+            String quizId, UserAccessContext access, int page, int size) {
+        String tenant = tenant(access.tenantId());
+        quizzes.findByTenantIdAndId(tenant, quizId)
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
+        var request = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 200));
+        List<String> classIds = list(access.managedClassIds());
+        List<String> unitIds = list(access.managedEducationUnitIds());
+        // An empty IN list is invalid SQL on some dialects; the sentinel id matches no row.
+        var result = attempts.findScopedQuizAttemptSummaries(tenant, quizId,
+                classIds.contains("*"), classIds.isEmpty() ? NO_SCOPE : classIds,
+                unitIds.contains("*"), unitIds.isEmpty() ? NO_SCOPE : unitIds, request);
+        return new com.erg.ergspringboot.common.response.PageResponse<>(
+                result.getContent().stream().map(this::attemptSummary).toList(), result.getNumber(), result.getSize(),
+                result.getTotalElements(), result.getTotalPages(), result.hasNext(), result.hasPrevious());
     }
 
     // List view: no jsonb answers/packageId/packageHash (not selected by the projection).

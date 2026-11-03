@@ -40,6 +40,10 @@ public class CrmOperations {
         return workspace.workspace(access);
     }
 
+    public WorkspaceResponse workspace(UserAccessContext access, int page, int size) {
+        return workspace.workspace(access, page, size);
+    }
+
     public LeadResponse updateLeadStatus(
             UserAccessContext access, String leadId, UpdateLeadStatusRequest request) {
         return workspace.updateLeadStatus(access, leadId, request);

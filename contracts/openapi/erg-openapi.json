@@ -3188,6 +3188,32 @@
         },
         "type": "object"
       },
+      "ApiResponsePageResponseAttemptResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseAttemptResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePageResponseNotificationItemResponse": {
         "properties": {
           "data": {
@@ -9715,6 +9741,39 @@
         },
         "type": "object"
       },
+      "PageResponseAttemptResponse": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalItems": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PageResponseNotificationItemResponse": {
         "properties": {
           "hasNext": {
@@ -12873,6 +12932,26 @@
         ],
         "type": "object"
       },
+      "WorkspacePage": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalSchools": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "WorkspaceResponse": {
         "properties": {
           "followUps": {
@@ -12898,6 +12977,9 @@
               "$ref": "#/components/schemas/OpportunityResponse"
             },
             "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/WorkspacePage"
           }
         },
         "type": "object"
@@ -15858,6 +15940,28 @@
     "/api/v1/crm/workspace": {
       "get": {
         "operationId": "workspace",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -20526,6 +20630,56 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListAttemptResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/quizzes/{quizId}/students/page": {
+      "get": {
+        "operationId": "quizStudentsPage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quizId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseAttemptResponse"
                 }
               }
             },

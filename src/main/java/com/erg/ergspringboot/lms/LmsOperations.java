@@ -112,6 +112,11 @@ public class LmsOperations {
         return legacy.quizStudents(quizId, access);
     }
 
+    public com.erg.ergspringboot.common.response.PageResponse<AttemptResponse> quizStudentsPage(
+            String quizId, UserAccessContext access, int page, int size) {
+        return legacy.quizStudentsPage(quizId, access, page, size);
+    }
+
     public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) {
         return legacy.assignmentProgress(assignmentId, access);
     }

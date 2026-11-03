@@ -208,6 +208,19 @@ public class LmsController {
         return ok("Quiz students loaded", lms.quizStudents(quizId, UserAccessContext.from(request)), request);
     }
 
+    /** Paged successor of {@code /students}: the scope filter runs before the page cut and totals are reported. */
+    @GetMapping("/quizzes/{quizId}/students/page")
+    @LmsGradeRead
+    public ApiResponse<com.erg.ergspringboot.common.response.PageResponse<AttemptResponse>> quizStudentsPage(
+            @PathVariable String quizId,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "50") int size,
+            HttpServletRequest request
+    ) {
+        return ok("Quiz students loaded",
+                lms.quizStudentsPage(quizId, UserAccessContext.from(request), page, size), request);
+    }
+
     @GetMapping("/assignments/{assignmentId}/progress")
     @LmsAssignmentProgressRead
     public ApiResponse<AssignmentProgressResponse> assignmentProgress(@PathVariable String assignmentId, HttpServletRequest request) {

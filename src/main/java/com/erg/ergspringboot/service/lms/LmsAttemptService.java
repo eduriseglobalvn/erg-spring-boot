@@ -94,6 +94,14 @@ public class LmsAttemptService {
                 tenantId, quizId, org.springframework.data.domain.PageRequest.of(0, 500));
     }
 
+    public org.springframework.data.domain.Page<com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection>
+            findScopedQuizAttemptSummaries(String tenantId, String quizId, boolean allClasses,
+                    java.util.Collection<String> classIds, boolean allUnits, java.util.Collection<String> unitIds,
+                    org.springframework.data.domain.Pageable pageable) {
+        return repository.findScopedQuizAttemptSummaries(
+                tenantId, quizId, allClasses, classIds, allUnits, unitIds, pageable);
+    }
+
     @Transactional("postgresTransactionManager")
     public Attempt save(Attempt attempt) {
         return repository.save(attempt);

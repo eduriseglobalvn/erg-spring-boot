@@ -66,9 +66,8 @@ class CrmWorkspaceServiceTest {
     void workspaceOnlyIncludesSchoolsFromPrincipalTenantAndManagedScope() {
         CrmWorkspaceService service = service();
         EducationUnit allowed = unit("school-1", "tenant-a");
-        EducationUnit outsideManagedScope = unit("school-2", "tenant-a");
-        when(unitRepository.findByTenantIdOrderByNameAsc(eq("tenant-a"), any(Pageable.class)))
-                .thenReturn(List.of(allowed, outsideManagedScope));
+        when(unitRepository.findPageByTenantIdAndIdInOrderByNameAsc(eq("tenant-a"), eq(List.of("school-1")), any(Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(allowed)));
         when(profileRepository.findByTenantIdAndSchoolIdIn("tenant-a", List.of("school-1")))
                 .thenReturn(List.of(profile("lead-1", "school-1")));
         when(contactRepository.findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc("tenant-a", List.of("school-1")))
@@ -81,6 +80,8 @@ class CrmWorkspaceServiceTest {
         var response = service.workspace(access("seo-1", "tenant-a", List.of("school-1")));
 
         assertThat(response.leads()).extracting("id").containsExactly("lead-1");
+        assertThat(response.page().hasMore()).isFalse();
+        assertThat(response.page().totalSchools()).isEqualTo(1);
         verify(profileRepository).findByTenantIdAndSchoolIdIn("tenant-a", List.of("school-1"));
     }
 

@@ -15,6 +15,7 @@ import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.UpdateFollowUpCompl
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.UpdateLeadStatusRequest;
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.UpdateOpportunityRequest;
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.WorkspaceResponse;
+import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.WorkspacePage;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
@@ -45,6 +46,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -55,6 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Deprecated(since = "2026-08-08", forRemoval = false)
 @Service
 public class CrmWorkspaceService {
+
+    static final int MAX_WORKSPACE_SCHOOLS = 500;
 
     private static final Set<String> LEAD_STATUSES = Set.of(
             "new_lead", "consulted", "waiting_decision", "negotiating", "won_pending_setup", "active", "paused", "lost");
@@ -91,13 +95,25 @@ public class CrmWorkspaceService {
 
     @Transactional(readOnly = true)
     public WorkspaceResponse workspace(UserAccessContext access) {
-        List<EducationUnit> units = unitRepository
-                .findByTenantIdOrderByNameAsc(access.tenantId(), PageRequest.of(0, 500)).stream()
-                .filter(unit -> access.canAccessEducationUnit(unit.getId()))
-                .toList();
+        return workspace(access, 0, MAX_WORKSPACE_SCHOOLS);
+    }
+
+    /** Pages over the schools in scope; the scope filter runs in the query, before the page is cut. */
+    @Transactional(readOnly = true)
+    public WorkspaceResponse workspace(UserAccessContext access, int page, int size) {
+        PageRequest request = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, MAX_WORKSPACE_SCHOOLS));
+        List<String> scope = safe(access.managedEducationUnitIds());
+        Page<EducationUnit> unitPage = scope.contains("*")
+                ? unitRepository.findPageByTenantIdOrderByNameAsc(access.tenantId(), request)
+                : scope.isEmpty()
+                        ? Page.empty(request)
+                        : unitRepository.findPageByTenantIdAndIdInOrderByNameAsc(access.tenantId(), scope, request);
+        WorkspacePage pageInfo = new WorkspacePage(request.getPageNumber(), request.getPageSize(),
+                unitPage.getTotalElements(), unitPage.hasNext());
+        List<EducationUnit> units = unitPage.getContent();
         List<String> schoolIds = units.stream().map(EducationUnit::getId).toList();
         if (schoolIds.isEmpty()) {
-            return new WorkspaceResponse(List.of(), List.of(), List.of(), List.of());
+            return new WorkspaceResponse(List.of(), List.of(), List.of(), List.of(), pageInfo);
         }
 
         String tenantId = access.tenantId();
@@ -121,7 +137,7 @@ public class CrmWorkspaceService {
                 .findByTenantIdAndSchoolIdInOrderByCreatedAtDesc(tenantId, schoolIds).stream()
                 .map(this::handoverResponse)
                 .toList();
-        return new WorkspaceResponse(leads, opportunities, followUps, handovers);
+        return new WorkspaceResponse(leads, opportunities, followUps, handovers, pageInfo);
     }
 
     @Transactional

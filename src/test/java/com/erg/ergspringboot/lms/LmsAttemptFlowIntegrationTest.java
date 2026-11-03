@@ -97,6 +97,22 @@ class LmsAttemptFlowIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void pagedRosterAppliesClassAndUnitScopeInSql() {
+        seed();
+        attemptRepository.saveAndFlush(inProgress("att-flow-1"));
+        var page = org.springframework.data.domain.PageRequest.of(0, 10);
+
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                false, List.of("class-flow"), false, List.of("school-flow"), page).getTotalElements()).isEqualTo(1);
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                true, List.of("x"), true, List.of("x"), page).getContent()).extracting("id").containsExactly("att-flow-1");
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                false, List.of("class-other"), true, List.of("x"), page).getTotalElements()).isZero();
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                true, List.of("x"), false, List.of("school-other"), page).getTotalElements()).isZero();
+    }
+
     private Attempt inProgress(String id) {
         Attempt attempt = new Attempt();
         attempt.setId(id);

@@ -26,6 +26,11 @@ public interface EducationUnitRepository extends JpaRepository<EducationUnit, St
     List<EducationUnit> findByTenantIdAndIdInOrderByNameAsc(
             String tenantId, Collection<String> ids, Pageable pageable);
 
+    Page<EducationUnit> findPageByTenantIdOrderByNameAsc(String tenantId, Pageable pageable);
+
+    Page<EducationUnit> findPageByTenantIdAndIdInOrderByNameAsc(
+            String tenantId, Collection<String> ids, Pageable pageable);
+
     Optional<EducationUnit> findByIdAndTenantId(String id, String tenantId);
 
     boolean existsByTenantIdAndSlugIgnoreCase(String tenantId, String slug);
