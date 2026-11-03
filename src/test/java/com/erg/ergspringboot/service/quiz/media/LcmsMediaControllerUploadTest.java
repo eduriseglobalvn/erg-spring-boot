@@ -67,7 +67,7 @@ class LcmsMediaControllerUploadTest {
     }
 
     @Test
-    void storesBytesWhenSignatureTenantAndChecksumAllMatch() {
+    void storesBytesWhenSignatureTenantAndChecksumAllMatch() throws Exception {
         byte[] bytes = "committed-slide-image".getBytes(StandardCharsets.UTF_8);
         String sha = sha256(bytes);
         String key = storage.storageKey("tenant-a", sha, "image/png");
@@ -145,19 +145,33 @@ class LcmsMediaControllerUploadTest {
                 .hasMessageContaining("maximum allowed size");
     }
 
-    private ResponseEntity<Void> upload(String url, String tenantId, String mimeType, byte[] bytes) {
+    @Test
+    void storageFailureSurfacesAsServerErrorInsteadOfInvalidSignature() throws Exception {
+        java.nio.file.Path blocked = java.nio.file.Files.createFile(storageRoot.resolve("not-a-directory"));
+        LocalMediaStorageAdapter broken = new LocalMediaStorageAdapter("/api/v1/lcms/media/blob", BASE, SECRET, CLOCK, blocked);
+        byte[] bytes = "disk-full".getBytes(StandardCharsets.UTF_8);
+        String key = broken.storageKey("tenant-a", sha256(bytes), "image/png");
+        String url = broken.presignUpload(key, "image/png", bytes.length);
+
+        assertThatThrownBy(() -> upload(new LcmsMediaController(operationsFor(broken)), url, "tenant-a", "image/png", bytes))
+                .isInstanceOf(IllegalStateException.class)
+                .isNotInstanceOf(BadRequestException.class);
+    }
+
+    private ResponseEntity<Void> upload(String url, String tenantId, String mimeType, byte[] bytes) throws java.io.IOException {
         return upload(controller, url, tenantId, mimeType, bytes);
     }
 
     private ResponseEntity<Void> upload(
-            LcmsMediaController target, String url, String tenantId, String mimeType, byte[] bytes) {
+            LcmsMediaController target, String url, String tenantId, String mimeType, byte[] bytes) throws java.io.IOException {
         URI uri = URI.create(url);
         String[] segments = uri.getPath().split("/");
         String prefix = segments[segments.length - 2];
         String filename = segments[segments.length - 1];
         MockHttpServletRequest request = new MockHttpServletRequest("PUT", uri.getPath());
         request.setQueryString(uri.getRawQuery());
-        return target.uploadLocal(tenantId, prefix, filename, mimeType, bytes, request);
+        request.setContent(bytes);
+        return target.uploadLocal(tenantId, prefix, filename, mimeType, request);
     }
 
     private static String sha256(byte[] bytes) {

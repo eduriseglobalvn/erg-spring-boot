@@ -69,7 +69,7 @@ public final class R2MediaStorageAdapter implements MediaStorageAdapter {
                     && path.contains("quiz-media/" + tenantId + "/")
                     && query != null
                     && query.toLowerCase(Locale.ROOT).contains("x-amz-signature=");
-        } catch (RuntimeException invalid) {
+        } catch (IllegalArgumentException invalid) {
             return false;
         }
     }
