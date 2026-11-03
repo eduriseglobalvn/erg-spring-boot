@@ -64,7 +64,24 @@ class TransactionalOutboxWorkerTest {
         assertThat(event.getStatus()).isEqualTo("retry");
         assertThat(event.getAttempts()).isEqualTo(1);
         assertThat(event.getLeaseUntil()).isNull();
-        assertThat(event.getLastError()).contains("smtp timeout");
+        assertThat(event.getLastError()).isEqualTo("IllegalStateException");
+    }
+
+    @Test
+    void decryptsRecipientWrittenByTheTransactionalMailSender() {
+        OutboxEvent event = event();
+        OutboxPayloadCipher cipher = new OutboxPayloadCipher("test-key");
+        event.setPayload(Map.of("recipientCiphertext", cipher.encrypt("teacher@example.com"), "fullName", "Teacher",
+                "secret", cipher.encrypt("secret")));
+        when(repository.findDueForUpdate(any(), any(Integer.class))).thenReturn(List.of(event));
+        when(repository.findById("event-1")).thenReturn(Optional.of(event));
+        TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
+                repository, smtp, cipher, new ImmediateTransactionManager());
+
+        worker.runDueBatch();
+
+        org.mockito.Mockito.verify(smtp).sendTeacherInvite("teacher@example.com", "Teacher", "secret");
+        assertThat(event.getStatus()).isEqualTo("sent");
     }
 
     private OutboxEvent event() {
