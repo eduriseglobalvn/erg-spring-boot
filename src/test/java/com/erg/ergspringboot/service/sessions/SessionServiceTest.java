@@ -55,7 +55,8 @@ class SessionServiceTest {
                 sessionRepository,
                 educationUnitRepository,
                 classroomRepository,
-                userPermissionOverrideRepository
+                userPermissionOverrideRepository,
+                userRoleAssignmentRepository
         );
         User user = userWithRole("u-teacher", "teacher");
         AuthSession session = new AuthSession();
@@ -91,7 +92,8 @@ class SessionServiceTest {
                 sessionRepository,
                 educationUnitRepository,
                 classroomRepository,
-                userPermissionOverrideRepository
+                userPermissionOverrideRepository,
+                userRoleAssignmentRepository
         );
         User user = userWithRole("u-admin", "system.super_admin");
         Permission wildcard = new Permission();
@@ -129,7 +131,8 @@ class SessionServiceTest {
                 sessionRepository,
                 educationUnitRepository,
                 classroomRepository,
-                userPermissionOverrideRepository
+                userPermissionOverrideRepository,
+                userRoleAssignmentRepository
         );
         User user = userWithRole("u-local-admin", "admin");
         user.setIsProfileCompleted(true);
@@ -157,7 +160,8 @@ class SessionServiceTest {
     @Test
     void currentBootstrapRejectsMoreThanFiveHundredManageableClasses() {
         SessionService service = new SessionService(
-                sessionRepository, educationUnitRepository, classroomRepository, userPermissionOverrideRepository);
+                sessionRepository, educationUnitRepository, classroomRepository, userPermissionOverrideRepository,
+                userRoleAssignmentRepository);
         User user = userWithRole("u-admin", "system.super_admin");
         Permission wildcard = new Permission();
         wildcard.setName("*");
@@ -243,6 +247,45 @@ class SessionServiceTest {
         assertThat(response.manageableUnits().getFirst().type()).isEqualTo("school");
         assertThat(response.currentScope().level()).isEqualTo("school");
         assertThat(response.currentScope().unitId()).isEqualTo("school-assigned-1");
+    }
+
+    @Test
+    void onlyExactEducationUnitAdminRoleNamesExpandToDescendantUnits() {
+        SessionService service = new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
+                userPermissionOverrideRepository, userRoleAssignmentRepository);
+        for (String roleName : List.of("vice_principal", "principal")) {
+            User user = userWithRole("u-" + roleName, "staff");
+            AuthSession session = new AuthSession();
+            session.setUser(user);
+            session.setSessionId("s-" + roleName);
+            session.setTenantId("erg");
+            session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+            Role role = new Role();
+            role.setName(roleName);
+            UserRoleAssignment assignment = new UserRoleAssignment();
+            assignment.setUserId(user.getId());
+            assignment.setRoleId("role-" + roleName);
+            assignment.setRole(role);
+            assignment.setScopeType("school");
+            assignment.setScopeId("school-1");
+            when(sessionRepository.findWithUserBySessionIdAndTenantId("s-" + roleName, "erg"))
+                    .thenReturn(Optional.of(session));
+            when(userRoleAssignmentRepository.findActiveForUser(eq(user.getId()), eq("erg"), any(OffsetDateTime.class)))
+                    .thenReturn(List.of(assignment));
+            when(educationUnitRepository.findByIdInOrderByNameAsc(any(Collection.class)))
+                    .thenReturn(List.of(educationUnit("school-1", "School", "school", null)));
+            org.mockito.Mockito.lenient().when(educationUnitRepository.findByTenantIdAndParentIdInOrderByNameAsc(
+                            eq("erg"), any(Collection.class), any(Pageable.class)))
+                    .thenAnswer(invocation -> ((Collection<?>) invocation.getArgument(1)).contains("school-1")
+                            ? List.of(educationUnit("campus-1", "Campus", "campus", "school-1")) : List.of());
+
+            SessionBootstrapResponse response = service.currentBootstrap("s-" + roleName, "erg",
+                    new UserAccessContext(user.getId(), "erg", List.of(), List.of(), null, null));
+
+            assertThat(response.manageableUnits()).as(roleName).extracting(unit -> unit.id())
+                    .containsExactlyInAnyOrderElementsOf("principal".equals(roleName)
+                            ? List.of("school-1", "campus-1") : List.of("school-1"));
+        }
     }
 
     private EducationUnit educationUnit(String id, String name, String type, String parentId) {

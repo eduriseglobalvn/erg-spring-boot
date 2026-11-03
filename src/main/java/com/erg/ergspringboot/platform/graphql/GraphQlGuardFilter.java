@@ -31,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class GraphQlGuardFilter extends OncePerRequestFilter {
 
+    private static final String ALL_OPERATIONS = "operation:all";
     private static final Set<String> SENSITIVE_VARIABLE_NAMES = Set.of(
             "password", "passwd", "secret", "token", "access_token", "refresh_token",
             "apikey", "api_key", "credential", "credentials", "authorization"
@@ -114,7 +115,7 @@ public class GraphQlGuardFilter extends OncePerRequestFilter {
                 return;
             }
         }
-        GraphQlRateLimiter.Decision rateLimit = rateLimiter.allow(rateLimitKey(request, operationName));
+        GraphQlRateLimiter.Decision rateLimit = rateLimiter.allow(rateLimitKey(request));
         if (!rateLimit.allowed()) {
             response.setHeader("Retry-After", String.valueOf(rateLimit.retryAfterSeconds()));
             writeError(response, 429, "RATE_LIMITED", "GraphQL rate limit exceeded.");
@@ -139,7 +140,11 @@ public class GraphQlGuardFilter extends OncePerRequestFilter {
         filterChain.doFilter(new CachedBodyRequest(request, body), response);
     }
 
-    private GraphQlRateLimitKey rateLimitKey(HttpServletRequest request, String operationName) {
+    /**
+     * One bucket per caller. operationName, tenant headers and Authorization values are chosen
+     * by the client, so none of them may split a caller's quota into fresh buckets.
+     */
+    private GraphQlRateLimitKey rateLimitKey(HttpServletRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null
                 && authentication.isAuthenticated()
@@ -147,23 +152,15 @@ public class GraphQlGuardFilter extends OncePerRequestFilter {
             return new GraphQlRateLimitKey(
                     stablePart(principal.tenantId(), "tenant:authenticated"),
                     stablePart(principal.userId(), "user:authenticated"),
-                    stablePart(operationName, "operation:anonymous")
+                    ALL_OPERATIONS
             );
         }
 
         return new GraphQlRateLimitKey(
-                stablePart(request.getHeader("X-Tenant-ID"), "tenant:unknown"),
-                anonymousCallerId(request),
-                stablePart(operationName, "operation:anonymous")
+                "tenant:anonymous",
+                "ip:" + stablePart(request.getRemoteAddr(), "unknown"),
+                ALL_OPERATIONS
         );
-    }
-
-    private String anonymousCallerId(HttpServletRequest request) {
-        String authorization = request.getHeader("Authorization");
-        if (authorization != null && !authorization.isBlank()) {
-            return "auth:" + Integer.toUnsignedString(authorization.hashCode(), 36);
-        }
-        return "ip:" + stablePart(request.getRemoteAddr(), "unknown");
     }
 
     private String stablePart(String value, String fallback) {

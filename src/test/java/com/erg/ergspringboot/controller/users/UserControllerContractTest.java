@@ -159,8 +159,11 @@ class UserControllerContractTest {
     }
 
     @Test
-    void oldOnboardingAliasIsNotMounted() throws Exception {
-        MockMvc mockMvc = mockMvc(mock(UserService.class));
+    void selfServiceOnboardingIsMountedUnderMe() throws Exception {
+        UserService userService = mock(UserService.class);
+        when(userService.completeOnboarding(eq("user-1"), eq("erg"), org.mockito.ArgumentMatchers.any(OnboardingRequest.class)))
+                .thenReturn(new OnboardingResponse("user-1", "active@example.com", "Learner One", null, true));
+        MockMvc mockMvc = mockMvc(userService);
 
         mockMvc.perform(post("/api/v1/users/me/onboarding")
                         .contentType("application/json")
@@ -171,7 +174,18 @@ class UserControllerContractTest {
                                   "fullName": "Learner One"
                                 }
                                 """))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isProfileCompleted").value(true));
+    }
+
+    @Test
+    void onboardingRoutesAreSelfServiceInsteadOfAdminWorkspaceRoutes() {
+        org.junit.jupiter.api.Assertions.assertNull(
+                com.erg.ergspringboot.platform.security.SecurityUtils.portalFromPath("/api/v1/users/me/onboarding"));
+        org.junit.jupiter.api.Assertions.assertNull(
+                com.erg.ergspringboot.platform.security.SecurityUtils.portalFromPath("/api/v1/users/onboarding"));
+        org.junit.jupiter.api.Assertions.assertEquals("admin",
+                com.erg.ergspringboot.platform.security.SecurityUtils.portalFromPath("/api/v1/users/user-2"));
     }
 
     @Test

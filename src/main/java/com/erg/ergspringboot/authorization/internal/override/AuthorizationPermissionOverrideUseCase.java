@@ -6,6 +6,8 @@ import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
+import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
@@ -26,6 +28,7 @@ public class AuthorizationPermissionOverrideUseCase {
     private final PermissionRepository permissions;
     private final UserPermissionOverrideRepository overrides;
     private AuthorizationMutationAuditService audit;
+    private final ProtectedRolePolicy grantPolicy = new ProtectedRolePolicy();
 
     public AuthorizationPermissionOverrideUseCase(UserRepository users, PermissionRepository permissions,
                                                    UserPermissionOverrideRepository overrides,
@@ -44,6 +47,7 @@ public class AuthorizationPermissionOverrideUseCase {
         scopedUser(userId, tenantId);
         Permission permission = permissions.findByNameInIgnoreCase(List.of(request.permission()))
                 .stream().findFirst().orElseThrow(() -> new ResourceNotFoundException("permission not found"));
+        grantPolicy.assertCanGrantPermissions(SecurityUtils.principal(), userId, List.of(permission.getName()));
         UserPermissionOverride override = new UserPermissionOverride();
         override.setId(IdGenerator.newId());
         override.setUserId(userId);

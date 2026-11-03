@@ -13,6 +13,7 @@ import java.util.Locale;
 public final class ProtectedRolePolicy {
 
     private static final String SYSTEM_PREFIX = "system.";
+    private final AuthorizationCapabilityPolicy capabilityPolicy = new AuthorizationCapabilityPolicy();
 
     public void assertRoleDefinitionAllowed(String roleName) {
         String normalized = normalize(roleName);
@@ -46,14 +47,38 @@ public final class ProtectedRolePolicy {
         assertPlatformWildcard(actor, "protected role modification");
     }
 
+    /**
+     * Direct permission overrides use the same grant policy as role assignment: no self-grant,
+     * and wildcard/RBAC control-plane permissions only from a platform-wide actor.
+     */
+    public void assertCanGrantPermissions(ErgPrincipal actor, String targetUserId, Collection<String> permissionNames) {
+        if (actor == null || actor.userId() == null || actor.userId().isBlank()) {
+            throw new ForbiddenException("permission assignment requires an authenticated actor");
+        }
+        if (targetUserId != null && actor.userId().equals(targetUserId.trim())) {
+            throw new ForbiddenException("permission self-assignment is not allowed");
+        }
+        boolean privileged = permissionNames != null && permissionNames.stream().anyMatch(this::isPrivilegedPermission);
+        if (privileged) {
+            assertPlatformWildcard(actor, "wildcard or RBAC permission assignment");
+        }
+    }
+
+    /** Roles and their permission sets are global, so only platform-wide actors may define them. */
+    public void assertCanManageRoleDefinitions(ErgPrincipal actor) {
+        assertPlatformWildcard(actor, "role definition management");
+    }
+
+    public boolean isPrivilegedPermission(String permissionName) {
+        String normalized = normalize(permissionName);
+        return normalized != null && (normalized.startsWith("*") || normalized.startsWith("rbac."));
+    }
+
     private void assertPlatformWildcard(ErgPrincipal actor, String operation) {
         if (actor == null) {
             throw new ForbiddenException(operation + " requires authenticated platform wildcard authority");
         }
-        boolean wildcard = actor.permissions() != null && actor.permissions().stream()
-                .map(this::normalize)
-                .anyMatch("*"::equals);
-        if (wildcard) {
+        if (capabilityPolicy.isPlatformWide(actor)) {
             return;
         }
         throw new ForbiddenException(operation + " requires platform wildcard authority");

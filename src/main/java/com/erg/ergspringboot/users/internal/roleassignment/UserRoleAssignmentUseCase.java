@@ -22,6 +22,7 @@ import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditSer
 import com.erg.ergspringboot.service.users.UserService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
+import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
@@ -54,8 +55,12 @@ public class UserRoleAssignmentUseCase {
         authz.authorizationChanged(List.of(new UserRef(user.getId(),tenant(tenantId))),found.stream().map(Role::getId).sorted().collect(Collectors.joining(",")),"USER_ROLES_CHANGED",legacy(audit == null ? new UserAuditContext(user.getId(),null,null,null) : audit));
         return response(user);}
     @Transactional public PermissionOverrideResponse assignPermissions(String userId,String tenantId,AdminAssignPermissionsRequest request,UserAuditContext audit){
+        return assignPermissions(userId,tenantId,request,audit,SecurityUtils.principal());}
+    @Transactional public PermissionOverrideResponse assignPermissions(String userId,String tenantId,AdminAssignPermissionsRequest request,UserAuditContext audit,ErgPrincipal actor){
         User user=find(userId,tenantId);String grant=grant(request.grantType());List<String> names=request.permissions().stream().map(this::trim).filter(v->v!=null).toList();List<Permission> found=permissions.findByNameInIgnoreCase(names);
-        if(found.size()!=new LinkedHashSet<>(names).size())throw new BadRequestException("one or more permissions were not found");overrides.deleteByUserId(userId);
+        if(found.size()!=new LinkedHashSet<>(names).size())throw new BadRequestException("one or more permissions were not found");
+        rolePolicy.assertCanGrantPermissions(actor,userId,found.stream().map(Permission::getName).toList());
+        overrides.deleteByUserId(userId);
         List<UserPermissionOverride> saved=found.stream().map(p->{UserPermissionOverride o=new UserPermissionOverride();o.setId(IdGenerator.newId());o.setUserId(userId);o.setPermission(p.getName());o.setGrantType(grant);o.setReason(trim(request.reason()));o.setExpiresAt(parse(request.expiresAt()));o.setCreatedAt(OffsetDateTime.now());return o;}).toList();overrides.saveAll(saved);
         record(user,audit,"USER_PERMISSIONS_CHANGED",Map.of(),Map.of("grantType",grant,"permissions",names));
         authz.authorizationChanged(List.of(new UserRef(user.getId(),tenant(tenantId))),found.stream().map(Permission::getId).sorted().collect(Collectors.joining(",")),"USER_PERMISSIONS_CHANGED",legacy(audit == null ? new UserAuditContext(user.getId(),null,null,null) : audit));

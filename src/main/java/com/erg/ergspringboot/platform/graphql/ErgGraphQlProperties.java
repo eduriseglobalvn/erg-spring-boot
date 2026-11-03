@@ -11,14 +11,33 @@ public class ErgGraphQlProperties {
     private boolean requireOperationName = true;
     private boolean introspectionEnabled = false;
     private int maxQueryLength = 20_000;
-    private int maxRequestBodyBytes = 262_144;
+    private int maxRequestBodyBytes = 65_536;
     private int maxDepth = 8;
     private int maxComplexity = 500;
     private Duration executionTimeout = Duration.ofSeconds(5);
     private int maxAliases = 20;
     private boolean rejectSensitiveVariables = true;
-    private int maxVariableArrayItems = 500;
+    private int maxVariableArrayItems = 100;
     private RateLimit rateLimit = new RateLimit();
+    /** Operation names reported as the {@code operation} metric tag; empty admits the first {@link #maxMetricOperations}. */
+    private java.util.Set<String> metricOperationNames = java.util.Set.of();
+    private int maxMetricOperations = 100;
+
+    public java.util.Set<String> getMetricOperationNames() {
+        return metricOperationNames;
+    }
+
+    public void setMetricOperationNames(java.util.Set<String> metricOperationNames) {
+        this.metricOperationNames = metricOperationNames == null ? java.util.Set.of() : java.util.Set.copyOf(metricOperationNames);
+    }
+
+    public int getMaxMetricOperations() {
+        return maxMetricOperations;
+    }
+
+    public void setMaxMetricOperations(int maxMetricOperations) {
+        this.maxMetricOperations = maxMetricOperations;
+    }
 
     public boolean isRequireOperationName() {
         return requireOperationName;

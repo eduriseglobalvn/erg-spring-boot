@@ -119,7 +119,8 @@ public class UserController {
         return ok(data, servletRequest);
     }
 
-    @PostMapping("/onboarding")
+    /** {@code /onboarding} is the deprecated pre-1.x alias kept for existing clients. */
+    @PostMapping({"/me/onboarding", "/onboarding"})
     @UserSelfUpdate
     public ResponseEntity<ApiResponse<OnboardingResponse>> completeOnboarding(
             @Valid @RequestBody OnboardingRequest request,

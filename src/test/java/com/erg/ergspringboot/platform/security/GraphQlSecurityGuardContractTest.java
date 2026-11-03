@@ -90,6 +90,32 @@ class GraphQlSecurityGuardContractTest {
         assertThat(response.getContentAsString()).contains("cardinality");
     }
 
+    @Test
+    void rotatingOperationNameDoesNotEscapeThePerUserRateLimit() throws Exception {
+        properties.getRateLimit().setRequestsPerMinute(2);
+        properties.getRateLimit().setBurst(0);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        new ErgPrincipal("u-rotate", "s", "tenant-a", java.util.List.of(), java.util.List.of(),
+                                java.util.List.of(), java.util.List.of(), "staff", "user", java.util.Map.of()),
+                        null, java.util.List.of()));
+        try {
+            int[] statuses = new int[3];
+            for (int index = 0; index < statuses.length; index++) {
+                MockHttpServletRequest request = graphQlRequest(("{\"operationName\":\"Q%d\","
+                        + "\"query\":\"query Q%d { lms { myStudentCalendar { events { id } } } }\"}")
+                        .formatted(index, index));
+                MockHttpServletResponse response = new MockHttpServletResponse();
+                filter.doFilter(request, response, new MockFilterChain());
+                statuses[index] = response.getStatus();
+            }
+
+            assertThat(statuses).containsExactly(200, 200, 429);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
     private MockHttpServletRequest graphQlRequest(String body) {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/graphql");
         request.setContentType("application/json");

@@ -25,17 +25,20 @@ class ProductionConfigurationSafetyTest {
 
     @Test
     void authCookieDefaultsToSecure() throws Exception {
-        // BE-014 findings #4/#6: auth cookies must default to Secure so sessions never travel over
-        // plain HTTP unless an operator explicitly opts out.
+        // BE-014 findings #4/#6: the only session cookie is the BFF servlet session cookie and it is
+        // always Secure. The former erg.auth.cookie.* keys were never read (review N5) and are removed
+        // so they cannot suggest a protection that does not exist.
         String common = Files.readString(Path.of("src/main/resources/application.yml"));
+        String enterprise = Files.readString(Path.of("src/main/resources/application-enterprise-auth.yml"));
 
-        assertThat(common).contains("secure: ${AUTH__COOKIE__SECURE:true}");
+        assertThat(common).doesNotContain("AUTH__COOKIE__");
+        assertThat(enterprise).contains("secure: true").contains("http-only: true");
     }
 
     @Test
     void productionProfilePinsSecurityHardening() throws Exception {
-        // BE-014 findings #1/#4/#6: the prod profile hardcodes introspection off, Secure/strict
-        // cookies and no-override error masking, so no env var can widen them in production.
+        // BE-014 findings #1/#6: the prod profile hardcodes introspection and API docs off and
+        // requires push-token encryption, so no env var default can widen them in production.
         String common = Files.readString(Path.of("src/main/resources/application.yml"));
         int prodProfile = common.indexOf("on-profile: prod");
         assertThat(prodProfile).isPositive();
@@ -44,8 +47,7 @@ class ProductionConfigurationSafetyTest {
         assertThat(prodSection)
                 .contains("introspection:")
                 .contains("enabled: false")
-                .contains("secure: true")
-                .contains("same-site: strict");
+                .contains("registration-token-encryption-required: ${NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_REQUIRED:true}");
     }
 
     @Test

@@ -40,6 +40,15 @@ class TrustedClientIpResolverTest {
         assertThat(resolver.resolve(request)).isEqualTo("2001:db8:ffff:0:0:0:0:10");
     }
 
+    @Test
+    void unparsablePeerKeepsItsOwnIdentityInsteadOfSharedUnknownBucket() {
+        TrustedClientIpResolver resolver = new TrustedClientIpResolver("10.0.0.0/8");
+
+        assertThat(resolver.resolve(request("[2001:db8::7]", "1.1.1.1"))).isEqualTo("2001:db8:0:0:0:0:0:7");
+        assertThat(resolver.resolve(request("fe80::1%eth0", "1.1.1.1"))).isEqualTo("fe80:0:0:0:0:0:0:1");
+        assertThat(resolver.resolve(request("peer.internal", "1.1.1.1"))).isEqualTo("peer.internal");
+    }
+
     private MockHttpServletRequest request(String remoteAddress, String forwardedFor) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr(remoteAddress);

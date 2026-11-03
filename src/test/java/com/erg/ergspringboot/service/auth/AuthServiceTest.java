@@ -145,6 +145,8 @@ class AuthServiceTest {
         AuthSession session = session("session-1", "user-1", "tenant-a");
         session.setRefreshTokenHash(currentHash);
         when(sessionRepository.lockByRefreshTokenHash(currentHash)).thenReturn(Optional.of(session));
+        when(userRepository.findByIdAndTenantId("user-1", "tenant-a"))
+                .thenReturn(Optional.of(activeUser("user-1", "active@example.com", "secret123")));
 
         authService.refresh(new RefreshRequest(refreshToken, "device-a"),
                 new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a"));
@@ -157,6 +159,34 @@ class AuthServiceTest {
         verify(refreshTokenHistoryRepository).save(history.capture());
         assertEquals(currentHash, history.getValue().getTokenHash());
         assertEquals("session-1", history.getValue().getSessionId());
+    }
+
+    @Test
+    void refreshRejectsSessionWhoseUserIsNoLongerActive() {
+        String refreshToken = "refresh-token-banned";
+        String currentHash = tokenService.hashToken(refreshToken);
+        AuthSession session = session("session-1", "user-1", "tenant-a");
+        session.setRefreshTokenHash(currentHash);
+        User banned = activeUser("user-1", "banned@example.com", "secret123");
+        banned.setStatus("BANNED");
+        when(sessionRepository.lockByRefreshTokenHash(currentHash)).thenReturn(Optional.of(session));
+        when(userRepository.findByIdAndTenantId("user-1", "tenant-a")).thenReturn(Optional.of(banned));
+
+        assertThrows(AuthFailure.InvalidToken.class, () -> authService.refresh(
+                new RefreshRequest(refreshToken, "device-a"),
+                new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a")));
+
+        assertEquals(currentHash, session.getRefreshTokenHash());
+        org.mockito.Mockito.verify(sessionRepository, org.mockito.Mockito.never()).save(session);
+    }
+
+    @Test
+    void refreshUseCaseKeepsReplayRevocationWhenRejectingTheToken() throws Exception {
+        org.springframework.transaction.annotation.Transactional tx = com.erg.ergspringboot.auth.internal.refresh
+                .AuthRefreshUseCase.class.getMethod("refresh", RefreshRequest.class, AuthClientContext.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+
+        assertTrue(List.of(tx.noRollbackFor()).contains(AuthFailure.InvalidToken.class));
     }
 
     @Test
@@ -343,6 +373,85 @@ class AuthServiceTest {
         );
 
         verify(sessionRepository, never()).save(any(AuthSession.class));
+    }
+
+    @Test
+    void wrongPasswordForDisabledOrBannedAccountIsIndistinguishableFromBadCredentials() {
+        User inactive = activeUser("user-inactive", "inactive@example.com", "secret123");
+        inactive.setStatus("INACTIVE");
+        User banned = activeUser("user-banned", "banned@example.com", "secret123");
+        banned.setStatus("BANNED");
+        when(userRepository.findForLogin("inactive@example.com")).thenReturn(Optional.of(inactive));
+        when(userRepository.findForLogin("banned@example.com")).thenReturn(Optional.of(banned));
+
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("inactive@example.com", "wrong-password", null, null, null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", null, null, null)));
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("banned@example.com", "wrong-password", null, null, null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", null, null, null)));
+    }
+
+    @Test
+    void accountIsLockedAfterConfiguredConsecutiveWrongPasswords() {
+        User user = activeUser("user-1", "active@example.com", "secret123");
+        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
+            AuthLoginAttempt attempt = new AuthLoginAttempt();
+            attempt.setUserId("user-1");
+            attempt.setResult("FAILED");
+            attempt.setReason("invalid_credentials");
+            attempt.setCreatedAt(now.minusMinutes(index));
+            return attempt;
+        }).toList();
+        when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(failures);
+
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("active@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)));
+
+        verify(sessionRepository, never()).save(any(AuthSession.class));
+        ArgumentCaptor<AuthLoginAttempt> recorded = ArgumentCaptor.forClass(AuthLoginAttempt.class);
+        verify(loginAttemptRepository).save(recorded.capture());
+        assertEquals("account_temporarily_locked", recorded.getValue().getReason());
+    }
+
+    @Test
+    void lockoutExpiresAfterBlockDurationAndSuccessResetsTheCounter() {
+        User user = activeUser("user-1", "active@example.com", "secret123");
+        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        OffsetDateTime old = OffsetDateTime.now(java.time.ZoneOffset.UTC).minusHours(1);
+        List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
+            AuthLoginAttempt attempt = new AuthLoginAttempt();
+            attempt.setResult("FAILED");
+            attempt.setReason("invalid_credentials");
+            attempt.setCreatedAt(old.minusMinutes(index));
+            return attempt;
+        }).toList();
+        when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(failures);
+
+        assertNotNull(authService.login(
+                new LoginRequest("active@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)).accessToken());
+    }
+
+    @Test
+    void accountRateLimitIsSharedAcrossIdentifiersOfTheSameUser() {
+        User user = activeUser("user-1", "active@example.com", "secret123");
+        user.setUsername("active.user");
+        when(userRepository.findForLogin(any(String.class))).thenReturn(Optional.of(user));
+        authService.setAuthLoginRateLimiter(new AuthLoginRateLimiter(null, true, 100, 2, 100));
+        AuthClientContext context = new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null);
+
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("active@example.com", "bad", "web-1", "Chrome", null, "lms", false), context));
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("ACTIVE.USER", "bad", "web-1", "Chrome", null, "lms", false), context));
+        assertThrows(AuthFailure.TooManyAttempts.class, () -> authService.login(
+                new LoginRequest("active.user", "bad", "web-1", "Chrome", null, "lms", false), context));
     }
 
     @Test
@@ -569,7 +678,12 @@ class AuthServiceTest {
     @Test
     void ipSecurityStatusCountsFailedAttemptsForIpAndEmail() {
         when(loginAttemptRepository.countByIpAddressAndResultIn(eq("10.0.0.1"), any())).thenReturn(1L);
-        when(loginAttemptRepository.countByAttemptedEmailIgnoreCaseAndResultIn(eq("active@example.com"), any())).thenReturn(1L);
+        AuthLoginAttempt ownTenant = failedAttempt("erg");
+        AuthLoginAttempt otherTenant = failedAttempt("tenant-b");
+        when(loginAttemptRepository.findByAttemptedEmailIgnoreCaseOrderByCreatedAtDesc(
+                eq("active@example.com"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(List.of(ownTenant, otherTenant));
+        authenticate(List.of("operations.manage"));
 
         IpSecurityStatusResponse response = authService.ipSecurityStatus(
                 "active@example.com",
@@ -582,6 +696,36 @@ class AuthServiceTest {
         assertEquals(1L, response.failedAttemptsIp());
         assertEquals(1L, response.failedAttemptsEmail());
         assertEquals(5, response.threshold());
+    }
+
+    @Test
+    void ipSecurityStatusForAnotherEmailRequiresOperationsPermission() {
+        authenticate(List.of("lms.class.read"));
+
+        assertThrows(com.erg.ergspringboot.exception.ForbiddenException.class, () -> authService.ipSecurityStatus(
+                "admin@example.com", new AuthClientContext("10.0.0.1", "JUnit", null, null, null)));
+        assertNotNull(authService.ipSecurityStatus(null, new AuthClientContext("10.0.0.1", "JUnit", null, null, null)));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearSecurityContext() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
+    private void authenticate(List<String> permissions) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        new com.erg.ergspringboot.platform.security.ErgPrincipal("ops-1", "s-1", "erg",
+                                List.of("staff"), permissions, List.of(), List.of(), "staff", "user", java.util.Map.of()),
+                        null, List.of()));
+    }
+
+    private AuthLoginAttempt failedAttempt(String tenantId) {
+        AuthLoginAttempt attempt = new AuthLoginAttempt();
+        attempt.setTenantId(tenantId);
+        attempt.setResult("FAILED");
+        attempt.setCreatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC).minusDays(1));
+        return attempt;
     }
 
     private User activeUser(String id, String email, String rawPassword) {

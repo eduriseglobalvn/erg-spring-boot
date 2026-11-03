@@ -72,16 +72,16 @@ public class AccountVerificationService {
                 ? normalizeEmail(user.getEmail())
                 : normalizeEmail(requestedEmail);
 
+        // A Google account may verify its own primary address as recovery email; that is the only
+        // exemption from "must differ". The cross-account conflict check applies to every address.
         boolean isSelfGoogleVerification = isGoogleUser && email.equalsIgnoreCase(user.getEmail());
-        if (!isSelfGoogleVerification) {
-            if (email.equalsIgnoreCase(user.getEmail())) {
-                throw failure(HttpStatus.BAD_REQUEST, "RECOVERY_EMAIL_REQUIRED",
-                        "recovery email must differ from primary email");
-            }
-            if (userRepository.existsByRecoveryEmailIgnoreCaseAndIdNot(email, userId)) {
-                throw failure(HttpStatus.CONFLICT, "RECOVERY_EMAIL_CONFLICT",
-                        "recovery email is already used by another account");
-            }
+        if (!isSelfGoogleVerification && email.equalsIgnoreCase(user.getEmail())) {
+            throw failure(HttpStatus.BAD_REQUEST, "RECOVERY_EMAIL_REQUIRED",
+                    "recovery email must differ from primary email");
+        }
+        if (userRepository.existsByRecoveryEmailIgnoreCaseAndIdNot(email, userId)) {
+            throw failure(HttpStatus.CONFLICT, "RECOVERY_EMAIL_CONFLICT",
+                    "recovery email is already used by another account");
         }
         OffsetDateTime now = OffsetDateTime.now();
         codeRepository.findFirstByUserIdAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(userId, PURPOSE)

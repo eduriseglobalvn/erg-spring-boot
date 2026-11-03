@@ -50,7 +50,7 @@ class AuthorizationRoleMutationServiceTest {
         service = new AuthorizationService(roleRepository, permissionRepository, overrideRepository, userRepository);
         service.setUserRoleAssignmentRepository(assignmentRepository);
         service.setMutationAuditService(mutationAuditService);
-        actor = new ErgPrincipal("admin-1", "session-1", "tenant-a", List.of("admin"), List.of("*"),
+        actor = new ErgPrincipal("admin-1", "session-1", "tenant-a", List.of("system.super_admin"), List.of("*"),
                 List.of(), List.of("*"), "erg", "admin", Map.of());
         context = new AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit");
     }
@@ -139,15 +139,32 @@ class AuthorizationRoleMutationServiceTest {
                 .thenReturn(List.of(permission));
         when(overrideRepository.save(any(UserPermissionOverride.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(actor, null, List.of()));
 
-        service.addPermissionOverride(
-                "user-1",
-                new AddPermissionOverrideRequest("GRANT", "lms.assignment.create", "temporary", null),
-                "admin-1", "tenant-a", context);
+        try {
+            service.addPermissionOverride(
+                    "user-1",
+                    new AddPermissionOverrideRequest("GRANT", "lms.assignment.create", "temporary", null),
+                    "admin-1", "tenant-a", context);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
 
         verify(mutationAuditService).authorizationChanged(
                 List.of(new UserRef("user-1", "tenant-a")),
                 "perm-1", "PERMISSION_OVERRIDE_ADDED", context);
+    }
+
+    @Test
+    void tenantAdminWithoutPlatformRoleCannotDefineRoles() {
+        ErgPrincipal tenantAdmin = new ErgPrincipal("admin-2", "session-2", "tenant-b", List.of("admin"),
+                List.of("*", "rbac.role.update"), List.of(), List.of(), "erg", "admin", Map.of());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.updateRole(
+                        "role-teacher", new UpdateRoleRequest(null, null, List.of("*")), tenantAdmin, context))
+                .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
+        org.mockito.Mockito.verify(roleRepository, org.mockito.Mockito.never()).save(any());
     }
 
     private Role role(String id, String name) {

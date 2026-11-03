@@ -40,16 +40,32 @@ public class OidcBffController {
 
     static final String RETURN_TO_SESSION_KEY = "erg.auth.returnTo";
     static final String PORTAL_SESSION_KEY = "erg.auth.portal";
-    private static final Set<String> PORTALS = Set.of("admin", "crm", "lcms", "lms", "elearning");
+    /** Canonical workspace names; never subject to the legacy-alias sunset. */
+    private static final Set<String> CANONICAL_PORTALS = Set.of("admin", "teacher", "student", "crm");
+    private static final Set<String> LEGACY_PORTALS = Set.of("lcms", "lms", "elearning");
+    static final String DEFAULT_PORTAL = "teacher";
     private final Clock clock;
+    private final LocalDate legacySunset;
     private MeterRegistry meters;
 
     public OidcBffController() {
-        this(Clock.systemUTC());
+        this(Clock.systemUTC(), null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OidcBffController(
+            @org.springframework.beans.factory.annotation.Value("${erg.auth.legacy-portal-sunset:}") String legacySunset) {
+        this(Clock.systemUTC(), legacySunset == null || legacySunset.isBlank() ? null : LocalDate.parse(legacySunset.trim()));
     }
 
     OidcBffController(Clock clock) {
+        this(clock, null);
+    }
+
+    /** @param legacySunset overrides the built-in legacy alias sunset; {@code null} keeps the policy default. */
+    OidcBffController(Clock clock, LocalDate legacySunset) {
         this.clock = clock;
+        this.legacySunset = legacySunset;
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -59,14 +75,16 @@ public class OidcBffController {
 
     @GetMapping("/login")
     public ResponseEntity<Void> login(
-            @RequestParam(defaultValue = "lms") String portal,
+            @RequestParam(defaultValue = DEFAULT_PORTAL) String portal,
             @RequestParam(defaultValue = "/") String returnTo,
             HttpSession session
     ) {
         String sanitizedPortal = sanitizePortal(portal);
-        var alias = LegacyNamespacePolicy.alias(sanitizedPortal);
+        var alias = CANONICAL_PORTALS.contains(sanitizedPortal)
+                ? java.util.Optional.<LegacyNamespacePolicy.LegacyAlias>empty()
+                : LegacyNamespacePolicy.alias(sanitizedPortal).map(this::withConfiguredSunset);
         if (alias.isPresent()) {
-            if (!LegacyNamespacePolicy.isCompatibilityActive(sanitizedPortal, LocalDate.now(clock))) {
+            if (LocalDate.now(clock).isAfter(alias.get().sunset())) {
                 return ResponseEntity.status(HttpStatus.GONE)
                         .header("Deprecation", "true")
                         .header("Sunset", sunsetHeader(alias.get().sunset()))
@@ -146,8 +164,14 @@ public class OidcBffController {
     }
 
     static String sanitizePortal(String portal) {
-        String normalized = portal == null ? "lms" : portal.trim().toLowerCase();
-        return PORTALS.contains(normalized) ? normalized : "lms";
+        String normalized = portal == null ? DEFAULT_PORTAL : portal.trim().toLowerCase(Locale.ROOT);
+        return CANONICAL_PORTALS.contains(normalized) || LEGACY_PORTALS.contains(normalized)
+                ? normalized : DEFAULT_PORTAL;
+    }
+
+    private LegacyNamespacePolicy.LegacyAlias withConfiguredSunset(LegacyNamespacePolicy.LegacyAlias alias) {
+        return legacySunset == null ? alias : new LegacyNamespacePolicy.LegacyAlias(
+                alias.alias(), alias.canonicalWorkspace(), legacySunset, alias.successor());
     }
 
     private static List<String> safe(List<String> values) {

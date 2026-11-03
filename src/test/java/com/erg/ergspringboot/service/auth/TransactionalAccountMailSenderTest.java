@@ -39,7 +39,12 @@ class TransactionalAccountMailSenderTest {
         assertThat(event.getTenantId()).isEqualTo("tenant-a");
         assertThat(event.getEventType()).isEqualTo("ACCOUNT_TEACHER_INVITE");
         assertThat(event.getStatus()).isEqualTo("pending");
-        assertThat(event.getPayload()).containsEntry("recipient", "teacher@example.com");
+        assertThat(event.getPayload()).doesNotContainKey("recipient");
+        assertThat(event.getPayload().toString()).doesNotContain("teacher@example.com").doesNotContain("one-time");
+        assertThat(event.getIdempotencyKey()).doesNotContain("teacher@example.com");
+        assertThat(new OutboxPayloadCipher("test-key").decrypt(
+                (String) event.getPayload().get(TransactionalAccountMailSender.RECIPIENT_CIPHERTEXT)))
+                .isEqualTo("teacher@example.com");
     }
 
     @Test

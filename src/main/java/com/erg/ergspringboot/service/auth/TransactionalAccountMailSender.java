@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 public class TransactionalAccountMailSender implements AccountMailSender {
     private static final String INVITE = "ACCOUNT_TEACHER_INVITE";
     private static final String RECOVERY = "ACCOUNT_RECOVERY_CODE";
+    /** Payload key read by TransactionalOutboxWorker; legacy rows still carry a plain "recipient". */
+    public static final String RECIPIENT_CIPHERTEXT = "recipientCiphertext";
     private final OutboxEventRepository repository;
     private final OutboxPayloadCipher cipher;
 
@@ -29,14 +31,12 @@ public class TransactionalAccountMailSender implements AccountMailSender {
 
     @Override
     public void sendTeacherInvite(String recipient, String fullName, String temporaryCredential) {
-        enqueue(INVITE, recipient + ":" + digest(temporaryCredential),
-                Map.of("recipient", recipient, "fullName", safe(fullName), "secret", cipher.encrypt(temporaryCredential)));
+        enqueue(INVITE, digest(recipient) + ":" + digest(temporaryCredential), payload(recipient, fullName, temporaryCredential));
     }
 
     @Override
     public void sendRecoveryEmailCode(String recipient, String fullName, String code) {
-        enqueue(RECOVERY, recipient + ":" + digest(code),
-                Map.of("recipient", recipient, "fullName", safe(fullName), "secret", cipher.encrypt(code)));
+        enqueue(RECOVERY, digest(recipient) + ":" + digest(code), payload(recipient, fullName, code));
     }
 
     private void enqueue(String eventType, String idempotencyKey, Map<String, Object> payload) {
@@ -52,6 +52,12 @@ public class TransactionalAccountMailSender implements AccountMailSender {
         event.setAvailableAt(OffsetDateTime.now());
         event.setCreatedAt(OffsetDateTime.now());
         repository.save(event);
+    }
+
+    /** Recipient address and one-time secret are stored encrypted; neither appears in the idempotency key. */
+    private Map<String, Object> payload(String recipient, String fullName, String secret) {
+        return Map.of(RECIPIENT_CIPHERTEXT, cipher.encrypt(recipient), "fullName", safe(fullName),
+                "secret", cipher.encrypt(secret));
     }
 
     private String safe(String value) { return value == null ? "" : value; }

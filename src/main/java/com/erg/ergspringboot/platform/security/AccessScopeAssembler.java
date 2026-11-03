@@ -18,6 +18,18 @@ public final class AccessScopeAssembler {
     private AccessScopeAssembler() {
     }
 
+    private static final java.util.Set<String> EDUCATION_UNIT_SCOPE_TYPES = java.util.Set.of(
+            "SCHOOL", "CENTER", "SYSTEM", "ORGANIZATION");
+
+    /**
+     * The one rule for which role-assignment scope types name an education unit; shared by
+     * request authorization (ErgPrincipalService) and session bootstrap (SessionService).
+     */
+    public static boolean isEducationUnitScopeType(String scopeType) {
+        return scopeType != null
+                && EDUCATION_UNIT_SCOPE_TYPES.contains(scopeType.trim().toUpperCase(java.util.Locale.ROOT));
+    }
+
     public static AccessScopeSet from(ErgPrincipal principal) {
         if (principal == null) return AccessScopeSet.legacy(List.of(), List.of(), null, null);
         if (principal.permissions().contains("*")) {

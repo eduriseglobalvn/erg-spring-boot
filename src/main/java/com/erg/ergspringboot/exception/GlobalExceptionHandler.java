@@ -279,6 +279,73 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    /**
+     * Spring MVC protocol errors (405, 415, 406, missing header, ...) carry their own HTTP status
+     * through {@link org.springframework.web.ErrorResponse}; keep it instead of degrading to 500.
+     */
+    @ExceptionHandler({
+            jakarta.servlet.ServletException.class,
+            org.springframework.web.ErrorResponseException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleMvcProtocolException(Exception exception, WebRequest request) {
+        if (!(exception instanceof org.springframework.web.ErrorResponse errorResponse)) {
+            return handleUnexpectedException(exception, request);
+        }
+        HttpStatus status = HttpStatus.resolve(errorResponse.getStatusCode().value());
+        if (status == null || status.is5xxServerError()) {
+            return handleUnexpectedException(exception, request);
+        }
+        String detail = exception instanceof org.springframework.web.bind.MissingRequestHeaderException missingHeader
+                ? "Missing required request header: " + missingHeader.getHeaderName()
+                : status.getReasonPhrase();
+        ApiResponse<Void> response = buildErrorResponse(status, status.getReasonPhrase(), detail,
+                protocolErrorCode(status), request);
+        return ResponseEntity.status(status)
+                .headers(errorResponse.getHeaders())
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception,
+            WebRequest request
+    ) {
+        ApiResponse<Void> response = buildErrorResponse(HttpStatus.CONTENT_TOO_LARGE, "Payload Too Large",
+                "uploaded file exceeds the allowed size", "PAYLOAD_TOO_LARGE", request);
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
+                .body(response);
+    }
+
+    @ExceptionHandler({
+            org.springframework.beans.TypeMismatchException.class,
+            java.time.format.DateTimeParseException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleInvalidValue(Exception exception, WebRequest request) {
+        String detail = exception instanceof org.springframework.web.method.annotation.MethodArgumentTypeMismatchException mismatch
+                ? "Invalid value for request parameter: " + mismatch.getName()
+                : exception instanceof java.time.format.DateTimeParseException
+                ? "invalid date-time value"
+                : "invalid request value";
+        ApiResponse<Void> response = buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", detail,
+                "INVALID_REQUEST", request);
+        return ResponseEntity.badRequest()
+                .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
+                .body(response);
+    }
+
+    private String protocolErrorCode(HttpStatus status) {
+        return switch (status) {
+            case METHOD_NOT_ALLOWED -> "METHOD_NOT_ALLOWED";
+            case UNSUPPORTED_MEDIA_TYPE -> "UNSUPPORTED_MEDIA_TYPE";
+            case NOT_ACCEPTABLE -> "NOT_ACCEPTABLE";
+            case NOT_FOUND -> "NOT_FOUND";
+            case CONTENT_TOO_LARGE -> "PAYLOAD_TOO_LARGE";
+            default -> "INVALID_REQUEST";
+        };
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpectedException(Exception exception, WebRequest request) {
         ApiResponse<Void> response = buildErrorResponse(

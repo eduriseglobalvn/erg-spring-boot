@@ -85,6 +85,34 @@ class AccountVerificationServiceTest {
         org.junit.jupiter.api.Assertions.assertEquals("RECOVERY_EMAIL_CONFLICT", error.getCode());
     }
 
+    @Test
+    void googleSelfVerificationStillRejectsAddressUsedAsAnotherAccountsRecoveryEmail() {
+        User google = user();
+        google.setEmail("teacher@gmail.com");
+        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(google));
+        when(userRepository.existsByRecoveryEmailIgnoreCaseAndIdNot("teacher@gmail.com", "user-1"))
+                .thenReturn(true);
+
+        var error = assertThrows(
+                com.erg.ergspringboot.exception.AccountLifecycleException.class,
+                () -> service.requestRecoveryEmailChallenge("user-1", "erg", null)
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals("RECOVERY_EMAIL_CONFLICT", error.getCode());
+    }
+
+    @Test
+    void nonGoogleAccountCannotUsePrimaryEmailAsRecoveryEmail() {
+        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user()));
+
+        var error = assertThrows(
+                com.erg.ergspringboot.exception.AccountLifecycleException.class,
+                () -> service.requestRecoveryEmailChallenge("user-1", "erg", "Primary@Example.com")
+        );
+
+        org.junit.jupiter.api.Assertions.assertEquals("RECOVERY_EMAIL_REQUIRED", error.getCode());
+    }
+
     private User user() {
         User user = new User();
         user.setId("user-1");

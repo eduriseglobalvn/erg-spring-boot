@@ -96,9 +96,6 @@ class AuthorizationServiceSecurityTest {
 
     @Test
     void protectedRoleDefinitionCannotBeUpdatedWithoutPlatformWildcard() {
-        Role protectedRole = role("system.rbac_admin");
-        when(roleRepository.findById("role-system.rbac_admin")).thenReturn(Optional.of(protectedRole));
-
         assertThatThrownBy(() -> service.updateRole(
                         "role-system.rbac_admin",
                         new UpdateRoleRequest(null, "escalated definition", null)
@@ -110,9 +107,6 @@ class AuthorizationServiceSecurityTest {
 
     @Test
     void protectedRoleDefinitionCannotBeDeletedWithoutPlatformWildcard() {
-        Role protectedRole = role("system.rbac_admin");
-        when(roleRepository.findById("role-system.rbac_admin")).thenReturn(Optional.of(protectedRole));
-
         assertThatThrownBy(() -> service.deleteRole("role-system.rbac_admin"))
                 .isInstanceOf(ForbiddenException.class);
 

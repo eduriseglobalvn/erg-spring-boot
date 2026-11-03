@@ -93,7 +93,8 @@ public class TransactionalOutboxWorker {
         try (TenantContext.Scope ignored = TenantContext.scope(
                 TenantContext.of(event.getTenantId(), null, "system"))) {
             Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
-            String recipient = string(payload, "recipient");
+            String encryptedRecipient = string(payload, "recipientCiphertext");
+            String recipient = encryptedRecipient.isEmpty() ? string(payload, "recipient") : cipher.decrypt(encryptedRecipient);
             String fullName = string(payload, "fullName");
             if ("ACCOUNT_TEACHER_INVITE".equals(event.getEventType())) {
                 smtp.sendTeacherInvite(recipient, fullName, cipher.decrypt(string(payload, "secret")));
@@ -104,7 +105,8 @@ public class TransactionalOutboxWorker {
             }
             transition(event.getId(), true, null);
         } catch (RuntimeException failure) {
-            transition(event.getId(), false, failure.getMessage());
+            // Provider messages often echo the recipient address; persist only the failure type.
+            transition(event.getId(), false, failure.getClass().getSimpleName());
         }
     }
 

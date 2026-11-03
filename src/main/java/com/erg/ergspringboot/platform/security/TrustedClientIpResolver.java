@@ -29,8 +29,11 @@ public class TrustedClientIpResolver {
     }
 
     public String resolve(HttpServletRequest request) {
-        String peer = literal(request == null ? null : request.getRemoteAddr());
-        if (peer == null) return "unknown";
+        String remote = request == null ? null : request.getRemoteAddr();
+        String peer = literal(remote);
+        // An unparsable peer must still key its own rate-limit bucket instead of collapsing
+        // every such client into a shared "unknown" bucket (or disabling IP limits entirely).
+        if (peer == null) return value(remote).isBlank() ? "unknown" : value(remote).trim();
         if (!trusted(peer)) return peer;
 
         String forwarded = request.getHeader("X-Forwarded-For");
@@ -51,6 +54,9 @@ public class TrustedClientIpResolver {
 
     private String literal(String input) {
         String candidate = value(input).trim();
+        if (candidate.startsWith("[") && candidate.endsWith("]")) candidate = candidate.substring(1, candidate.length() - 1);
+        int zone = candidate.indexOf('%');
+        if (zone > 0) candidate = candidate.substring(0, zone);
         if (candidate.isEmpty() || !candidate.matches("[0-9A-Fa-f:.]+")) return null;
         try {
             return InetAddress.getByName(candidate).getHostAddress();

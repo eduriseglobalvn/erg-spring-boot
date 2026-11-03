@@ -161,6 +161,59 @@ class GlobalExceptionHandlerTest {
                 .contains("idempotency key");
     }
 
+    @org.springframework.web.bind.annotation.RestController
+    static class ProbeController {
+        @org.springframework.web.bind.annotation.PostMapping(value = "/probe", consumes = "application/json")
+        String post(@org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+            return "ok";
+        }
+
+        @org.springframework.web.bind.annotation.GetMapping("/probe/{id}")
+        String get(@org.springframework.web.bind.annotation.PathVariable int id,
+                   @org.springframework.web.bind.annotation.RequestHeader("X-Probe") String probe) {
+            return "ok";
+        }
+
+        @org.springframework.web.bind.annotation.GetMapping("/probe-date")
+        String date() {
+            return java.time.OffsetDateTime.parse("not-a-date").toString();
+        }
+    }
+
+    @Test
+    void mvcProtocolErrorsKeepTheirStatusInsideTheApiEnvelope() throws Exception {
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+                .standaloneSetup(new ProbeController()).setControllerAdvice(handler).build();
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/probe"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isMethodNotAllowed())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("Allow"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.statusCode").value(405));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/probe")
+                        .contentType("text/plain").content("x"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isUnsupportedMediaType())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.statusCode").value(415));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/probe/abc").header("X-Probe", "1"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.statusCode").value(400));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/probe/1"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message")
+                        .value("Missing required request header: X-Probe"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/probe-date"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
+    }
+
+    @Test
+    void oversizedUploadMapsToPayloadTooLarge() {
+        ResponseEntity<ApiResponse<Void>> response = handler.handleMaxUploadSize(
+                new org.springframework.web.multipart.MaxUploadSizeExceededException(1024),
+                new ServletWebRequest(new MockHttpServletRequest("POST", "/api/v1/lcms/media/upload")));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(413);
+        assertThat(errorCode(response)).isEqualTo("PAYLOAD_TOO_LARGE");
+    }
+
     private String errorCode(ResponseEntity<ApiResponse<Void>> response) {
         return ((TransportError.Code) response.getBody().errors()).value();
     }

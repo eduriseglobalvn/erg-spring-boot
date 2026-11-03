@@ -69,6 +69,7 @@ class OidcPrincipalBridgeFilterTest {
         UserRepository userRepository = mock(UserRepository.class);
         OidcUser oidcUser = oidcUser("forged-admin", null);
         User user = activeUser();
+        user.setUsername("forged-admin");
         Role role = new Role();
         role.setName("system.super_admin");
         role.setPermissions(Set.of());
@@ -121,7 +122,9 @@ class OidcPrincipalBridgeFilterTest {
     void clearsAuthenticationWhenInternalUserIsNotActive() throws Exception {
         UserRepository userRepository = mock(UserRepository.class);
         OidcUser oidcUser = oidcUser(null, " Invited@Example.Test ");
+        when(oidcUser.getEmailVerified()).thenReturn(true);
         User user = activeUser();
+        user.setEmail("invited@example.test");
         user.setStatus("INVITED");
         when(userRepository.findWithDetailsByTenantAndIdentifier(
                 "tenant-1", "invited@example.test", "invited@example.test"))
@@ -173,6 +176,79 @@ class OidcPrincipalBridgeFilterTest {
                         .isNull());
 
         verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void preferredUsernameEqualToAnotherUsersEmailDoesNotTakeOverThatAccount() throws Exception {
+        UserRepository userRepository = mock(UserRepository.class);
+        OidcUser oidcUser = oidcUser("staff@example.test", "attacker@example.test");
+        when(userRepository.findWithDetailsByTenantAndIdentifier(
+                "tenant-1", "staff@example.test", "staff@example.test"))
+                .thenReturn(Optional.of(activeUser()));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(oidcUser, null, List.of()));
+
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
+                new MockHttpServletRequest(), new MockHttpServletResponse(),
+                (request, response) -> assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull());
+    }
+
+    @Test
+    void unverifiedEmailIsNeverUsedForAccountLinking() throws Exception {
+        UserRepository userRepository = mock(UserRepository.class);
+        OidcUser oidcUser = oidcUser(null, "staff@example.test");
+        when(oidcUser.getEmailVerified()).thenReturn(false);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(oidcUser, null, List.of()));
+
+        new OidcPrincipalBridgeFilter(userRepository, "tenant-1").doFilter(
+                new MockHttpServletRequest(), new MockHttpServletResponse(),
+                (request, response) -> assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull());
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void storedIssuerSubjectLinkWinsOverIdentifierClaims() throws Exception {
+        UserRepository userRepository = mock(UserRepository.class);
+        OidcIdentityLinkStore links = mock(OidcIdentityLinkStore.class);
+        OidcUser oidcUser = oidcUser("renamed-at-idp", null);
+        when(oidcUser.getIssuer()).thenReturn(new java.net.URL("https://auth.erg.edu.vn/realms/erg"));
+        when(oidcUser.getSubject()).thenReturn("sub-1");
+        when(links.linkedUserId("tenant-1", "https://auth.erg.edu.vn/realms/erg", "sub-1"))
+                .thenReturn(Optional.of("user-1"));
+        when(userRepository.findWithDetailsByIdAndTenantId("user-1", "tenant-1")).thenReturn(Optional.of(activeUser()));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(oidcUser, null, List.of()));
+        OidcPrincipalBridgeFilter filter = new OidcPrincipalBridgeFilter(userRepository, "tenant-1");
+        filter.setCollaborators(null, links);
+
+        filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
+                (request, response) -> assertThat(((ErgPrincipal) SecurityContextHolder.getContext()
+                        .getAuthentication().getPrincipal()).userId()).isEqualTo("user-1"));
+        org.mockito.Mockito.verify(userRepository, org.mockito.Mockito.never())
+                .findWithDetailsByTenantAndIdentifier(org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void accountAlreadyLinkedToAnotherSubjectIsNotTakenOver() throws Exception {
+        UserRepository userRepository = mock(UserRepository.class);
+        OidcIdentityLinkStore links = mock(OidcIdentityLinkStore.class);
+        OidcUser oidcUser = oidcUser("staff-01", null);
+        when(oidcUser.getIssuer()).thenReturn(new java.net.URL("https://auth.erg.edu.vn/realms/erg"));
+        when(oidcUser.getSubject()).thenReturn("sub-attacker");
+        when(links.linkedUserId("tenant-1", "https://auth.erg.edu.vn/realms/erg", "sub-attacker"))
+                .thenReturn(Optional.empty());
+        when(links.link("tenant-1", "https://auth.erg.edu.vn/realms/erg", "sub-attacker", "user-1")).thenReturn(false);
+        when(userRepository.findWithDetailsByTenantAndIdentifier("tenant-1", "staff-01", "staff-01"))
+                .thenReturn(Optional.of(activeUser()));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(oidcUser, null, List.of()));
+        OidcPrincipalBridgeFilter filter = new OidcPrincipalBridgeFilter(userRepository, "tenant-1");
+        filter.setCollaborators(null, links);
+
+        filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
+                (request, response) -> assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull());
     }
 
     private static OidcUser oidcUser(String preferredUsername, String email) {

@@ -225,6 +225,7 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return path.equals("/api/v1/users/me")
                 || path.startsWith("/api/v1/users/me/")
+                || path.equals("/api/v1/users/onboarding")
                 || path.startsWith("/api/v1/sessions/")
                 || path.equals("/api/v1/auth/logout")
                 || path.equals("/api/v1/auth/refresh");
