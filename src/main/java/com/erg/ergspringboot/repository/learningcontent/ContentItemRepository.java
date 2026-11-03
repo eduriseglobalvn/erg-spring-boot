@@ -47,6 +47,7 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, String
                   and (:categoryId is null or level.id = :categoryId)
                   and (:topicId is null or topic.id = :topicId)
                   and (:visibility is null or lower(item.visibility) = lower(:visibility))
+                  and (:viewerId is null or lower(item.visibility) in ('public', 'tenant') or item.owner_id = :viewerId)
                   and (
                     :status is null
                     or (:status = 'active' and lower(item.status) in ('active', 'published'))
@@ -72,6 +73,7 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, String
               and (:categoryId is null or level.id = :categoryId)
               and (:topicId is null or topic.id = :topicId)
               and (:visibility is null or lower(item.visibility) = lower(:visibility))
+              and (:viewerId is null or lower(item.visibility) in ('public', 'tenant') or item.owner_id = :viewerId)
               and (
                 :status is null
                 or (:status = 'active' and lower(item.status) in ('active', 'published'))
@@ -85,6 +87,8 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, String
             @Param("topicId") String topicId,
             @Param("status") String status,
             @Param("visibility") String visibility,
+            /** Non-null restricts the cards to public/tenant items plus the viewer's own private items. */
+            @Param("viewerId") String viewerId,
             Pageable pageable
     );
 

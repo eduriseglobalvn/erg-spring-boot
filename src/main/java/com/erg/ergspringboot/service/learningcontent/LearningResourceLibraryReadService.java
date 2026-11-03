@@ -65,12 +65,13 @@ public class LearningResourceLibraryReadService {
 
     @Cacheable(
             cacheNames = "learningResourceLibrary",
-            key = "{#tenantId, #educationUnitId, #userId, #academicYear, #subjectId, #gradeId, #categoryId, #sectionId, #topicId, #status, #visibility, #page, #size}"
+            key = "{#tenantId, #educationUnitId, #userId, #contentManager, #academicYear, #subjectId, #gradeId, #categoryId, #sectionId, #topicId, #status, #visibility, #page, #size}"
     )
     public LearningResourceLibraryResponse learningResourceLibrary(
             String tenantId,
             String educationUnitId,
             String userId,
+            boolean contentManager,
             String academicYear,
             String subjectId,
             String gradeId,
@@ -83,7 +84,10 @@ public class LearningResourceLibraryReadService {
             Integer size
     ) {
         String resolvedTenantId = requiredTenant(tenantId);
-        String normalizedStatus = normalized(status);
+        // B5: without content.manage the library only shows active content that is public/tenant-visible
+        // (plus the caller's own private items); drafts and other teachers' private items stay hidden.
+        String normalizedStatus = contentManager ? normalized(status) : ACTIVE;
+        String viewerId = contentManager ? null : (blankToNull(userId) == null ? "" : userId.trim());
         List<CurriculumSubject> subjects = loadSubjects(resolvedTenantId, normalizedStatus, subjectId);
         List<String> subjectIds = subjects.stream().map(CurriculumSubject::getId).toList();
         List<CurriculumLevel> levels = subjectIds.isEmpty()
@@ -112,6 +116,7 @@ public class LearningResourceLibraryReadService {
                 firstNonBlank(topicId, sectionId),
                 normalizedStatus,
                 normalized(visibility),
+                viewerId,
                 safePage(page),
                 safeSize(size),
                 levelsById,
@@ -298,6 +303,7 @@ public class LearningResourceLibraryReadService {
             String topicId,
             String status,
             String visibility,
+            String viewerId,
             int page,
             int size,
             Map<String, CurriculumLevel> levelsById,
@@ -311,6 +317,7 @@ public class LearningResourceLibraryReadService {
                         blankToNull(topicId),
                         status,
                         visibility,
+                        viewerId,
                         PageRequest.of(page, size)
                 );
         List<LearningResourceCardResponse> cards = result.getContent().stream()

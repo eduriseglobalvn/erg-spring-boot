@@ -83,7 +83,7 @@ class LearningResourceLibraryReadServiceTest {
                 .thenReturn(List.of(topicCount("topic-1", 1)));
         when(contentItemRepository.findLearningResourceCards(
                 org.mockito.ArgumentMatchers.eq("tenant-a"), any(), any(), any(),
-                org.mockito.ArgumentMatchers.eq("active"), any(), any(Pageable.class)))
+                org.mockito.ArgumentMatchers.eq("active"), any(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(cardProjection("content-1", "subject-1", "level-1", "topic-1",
                         "Internet Safety Practice", "published", "public")), PageRequest.of(0, 20), 1));
 
@@ -91,6 +91,7 @@ class LearningResourceLibraryReadServiceTest {
                 "tenant-a",
                 null,
                 "user-1",
+                false,
                 "2026",
                 null,
                 null,
@@ -112,6 +113,25 @@ class LearningResourceLibraryReadServiceTest {
         assertThat(card.sectionId()).isEqualTo("topic-1");
         assertThat(card.topicId()).isEqualTo("topic-1");
         assertThat(card.status()).isEqualTo("published");
+        // B5: a caller without content.manage is restricted to public/tenant items plus their own.
+        org.mockito.Mockito.verify(contentItemRepository).findLearningResourceCards(
+                org.mockito.ArgumentMatchers.eq("tenant-a"), any(), any(), any(),
+                org.mockito.ArgumentMatchers.eq("active"), any(), org.mockito.ArgumentMatchers.eq("user-1"), any(Pageable.class));
+    }
+
+    @Test
+    void nonManagersCannotRequestDraftResources() {
+        when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(eq("tenant-a"), eq("active"), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(contentItemRepository.findLearningResourceCards(any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        service.learningResourceLibrary("tenant-a", null, "teacher-b", false, null, null, null, null, null, null,
+                "draft", null, 0, 20);
+
+        org.mockito.Mockito.verify(contentItemRepository).findLearningResourceCards(
+                org.mockito.ArgumentMatchers.eq("tenant-a"), any(), any(), any(),
+                org.mockito.ArgumentMatchers.eq("active"), any(), org.mockito.ArgumentMatchers.eq("teacher-b"), any(Pageable.class));
     }
 
     @Test
@@ -138,7 +158,7 @@ class LearningResourceLibraryReadServiceTest {
                 .thenReturn(List.of(topicCount("topic-2", 1)));
         when(contentItemRepository.findLearningResourceCards(
                 org.mockito.ArgumentMatchers.eq("tenant-a"), any(), org.mockito.ArgumentMatchers.eq("level-2"),
-                any(), org.mockito.ArgumentMatchers.eq("active"), any(), any(Pageable.class)))
+                any(), org.mockito.ArgumentMatchers.eq("active"), any(), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(cardProjection("content-2", "subject-1", "level-2", "topic-2",
                         "Algorithm Basics Worksheet", "published", "public")), PageRequest.of(0, 1), 1));
 
@@ -146,6 +166,7 @@ class LearningResourceLibraryReadServiceTest {
                 "tenant-a",
                 null,
                 "user-1",
+                true,
                 "2026",
                 "subject-1",
                 null,
