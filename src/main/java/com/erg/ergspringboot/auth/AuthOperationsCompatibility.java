@@ -27,7 +27,7 @@ public final class AuthOperationsCompatibility {
             AuthTokenService tokens) {
         return new AuthOperations(
                 new AuthLoginUseCase(users, sessions, attempts, passwords, tokens),
-                new AuthRefreshUseCase(sessions, tokens),
+                new AuthRefreshUseCase(sessions, tokens, users),
                 new AuthSessionLifecycleUseCase(sessions),
                 new AuthSecurityQueryUseCase(attempts),
                 null);

@@ -145,6 +145,8 @@ class AuthServiceTest {
         AuthSession session = session("session-1", "user-1", "tenant-a");
         session.setRefreshTokenHash(currentHash);
         when(sessionRepository.lockByRefreshTokenHash(currentHash)).thenReturn(Optional.of(session));
+        when(userRepository.findByIdAndTenantId("user-1", "tenant-a"))
+                .thenReturn(Optional.of(activeUser("user-1", "active@example.com", "secret123")));
 
         authService.refresh(new RefreshRequest(refreshToken, "device-a"),
                 new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a"));
@@ -157,6 +159,34 @@ class AuthServiceTest {
         verify(refreshTokenHistoryRepository).save(history.capture());
         assertEquals(currentHash, history.getValue().getTokenHash());
         assertEquals("session-1", history.getValue().getSessionId());
+    }
+
+    @Test
+    void refreshRejectsSessionWhoseUserIsNoLongerActive() {
+        String refreshToken = "refresh-token-banned";
+        String currentHash = tokenService.hashToken(refreshToken);
+        AuthSession session = session("session-1", "user-1", "tenant-a");
+        session.setRefreshTokenHash(currentHash);
+        User banned = activeUser("user-1", "banned@example.com", "secret123");
+        banned.setStatus("BANNED");
+        when(sessionRepository.lockByRefreshTokenHash(currentHash)).thenReturn(Optional.of(session));
+        when(userRepository.findByIdAndTenantId("user-1", "tenant-a")).thenReturn(Optional.of(banned));
+
+        assertThrows(AuthFailure.InvalidToken.class, () -> authService.refresh(
+                new RefreshRequest(refreshToken, "device-a"),
+                new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a")));
+
+        assertEquals(currentHash, session.getRefreshTokenHash());
+        org.mockito.Mockito.verify(sessionRepository, org.mockito.Mockito.never()).save(session);
+    }
+
+    @Test
+    void refreshUseCaseKeepsReplayRevocationWhenRejectingTheToken() throws Exception {
+        org.springframework.transaction.annotation.Transactional tx = com.erg.ergspringboot.auth.internal.refresh
+                .AuthRefreshUseCase.class.getMethod("refresh", RefreshRequest.class, AuthClientContext.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+
+        assertTrue(List.of(tx.noRollbackFor()).contains(AuthFailure.InvalidToken.class));
     }
 
     @Test

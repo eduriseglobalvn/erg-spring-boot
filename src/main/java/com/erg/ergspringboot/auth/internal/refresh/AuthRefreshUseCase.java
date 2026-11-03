@@ -10,6 +10,7 @@ import com.erg.ergspringboot.model.auth.SecurityEvent;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
+import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.service.auth.AuthTokenService;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.Duration;
@@ -30,6 +31,7 @@ public class AuthRefreshUseCase {
 
     private final AuthSessionRepository sessions;
     private final AuthTokenService tokens;
+    private final UserRepository users;
     private SecurityEventRepository securityEvents;
     private RefreshTokenHistoryRepository refreshHistory;
 
@@ -37,17 +39,19 @@ public class AuthRefreshUseCase {
     public AuthRefreshUseCase(
             AuthSessionRepository sessions,
             AuthTokenService tokens,
+            UserRepository users,
             ObjectProvider<SecurityEventRepository> securityEvents,
             ObjectProvider<RefreshTokenHistoryRepository> refreshHistory) {
-        this(sessions, tokens);
+        this(sessions, tokens, users);
         this.securityEvents = securityEvents.getIfAvailable();
         this.refreshHistory = refreshHistory.getIfAvailable();
     }
 
     /** Compatibility constructor for the legacy facade and focused unit tests. */
-    public AuthRefreshUseCase(AuthSessionRepository sessions, AuthTokenService tokens) {
+    public AuthRefreshUseCase(AuthSessionRepository sessions, AuthTokenService tokens, UserRepository users) {
         this.sessions = sessions;
         this.tokens = tokens;
+        this.users = users;
     }
 
     public void setSecurityEventRepository(SecurityEventRepository securityEvents) {
@@ -58,12 +62,19 @@ public class AuthRefreshUseCase {
         this.refreshHistory = refreshHistory;
     }
 
-    @Transactional
+    /**
+     * Replay handling revokes every session of the account and records a CRITICAL event before
+     * rejecting the request; {@code noRollbackFor} keeps that response durable.
+     */
+    @Transactional(noRollbackFor = AuthFailure.InvalidToken.class)
     public TokenResponse refresh(RefreshRequest request, AuthClientContext context) {
         String currentHash = tokens.hashToken(request.refreshToken());
         AuthSession session = sessions.lockByRefreshTokenHash(currentHash)
                 .filter(this::isSessionActive)
                 .orElse(null);
+        if (session != null && !isUserActive(session)) {
+            throw new AuthFailure.InvalidToken();
+        }
         if (session == null) {
             AuthSession replayed = sessions.findByPreviousRefreshTokenHash(currentHash).orElse(null);
             if (replayed == null && refreshHistory != null) {
@@ -144,6 +155,12 @@ public class AuthRefreshUseCase {
         return session.getRevokedAt() == null
                 && session.getExpiresAt() != null
                 && session.getExpiresAt().isAfter(now());
+    }
+
+    private boolean isUserActive(AuthSession session) {
+        return users.findByIdAndTenantId(session.getUserId(), firstNonBlank(session.getTenantId(), DEFAULT_TENANT))
+                .map(user -> "ACTIVE".equalsIgnoreCase(user.getStatus()))
+                .orElse(false);
     }
 
     private String firstNonBlank(String value, String fallback) {
