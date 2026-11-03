@@ -61,7 +61,8 @@ class AttemptRepositoryReadModelContractTest {
         Method method = AttemptRepository.class.getMethod(
                 "summarizeClassWorkspaceScores",
                 String.class,
-                String.class
+                String.class,
+                java.util.Collection.class
         );
         Query query = method.getAnnotation(Query.class);
 
@@ -84,7 +85,8 @@ class AttemptRepositoryReadModelContractTest {
                 "findTeacherPendingReviews",
                 String.class,
                 String.class,
-                org.springframework.data.domain.Pageable.class
+                org.springframework.data.domain.Pageable.class,
+                java.util.Collection.class
         );
         Query query = method.getAnnotation(Query.class);
 
@@ -96,7 +98,7 @@ class AttemptRepositoryReadModelContractTest {
                 .contains("PendingReviewProjection")
                 .contains("assignment.assignedBy = :teacherId")
                 .contains("attempt.tenantId = :tenantId")
-                .contains("lower(attempt.status) in ('submitted', 'needs_review', 'review_required')")
+                .contains("lower(attempt.status) in :reviewStates")
                 .doesNotContain("attempt.answers")
                 .doesNotContain("attempt.events")
                 .doesNotContain("attempt.client")

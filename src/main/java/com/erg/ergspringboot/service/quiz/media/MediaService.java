@@ -11,15 +11,16 @@ import com.erg.ergspringboot.repository.quiz.media.MediaAssetRepository;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Hash-first, deduplicated media pipeline for the quiz editor (spec §5). Presign resolves an existing
  * asset by (tenant, sha256) or provisions a pending row + short-lived upload URL; commit verifies the
  * uploaded object and flips the asset to committed. Replaces the FE's base64 data URLs.
+ *
+ * <p>SQ-07: no class-level transaction. Storage calls (HEAD/PUT to R2 or local disk) run outside any
+ * database transaction; each repository write is its own short transaction.
  */
 @Service
-@Transactional(value = "postgresTransactionManager")
 public class MediaService {
 
     public static final long MAX_IMAGE_BYTES = 15L * 1024L * 1024L;

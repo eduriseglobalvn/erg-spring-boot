@@ -61,13 +61,28 @@ class LmsAssignmentCommandServiceTest {
     @Mock private Cache quizAssignmentReportCache;
     @Mock private Cache quizQuestionAnalyticsCache;
 
+    @Mock private LmsClassroomService classrooms;
+    private com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy policy;
     private LmsAssignmentCommandService service;
+    private final com.erg.ergspringboot.platform.security.UserAccessContext admin =
+            new com.erg.ergspringboot.platform.security.UserAccessContext("teacher-1", "tenant-a", List.of("*"), List.of("*"), null, null);
 
     @BeforeEach
     void setUp() {
+        policy = new com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy(org.mockito.Mockito.mock(LmsAssignmentService.class),
+                classrooms, org.mockito.Mockito.mock(LmsStudentService.class), recipientRepository, resourceRepository,
+                org.mockito.Mockito.mock(com.erg.ergspringboot.lms.LmsCallerPermissions.class));
         service = new LmsAssignmentCommandService(
                 assignmentRepository, resourceRepository, recipientRepository,
-                studentGroupRepository, studentGroupMemberRepository, studentRepository, quizVersionRepository, cacheManager);
+                studentGroupRepository, studentGroupMemberRepository, studentRepository, quizVersionRepository,
+                new com.erg.ergspringboot.lms.LmsReadCacheInvalidator(cacheManager, (com.erg.ergspringboot.platform.cache.CacheInvalidationService) null),
+                policy, (com.erg.ergspringboot.platform.sync.LmsSyncOperationService) null);
+        when(classrooms.findByTenantIdAndId(eq("tenant-a"), anyString())).thenAnswer(invocation -> {
+            com.erg.ergspringboot.model.lms.Classroom classroom = new com.erg.ergspringboot.model.lms.Classroom();
+            classroom.setId(invocation.getArgument(1));
+            classroom.setSchoolId("school-1");
+            return Optional.of(classroom);
+        });
         when(cacheManager.getCache("lmsHomeworkWorkspace")).thenReturn(lmsHomeworkWorkspaceCache);
         when(cacheManager.getCache("lmsClassWorkspace")).thenReturn(lmsClassWorkspaceCache);
         when(cacheManager.getCache("lmsAssignmentProgress")).thenReturn(lmsAssignmentProgressCache);
@@ -125,7 +140,7 @@ class LmsAssignmentCommandServiceTest {
         CreateAssignmentRequest request = new CreateAssignmentRequest(
                 "Homework 1", List.of("quiz-1"), "class", "class-1", null, null, null, null, null, null, null);
 
-        CreateAssignmentResponse response = service.create("tenant-a", "teacher-1", "idem-1", request);
+        CreateAssignmentResponse response = service.create(admin, "idem-1", request);
 
         assertThat(response.recipientCount()).isEqualTo(2);
         assertThat(response.resources()).singleElement()
@@ -166,7 +181,7 @@ class LmsAssignmentCommandServiceTest {
                 "Offline homework", List.of("quiz-1"), "class", "class-1", null, null,
                 null, null, null, null, null, true);
 
-        service.create("tenant-a", "teacher-1", "idem-offline", request);
+        service.create(admin, "idem-offline", request);
 
         ArgumentCaptor<Assignment> captor = ArgumentCaptor.forClass(Assignment.class);
         verify(assignmentRepository).save(captor.capture());
@@ -186,7 +201,7 @@ class LmsAssignmentCommandServiceTest {
         CreateAssignmentRequest request = new CreateAssignmentRequest(
                 "Homework", List.of("quiz-1"), "class", "class-1", null, null, null, null, null, null, null);
 
-        CreateAssignmentResponse response = service.create("tenant-a", "teacher-1", "idem-dup", request);
+        CreateAssignmentResponse response = service.create(admin, "idem-dup", request);
 
         assertThat(response.assignmentId()).isEqualTo("assignment-existing");
         assertThat(response.recipientCount()).isEqualTo(3);
@@ -213,7 +228,7 @@ class LmsAssignmentCommandServiceTest {
         CreateAssignmentRequest request = new CreateAssignmentRequest(
                 "Homework", List.of("quiz-unpub"), "class", "class-1", null, null, null, null, null, null, null);
 
-        assertThatThrownBy(() -> service.create("tenant-a", "teacher-1", null, request))
+        assertThatThrownBy(() -> service.create(admin, null, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("no published version");
     }
@@ -235,7 +250,7 @@ class LmsAssignmentCommandServiceTest {
         CreateAssignmentRequest request = new CreateAssignmentRequest(
                 "Group HW", List.of("quiz-1"), "group", null, "group-1", null, null, null, null, null, null);
 
-        CreateAssignmentResponse response = service.create("tenant-a", "teacher-1", null, request);
+        CreateAssignmentResponse response = service.create(admin, null, request);
 
         assertThat(response.recipientCount()).isEqualTo(1);
         verify(recipientRepository).saveAll(anyList());
@@ -249,7 +264,7 @@ class LmsAssignmentCommandServiceTest {
         CreateAssignmentRequest request = new CreateAssignmentRequest(
                 "Homework", List.of("quiz-1"), "class", "empty-class", null, null, null, null, null, null, null);
 
-        assertThatThrownBy(() -> service.create("tenant-a", "teacher-1", null, request))
+        assertThatThrownBy(() -> service.create(admin, null, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("zero recipients");
     }
@@ -259,9 +274,57 @@ class LmsAssignmentCommandServiceTest {
         CreateAssignmentRequest request = new CreateAssignmentRequest(
                 "Homework", List.of(), "class", "class-1", null, null, null, null, null, null, null);
 
-        assertThatThrownBy(() -> service.create("tenant-a", "teacher-1", null, request))
+        assertThatThrownBy(() -> service.create(admin, null, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("quizId");
+        verify(assignmentRepository, never()).save(any(Assignment.class));
+    }
+
+    @Test
+    void teacherOutsideTheAssignmentClassCannotUpdateOrDeleteIt() {
+        Assignment assignment = new Assignment();
+        assignment.setId("assignment-9");
+        assignment.setTenantId("tenant-a");
+        assignment.setAcademicClassId("class-9a2");
+        when(assignmentRepository.findById("assignment-9")).thenReturn(Optional.of(assignment));
+        var otherTeacher = new com.erg.ergspringboot.platform.security.UserAccessContext(
+                "teacher-6a1", "tenant-a", List.of("school-1"), List.of("class-6a1"), null, null);
+
+        assertThatThrownBy(() -> service.delete(otherTeacher, "assignment-9"))
+                .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
+        assertThatThrownBy(() -> service.updateAssignment(otherTeacher, "assignment-9",
+                new com.erg.ergspringboot.common.request.quiz.AssignmentRequests.UpdateAssignmentRequest(
+                        null, null, null, null, null, null, "archived", null)))
+                .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
+        verify(assignmentRepository, never()).delete(any(Assignment.class));
+    }
+
+    @Test
+    void createRejectsRecipientsOutsideTheCallerScope() {
+        when(studentRepository.findByTenantIdAndAcademicClassIdOrderByFullNameAsc("tenant-a", "class-9a2"))
+                .thenReturn(List.of(student("s1", "class-9a2")));
+        var otherTeacher = new com.erg.ergspringboot.platform.security.UserAccessContext(
+                "teacher-6a1", "tenant-a", List.of("school-1"), List.of("class-6a1"), null, null);
+        CreateAssignmentRequest request = new CreateAssignmentRequest(
+                "Homework", List.of("quiz-1"), "class", "class-9a2", null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.create(otherTeacher, null, request))
+                .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
+        verify(assignmentRepository, never()).save(any(Assignment.class));
+    }
+
+    @Test
+    void updateRejectsUnknownAssignmentStatus() {
+        Assignment assignment = new Assignment();
+        assignment.setId("assignment-1");
+        assignment.setTenantId("tenant-a");
+        assignment.setAcademicClassId("class-1");
+        when(assignmentRepository.findById("assignment-1")).thenReturn(Optional.of(assignment));
+
+        assertThatThrownBy(() -> service.updateAssignment(admin, "assignment-1",
+                new com.erg.ergspringboot.common.request.quiz.AssignmentRequests.UpdateAssignmentRequest(
+                        null, null, null, null, null, null, "foo", null)))
+                .isInstanceOf(BadRequestException.class);
         verify(assignmentRepository, never()).save(any(Assignment.class));
     }
 }

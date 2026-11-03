@@ -14,4 +14,9 @@ public interface ReportJobPort {
     }
 
     ReportJobResponse get(String tenantId, String id);
+
+    /** The user that requested the job; empty when the adapter cannot tell (callers then require scope). */
+    default java.util.Optional<String> requestedBy(String tenantId, String id) {
+        return java.util.Optional.empty();
+    }
 }

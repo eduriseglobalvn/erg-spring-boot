@@ -251,7 +251,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
               and attempt.assignmentId = :assignmentId
               and attempt.studentId in :studentIds
               and attempt.percent is not null
-              and lower(attempt.status) in ('submitted', 'graded', 'completed')
+              and lower(attempt.status) in :completedStates
               and not exists (
                   select betterAttempt.id
                   from Attempt betterAttempt
@@ -259,7 +259,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                     and betterAttempt.assignmentId = attempt.assignmentId
                     and betterAttempt.studentId = attempt.studentId
                     and betterAttempt.percent is not null
-                    and lower(betterAttempt.status) in ('submitted', 'graded', 'completed')
+                    and lower(betterAttempt.status) in :completedStates
                     and (
                         betterAttempt.percent > attempt.percent
                         or (
@@ -274,11 +274,16 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                     )
               )
             """)
-    List<AttemptScoreProjection> findBestAttemptScoresForRecipients(
-            String tenantId,
+    List<AttemptScoreProjection> findBestAttemptScoresForRecipients(String tenantId,
             String assignmentId,
-            Collection<String> studentIds
-    );
+            Collection<String> studentIds, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default List<AttemptScoreProjection> findBestAttemptScoresForRecipients(String tenantId,
+            String assignmentId,
+            Collection<String> studentIds) {
+        return findBestAttemptScoresForRecipients(tenantId, assignmentId, studentIds, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 
     @Query(
             value = """
@@ -307,7 +312,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                         and student.id = attempt.studentId
                     where attempt.tenantId = :tenantId
                       and assignment.assignedBy = :teacherId
-                      and lower(attempt.status) in ('submitted', 'needs_review', 'review_required')
+                      and lower(attempt.status) in :reviewStates
                     order by attempt.updatedAt desc
                     """,
             countQuery = """
@@ -318,10 +323,15 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                         and assignment.id = attempt.assignmentId
                     where attempt.tenantId = :tenantId
                       and assignment.assignedBy = :teacherId
-                      and lower(attempt.status) in ('submitted', 'needs_review', 'review_required')
+                      and lower(attempt.status) in :reviewStates
                     """
     )
-    Page<PendingReviewProjection> findTeacherPendingReviews(String tenantId, String teacherId, Pageable pageable);
+    Page<PendingReviewProjection> findTeacherPendingReviews(String tenantId, String teacherId, Pageable pageable, java.util.Collection<String> reviewStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default Page<PendingReviewProjection> findTeacherPendingReviews(String tenantId, String teacherId, Pageable pageable) {
+        return findTeacherPendingReviews(tenantId, teacherId, pageable, com.erg.ergspringboot.lms.LmsStatePolicy.reviewQueueAttemptStates());
+    }
 
     @Query(
             value = """
@@ -370,9 +380,14 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                 and assignment.id = attempt.assignmentId
             where attempt.tenantId = :tenantId
               and assignment.academicClassId = :academicClassId
-              and lower(attempt.status) in ('submitted', 'graded', 'completed')
+              and lower(attempt.status) in :completedStates
             """)
-    ClassScoreSummaryProjection summarizeClassWorkspaceScores(String tenantId, String academicClassId);
+    ClassScoreSummaryProjection summarizeClassWorkspaceScores(String tenantId, String academicClassId, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default ClassScoreSummaryProjection summarizeClassWorkspaceScores(String tenantId, String academicClassId) {
+        return summarizeClassWorkspaceScores(tenantId, academicClassId, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 
     @Query("""
             select new com.erg.ergspringboot.repository.lms.projection.StudentDashboardScoreSummaryProjection(
@@ -393,11 +408,16 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                   or attempt.classId = :academicClassId
                   or (attempt.classId is null and assignment.academicClassId = :academicClassId)
               )
-              and lower(attempt.status) in ('submitted', 'graded', 'completed')
+              and lower(attempt.status) in :completedStates
             """)
-    StudentDashboardScoreSummaryProjection summarizeStudentDashboardScores(
-            String tenantId,
+    StudentDashboardScoreSummaryProjection summarizeStudentDashboardScores(String tenantId,
             String studentId,
-            String academicClassId
-    );
+            String academicClassId, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default StudentDashboardScoreSummaryProjection summarizeStudentDashboardScores(String tenantId,
+            String studentId,
+            String academicClassId) {
+        return summarizeStudentDashboardScores(tenantId, studentId, academicClassId, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 }

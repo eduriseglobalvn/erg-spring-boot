@@ -9,6 +9,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ManualGradeRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SaveAnswerRequest;
@@ -24,7 +25,6 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssi
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.service.lms.LmsAssignmentCommandService;
-import com.erg.ergspringboot.service.lms.LmsRuntimeService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -34,16 +34,9 @@ public class LmsOperations {
     private final LmsRuntimePort legacy;
     private final LmsAssignmentCommandService assignments;
 
-    @org.springframework.beans.factory.annotation.Autowired
     public LmsOperations(LmsRuntimePort legacy, LmsAssignmentCommandService assignments) {
         this.legacy = legacy;
         this.assignments = assignments;
-    }
-
-    /** Compatibility constructor retained for focused legacy adapter tests. */
-    @Deprecated
-    public LmsOperations(LmsRuntimeService legacy, LmsAssignmentCommandService assignments) {
-        this((LmsRuntimePort) legacy, assignments);
     }
 
     public AttemptResponse startAttempt(String studentId, StartAttemptRequest request,
@@ -56,22 +49,27 @@ public class LmsOperations {
         return legacy.submitAttempt(attemptId, request, access);
     }
 
-    public CreateAssignmentResponse createAssignment(String tenantId, String userId, String idempotencyKey,
+    public AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request,
+            UserAccessContext access) {
+        return legacy.gradeManualAnswer(attemptId, questionId, request, access);
+    }
+
+    public CreateAssignmentResponse createAssignment(UserAccessContext access, String idempotencyKey,
             CreateAssignmentRequest request) {
-        return assignments.create(tenantId, userId, idempotencyKey, request);
+        return assignments.create(access, idempotencyKey, request);
     }
 
-    public void updateAssignment(String tenantId, String assignmentId, UpdateAssignmentRequest request) {
-        assignments.updateAssignment(tenantId, assignmentId, request);
+    public void updateAssignment(UserAccessContext access, String assignmentId, UpdateAssignmentRequest request) {
+        assignments.updateAssignment(access, assignmentId, request);
     }
 
-    public CreateAssignmentResponse updateAssignmentRecipients(String tenantId, String assignmentId,
+    public CreateAssignmentResponse updateAssignmentRecipients(UserAccessContext access, String assignmentId,
             UpdateRecipientsRequest request) {
-        return assignments.updateRecipients(tenantId, assignmentId, request);
+        return assignments.updateRecipients(access, assignmentId, request);
     }
 
-    public void deleteAssignment(String tenantId, String assignmentId) {
-        assignments.delete(tenantId, assignmentId);
+    public void deleteAssignment(UserAccessContext access, String assignmentId) {
+        assignments.delete(access, assignmentId);
     }
 
     public StudentGroupResponse createStudentGroup(String tenantId, String userId, StudentGroupRequest request) {
@@ -93,8 +91,8 @@ public class LmsOperations {
         return legacy.listStudentScores(studentId, access, page, size);
     }
 
-    public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
-        return legacy.getQuizPackage(quizId, access);
+    public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) {
+        return legacy.getQuizPackage(quizId, assignmentId, access);
     }
 
     public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return legacy.getQuiz(quizId, access); }

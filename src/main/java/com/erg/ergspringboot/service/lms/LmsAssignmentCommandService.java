@@ -8,6 +8,12 @@ import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.Assignment
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssignmentResponse;
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
+import com.erg.ergspringboot.lms.LmsStatePolicy;
+import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.lms.Assignment;
 import com.erg.ergspringboot.model.lms.AssignmentRecipient;
@@ -34,15 +40,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * LMS distribution writes (spec §4.8). An assignment fans one or more quizzes to a recipient set. The
@@ -62,16 +64,6 @@ public class LmsAssignmentCommandService {
     private static final String MODE_GROUP = "group";
     private static final String MODE_STUDENTS = "students";
     private static final String STATUS_ACTIVE = "active";
-    private static final List<String> ASSIGNMENT_READ_CACHES = List.of(
-            "lmsHomeworkWorkspace",
-            "lmsClassWorkspace",
-            "lmsAssignmentProgress",
-            "lmsStudentAssignments",
-            "studentDashboard",
-            "quizAssignmentReport",
-            "quizQuestionAnalytics"
-    );
-
     private final AssignmentRepository assignmentRepository;
     private final AssignmentResourceRepository resourceRepository;
     private final AssignmentRecipientRepository recipientRepository;
@@ -79,23 +71,9 @@ public class LmsAssignmentCommandService {
     private final StudentGroupMemberRepository studentGroupMemberRepository;
     private final StudentRepository studentRepository;
     private final QuizVersionRepository quizVersionRepository;
-    private final CacheManager cacheManager;
+    private final LmsReadCacheInvalidator caches;
+    private final LmsAssignmentAccessPolicy policy;
     private final LmsSyncOperationService sync;
-
-    public LmsAssignmentCommandService(
-            AssignmentRepository assignmentRepository,
-            AssignmentResourceRepository resourceRepository,
-            AssignmentRecipientRepository recipientRepository,
-            StudentGroupRepository studentGroupRepository,
-            StudentGroupMemberRepository studentGroupMemberRepository,
-            StudentRepository studentRepository,
-            QuizVersionRepository quizVersionRepository,
-            CacheManager cacheManager
-    ) {
-        this(assignmentRepository, resourceRepository, recipientRepository, studentGroupRepository,
-                studentGroupMemberRepository, studentRepository, quizVersionRepository, cacheManager,
-                (LmsSyncOperationService) null);
-    }
 
     @Autowired
     public LmsAssignmentCommandService(
@@ -106,15 +84,17 @@ public class LmsAssignmentCommandService {
             StudentGroupMemberRepository studentGroupMemberRepository,
             StudentRepository studentRepository,
             QuizVersionRepository quizVersionRepository,
-            CacheManager cacheManager,
+            LmsReadCacheInvalidator caches,
+            LmsAssignmentAccessPolicy policy,
             ObjectProvider<LmsSyncOperationService> sync
     ) {
         this(assignmentRepository, resourceRepository, recipientRepository, studentGroupRepository,
-                studentGroupMemberRepository, studentRepository, quizVersionRepository, cacheManager,
+                studentGroupMemberRepository, studentRepository, quizVersionRepository, caches, policy,
                 sync == null ? null : sync.getIfAvailable());
     }
 
-    private LmsAssignmentCommandService(
+    /** Explicit wiring; {@code sync} is optional (null disables durable idempotency receipts). */
+    public LmsAssignmentCommandService(
             AssignmentRepository assignmentRepository,
             AssignmentResourceRepository resourceRepository,
             AssignmentRecipientRepository recipientRepository,
@@ -122,7 +102,8 @@ public class LmsAssignmentCommandService {
             StudentGroupMemberRepository studentGroupMemberRepository,
             StudentRepository studentRepository,
             QuizVersionRepository quizVersionRepository,
-            CacheManager cacheManager,
+            LmsReadCacheInvalidator caches,
+            LmsAssignmentAccessPolicy policy,
             LmsSyncOperationService sync
     ) {
         this.assignmentRepository = assignmentRepository;
@@ -132,11 +113,14 @@ public class LmsAssignmentCommandService {
         this.studentGroupMemberRepository = studentGroupMemberRepository;
         this.studentRepository = studentRepository;
         this.quizVersionRepository = quizVersionRepository;
-        this.cacheManager = cacheManager;
+        this.caches = caches;
+        this.policy = policy;
         this.sync = sync;
     }
 
-    public CreateAssignmentResponse create(String tenantId, String userId, String idempotencyKey, CreateAssignmentRequest request) {
+    public CreateAssignmentResponse create(UserAccessContext access, String idempotencyKey, CreateAssignmentRequest request) {
+        String tenantId = AuthenticatedTenant.require(access.tenantId());
+        String userId = access.userId();
         if (request == null || request.quizIds() == null || request.quizIds().isEmpty()) {
             throw new BadRequestException("at least one quizId is required");
         }
@@ -144,21 +128,23 @@ public class LmsAssignmentCommandService {
         LmsSyncOperationService.Receipt receipt = sync == null || key == null ? null
                 : sync.reserve(tenantId, userId, key, key, "lms.assignment", key, request, null).orElse(null);
         if (receipt != null && receipt.replayed()) return sync.result(receipt, CreateAssignmentResponse.class);
-        try {
-            if (key != null) {
-                Assignment existing = assignmentRepository.findByTenantIdAndIdempotencyKey(tenantId, key).orElse(null);
-                if (existing != null) {
-                    CreateAssignmentResponse replay = describe(existing);
-                    if (receipt != null) sync.complete(receipt, replay, existing.getRecordVersion() == null ? 0L : existing.getRecordVersion());
-                    return replay;
-                }
+        if (key != null) {
+            Assignment existing = assignmentRepository.findByTenantIdAndIdempotencyKey(tenantId, key).orElse(null);
+            if (existing != null) {
+                policy.ensureManagedScope(existing, access);
+                CreateAssignmentResponse replay = describe(existing);
+                if (receipt != null) sync.complete(receipt, replay, existing.getRecordVersion() == null ? 0L : existing.getRecordVersion());
+                return replay;
             }
+        }
 
         String mode = normalizeMode(request.recipientMode());
+        if (blankToNull(request.classId()) != null) policy.ensureClassScope(tenantId, request.classId().trim(), access);
         List<Student> recipients = resolveRecipients(tenantId, mode, request.classId(), request.groupId(), request.studentIds());
         if (recipients.isEmpty()) {
             throw new BadRequestException("assignment resolved to zero recipients");
         }
+        ensureRecipientScope(tenantId, recipients, access);
         String primaryClassId = primaryClassId(mode, request.classId(), recipients);
 
         Assignment assignment = new Assignment();
@@ -182,20 +168,19 @@ public class LmsAssignmentCommandService {
 
         List<AssignmentResource> resources = persistResources(tenantId, saved.getId(), request.quizIds());
         persistRecipients(tenantId, saved.getId(), primaryClassId, mode, recipients);
-        evictAssignmentReadCachesAfterCommit();
+        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
 
-            CreateAssignmentResponse result = new CreateAssignmentResponse(saved.getId(), recipients.size(), toResourceResponses(resources));
-            if (receipt != null) sync.complete(receipt, result, saved.getRecordVersion() == null ? 0L : saved.getRecordVersion());
-            return result;
-        } catch (RuntimeException exception) {
-            if (receipt != null) sync.abandon(receipt);
-            throw exception;
-        }
+        CreateAssignmentResponse result = new CreateAssignmentResponse(saved.getId(), recipients.size(), toResourceResponses(resources));
+        if (receipt != null) sync.complete(receipt, result, saved.getRecordVersion() == null ? 0L : saved.getRecordVersion());
+        return result;
     }
 
-    public CreateAssignmentResponse updateRecipients(String tenantId, String assignmentId, UpdateRecipientsRequest request) {
+    public CreateAssignmentResponse updateRecipients(UserAccessContext access, String assignmentId, UpdateRecipientsRequest request) {
+        String tenantId = AuthenticatedTenant.require(access.tenantId());
         Assignment assignment = requireAssignment(tenantId, assignmentId);
+        policy.ensureManagedScope(assignment, access);
         String mode = normalizeMode(request == null ? null : request.recipientMode());
+        if (request != null && blankToNull(request.classId()) != null) policy.ensureClassScope(tenantId, request.classId().trim(), access);
         List<Student> recipients = resolveRecipients(
                 tenantId, mode,
                 request == null ? null : request.classId(),
@@ -204,6 +189,7 @@ public class LmsAssignmentCommandService {
         if (recipients.isEmpty()) {
             throw new BadRequestException("assignment resolved to zero recipients");
         }
+        ensureRecipientScope(tenantId, recipients, access);
         recipientRepository.deleteByAssignmentId(assignmentId);
         String primaryClassId = primaryClassId(mode, request == null ? null : request.classId(), recipients);
         persistRecipients(tenantId, assignmentId, primaryClassId, mode, recipients);
@@ -213,12 +199,14 @@ public class LmsAssignmentCommandService {
         assignment.setStudentIds(recipients.stream().map(Student::getId).toList());
         assignment.setRecipientCount(recipients.size());
         assignmentRepository.save(assignment);
-        evictAssignmentReadCachesAfterCommit();
+        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
         return describe(assignment);
     }
 
-    public void updateAssignment(String tenantId, String assignmentId, UpdateAssignmentRequest request) {
+    public void updateAssignment(UserAccessContext access, String assignmentId, UpdateAssignmentRequest request) {
+        String tenantId = AuthenticatedTenant.require(access.tenantId());
         Assignment assignment = requireAssignment(tenantId, assignmentId);
+        policy.ensureManagedScope(assignment, access);
         if (request == null) {
             return;
         }
@@ -244,18 +232,36 @@ public class LmsAssignmentCommandService {
             assignment.setTeacherNote(blankToNull(request.teacherNote()));
         }
         if (blankToNull(request.status()) != null) {
-            assignment.setStatus(request.status().trim().toLowerCase(Locale.ROOT));
+            assignment.setStatus(LmsStatePolicy.assignmentState(request.status()));
         }
         assignmentRepository.save(assignment);
-        evictAssignmentReadCachesAfterCommit();
+        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
     }
 
-    public void delete(String tenantId, String assignmentId) {
+    public void delete(UserAccessContext access, String assignmentId) {
+        String tenantId = AuthenticatedTenant.require(access.tenantId());
         Assignment assignment = requireAssignment(tenantId, assignmentId);
+        policy.ensureManagedScope(assignment, access);
         recipientRepository.deleteByAssignmentId(assignmentId);
         resourceRepository.deleteByAssignmentId(assignmentId);
         assignmentRepository.delete(assignment);
-        evictAssignmentReadCachesAfterCommit();
+        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+    }
+
+    /** Every recipient must sit in a class (or, without class, a school) the caller manages. */
+    private void ensureRecipientScope(String tenantId, List<Student> recipients, UserAccessContext access) {
+        Set<String> checked = new LinkedHashSet<>();
+        for (Student student : recipients) {
+            String classId = blankToNull(student.getAcademicClassId());
+            if (classId == null) {
+                if (!access.canAccessEducationUnit(student.getSchoolId())
+                        || (blankToNull(student.getSchoolId()) == null && !access.managedEducationUnitIds().contains("*"))) {
+                    throw new ForbiddenException("You can only assign students in managed centers/classes");
+                }
+            } else if (checked.add(classId)) {
+                policy.ensureClassScope(tenantId, classId, access);
+            }
+        }
     }
 
     @CacheEvict(cacheNames = "lmsStudentGroups", allEntries = true)
@@ -463,25 +469,6 @@ public class LmsAssignmentCommandService {
                 .map(resource -> new AssignmentResourceResponse(
                         resource.getQuizId(), resource.getQuizVersionId(), resource.getQuizVersionLabel()))
                 .toList();
-    }
-
-    private void evictAssignmentReadCachesAfterCommit() {
-        Runnable evict = () -> ASSIGNMENT_READ_CACHES.forEach(cacheName -> {
-            Cache cache = cacheManager.getCache(cacheName);
-            if (cache != null) {
-                cache.clear();
-            }
-        });
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            evict.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                evict.run();
-            }
-        });
     }
 
     private Assignment requireAssignment(String tenantId, String assignmentId) {

@@ -25,11 +25,15 @@ public class CurriculumChainValidationUseCase {
     public CurriculumChainValidationUseCase(
             CurriculumSubjectRepository subjects,
             CurriculumLevelRepository levels,
-            CurriculumTopicRepository topics) {
+            CurriculumTopicRepository topics,
+            com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess reviewAccess) {
         this.subjects = subjects;
         this.levels = levels;
         this.topics = topics;
+        this.reviewAccess = reviewAccess;
     }
+
+    private final com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess reviewAccess;
 
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public CurriculumTopicResponse validate(
@@ -68,7 +72,7 @@ public class CurriculumChainValidationUseCase {
     }
 
     private void requireActive(String status, String nodeType, String id) {
-        if (!ACTIVE.equalsIgnoreCase(status)) {
+        if (!reviewAccess.isUsableParent(status)) {
             throw CurriculumException.badRequest(
                     "CURRICULUM_PARENT_NOT_ACTIVE", nodeType + " must be active: " + id);
         }

@@ -98,4 +98,10 @@ public class LmsAttemptService {
     public Attempt save(Attempt attempt) {
         return repository.save(attempt);
     }
+
+    /** Flushes immediately so unique-index races (single in-progress attempt) surface inside the caller. */
+    @Transactional("postgresTransactionManager")
+    public Attempt saveAndFlush(Attempt attempt) {
+        return repository.saveAndFlush(attempt);
+    }
 }

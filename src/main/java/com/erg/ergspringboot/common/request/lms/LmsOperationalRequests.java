@@ -45,8 +45,18 @@ public final class LmsOperationalRequests {
             @Size(max = 64) String parentRelationship,
             OffsetDateTime enrollmentDate,
             @Size(max = 1000) String note,
-            @Size(max = 32) String status
-    ) {}
+            @Size(max = 32) String status,
+            /** Links the LMS student to its login account; validated against the caller's tenant. */
+            @Size(max = 36) String authUserId
+    ) {
+        public CreateStudentRequest(String studentCode, String fullName, String academicClassId, String email,
+                String username, String gender, OffsetDateTime birthday, String phone, String address,
+                String parentName, String parentPhone, String parentEmail, String parentRelationship,
+                OffsetDateTime enrollmentDate, String note, String status) {
+            this(studentCode, fullName, academicClassId, email, username, gender, birthday, phone, address,
+                    parentName, parentPhone, parentEmail, parentRelationship, enrollmentDate, note, status, null);
+        }
+    }
 
     public record BulkStudentImportRequest(
             @NotEmpty @Size(max = 500) List<@Valid CreateStudentRequest> items
@@ -69,8 +79,18 @@ public final class LmsOperationalRequests {
             @Size(max = 64) String parentRelationship,
             OffsetDateTime enrollmentDate,
             @Size(max = 1000) String note,
-            @Size(max = 32) String status
-    ) {}
+            @Size(max = 32) String status,
+            /** Links (or re-links) the LMS student to its login account; blank keeps the current link. */
+            @Size(max = 36) String authUserId
+    ) {
+        public UpdateStudentRequest(Long version, String studentCode, String fullName, String academicClassId,
+                String email, String username, String gender, OffsetDateTime birthday, String phone, String address,
+                String parentName, String parentPhone, String parentEmail, String parentRelationship,
+                OffsetDateTime enrollmentDate, String note, String status) {
+            this(version, studentCode, fullName, academicClassId, email, username, gender, birthday, phone, address,
+                    parentName, parentPhone, parentEmail, parentRelationship, enrollmentDate, note, status, null);
+        }
+    }
 
     public record CreateSubjectRequest(
             @NotBlank @Size(max = 255) String name,

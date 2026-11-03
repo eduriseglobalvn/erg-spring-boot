@@ -33,9 +33,9 @@ public final class CurriculumOperationsCompatibility {
                 subjects, levels, topics, contentItems, questions, quizzes,
                 quizVersions, assignments, attempts);
         return new CurriculumOperations(
-                new CurriculumTreeQueryUseCase(subjects, levels, topics),
+                new CurriculumTreeQueryUseCase(subjects, levels, topics, com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess.denyAll()),
                 impacts,
-                new CurriculumChainValidationUseCase(subjects, levels, topics),
-                new CurriculumCommandUseCase(subjects, levels, topics, impacts));
+                new CurriculumChainValidationUseCase(subjects, levels, topics, com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess.denyAll()),
+                new CurriculumCommandUseCase(subjects, levels, topics, impacts, com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess.denyAll()));
     }
 }

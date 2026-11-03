@@ -239,13 +239,46 @@ class LearningOutcomesServiceTest {
         outOfScopePath.setClassId("class-2");
         when(certificates.findTop100ByTenantIdAndLearnerIdOrderByIssuedAtDesc("tenant-1", "learner-1"))
                 .thenReturn(List.of(certificate));
-        when(paths.findByTenantIdAndId("tenant-1", "path-2")).thenReturn(Optional.of(outOfScopePath));
+        when(paths.findAllById(List.of("path-2"))).thenReturn(List.of(outOfScopePath));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 ErgPrincipal.authenticated("teacher-1", "session", "tenant-1", List.of("teacher"),
                         List.of("learning.outcomes.manage"), List.of(), List.of(), "user", "teacher", Map.of()),
                 "token", List.of(new SimpleGrantedAuthority("ROLE_TEACHER"))));
 
         assertThat(service.certificates(scopedAccess, "learner-1")).isEmpty();
+    }
+
+    @Test
+    void certificateVisibilityLoadsLearningPathsInOneBatch() {
+        UserAccessContext scopedAccess = new UserAccessContext(
+                "teacher-1", "tenant-1", List.of("unit-1"), List.of("class-1"), "unit-1", "class-1");
+        List<OutcomeCertificate> rows = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            OutcomeCertificate certificate = new OutcomeCertificate();
+            certificate.setId("certificate-" + i);
+            certificate.setTenantId("tenant-1");
+            certificate.setLearnerId("learner-1");
+            certificate.setLearningPathId("path-1");
+            certificate.setCertificateNumber("CERT-" + i);
+            certificate.setStatus("ISSUED");
+            certificate.setEvidenceRef("evidence");
+            certificate.setIssuedAt(OffsetDateTime.now());
+            rows.add(certificate);
+        }
+        LearningPath inScope = persistedPath();
+        inScope.setId("path-1");
+        inScope.setEducationUnitId("unit-1");
+        inScope.setClassId("class-1");
+        when(certificates.findTop100ByTenantIdAndLearnerIdOrderByIssuedAtDesc("tenant-1", "learner-1")).thenReturn(rows);
+        when(paths.findAllById(List.of("path-1"))).thenReturn(List.of(inScope));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                ErgPrincipal.authenticated("teacher-1", "session", "tenant-1", List.of("teacher"),
+                        List.of("learning.outcomes.manage"), List.of(), List.of(), "user", "teacher", Map.of()),
+                "token", List.of(new SimpleGrantedAuthority("ROLE_TEACHER"))));
+
+        assertThat(service.certificates(scopedAccess, "learner-1")).hasSize(5);
+        org.mockito.Mockito.verify(paths, org.mockito.Mockito.times(1)).findAllById(List.of("path-1"));
+        org.mockito.Mockito.verify(paths, org.mockito.Mockito.never()).findByTenantIdAndId(any(), any());
     }
 
     @Test

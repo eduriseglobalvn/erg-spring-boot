@@ -176,7 +176,7 @@ public class QuizPublishService {
             throw new ValidationFailedException(errors);
         }
 
-        String gradingMode = normalizeGradingMode(request == null ? null : request.gradingMode());
+        String gradingMode = gradingModeFor(quiz, request == null ? null : request.gradingMode());
         int versionNumber = quizVersionRepository
                 .findTopByQuizIdAndTenantIdOrderByVersionNumberDesc(quizId, tenantId)
                 .map(QuizVersion::getVersionNumber)
@@ -427,6 +427,13 @@ public class QuizPublishService {
         if (!requestedDocVersion.equals(draft.getDocVersion())) {
             throw new StaleDraftException(draft.getDocVersion());
         }
+    }
+
+    /** Tests are always graded server-side so their answer key never ships in the learner package. */
+    private String gradingModeFor(Quiz quiz, String requested) {
+        String normalized = normalizeGradingMode(requested);
+        String kind = quiz.getKind() == null ? "" : quiz.getKind().trim().toLowerCase(Locale.ROOT);
+        return kind.equals("test") || kind.equals("testing") ? MODE_SERVER_AUTH : normalized;
     }
 
     private String normalizeGradingMode(String gradingMode) {

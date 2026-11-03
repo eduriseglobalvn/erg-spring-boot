@@ -8,7 +8,9 @@ import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
 import com.erg.ergspringboot.platform.security.AccessScopeSet;
+import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsQueryOperations;
+import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.authorization.LmsAssignmentRead;
 import com.erg.ergspringboot.lms.authorization.LmsAssignmentProgressRead;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -21,13 +23,16 @@ public class LmsHomeworkWorkspaceGraphQlController {
 
     private final LmsQueryOperations queries;
     private final GraphQlAccessSupport accessSupport;
+    private final LmsAssignmentAccessPolicy assignmentAccess;
 
     public LmsHomeworkWorkspaceGraphQlController(
             LmsQueryOperations queries,
-            GraphQlAccessSupport accessSupport
+            GraphQlAccessSupport accessSupport,
+            LmsAssignmentAccessPolicy assignmentAccess
     ) {
         this.queries = queries;
         this.accessSupport = accessSupport;
+        this.assignmentAccess = assignmentAccess;
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "teacherHomeworkWorkspace")
@@ -55,16 +60,19 @@ public class LmsHomeworkWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.assignment.progress.read", "lms.grade.read", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
+        // N8: same class + education-unit policy as REST, evaluated before the (cached) read model runs.
+        if (!accessSupport.isWildcardPrincipal(principal)) {
+            assignmentAccess.readableAssignment(tenantId, safeInput.assignmentId(), new UserAccessContext(
+                    principal.userId(), tenantId, null, null, null, null, AccessScopeAssembler.from(principal)));
+        }
 
-        AssignmentProgressWorkspaceResponse response = queries.assignmentProgressWorkspace(
+        return queries.assignmentProgressWorkspace(
                 tenantId,
                 safeInput.assignmentId(),
                 safeInput.attemptStatus(),
                 safeInput.page(),
                 safeInput.size()
         );
-        assertAssignmentResponseScope(principal, response.assignment().academicClassId(), response.assignment().assignedBy());
-        return response;
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "studentGroups")
@@ -92,25 +100,6 @@ public class LmsHomeworkWorkspaceGraphQlController {
             throw new ForbiddenException("GraphQL teacher homework workspace requires a scoped principal.");
         }
         return userId;
-    }
-
-    private void assertAssignmentResponseScope(ErgPrincipal principal, String classId, String assignedBy) {
-        if (accessSupport.isWildcardPrincipal(principal)) {
-            return;
-        }
-        String principalUserId = accessSupport.blankToNull(principal == null ? null : principal.userId());
-        String normalizedAssignedBy = accessSupport.blankToNull(assignedBy);
-        if (principalUserId != null && principalUserId.equals(normalizedAssignedBy)) {
-            return;
-        }
-        String normalizedClassId = accessSupport.blankToNull(classId);
-        if (normalizedClassId == null) {
-            throw new ForbiddenException("GraphQL assignment progress workspace requires class scope.");
-        }
-        if (AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.CLASS).contains(normalizedClassId)) {
-            return;
-        }
-        throw new ForbiddenException("GraphQL assignment progress workspace is outside the authenticated class scope.");
     }
 
     private List<String> readableClassIds(ErgPrincipal principal) {

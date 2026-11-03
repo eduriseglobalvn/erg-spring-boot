@@ -34,15 +34,22 @@ public class LcmsMediaController {
 
     @PutMapping("/api/v1/lcms/media/upload/quiz-media/{tenantId}/{prefix}/{filename}")
     @ReviewedPublicEndpoint
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @io.swagger.v3.oas.annotations.media.Content(
+            schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "binary")))
     public ResponseEntity<Void> uploadLocal(
             @PathVariable String tenantId,
             @PathVariable String prefix,
             @PathVariable String filename,
             @RequestHeader("Content-Type") String mimeType,
-            @RequestBody byte[] bytes,
             HttpServletRequest request
-    ) {
-        if (bytes.length > lcms.maxMediaUploadBytes()) {
+    ) throws java.io.IOException {
+        // SQ-07: reject oversized uploads from Content-Length and a bounded read, never buffering the full body.
+        long max = lcms.maxMediaUploadBytes();
+        if (request.getContentLengthLong() > max) {
+            throw new BadRequestException("media exceeds the maximum allowed size");
+        }
+        byte[] bytes = request.getInputStream().readNBytes((int) Math.min(Integer.MAX_VALUE - 1L, max + 1));
+        if (bytes.length > max) {
             throw new BadRequestException("media exceeds the maximum allowed size");
         }
         String uploadUrl = request.getRequestURL()

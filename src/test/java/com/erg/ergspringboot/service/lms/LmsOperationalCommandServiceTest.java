@@ -41,6 +41,7 @@ class LmsOperationalCommandServiceTest {
     @Mock private StudentEnrollmentRepository enrollments;
     @Mock private EducationUnitRepository schools;
     @Mock private UserActivityRepository activities;
+    @Mock private com.erg.ergspringboot.repository.auth.user.UserRepository users;
 
     private LmsOperationalCommandService service;
     private final UserAccessContext access =
@@ -48,7 +49,7 @@ class LmsOperationalCommandServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LmsOperationalCommandService(classrooms, students, subjects, enrollments, schools, activities);
+        service = new LmsOperationalCommandService(classrooms, students, subjects, enrollments, schools, activities, users);
     }
 
     @Test
@@ -128,6 +129,44 @@ class LmsOperationalCommandServiceTest {
         assertThat(result.replayed()).isTrue();
         assertThat(result.id()).isEqualTo("enrollment-1");
         verify(enrollments, never()).save(any());
+        verify(students, never()).save(any());
+    }
+
+    @Test
+    void updateLinksStudentToExistingTenantLoginAccount() {
+        Student student = student("student-1", "S-001", "Alice");
+        student.setRecordVersion(2L);
+        when(students.findByTenantIdAndId("tenant-1", "student-1")).thenReturn(Optional.of(student));
+        when(users.findByIdAndTenantId("usr-1", "tenant-1"))
+                .thenReturn(Optional.of(new com.erg.ergspringboot.model.users.User()));
+        when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "usr-1")).thenReturn(Optional.empty());
+        when(students.save(any(Student.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = service.updateStudent("school-1", "student-1", new UpdateStudentRequest(
+                2L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                "usr-1"), access);
+
+        assertThat(result.authUserId()).isEqualTo("usr-1");
+    }
+
+    @Test
+    void linkRejectsUnknownOrAlreadyLinkedLoginAccounts() {
+        Student student = student("student-1", "S-001", "Alice");
+        student.setRecordVersion(2L);
+        when(students.findByTenantIdAndId("tenant-1", "student-1")).thenReturn(Optional.of(student));
+        when(users.findByIdAndTenantId("usr-other-tenant", "tenant-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateStudent("school-1", "student-1", new UpdateStudentRequest(
+                2L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                "usr-other-tenant"), access)).isInstanceOf(BadRequestException.class);
+
+        when(users.findByIdAndTenantId("usr-2", "tenant-1"))
+                .thenReturn(Optional.of(new com.erg.ergspringboot.model.users.User()));
+        when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "usr-2"))
+                .thenReturn(Optional.of(student("student-2", "S-002", "Bob")));
+        assertThatThrownBy(() -> service.updateStudent("school-1", "student-1", new UpdateStudentRequest(
+                2L, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                "usr-2"), access)).isInstanceOf(ConflictException.class);
         verify(students, never()).save(any());
     }
 

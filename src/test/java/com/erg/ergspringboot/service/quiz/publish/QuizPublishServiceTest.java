@@ -38,6 +38,22 @@ class QuizPublishServiceTest {
 
     @Test
     void publishEvictsRuntimePackageCacheForTenantQuiz() {
+        publishAndCapture(null, "server-authoritative", true);
+    }
+
+    @Test
+    void testQuizzesArePublishedServerAuthoritativeEvenWhenClientFirstIsRequested() {
+        QuizVersion version = publishAndCapture("test", "client-first", false);
+        assertThat(version.getGradingMode()).isEqualTo("server-authoritative");
+    }
+
+    @Test
+    void trainingQuizzesKeepTheRequestedClientFirstMode() {
+        QuizVersion version = publishAndCapture("train", "client-first", false);
+        assertThat(version.getGradingMode()).isEqualTo("client-first");
+    }
+
+    private QuizVersion publishAndCapture(String kind, String gradingMode, boolean verifyCache) {
         QuizRepository quizRepository = mock(QuizRepository.class);
         QuestionRepository bankQuestionRepository = mock(QuestionRepository.class);
         QuizQuestionRepository quizQuestionRepository = mock(QuizQuestionRepository.class);
@@ -61,6 +77,7 @@ class QuizPublishServiceTest {
         quiz.setSubjectId("subject-1");
         quiz.setLevelId("level-1");
         quiz.setCategoryId("topic-1");
+        quiz.setKind(kind);
 
         QuizDraft draft = new QuizDraft();
         draft.setId("draft-1");
@@ -156,9 +173,12 @@ class QuizPublishServiceTest {
                 "quiz-1",
                 "author-1",
                 "publish-key-1",
-                new PublishRequest(7L, "server-authoritative", "v1")
+                new PublishRequest(7L, gradingMode, "v1")
         );
 
+        ArgumentCaptor<QuizVersion> versionCaptor = ArgumentCaptor.forClass(QuizVersion.class);
+        verify(quizVersionRepository).save(versionCaptor.capture());
+        if (!verifyCache) return versionCaptor.getValue();
         assertThat(response.quizVersionId()).isEqualTo("version-1");
         assertThat(response.contentHash()).isEqualTo("sha256:abcdef1234567890");
         verify(packageSigner).contentHash("canonical-package-json");
@@ -167,13 +187,12 @@ class QuizPublishServiceTest {
         verify(quizRepository).save(quiz);
         assertThat(quiz.getCurrentVersionId()).isEqualTo("version-1");
         assertThat(quiz.getPackageHash()).isEqualTo("sha256:abcdef1234567890");
-        ArgumentCaptor<QuizVersion> versionCaptor = ArgumentCaptor.forClass(QuizVersion.class);
-        verify(quizVersionRepository).save(versionCaptor.capture());
         assertThat(versionCaptor.getValue().getAuthoringSnapshot())
                 .containsEntry("curriculumSnapshot", Map.of(
                         "subject", Map.of("id", "subject-1", "label", "IC3"),
                         "level", Map.of("id", "level-1", "label", "GS6 Level 1"),
                         "topic", Map.of("id", "topic-1", "label", "Hardware")
                 ));
+        return versionCaptor.getValue();
     }
 }

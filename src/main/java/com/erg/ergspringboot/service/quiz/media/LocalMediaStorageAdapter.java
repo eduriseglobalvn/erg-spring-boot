@@ -95,7 +95,8 @@ public class LocalMediaStorageAdapter implements MediaStorageAdapter {
             return MessageDigest.isEqual(
                     expected.getBytes(StandardCharsets.US_ASCII),
                     actual.getBytes(StandardCharsets.US_ASCII));
-        } catch (RuntimeException exception) {
+        } catch (IllegalArgumentException malformed) {
+            // Malformed URL/query/expiry is an invalid signature; signing or storage failures propagate as 5xx.
             return false;
         }
     }

@@ -88,7 +88,7 @@ public interface StudentRepository extends JpaRepository<Student, String> {
                         on completedAttempt.tenantId = assignment.tenantId
                         and completedAttempt.assignmentId = assignment.id
                         and completedAttempt.studentId = student.id
-                        and lower(completedAttempt.status) in ('submitted', 'graded', 'completed')
+                        and lower(completedAttempt.status) in :completedStates
                     where assignment.tenantId = :tenantId
                       and assignment.assignedBy = :teacherId
                       and lower(assignment.status) = 'active'
@@ -108,7 +108,7 @@ public interface StudentRepository extends JpaRepository<Student, String> {
                         on completedAttempt.tenantId = assignment.tenantId
                         and completedAttempt.assignmentId = assignment.id
                         and completedAttempt.studentId = student.id
-                        and lower(completedAttempt.status) in ('submitted', 'graded', 'completed')
+                        and lower(completedAttempt.status) in :completedStates
                     where assignment.tenantId = :tenantId
                       and assignment.assignedBy = :teacherId
                       and lower(assignment.status) = 'active'
@@ -118,7 +118,12 @@ public interface StudentRepository extends JpaRepository<Student, String> {
                       and completedAttempt.id is null
                     """
     )
-    Page<OverdueStudentProjection> findTeacherOverdueStudents(String tenantId, String teacherId, Pageable pageable);
+    Page<OverdueStudentProjection> findTeacherOverdueStudents(String tenantId, String teacherId, Pageable pageable, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default Page<OverdueStudentProjection> findTeacherOverdueStudents(String tenantId, String teacherId, Pageable pageable) {
+        return findTeacherOverdueStudents(tenantId, teacherId, pageable, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 
     @Query("""
             select new com.erg.ergspringboot.repository.lms.projection.ClassRiskSummaryProjection(
@@ -141,19 +146,24 @@ public interface StudentRepository extends JpaRepository<Student, String> {
                 on completedAttempt.tenantId = student.tenantId
                 and completedAttempt.assignmentId = overdueAssignment.id
                 and completedAttempt.studentId = student.id
-                and lower(completedAttempt.status) in ('submitted', 'graded', 'completed')
+                and lower(completedAttempt.status) in :completedStates
             left join Attempt lowScoreAttempt
                 on lowScoreAttempt.tenantId = student.tenantId
                 and lowScoreAttempt.studentId = student.id
-                and lower(lowScoreAttempt.status) in ('submitted', 'graded', 'completed')
+                and lower(lowScoreAttempt.status) in :completedStates
                 and lowScoreAttempt.percent is not null
                 and lowScoreAttempt.percent < :lowScoreThreshold
             where student.tenantId = :tenantId
               and student.academicClassId = :academicClassId
             """)
-    ClassRiskSummaryProjection summarizeClassWorkspaceRisks(
-            String tenantId,
+    ClassRiskSummaryProjection summarizeClassWorkspaceRisks(String tenantId,
             String academicClassId,
-            double lowScoreThreshold
-    );
+            double lowScoreThreshold, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default ClassRiskSummaryProjection summarizeClassWorkspaceRisks(String tenantId,
+            String academicClassId,
+            double lowScoreThreshold) {
+        return summarizeClassWorkspaceRisks(tenantId, academicClassId, lowScoreThreshold, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 }

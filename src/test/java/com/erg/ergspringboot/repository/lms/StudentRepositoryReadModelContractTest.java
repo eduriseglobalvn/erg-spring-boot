@@ -46,7 +46,8 @@ class StudentRepositoryReadModelContractTest {
                 "summarizeClassWorkspaceRisks",
                 String.class,
                 String.class,
-                double.class
+                double.class,
+                java.util.Collection.class
         );
         Query query = method.getAnnotation(Query.class);
 
@@ -71,7 +72,8 @@ class StudentRepositoryReadModelContractTest {
                 "findTeacherOverdueStudents",
                 String.class,
                 String.class,
-                Pageable.class
+                Pageable.class,
+                java.util.Collection.class
         );
         Query query = method.getAnnotation(Query.class);
 

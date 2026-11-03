@@ -39,13 +39,17 @@ public interface AttemptAnswerRowRepository extends JpaRepository<AttemptAnswerR
                     where answer.tenant_id = :tenantId
                       and attempt.tenant_id = :tenantId
                       and attempt.quiz_version_id = :quizVersionId
-                      and lower(attempt.status) in ('submitted', 'graded', 'completed', 'needs_review')
+                      and lower(attempt.status) in :completedStates
                     group by answer.quiz_version_question_id, answer.question_kind
                     """,
             nativeQuery = true
     )
-    List<QuestionAnalyticsProjection> findQuestionAnalytics(
-            @Param("tenantId") String tenantId,
-            @Param("quizVersionId") String quizVersionId
-    );
+    List<QuestionAnalyticsProjection> findQuestionAnalytics(@Param("tenantId") String tenantId,
+            @Param("quizVersionId") String quizVersionId, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default List<QuestionAnalyticsProjection> findQuestionAnalytics(@Param("tenantId") String tenantId,
+            @Param("quizVersionId") String quizVersionId) {
+        return findQuestionAnalytics(tenantId, quizVersionId, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 }

@@ -193,4 +193,14 @@ class MediaServiceValidationTest {
         @Override public <S extends MediaAsset> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
         @Override public <S extends MediaAsset, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
     }
+
+    @Test
+    void storageCallsAreNotWrappedInAClassLevelTransaction() throws Exception {
+        // SQ-07: R2 HEAD/PUT must not hold a database connection for the network round trip.
+        org.assertj.core.api.Assertions.assertThat(MediaService.class.isAnnotationPresent(
+                org.springframework.transaction.annotation.Transactional.class)).isFalse();
+        org.assertj.core.api.Assertions.assertThat(MediaService.class.getMethod("commit", String.class,
+                com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaCommitRequest.class)
+                .isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class)).isFalse();
+    }
 }

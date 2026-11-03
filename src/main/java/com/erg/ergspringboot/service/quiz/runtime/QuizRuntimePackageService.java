@@ -58,6 +58,27 @@ public class QuizRuntimePackageService {
                 .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId));
     }
 
+    /** The package of a specific (pinned) quiz version; used when an assignment pinned a version at assign time. */
+    public Optional<QuizPackage> packageEntityForVersion(String tenantId, String quizId, String quizVersionId) {
+        return quizVersionRepository.findByIdAndTenantId(quizVersionId, tenantId)
+                .filter(version -> quizId.equals(version.getQuizId()))
+                .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId));
+    }
+
+    public Optional<QuizPackageResponse> packageForVersion(String tenantId, String quizId, String quizVersionId) {
+        return quizVersionRepository.findByIdAndTenantId(quizVersionId, tenantId)
+                .filter(version -> quizId.equals(version.getQuizId()))
+                .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId)
+                        .map(pkg -> toResponse(quizId, version, pkg)));
+    }
+
+    /** Learner view of a package: the answer key is removed unless the caller explicitly allows offline grading. */
+    public static QuizPackageResponse withoutAnswerKey(QuizPackageResponse response) {
+        if (response == null || response.answerKey() == null || response.answerKey().isEmpty()) return response;
+        return new QuizPackageResponse(response.version(), response.packageHash(), response.contentHash(),
+                response.signature(), response.gradingMode(), response.quiz(), Map.of());
+    }
+
     @SuppressWarnings("unchecked")
     private QuizPackageResponse toResponse(String quizId, QuizVersion version, QuizPackage pkg) {
         Map<String, Object> packageJson = pkg.getPackageJson() == null ? Map.of() : pkg.getPackageJson();

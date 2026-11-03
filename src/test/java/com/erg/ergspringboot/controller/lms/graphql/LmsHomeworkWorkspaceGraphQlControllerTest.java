@@ -36,13 +36,17 @@ class LmsHomeworkWorkspaceGraphQlControllerTest {
     @Mock
     private LmsQueryOperations lmsReadModelService;
 
+    @Mock
+    private com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy assignmentAccess;
+
     private LmsHomeworkWorkspaceGraphQlController controller;
 
     @BeforeEach
     void setUp() {
         controller = new LmsHomeworkWorkspaceGraphQlController(
                 lmsReadModelService,
-                new GraphQlAccessSupport(new com.erg.ergspringboot.platform.security.ErgPolicyService()));
+                new GraphQlAccessSupport(new com.erg.ergspringboot.platform.security.ErgPolicyService()),
+                assignmentAccess);
     }
 
     @AfterEach
@@ -98,7 +102,7 @@ class LmsHomeworkWorkspaceGraphQlControllerTest {
     }
 
     @Test
-    void assignmentProgressWorkspaceUsesPrincipalTenantAndAllowsAssignmentOwner() {
+    void assignmentProgressWorkspaceUsesPrincipalTenantWhenPolicyAllows() {
         authenticate(principal("teacher-1", "tenant-a", List.of("lms.assignment.progress.read"), List.of()));
         AssignmentProgressWorkspaceResponse expected = assignmentProgressResponse("tenant-a", "class-1", "teacher-1");
         when(lmsReadModelService.assignmentProgressWorkspace("tenant-a", "assignment-1", "submitted", 0, 25))
@@ -158,10 +162,10 @@ class LmsHomeworkWorkspaceGraphQlControllerTest {
     }
 
     @Test
-    void assignmentProgressWorkspaceRejectsResponseOutsideOwnerAndClassScope() {
+    void assignmentProgressWorkspaceChecksSharedAssignmentPolicyBeforeQuerying() {
         authenticate(principal("teacher-1", "tenant-a", List.of("lms.assignment.progress.read"), List.of()));
-        when(lmsReadModelService.assignmentProgressWorkspace("tenant-a", "assignment-1", null, 0, 25))
-                .thenReturn(assignmentProgressResponse("tenant-a", "class-denied", "teacher-2"));
+        when(assignmentAccess.readableAssignment(org.mockito.ArgumentMatchers.eq("tenant-a"), org.mockito.ArgumentMatchers.eq("assignment-1"), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new ForbiddenException("outside scope"));
 
         assertThatThrownBy(() -> controller.assignmentProgressWorkspace(new AssignmentProgressWorkspaceInput(
                 null,
@@ -170,6 +174,7 @@ class LmsHomeworkWorkspaceGraphQlControllerTest {
                 0,
                 25
         ))).isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(lmsReadModelService);
     }
 
     @Test

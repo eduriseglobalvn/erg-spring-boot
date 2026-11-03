@@ -41,31 +41,26 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
 
-@ExtendWith(MockitoExtension.class)
 class LmsAttemptPolicyContractTest {
 
     private static final OffsetDateTime SERVER_NOW = OffsetDateTime.parse("2026-08-08T09:00:00Z");
 
-    @Mock private LmsClassroomService classrooms;
-    @Mock private LmsAssignmentService assignments;
-    @Mock private LmsQuizService quizzes;
-    @Mock private LmsAttemptService attempts;
-    @Mock private LmsStudentService students;
-    @Mock private QuizRuntimePackageService packages;
-    @Mock private QuizAttemptGradingService grading;
-    @Mock private AttemptEventRecorder events;
-    @Mock private CacheManager caches;
+    private LmsAttemptFixture fixture;
+    private LmsAssignmentService assignments;
+    private LmsQuizService quizzes;
+    private LmsAttemptService attempts;
+    private LmsStudentService students;
+    private QuizRuntimePackageService packages;
+    private QuizAttemptGradingService grading;
 
     private LmsAttemptUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new LmsAttemptUseCase(
-                classrooms, assignments, quizzes, attempts, students, packages, grading, events, caches,
-                Clock.fixed(Instant.parse("2026-08-08T09:00:00Z"), ZoneOffset.UTC));
-        lenient().when(attempts.save(any(Attempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(attempts.findInProgress(any(), any(), any(), any())).thenReturn(Optional.empty());
-        lenient().when(attempts.countCompletedForLimit(any(), any(), any(), any())).thenReturn(0L);
+        fixture = new LmsAttemptFixture();
+        assignments = fixture.assignments; quizzes = fixture.quizzes; attempts = fixture.attempts;
+        students = fixture.students; packages = fixture.packages; grading = fixture.grading;
+        useCase = fixture.useCase(Clock.fixed(Instant.parse("2026-08-08T09:00:00Z"), ZoneOffset.UTC));
     }
 
     @Test
@@ -136,7 +131,7 @@ class LmsAttemptPolicyContractTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("package contract mismatch");
 
-        verify(attempts, never()).save(any());
+        verify(attempts, never()).saveAndFlush(any());
     }
 
     @Test
@@ -144,7 +139,7 @@ class LmsAttemptPolicyContractTest {
         Assignment assignment = assignment();
         assignment.setMaxDurationMinutes(10);
         Attempt attempt = attempt();
-        attempt.setStartedAt(SERVER_NOW.minusMinutes(11));
+        attempt.setStartedAt(SERVER_NOW.minusMinutes(12));
         when(attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
         when(assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
 
@@ -189,6 +184,7 @@ class LmsAttemptPolicyContractTest {
         assignment.setTenantId("erg");
         assignment.setAcademicClassId("");
         assignment.setQuizId("quiz-1");
+        assignment.setStatus("active");
         assignment.setStudentIds(List.of("student-1"));
         return assignment;
     }

@@ -434,8 +434,8 @@ public class StudentDashboardReadService {
             return false;
         }
         String attemptStatus = blankToNull(projection.latestAttemptStatus());
-        return attemptStatus == null
-                || !List.of("submitted", "graded", "completed").contains(attemptStatus.toLowerCase());
+        // needs_review counts as handed in, exactly like the attempt-limit rule (LmsStatePolicy).
+        return attemptStatus == null || !com.erg.ergspringboot.lms.LmsStatePolicy.attemptIsCompleted(attemptStatus);
     }
 
     private String assignmentStatus(StudentDashboardAssignmentProjection projection) {

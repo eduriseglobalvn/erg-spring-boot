@@ -38,11 +38,14 @@ public class CurriculumTreeQueryUseCase {
     private final CurriculumSubjectRepository subjects;
     private final CurriculumLevelRepository levels;
     private final CurriculumTopicRepository topics;
+    private final com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess reviewAccess;
 
     public CurriculumTreeQueryUseCase(
             CurriculumSubjectRepository subjects,
             CurriculumLevelRepository levels,
-            CurriculumTopicRepository topics) {
+            CurriculumTopicRepository topics,
+            com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess reviewAccess) {
+        this.reviewAccess = reviewAccess;
         this.subjects = subjects;
         this.levels = levels;
         this.topics = topics;
@@ -156,6 +159,10 @@ public class CurriculumTreeQueryUseCase {
             throw CurriculumException.badRequest("CURRICULUM_STATUS_REQUIRED", "status is required");
         }
         String lower = normalized.toLowerCase(Locale.ROOT);
+        if (com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess.isReviewState(lower)
+                && reviewAccess.canSeeReviewStates()) {
+            return lower;
+        }
         if (!STATUSES.contains(lower)) {
             throw CurriculumException.badRequest(
                     "CURRICULUM_STATUS_INVALID", "status must be one of: active, archived, draft");

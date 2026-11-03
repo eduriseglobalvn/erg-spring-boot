@@ -80,6 +80,12 @@ public class ReportJobUseCase implements ReportJobPort {
                 .orElseThrow(() -> new ResourceNotFoundException("report job not found"));
     }
 
+    @Override
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public java.util.Optional<String> requestedBy(String tenantId, String id) {
+        return repository.findByIdAndTenantId(id, tenantId).map(ReportJob::getRequestedBy);
+    }
+
     public ReportJobResponse toResponse(ReportJob job) {
         return new ReportJobResponse(
                 job.getId(), job.getReportType(), job.getAggregateId(), job.getStatus(), job.getProgress(),

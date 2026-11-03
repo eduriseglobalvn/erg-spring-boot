@@ -307,6 +307,13 @@ public final class LmsRuntimeDtos {
     public record AttemptSubmitResponse(double score, double maxScore, double percent, boolean passed) {
     }
 
+    /** Teacher grade for one answer awaiting manual review; {@code expectedVersion} guards concurrent graders. */
+    public record ManualGradeRequest(
+            @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.PositiveOrZero Double points,
+            Long expectedVersion
+    ) {
+    }
+
     public record AttemptSyncRequest(
             @NotBlank String packageHash,
             String quizVersion,

@@ -34,12 +34,15 @@ public class CurriculumCommandUseCase {
     private final CurriculumLevelRepository levels;
     private final CurriculumTopicRepository topics;
     private final CurriculumImpactQueryUseCase impacts;
+    private final com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess reviewAccess;
 
     public CurriculumCommandUseCase(
             CurriculumSubjectRepository subjects,
             CurriculumLevelRepository levels,
             CurriculumTopicRepository topics,
-            CurriculumImpactQueryUseCase impacts) {
+            CurriculumImpactQueryUseCase impacts,
+            com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess reviewAccess) {
+        this.reviewAccess = reviewAccess;
         this.subjects = subjects;
         this.levels = levels;
         this.topics = topics;
@@ -263,7 +266,7 @@ public class CurriculumCommandUseCase {
     }
 
     private void requireActive(String status, String nodeType, String id) {
-        if (!ACTIVE.equalsIgnoreCase(status)) {
+        if (!reviewAccess.isUsableParent(status)) {
             throw CurriculumException.badRequest(
                     "CURRICULUM_PARENT_NOT_ACTIVE", nodeType + " must be active: " + id);
         }

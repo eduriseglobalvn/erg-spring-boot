@@ -36,6 +36,7 @@ public class LmsLearningResourceGraphQlController {
                 tenantId,
                 safeInput.educationUnitId(),
                 principal.userId(),
+                accessSupport.isAllowed(principal, "content.manage", "*"),
                 accessSupport.academicYear(principal, safeInput.academicYear()),
                 safeInput.subjectId(),
                 safeInput.gradeId(),

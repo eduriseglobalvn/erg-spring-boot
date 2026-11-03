@@ -28,6 +28,10 @@ public class LmsAssignmentService {
         return ids == null || ids.isEmpty() ? List.of() : repository.findByTenantIdAndIdIn(tenantId, ids);
     }
 
+    public List<Assignment> findByTenantIdAndQuizId(String tenantId, String quizId) {
+        return repository.findByTenantIdAndQuizId(tenantId, quizId);
+    }
+
     public Page<Assignment> findStudentAssignments(
             String tenantId, String studentId, String academicClassId, Pageable pageable
     ) {

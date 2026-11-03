@@ -30,7 +30,7 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
 
     @Override public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access, int page, int size) { return students.listAssignments(studentId, access, page, size); }
     @Override public StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access, int page, int size) { return students.listScores(studentId, access, page, size); }
-    @Override public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) { return resources.getQuizPackage(quizId, access); }
+    @Override public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) { return resources.getQuizPackage(quizId, assignmentId, access); }
     @Override public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return resources.getQuiz(quizId, access); }
     @Override public AttemptResponse startAttempt(String studentId, StartAttemptRequest request, UserAccessContext access) { return attempts.start(studentId, request, null, access); }
     @Override public AttemptResponse startAttempt(String studentId, StartAttemptRequest request, String idempotencyKey, UserAccessContext access) { return attempts.start(studentId, request, idempotencyKey, access); }
@@ -38,6 +38,7 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
     @Override public AnswerResultResponse saveAnswer(String attemptId, String questionId, SaveAnswerRequest request, UserAccessContext access) { return attempts.saveAnswer(attemptId, questionId, request, access); }
     @Override public AttemptSyncResponse syncAttempt(String attemptId, AttemptSyncRequest request, UserAccessContext access) { return attempts.sync(attemptId, request, access); }
     @Override public AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access) { return attempts.submit(attemptId, request, access); }
+    @Override public AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access) { return attempts.gradeManualAnswer(attemptId, questionId, request, access); }
     @Override public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) { return students.assignmentProgress(assignmentId, access); }
     @Override public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) { return students.quizStudents(quizId, access); }
     @Override public EducationUnitListResponse listEducationUnits(UserAccessContext access) { return classrooms.listEducationUnits(access); }

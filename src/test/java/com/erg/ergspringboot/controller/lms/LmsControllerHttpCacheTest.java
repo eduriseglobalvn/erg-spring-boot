@@ -14,7 +14,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ContentScope;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizResponse;
-import com.erg.ergspringboot.service.lms.LmsRuntimeService;
+import com.erg.ergspringboot.lms.LmsRuntimePort;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -45,8 +45,8 @@ class LmsControllerHttpCacheTest {
 
     @Test
     void quizPackageSupportsETagCacheControlAndConditionalGet() throws Exception {
-        LmsRuntimeService runtimeService = org.mockito.Mockito.mock(LmsRuntimeService.class);
-        when(runtimeService.getQuizPackage(eq("quiz-1"), any())).thenReturn(packageResponse());
+        LmsRuntimePort runtimeService = org.mockito.Mockito.mock(LmsRuntimePort.class);
+        when(runtimeService.getQuizPackage(eq("quiz-1"), org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(packageResponse());
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new LmsController(
                 new com.erg.ergspringboot.lms.LmsOperations(runtimeService,
                         org.mockito.Mockito.mock(com.erg.ergspringboot.service.lms.LmsAssignmentCommandService.class))))

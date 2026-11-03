@@ -46,7 +46,7 @@ public class QuizAttemptGradingService {
     }
 
     private static final int SCALE = 2;
-    private static final double PASS_PERCENT = 50.0;
+    private static final double DEFAULT_PASS_PERCENT = 50.0;
 
     private final QuizVersionRepository quizVersionRepository;
     private final QuizVersionQuestionRepository questionRepository;
@@ -132,21 +132,122 @@ public class QuizAttemptGradingService {
             answerRowRepository.saveAll(changedRows);
         }
 
+        return Optional.of(totals(quizVersionId, awardedTotal, maxTotal, anyManual, gradedCount, questions.size()));
+    }
+
+    /** Runtime question ids of a published version; submitted answers are filtered to this set. */
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public java.util.Set<String> runtimeQuestionIds(String quizVersionId) {
+        if (quizVersionId == null || quizVersionId.isBlank()) return java.util.Set.of();
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        questionRepository.findByQuizVersionIdOrderByOrderIndexAsc(quizVersionId)
+                .forEach(question -> ids.add(question.getRuntimeQuestionId()));
+        return ids;
+    }
+
+    /**
+     * Teacher grade for one manual (essay) answer. Updates the normalized row and recomputes the attempt
+     * totals from all rows; {@code needsManualGrade} stays true while another manual answer is ungraded.
+     */
+    public GradedAttempt gradeManualAnswer(
+            String tenantId,
+            String attemptId,
+            String quizVersionId,
+            String runtimeQuestionId,
+            BigDecimal points,
+            String graderUserId
+    ) {
+        List<QuizVersionQuestion> questions = questionRepository.findByQuizVersionIdOrderByOrderIndexAsc(quizVersionId);
+        QuizVersionQuestion target = questions.stream()
+                .filter(question -> runtimeQuestionId.equals(question.getRuntimeQuestionId()))
+                .findFirst()
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("question not found in attempt"));
+        BigDecimal maxPoints = target.getPoints() == null ? BigDecimal.ZERO : target.getPoints();
+        if (points == null || points.signum() < 0 || points.compareTo(maxPoints) > 0) {
+            throw new com.erg.ergspringboot.exception.BadRequestException("points must be between 0 and " + maxPoints.toPlainString());
+        }
+        Map<String, AttemptAnswerRow> rows = new HashMap<>();
+        answerRowRepository.findByAttemptIdAndQuizVersionQuestionIdIn(attemptId,
+                        questions.stream().map(QuizVersionQuestion::getId).toList())
+                .forEach(row -> rows.put(row.getQuizVersionQuestionId(), row));
+        AttemptAnswerRow row = rows.get(target.getId());
+        if (row == null || !Boolean.TRUE.equals(row.getNeedsManualGrade())) {
+            throw new com.erg.ergspringboot.exception.ConflictException("answer does not need manual grading");
+        }
+        row.setAwardedPoints(points.setScale(SCALE, RoundingMode.HALF_UP));
+        row.setCorrect(points.compareTo(maxPoints) == 0);
+        row.setPartiallyRight(points.signum() > 0 && points.compareTo(maxPoints) < 0);
+        row.setNeedsManualGrade(false);
+        row.setGradedBy(graderUserId);
+        row.setGradedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        answerRowRepository.save(row);
+
+        BigDecimal awarded = BigDecimal.ZERO;
+        BigDecimal max = BigDecimal.ZERO;
+        boolean pending = false;
+        int graded = 0;
+        for (QuizVersionQuestion question : questions) {
+            if ("survey".equals(question.getGradingPolicy())) continue;
+            max = max.add(question.getPoints() == null ? BigDecimal.ZERO : question.getPoints());
+            AttemptAnswerRow current = rows.get(question.getId());
+            if (current == null) continue;
+            if (Boolean.TRUE.equals(current.getNeedsManualGrade())) {
+                pending = true;
+                continue;
+            }
+            awarded = awarded.add(current.getAwardedPoints() == null ? BigDecimal.ZERO : current.getAwardedPoints());
+            graded++;
+        }
+        return totals(quizVersionId, awarded, max, pending, graded, questions.size());
+    }
+
+    private GradedAttempt totals(String quizVersionId, BigDecimal awardedTotal, BigDecimal maxTotal,
+            boolean anyManual, int gradedCount, int totalQuestions) {
         double percent = maxTotal.signum() > 0
                 ? awardedTotal.divide(maxTotal, 6, RoundingMode.HALF_UP).doubleValue() * 100.0
                 : 0.0;
         percent = Math.min(100.0, Math.max(0.0, percent));
-        boolean passed = !anyManual && percent >= PASS_PERCENT;
-
-        return Optional.of(new GradedAttempt(
+        boolean passed = !anyManual && percent >= passPercent(quizVersionId);
+        return new GradedAttempt(
                 awardedTotal.setScale(SCALE, RoundingMode.HALF_UP),
                 maxTotal.setScale(SCALE, RoundingMode.HALF_UP),
                 percent,
                 passed,
                 anyManual,
                 gradedCount,
-                questions.size()
-        ));
+                totalQuestions);
+    }
+
+    /** Pass threshold from the pinned version's runtime settings ({@code passPercent}); 50% when unset. */
+    double passPercent(String quizVersionId) {
+        return quizVersionRepository.findById(quizVersionId)
+                .map(QuizVersion::getRuntimeQuiz)
+                .map(QuizAttemptGradingService::configuredPassPercent)
+                .orElse(DEFAULT_PASS_PERCENT);
+    }
+
+    @SuppressWarnings("unchecked")
+    static Double configuredPassPercent(Map<String, Object> runtimeQuiz) {
+        if (runtimeQuiz == null) return null;
+        List<Object> holders = new ArrayList<>();
+        Object settings = runtimeQuiz.get("settings");
+        holders.add(settings);
+        if (settings instanceof Map<?, ?> map) holders.add(map.get("runtime"));
+        holders.add(runtimeQuiz.get("runtime"));
+        holders.add(runtimeQuiz.get("result"));
+        for (Object holder : holders) {
+            if (!(holder instanceof Map<?, ?> map)) continue;
+            Object value = ((Map<String, Object>) map).get("passPercent");
+            if (value instanceof Number number) return Math.max(0.0, Math.min(100.0, number.doubleValue()));
+            if (value instanceof String text && !text.isBlank()) {
+                try {
+                    return Math.max(0.0, Math.min(100.0, Double.parseDouble(text.trim())));
+                } catch (NumberFormatException ignored) {
+                    // fall through to the next holder / default threshold
+                }
+            }
+        }
+        return null;
     }
 
     private void upsertAnswerRow(
@@ -180,7 +281,12 @@ public class QuizAttemptGradingService {
         changedRows.add(row);
     }
 
-    /** Upserts the live progress projection for the teacher dashboard (spec §1.7). */
+    /**
+     * Upserts the live progress projection for the teacher dashboard (spec §1.7). Runs in its own
+     * transaction because attempt commands call it after their own transaction committed.
+     */
+    @Transactional(value = "postgresTransactionManager",
+            propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void projectProgress(
             String tenantId,
             String studentUserId,
