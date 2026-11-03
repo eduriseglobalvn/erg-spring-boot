@@ -37,4 +37,27 @@ class LmsStatePolicyTest {
         assertThat(LmsStatePolicy.assignmentIsVisible("archived")).isFalse();
         assertThat(LmsStatePolicy.assignmentIsVisible("active")).isTrue();
     }
+
+    @Test
+    void needsReviewCountsAsHandedInEverywhere() throws Exception {
+        assertThat(LmsStatePolicy.attemptIsCompleted("needs_review")).isTrue();
+        assertThat(LmsStatePolicy.attemptIsCompleted("in_progress")).isFalse();
+        // SQ-03: JPQL read models take the state list as a parameter instead of re-declaring it.
+        for (String repository : java.util.List.of("AttemptRepository", "AssignmentRepository", "StudentRepository")) {
+            String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+                    "src/main/java/com/erg/ergspringboot/repository/lms/" + repository + ".java"));
+            assertThat(source).as(repository).doesNotContain("('submitted', 'graded', 'completed')")
+                    .doesNotContain("('submitted', 'needs_review', 'review_required')");
+        }
+        String dashboard = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/com/erg/ergspringboot/service/elearning/readmodel/StudentDashboardReadService.java"));
+        assertThat(dashboard).contains("LmsStatePolicy.attemptIsCompleted");
+    }
+
+    @Test
+    void storedAssignmentStatusIsValidated() {
+        assertThat(LmsStatePolicy.assignmentState(" Archived ")).isEqualTo("archived");
+        assertThatThrownBy(() -> LmsStatePolicy.assignmentState("foo")).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> LmsStatePolicy.assignmentState("overdue")).isInstanceOf(RuntimeException.class);
+    }
 }

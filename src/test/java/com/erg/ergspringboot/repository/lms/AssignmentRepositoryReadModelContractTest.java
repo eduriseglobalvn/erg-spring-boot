@@ -136,7 +136,8 @@ class AssignmentRepositoryReadModelContractTest {
                 "countPendingStudentAssignmentActions",
                 String.class,
                 String.class,
-                String.class
+                String.class,
+                java.util.Collection.class
         );
 
         assertStudentDashboardRecipientQuery(assignments.getAnnotation(Query.class).value());

@@ -215,7 +215,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                             where completedAttempt.tenantId = assignment.tenantId
                               and completedAttempt.assignmentId = assignment.id
                               and completedAttempt.studentId = student.id
-                              and lower(completedAttempt.status) in ('submitted', 'graded', 'completed')
+                              and lower(completedAttempt.status) in :completedStates
                         ) then true else false end,
                         case when assignment.dueAt is not null
                             and assignment.dueAt < CURRENT_TIMESTAMP
@@ -225,7 +225,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                                 where onTimeAttempt.tenantId = assignment.tenantId
                                   and onTimeAttempt.assignmentId = assignment.id
                                   and onTimeAttempt.studentId = student.id
-                                  and lower(onTimeAttempt.status) in ('submitted', 'graded', 'completed')
+                                  and lower(onTimeAttempt.status) in :completedStates
                                   and onTimeAttempt.submittedAt is not null
                                   and onTimeAttempt.submittedAt <= assignment.dueAt
                             )
@@ -247,7 +247,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                           where onTimeAttempt.tenantId = assignment.tenantId
                             and onTimeAttempt.assignmentId = assignment.id
                             and onTimeAttempt.studentId = student.id
-                            and lower(onTimeAttempt.status) in ('submitted', 'graded', 'completed')
+                            and lower(onTimeAttempt.status) in :completedStates
                             and onTimeAttempt.submittedAt is not null
                             and onTimeAttempt.submittedAt <= assignment.dueAt
                       )
@@ -270,17 +270,22 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                           where onTimeAttempt.tenantId = assignment.tenantId
                             and onTimeAttempt.assignmentId = assignment.id
                             and onTimeAttempt.studentId = student.id
-                            and lower(onTimeAttempt.status) in ('submitted', 'graded', 'completed')
+                            and lower(onTimeAttempt.status) in :completedStates
                             and onTimeAttempt.submittedAt is not null
                             and onTimeAttempt.submittedAt <= assignment.dueAt
                       )
                     """
     )
-    Page<MissingLateStudentProjection> findAssignmentMissingLateStudents(
-            String tenantId,
+    Page<MissingLateStudentProjection> findAssignmentMissingLateStudents(String tenantId,
             String assignmentId,
-            Pageable pageable
-    );
+            Pageable pageable, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default Page<MissingLateStudentProjection> findAssignmentMissingLateStudents(String tenantId,
+            String assignmentId,
+            Pageable pageable) {
+        return findAssignmentMissingLateStudents(tenantId, assignmentId, pageable, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 
     @Query(
             value = """
@@ -449,7 +454,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                         where attempt.tenantId = assignment.tenantId
                           and attempt.assignmentId = assignment.id
                           and attempt.studentId = :studentId
-                          and lower(attempt.status) in ('submitted', 'graded', 'completed')
+                          and lower(attempt.status) in :completedStates
                     ) then assignment.id else null end)
             )
             from Assignment assignment
@@ -479,11 +484,16 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                   )
               )
             """)
-    StudentDashboardAssignmentCountProjection summarizeStudentDashboardAssignments(
-            String tenantId,
+    StudentDashboardAssignmentCountProjection summarizeStudentDashboardAssignments(String tenantId,
             String academicClassId,
-            String studentId
-    );
+            String studentId, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default StudentDashboardAssignmentCountProjection summarizeStudentDashboardAssignments(String tenantId,
+            String academicClassId,
+            String studentId) {
+        return summarizeStudentDashboardAssignments(tenantId, academicClassId, studentId, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 
     @Query("""
             select count(distinct assignment.id)
@@ -552,8 +562,13 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                   where attempt.tenantId = assignment.tenantId
                     and attempt.assignmentId = assignment.id
                     and attempt.studentId = :studentId
-                    and lower(attempt.status) in ('submitted', 'graded', 'completed')
+                    and lower(attempt.status) in :completedStates
               )
             """)
-    long countPendingStudentAssignmentActions(String tenantId, String academicClassId, String studentId);
+    long countPendingStudentAssignmentActions(String tenantId, String academicClassId, String studentId, java.util.Collection<String> completedStates);
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default long countPendingStudentAssignmentActions(String tenantId, String academicClassId, String studentId) {
+        return countPendingStudentAssignmentActions(tenantId, academicClassId, studentId, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+    }
 }
