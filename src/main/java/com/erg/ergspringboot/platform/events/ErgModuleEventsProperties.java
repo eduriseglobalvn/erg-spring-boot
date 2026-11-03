@@ -56,7 +56,18 @@ public class ErgModuleEventsProperties {
         private int maxInFlight = 16;
         @NotNull
         private Duration minAge = Duration.ofSeconds(30);
+        /** Completion attempts after which a failed publication is moved to quarantine. */
+        @Min(1)
+        @Max(1000)
+        private int maxAttempts = 10;
+        @Min(1)
+        @Max(10000)
+        private int quarantineBatchSize = 500;
 
+        public int getMaxAttempts() { return maxAttempts; }
+        public void setMaxAttempts(int maxAttempts) { this.maxAttempts = maxAttempts; }
+        public int getQuarantineBatchSize() { return quarantineBatchSize; }
+        public void setQuarantineBatchSize(int quarantineBatchSize) { this.quarantineBatchSize = quarantineBatchSize; }
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
         public Duration getFixedDelay() { return fixedDelay; }
@@ -80,6 +91,8 @@ public class ErgModuleEventsProperties {
 
         void validate() {
             if (batchSize < 1 || batchSize > 1000 || maxInFlight < 1 || maxInFlight > 128
+                    || maxAttempts < 1 || maxAttempts > 1000
+                    || quarantineBatchSize < 1 || quarantineBatchSize > 10000
                     || !isFixedDelayValid() || !isMinAgeValid()) {
                 throw new IllegalArgumentException("Invalid Modulith event recovery bounds");
             }
