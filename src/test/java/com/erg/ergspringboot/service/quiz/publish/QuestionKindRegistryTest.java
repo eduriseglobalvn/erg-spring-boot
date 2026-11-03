@@ -85,4 +85,18 @@ class QuestionKindRegistryTest {
         assertThat(body.get("wordSlots")).isEqualTo(List.of(Map.of("id", "w")));
         assertThat(body.get("numericAnswer")).isEqualTo(Map.of("unit", "cm"));
     }
+
+    @Test
+    void answerKeySourceFieldsForOrderingMatchingHotspotAndDragDropNeverReachThePlayer() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        for (String field : List.of("correctOrder", "order", "correctPairs", "pairs",
+                "correctRegions", "regions", "correctTargets", "targets")) {
+            body.put(field, List.of("answer"));
+        }
+        body.put("sequenceItems", List.of(Map.of("id", "s1")));
+
+        QuestionKindCompiler.stripAllAnswers(body);
+
+        assertThat(body).containsOnlyKeys("sequenceItems");
+    }
 }

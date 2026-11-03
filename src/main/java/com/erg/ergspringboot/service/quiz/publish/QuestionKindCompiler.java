@@ -90,12 +90,24 @@ enum QuestionKindCompiler {
 
     SEQUENCE {
         @Override
+        void stripAnswers(Map<String, Object> body) {
+            body.remove("correctOrder");
+            body.remove("order");
+        }
+
+        @Override
         void extractAnswerKey(Map<String, Object> slide, Map<String, Object> key) {
             putIfPresent(key, "order", firstNonNull(slide.get("correctOrder"), slide.get("order"), ids(slide.get("sequenceItems"))));
         }
     },
 
     MATCHING {
+        @Override
+        void stripAnswers(Map<String, Object> body) {
+            body.remove("correctPairs");
+            body.remove("pairs");
+        }
+
         @Override
         void extractAnswerKey(Map<String, Object> slide, Map<String, Object> key) {
             putIfPresent(key, "pairs", firstNonNull(slide.get("correctPairs"), slide.get("pairs"), matchingPairs(slide.get("matching"))));
@@ -122,6 +134,8 @@ enum QuestionKindCompiler {
         @Override
         void stripAnswers(Map<String, Object> body) {
             stripListItems(body, "hotspotAreas", "correct");
+            body.remove("correctRegions");
+            body.remove("regions");
         }
 
         @Override
@@ -134,6 +148,8 @@ enum QuestionKindCompiler {
         @Override
         void stripAnswers(Map<String, Object> body) {
             stripListItems(body, "dragDropItems", "correctTargetId");
+            body.remove("correctTargets");
+            body.remove("targets");
         }
 
         @Override
