@@ -8,7 +8,9 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /** Encrypts one-time credentials/codes before they are persisted in JSONB. */
@@ -19,15 +21,34 @@ public class OutboxPayloadCipher {
     private final SecretKeySpec key;
     private final SecureRandom random = new SecureRandom();
 
+    /** Source-visible fallback; acceptable only outside the {@code prod} profile. */
+    static final String DEVELOPMENT_KEY = "development-only-change-me";
+
+    @Autowired
     public OutboxPayloadCipher(
-            @Value("${ERG_OUTBOX_ENCRYPTION_KEY:${SECRET_OUTBOX__KEY:development-only-change-me}}") String configuredKey
+            @Value("${ERG_OUTBOX_ENCRYPTION_KEY:${SECRET_OUTBOX__KEY:}}") String configuredKey,
+            Environment environment
     ) {
+        this(requireProductionKey(configuredKey, environment));
+    }
+
+    public OutboxPayloadCipher(String configuredKey) {
+        String effectiveKey = configuredKey == null || configuredKey.isBlank() ? DEVELOPMENT_KEY : configuredKey;
         try {
             this.key = new SecretKeySpec(MessageDigest.getInstance("SHA-256")
-                    .digest(configuredKey.getBytes(StandardCharsets.UTF_8)), "AES");
+                    .digest(effectiveKey.getBytes(StandardCharsets.UTF_8)), "AES");
         } catch (Exception exception) {
             throw new IllegalStateException("Cannot initialize outbox payload cipher", exception);
         }
+    }
+
+    private static String requireProductionKey(String configuredKey, Environment environment) {
+        boolean production = environment != null && environment.matchesProfiles("prod");
+        if (production && (configuredKey == null || configuredKey.isBlank() || DEVELOPMENT_KEY.equals(configuredKey.trim()))) {
+            throw new IllegalStateException(
+                    "ERG_OUTBOX_ENCRYPTION_KEY must be set to a non-default secret in the prod profile");
+        }
+        return configuredKey;
     }
 
     public String encrypt(String value) {
