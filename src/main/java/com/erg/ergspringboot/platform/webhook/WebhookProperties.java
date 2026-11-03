@@ -12,6 +12,17 @@ public class WebhookProperties {
     private Duration timestampTolerance = Duration.ofMinutes(5);
     private String discordPublicKey = "";
     private String telegramSecretToken = "";
+    /** When false the bot routes accept nothing (404) because no inbox processor exists yet. */
+    private boolean enabled = true;
+    private Duration inboxRetention = Duration.ofDays(30);
+    private int retentionBatchSize = 1000;
+
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public Duration getInboxRetention() { return inboxRetention; }
+    public void setInboxRetention(Duration inboxRetention) { this.inboxRetention = inboxRetention; }
+    public int getRetentionBatchSize() { return retentionBatchSize; }
+    public void setRetentionBatchSize(int retentionBatchSize) { this.retentionBatchSize = retentionBatchSize; }
 
     public int getMaxBodyBytes() { return maxBodyBytes; }
     public void setMaxBodyBytes(int maxBodyBytes) { this.maxBodyBytes = maxBodyBytes; }

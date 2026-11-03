@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.platform.webhook;
 
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,6 +29,9 @@ public class WebhookInboxService {
 
     @Transactional("postgresTransactionManager")
     public void accept(String provider, String receiptKey, JsonNode payload) {
+        if (!properties.isEnabled()) {
+            throw new ResourceNotFoundException("Webhook route is disabled");
+        }
         replayGuard.claim(provider, receiptKey, properties.getReplayTtl());
         jdbc.update("""
                 insert into webhook_inbox(provider, receipt_key, payload, status, received_at)
@@ -36,7 +40,14 @@ public class WebhookInboxService {
         counter("webhook.accepted", provider);
     }
 
-    public void rejected(String provider, String reason) { counter("webhook.rejected." + reason, provider); }
+    /** Bounded rejection metric: unknown reasons collapse into {@code other}. */
+    public void rejected(String provider, String reason) {
+        String bounded = REJECTION_REASONS.contains(reason) ? reason : "other";
+        counter("webhook.rejected." + bounded, provider);
+    }
+
+    private static final java.util.Set<String> REJECTION_REASONS =
+            java.util.Set.of("verification", "replay", "invalid", "disabled");
 
     private String json(JsonNode payload) {
         try { return mapper.writeValueAsString(payload); }
