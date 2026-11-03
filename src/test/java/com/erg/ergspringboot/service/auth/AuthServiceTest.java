@@ -376,6 +376,85 @@ class AuthServiceTest {
     }
 
     @Test
+    void wrongPasswordForDisabledOrBannedAccountIsIndistinguishableFromBadCredentials() {
+        User inactive = activeUser("user-inactive", "inactive@example.com", "secret123");
+        inactive.setStatus("INACTIVE");
+        User banned = activeUser("user-banned", "banned@example.com", "secret123");
+        banned.setStatus("BANNED");
+        when(userRepository.findForLogin("inactive@example.com")).thenReturn(Optional.of(inactive));
+        when(userRepository.findForLogin("banned@example.com")).thenReturn(Optional.of(banned));
+
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("inactive@example.com", "wrong-password", null, null, null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", null, null, null)));
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("banned@example.com", "wrong-password", null, null, null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", null, null, null)));
+    }
+
+    @Test
+    void accountIsLockedAfterConfiguredConsecutiveWrongPasswords() {
+        User user = activeUser("user-1", "active@example.com", "secret123");
+        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
+            AuthLoginAttempt attempt = new AuthLoginAttempt();
+            attempt.setUserId("user-1");
+            attempt.setResult("FAILED");
+            attempt.setReason("invalid_credentials");
+            attempt.setCreatedAt(now.minusMinutes(index));
+            return attempt;
+        }).toList();
+        when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(failures);
+
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("active@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)));
+
+        verify(sessionRepository, never()).save(any(AuthSession.class));
+        ArgumentCaptor<AuthLoginAttempt> recorded = ArgumentCaptor.forClass(AuthLoginAttempt.class);
+        verify(loginAttemptRepository).save(recorded.capture());
+        assertEquals("account_temporarily_locked", recorded.getValue().getReason());
+    }
+
+    @Test
+    void lockoutExpiresAfterBlockDurationAndSuccessResetsTheCounter() {
+        User user = activeUser("user-1", "active@example.com", "secret123");
+        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        OffsetDateTime old = OffsetDateTime.now(java.time.ZoneOffset.UTC).minusHours(1);
+        List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
+            AuthLoginAttempt attempt = new AuthLoginAttempt();
+            attempt.setResult("FAILED");
+            attempt.setReason("invalid_credentials");
+            attempt.setCreatedAt(old.minusMinutes(index));
+            return attempt;
+        }).toList();
+        when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(failures);
+
+        assertNotNull(authService.login(
+                new LoginRequest("active@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)).accessToken());
+    }
+
+    @Test
+    void accountRateLimitIsSharedAcrossIdentifiersOfTheSameUser() {
+        User user = activeUser("user-1", "active@example.com", "secret123");
+        user.setUsername("active.user");
+        when(userRepository.findForLogin(any(String.class))).thenReturn(Optional.of(user));
+        authService.setAuthLoginRateLimiter(new AuthLoginRateLimiter(null, true, 100, 2, 100));
+        AuthClientContext context = new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null);
+
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("active@example.com", "bad", "web-1", "Chrome", null, "lms", false), context));
+        assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
+                new LoginRequest("ACTIVE.USER", "bad", "web-1", "Chrome", null, "lms", false), context));
+        assertThrows(AuthFailure.TooManyAttempts.class, () -> authService.login(
+                new LoginRequest("active.user", "bad", "web-1", "Chrome", null, "lms", false), context));
+    }
+
+    @Test
     void sameBrowserContextCanOpenLmsAndLcmsWithoutRevokingEitherPortalSession() {
         User user = activeUser("user-1", "active@example.com", "secret123");
         Permission lmsRead = new Permission();

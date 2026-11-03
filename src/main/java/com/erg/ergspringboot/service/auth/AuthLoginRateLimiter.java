@@ -68,24 +68,45 @@ public class AuthLoginRateLimiter {
         return new AuthLoginRateLimiter(provider, true, sourceLimit, accountLimit, deviceLimit, false);
     }
 
+    /** Applies every dimension at once; the account dimension is keyed by {@code identifier}. */
     public Decision allow(String identifier, AuthClientContext context) {
+        Decision request = allowRequest(context);
+        Decision account = allowAccount(identifier);
+        return request.allowed() && account.allowed() ? request : request.allowed() ? account : request;
+    }
+
+    /** Source-IP and device dimensions, checked before the account is looked up. */
+    public Decision allowRequest(AuthClientContext context) {
+        return check(windowStart -> increment(key("source", context == null ? null : context.ipAddress(), windowStart),
+                        sourceLimit, windowEnd(windowStart))
+                && increment(key("device", context == null ? null
+                        : first(context.deviceFingerprint(), context.deviceId()), windowStart), deviceLimit,
+                        windowEnd(windowStart)));
+    }
+
+    /**
+     * Account dimension. Callers pass the resolved user id when the account exists so that
+     * username, email and case variants of the same person share one bucket.
+     */
+    public Decision allowAccount(String accountKey) {
+        return check(windowStart -> increment(key("account", accountKey, windowStart), accountLimit,
+                windowEnd(windowStart)));
+    }
+
+    private Decision check(java.util.function.LongPredicate counters) {
         if (!enabled) return new Decision(true, 0);
         long now = System.currentTimeMillis();
         long windowStart = now - now % WINDOW_MILLIS;
-        Instant windowEnd = Instant.ofEpochMilli(windowStart + WINDOW_MILLIS);
-        boolean source;
-        boolean account;
-        boolean device;
+        long retryAfter = Math.max(1, (windowStart + WINDOW_MILLIS - now + 999) / 1000);
         try {
-            source = increment(key("source", context == null ? null : context.ipAddress(), windowStart), sourceLimit, windowEnd);
-            account = increment(key("account", identifier, windowStart), accountLimit, windowEnd);
-            device = increment(key("device", context == null ? null
-                    : first(context.deviceFingerprint(), context.deviceId()), windowStart), deviceLimit, windowEnd);
+            return counters.test(windowStart) ? new Decision(true, 0) : new Decision(false, retryAfter);
         } catch (RuntimeException unavailable) {
-            return new Decision(false, Math.max(1, (windowEnd.toEpochMilli() - now + 999) / 1000));
+            return new Decision(false, retryAfter);
         }
-        long retryAfter = Math.max(1, (windowEnd.toEpochMilli() - now + 999) / 1000);
-        return source && account && device ? new Decision(true, 0) : new Decision(false, retryAfter);
+    }
+
+    private static Instant windowEnd(long windowStart) {
+        return Instant.ofEpochMilli(windowStart + WINDOW_MILLIS);
     }
 
     Set<String> debugKeys() { return Set.copyOf(debugKeys); }

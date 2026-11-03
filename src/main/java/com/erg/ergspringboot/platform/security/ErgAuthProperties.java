@@ -23,6 +23,26 @@ public class ErgAuthProperties {
     @Valid
     private final LoginRateLimit loginRateLimit = new LoginRateLimit();
 
+    /** Wrong passwords per account inside {@link #failedLoginWindow} before the account is locked. */
+    @Min(1)
+    @Max(1000)
+    private int maxFailedLogin = 5;
+    private java.time.Duration failedLoginWindow = java.time.Duration.ofMinutes(15);
+    private java.time.Duration blockDuration = java.time.Duration.ofMinutes(15);
+
+    public int getMaxFailedLogin() { return maxFailedLogin; }
+    public void setMaxFailedLogin(int maxFailedLogin) { this.maxFailedLogin = maxFailedLogin; }
+    public java.time.Duration getFailedLoginWindow() { return failedLoginWindow; }
+    public void setFailedLoginWindow(java.time.Duration failedLoginWindow) { this.failedLoginWindow = failedLoginWindow; }
+    public java.time.Duration getBlockDuration() { return blockDuration; }
+    public void setBlockDuration(java.time.Duration blockDuration) { this.blockDuration = blockDuration; }
+
+    @AssertTrue(message = "erg.auth.failed-login-window and erg.auth.block-duration must be positive")
+    public boolean isLockoutDurationValid() {
+        return failedLoginWindow != null && !failedLoginWindow.isNegative() && !failedLoginWindow.isZero()
+                && blockDuration != null && !blockDuration.isNegative() && !blockDuration.isZero();
+    }
+
     public boolean isBffEnabled() {
         return bffEnabled;
     }

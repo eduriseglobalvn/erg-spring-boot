@@ -57,9 +57,6 @@ public class AuthLoginUseCase {
     private static final Duration ACCESS_TOKEN_TTL = Duration.ofMinutes(15);
     private static final Duration PRIVILEGED_SESSION_TTL = Duration.ofHours(8);
     private static final Duration STANDARD_SESSION_TTL = Duration.ofHours(12);
-    private static final Duration LOGIN_ATTEMPT_WINDOW = Duration.ofMinutes(15);
-    private static final int LOGIN_ATTEMPT_THRESHOLD = 5;
-    private static final List<String> FAILED_LOGIN_RESULTS = List.of("FAILED", "FAILURE");
 
     private final UserRepository users;
     private final AuthSessionRepository sessions;
@@ -82,7 +79,9 @@ public class AuthLoginUseCase {
             AuthLoginAttemptRepository attempts,
             PasswordService passwords,
             AuthTokenService tokens) {
-        this(users, sessions, attempts, passwords, tokens, Optional.empty());
+        this(users, sessions, attempts, passwords, tokens, Optional.empty(),
+                new LoginFailureEnforcementService(users, sessions, attempts),
+                new AuthLoginRateLimiter(null, true, 30, 10, 20));
     }
 
     @Autowired
@@ -92,9 +91,11 @@ public class AuthLoginUseCase {
             AuthLoginAttemptRepository attempts,
             PasswordService passwords,
             AuthTokenService tokens,
-            ObjectProvider<MeterRegistry> meterRegistry) {
+            ObjectProvider<MeterRegistry> meterRegistry,
+            LoginFailureEnforcementService failureEnforcement,
+            AuthLoginRateLimiter rateLimiter) {
         this(users, sessions, attempts, passwords, tokens,
-                Optional.ofNullable(meterRegistry.getIfAvailable()));
+                Optional.ofNullable(meterRegistry.getIfAvailable()), failureEnforcement, rateLimiter);
     }
 
     private AuthLoginUseCase(
@@ -103,7 +104,11 @@ public class AuthLoginUseCase {
             AuthLoginAttemptRepository attempts,
             PasswordService passwords,
             AuthTokenService tokens,
-            Optional<MeterRegistry> meterRegistry) {
+            Optional<MeterRegistry> meterRegistry,
+            LoginFailureEnforcementService failureEnforcement,
+            AuthLoginRateLimiter rateLimiter) {
+        this.failureEnforcement = java.util.Objects.requireNonNull(failureEnforcement, "failureEnforcement");
+        this.rateLimiter = java.util.Objects.requireNonNull(rateLimiter, "rateLimiter");
         this.users = users;
         this.sessions = sessions;
         this.attempts = attempts;
@@ -123,14 +128,14 @@ public class AuthLoginUseCase {
         this.rapidSessionReplacementWindowMinutes = properties.getRapidSessionReplacement().getWindowMinutes();
     }
 
-    @Autowired(required = false)
+    /** Test/compatibility seam; production receives the collaborator through the constructor. */
     public void setLoginFailureEnforcementService(LoginFailureEnforcementService failureEnforcement) {
-        this.failureEnforcement = failureEnforcement;
+        this.failureEnforcement = java.util.Objects.requireNonNull(failureEnforcement, "failureEnforcement");
     }
 
-    @Autowired(required = false)
+    /** Test/compatibility seam; production receives the collaborator through the constructor. */
     public void setAuthLoginRateLimiter(AuthLoginRateLimiter rateLimiter) {
-        this.rateLimiter = rateLimiter;
+        this.rateLimiter = java.util.Objects.requireNonNull(rateLimiter, "rateLimiter");
     }
 
     @Autowired(required = false)
@@ -142,17 +147,35 @@ public class AuthLoginUseCase {
     public AuthResponse login(LoginRequest request, AuthClientContext context) {
         String identifier = normalizeIdentifier(request.identifier());
         String portal = normalizePortal(request.portal());
-        if (rateLimiter != null && !rateLimiter.allow(identifier, context).allowed()) {
+        if (!rateLimiter.allowRequest(context).allowed()) {
             throw new AuthFailure.TooManyAttempts();
         }
-        User user = users.findForLogin(identifier)
-                .orElseThrow(() -> {
-                    passwords.burnUnknownAccountCheck(request.password());
-                    recordFailure(null, identifier, context, portal, "invalid_credentials", false);
-                    return new AuthFailure.InvalidCredentials();
-                });
+        Optional<User> found = users.findForLogin(identifier);
+        // One bucket per person: username, email and case variants resolve to the same user id.
+        String accountKey = found.map(value -> "user:" + value.getId()).orElse("identifier:" + identifier);
+        if (!rateLimiter.allowAccount(accountKey).allowed()) {
+            throw new AuthFailure.TooManyAttempts();
+        }
+        User user = found.orElseThrow(() -> {
+            passwords.burnUnknownAccountCheck(request.password());
+            recordFailure(null, identifier, context, portal, "invalid_credentials", false);
+            return new AuthFailure.InvalidCredentials();
+        });
         String email = user.getEmail();
 
+        // A locked-out account answers exactly like a wrong password and never evaluates the
+        // submitted password, so lockout reveals neither account existence nor password validity.
+        if (failureEnforcement.isTemporarilyLocked(user)) {
+            passwords.burnUnknownAccountCheck(request.password());
+            recordFailure(user, email, context, portal, "account_temporarily_locked", false);
+            throw new AuthFailure.InvalidCredentials();
+        }
+        // Wrong passwords always yield AUTH_INVALID_CREDENTIALS; account status is disclosed
+        // only to a caller that proved knowledge of the password.
+        if (!passwords.matches(request.password(), user.getPasswordHash())) {
+            recordFailure(user, email, context, portal, "invalid_credentials", true);
+            throw new AuthFailure.InvalidCredentials();
+        }
         if (isLocked(user)) {
             recordFailure(user, email, context, portal, "account_locked", false);
             throw new AuthFailure.AccountLocked();
@@ -171,10 +194,6 @@ public class AuthLoginUseCase {
                 && PROVIDER_LOCAL.equalsIgnoreCase(user.getProvider())) {
             recordFailure(user, email, context, portal, "email_not_verified", false);
             throw new AuthFailure.EmailNotVerified();
-        }
-        if (!passwords.matches(request.password(), user.getPasswordHash())) {
-            recordFailure(user, email, context, portal, "invalid_credentials", true);
-            throw new AuthFailure.InvalidCredentials();
         }
 
         if (restrictedFirstLogin) {
@@ -285,32 +304,12 @@ public class AuthLoginUseCase {
     private void recordFailure(
             User user, String email, AuthClientContext context,
             String portal, String reason, boolean enforceThreshold) {
-        if (failureEnforcement != null) {
-            if (enforceThreshold && "invalid_credentials".equals(reason)) {
-                failureEnforcement.recordInvalidCredentials(user, email, context, portal);
-            } else {
-                failureEnforcement.recordFailure(user, email, context, portal, reason, enforceThreshold);
-            }
-            return;
+        // Failure records commit in their own transaction so the thrown AuthFailure cannot roll them back.
+        if (enforceThreshold && "invalid_credentials".equals(reason)) {
+            failureEnforcement.recordInvalidCredentials(user, email, context, portal);
+        } else {
+            failureEnforcement.recordFailure(user, email, context, portal, reason, enforceThreshold);
         }
-        recordLoginAttempt(user == null ? null : user.getId(), email, context, portal, "FAILED", reason);
-        if (enforceThreshold && user != null) {
-            blockUserIfFailedLoginThresholdReached(user, email, context);
-        }
-    }
-
-    private void blockUserIfFailedLoginThresholdReached(
-            User user, String email, AuthClientContext context) {
-        OffsetDateTime since = now().minus(LOGIN_ATTEMPT_WINDOW);
-        boolean emailExceeded = attempts.countByAttemptedEmailIgnoreCaseAndResultInAndCreatedAtAfter(
-                email, FAILED_LOGIN_RESULTS, since) >= LOGIN_ATTEMPT_THRESHOLD;
-        boolean ipExceeded = !isBlank(context.ipAddress())
-                && attempts.countByIpAddressAndResultInAndCreatedAtAfter(
-                context.ipAddress(), FAILED_LOGIN_RESULTS, since) >= LOGIN_ATTEMPT_THRESHOLD;
-        if (!emailExceeded && !ipExceeded) {
-            return;
-        }
-        // Durable account state must not be mutated from attacker-controlled failures.
     }
 
     private List<String> effectivePermissions(User user) {
