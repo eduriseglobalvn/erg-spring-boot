@@ -155,6 +155,9 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.sessions.read", "account.self.read", "profile.self", "*")))
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/users/me/sessions/**")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.sessions.read", "profile.self", "*")))
+                        // Onboarding is a self-service action; /api/v1/users/onboarding is the deprecated alias.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/me/onboarding", "/api/v1/users/onboarding")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.update", "profile.self", "*")))
                         .requestMatchers("/api/v1/users/me/**")
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
                         .requestMatchers("/api/v1/users", "/api/v1/users/**")

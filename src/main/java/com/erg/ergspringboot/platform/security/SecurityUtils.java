@@ -52,7 +52,7 @@ public final class SecurityUtils {
         String normalized = path == null ? "" : path.toLowerCase();
         if (normalized.startsWith("/api/v1/admin") || normalized.startsWith("/api/admin")) return "admin";
         if (normalized.startsWith("/api/v1/users") || normalized.startsWith("/api/users")) {
-            if (normalized.startsWith("/api/v1/users/me")) return null;
+            if (normalized.startsWith("/api/v1/users/me") || normalized.equals("/api/v1/users/onboarding")) return null;
             return "admin";
         }
         if (normalized.startsWith("/api/lms/access-management") || normalized.startsWith("/api/lms/auth/accounts")) return "admin";
