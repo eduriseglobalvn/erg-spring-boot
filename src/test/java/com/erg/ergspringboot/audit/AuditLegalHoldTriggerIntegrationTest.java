@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.audit;
 
+import com.erg.ergspringboot.config.persistence.FlywayConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -13,7 +14,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/** C11 (V134): legal hold is settable; retention deletes only expired, un-held rows; nothing else mutates. */
+/** C11 (V121): legal hold is settable; retention deletes only expired, un-held rows; nothing else mutates. */
 @Testcontainers(disabledWithoutDocker = true)
 class AuditLegalHoldTriggerIntegrationTest {
 
@@ -28,6 +29,7 @@ class AuditLegalHoldTriggerIntegrationTest {
         Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration/postgres")
+                .configuration(FlywayConfig.SESSION_LEVEL_LOCK)
                 .load()
                 .migrate();
     }

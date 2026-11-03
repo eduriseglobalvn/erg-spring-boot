@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import com.erg.ergspringboot.config.persistence.FlywayConfig;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -38,7 +39,8 @@ class WebhookRetentionAndToggleTest {
     void retentionDeletesExpiredReceiptsAndOldInboxRowsOnly() {
         DriverManagerDataSource dataSource =
                 new DriverManagerDataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration/postgres").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration/postgres")
+                .configuration(FlywayConfig.SESSION_LEVEL_LOCK).load().migrate();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         jdbc.update("insert into webhook_receipts values ('telegram','old',now() - interval '2 days',now() - interval '1 day')");
         jdbc.update("insert into webhook_receipts values ('telegram','live',now(),now() + interval '1 day')");

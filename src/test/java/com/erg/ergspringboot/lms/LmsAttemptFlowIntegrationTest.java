@@ -36,7 +36,7 @@ import org.testcontainers.DockerClientFactory;
 /**
  * P0-5 end-to-end proof against PostgreSQL + Flyway: an assignment created for a Student whose login id
  * differs from Student.id can be started and submitted by that learner, another learner gets 403, and
- * V120's partial unique index rejects a second in-progress attempt.
+ * V115's partial unique index rejects a second in-progress attempt.
  */
 @ActiveProfiles("test")
 @SpringBootTest(properties = "erg.quiz.media.signing-secret=lms-attempt-flow-test-signing-secret-0123456789")

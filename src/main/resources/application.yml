@@ -476,6 +476,12 @@ spring:
 erg:
   process-local:
     enabled: ${ERG_PROCESS_LOCAL_ENABLED:true}
+# API docs stay off by default (see shared document); local development opts back in.
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
+scalar:
+  enabled: ${SCALAR_ENABLED:true}
 
 ---
 spring:
@@ -510,6 +516,10 @@ spring:
 erg:
   process-local:
     enabled: true
+  quiz:
+    media:
+      # Test-only signing key; prod reads SECRET_MEDIA_URL_SIGNING_KEY.
+      signing-secret: test-only-media-url-signing-secret-0123456789
   outbox:
     worker:
       enabled: false
@@ -532,6 +542,15 @@ erg:
     push:
       worker:
         enabled: false
+  http:
+    cors:
+      # Literal so a developer .env cannot change what the CORS contract tests see.
+      exposed-headers: X-Request-ID,X-Trace-ID,Deprecation,Sunset,Link,X-ERG-API-Owner
+springdoc:
+  api-docs:
+    enabled: true
+scalar:
+  enabled: true
 
 ---
 spring:

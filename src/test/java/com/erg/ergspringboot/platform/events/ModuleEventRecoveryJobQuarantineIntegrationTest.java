@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
 import java.util.UUID;
+import com.erg.ergspringboot.config.persistence.FlywayConfig;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,8 @@ class ModuleEventRecoveryJobQuarantineIntegrationTest {
     @BeforeAll
     static void migrate() {
         dataSource = new DriverManagerDataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration/postgres").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration/postgres")
+                .configuration(FlywayConfig.SESSION_LEVEL_LOCK).load().migrate();
     }
 
     @BeforeEach

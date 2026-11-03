@@ -6,6 +6,7 @@ import com.erg.ergspringboot.audit.AuditOutcome;
 import com.erg.ergspringboot.audit.AuditPage;
 import com.erg.ergspringboot.audit.AuditQuery;
 import com.erg.ergspringboot.audit.authorization.AuditExport;
+import com.erg.ergspringboot.audit.authorization.AuditManage;
 import com.erg.ergspringboot.audit.authorization.AuditRead;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
@@ -19,6 +20,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -52,6 +56,24 @@ public class AuditController {
         AuditQuery query = query(from, to, actorId, resourceType, resourceId, outcome, page, size);
         AuditPage data = audit.query(UserAccessContext.from(request), query);
         return ApiResponse.success(200, "Audit events loaded", data, request.getRequestURI(), requestId(request));
+    }
+
+    @PutMapping("/events/{eventId}/legal-hold")
+    @AuditManage
+    public ApiResponse<Void> legalHold(
+            @PathVariable String eventId,
+            @RequestBody LegalHoldRequest body,
+            HttpServletRequest request
+    ) {
+        if (body == null || body.legalHold() == null) {
+            throw new BadRequestException("legalHold is required");
+        }
+        audit.setLegalHold(UserAccessContext.from(request), eventId, body.legalHold(), requestId(request));
+        return ApiResponse.success(200, body.legalHold() ? "Audit legal hold set" : "Audit legal hold released",
+                null, request.getRequestURI(), requestId(request));
+    }
+
+    public record LegalHoldRequest(Boolean legalHold) {
     }
 
     @GetMapping("/export")

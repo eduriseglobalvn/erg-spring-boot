@@ -21,7 +21,7 @@ public class TransactionalOutboxWorker {
     private static final int BATCH_SIZE = 50;
     private static final int MAX_ATTEMPTS = 8;
     private static final Duration LEASE = Duration.ofSeconds(60);
-    /** Per-instance lease owner (host:UUID), stored in outbox_events.locked_by (V133). */
+    /** Per-instance lease owner (host:UUID), stored in outbox_events.locked_by (V120). */
     static final String WORKER_ID = workerId();
     private final OutboxEventRepository repository;
     private final SmtpAccountMailSender smtp;

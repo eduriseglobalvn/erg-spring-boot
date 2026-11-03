@@ -44,7 +44,7 @@ public class FlywayConfig {
      * itself forever. A session-level lock keeps migrations serialized without that self-deadlock.
      * Every Flyway runner (app, upgrade test, reset script) must use it.
      */
-    static final Map<String, String> SESSION_LEVEL_LOCK = Map.of("flyway.postgresql.transactional.lock", "false");
+    public static final Map<String, String> SESSION_LEVEL_LOCK = Map.of("flyway.postgresql.transactional.lock", "false");
 
     /** One-time legacy onboarding switch for prod (env {@code ERG_FLYWAY_ALLOW_BASELINE_ON_MIGRATE=true}). */
     static final String PROD_BASELINE_OVERRIDE = "erg.flyway.allow-baseline-on-migrate";

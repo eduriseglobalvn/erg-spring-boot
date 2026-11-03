@@ -24,7 +24,7 @@ public final class JpaRegistrationCatalog {
             partiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
             dormant("courses", 1),
             enabled("crm", 6, 6),
-            enabled("curriculum", 3, 3),
+            enabled("curriculum", 6, 6),
             enabled("enterpriseconnectors", 3, 3),
             enabled("learningcontent", 4, 5),
             enabled("learningoutcomes", 7, 7),

@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.config;
 
+import com.erg.ergspringboot.config.persistence.FlywayConfig;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.Connection;
@@ -15,7 +16,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/** V130/V131: CRM tenant_id expand/backfill/enforce plus the dedicated handover approval permission. */
+/** V117/V118: CRM tenant_id expand/backfill/enforce plus the dedicated handover approval permission. */
 @Testcontainers(disabledWithoutDocker = true)
 class CrmTenantIsolationMigrationIntegrationTest {
 
@@ -86,7 +87,8 @@ class CrmTenantIsolationMigrationIntegrationTest {
     private Flyway flyway(MigrationVersion target) {
         var configuration = Flyway.configure()
                 .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
-                .locations("classpath:db/migration/postgres");
+                .locations("classpath:db/migration/postgres")
+                .configuration(FlywayConfig.SESSION_LEVEL_LOCK);
         if (target != null) {
             configuration.target(target);
         }

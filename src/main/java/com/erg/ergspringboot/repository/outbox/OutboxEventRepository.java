@@ -23,7 +23,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String
             """, nativeQuery = true)
     List<OutboxEvent> findDueForUpdate(@Param("now") OffsetDateTime now, @Param("limit") int limit);
 
-    /** Stamps the claiming worker on rows claimed in the current transaction (V133 column). */
+    /** Stamps the claiming worker on rows claimed in the current transaction (V120 column). */
     @Modifying
     @Query(value = "update outbox_events set locked_by = :workerId where id in (:ids)", nativeQuery = true)
     int markLockedBy(@Param("ids") Collection<String> ids, @Param("workerId") String workerId);

@@ -13,7 +13,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.testcontainers.DockerClientFactory;
 
-/** Proves V140 identity links persist under tenant RLS and refuse re-pointing an account. */
+/** Proves V123 identity links persist under tenant RLS and refuse re-pointing an account. */
 @ActiveProfiles("test")
 @SpringBootTest
 @org.junit.jupiter.api.condition.EnabledIf("postgresProofDatabaseAvailable")

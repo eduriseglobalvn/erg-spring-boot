@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Resubmission is bounded per publication: once a failed publication has used
  * {@code maxAttempts} completion attempts it is moved to {@code event_publication_quarantine}
- * (V132) and counted in {@code module.events.quarantined}, so a poison event stops retrying
+ * (V119) and counted in {@code module.events.quarantined}, so a poison event stops retrying
  * and cannot block newer failures at the head of the registry's batch. Only one instance in
  * the cluster runs a recovery pass at a time.</p>
  */

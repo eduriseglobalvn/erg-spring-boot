@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 555
+  route-count: 562
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -594,11 +594,27 @@ rest:
       state-owner: postgresql
       cache-policy: tenant-generation-or-none
       pagination-policy: required-for-collections
+    - route: GET /api/v1/curriculum/program => com.erg.ergspringboot.controller.curriculum.CurriculumController.program
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
     - route: GET /api/v1/curriculum/subjects/{id}/impact => com.erg.ergspringboot.controller.curriculum.CurriculumController.subjectImpact
       classification: persistent-read
       statement-budget: 12
       row-budget: 1000
       payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/curriculum/teaching-plan => com.erg.ergspringboot.controller.curriculum.CurriculumController.teachingPlan
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 1048576
       state-owner: postgresql
       cache-policy: tenant-generation-or-none
       pagination-policy: required-for-collections
@@ -3716,6 +3732,14 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
+    - route: POST /api/v1/lms/attempts/{attemptId}/answers/{questionId}/grade => com.erg.ergspringboot.controller.lms.LmsController.gradeAnswer
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
     - route: POST /api/v1/lms/attempts/{attemptId}/submit => com.erg.ergspringboot.controller.lms.LmsController.submitAttempt
       classification: persistent-write
       statement-budget: 25
@@ -4138,6 +4162,14 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
+    - route: POST /api/v1/users/me/onboarding => com.erg.ergspringboot.controller.users.UserController.completeOnboarding
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/users/me/recovery-email/challenges => com.erg.ergspringboot.controller.users.UserController.requestRecoveryEmailChallenge
       classification: persistent-write
       statement-budget: 12
@@ -4244,12 +4276,36 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
+    - route: PUT /api/v1/audit/events/{eventId}/legal-hold => com.erg.ergspringboot.controller.audit.AuditController.legalHold
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 1
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: PUT /api/v1/calendar/events/{eventId} => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.updateEvent
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000
       payload-budget-bytes: 1048576
       state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/curriculum/program => com.erg.ergspringboot.controller.curriculum.CurriculumController.upsertProgram
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: PUT /api/v1/curriculum/teaching-plan => com.erg.ergspringboot.controller.curriculum.CurriculumController.upsertTeachingPlan
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
     - route: PUT /api/v1/insight/session/{id}/finish => com.erg.ergspringboot.controller.operations.AnalyticsOperationsController.finishSession

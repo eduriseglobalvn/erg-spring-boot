@@ -45,7 +45,7 @@ public class EnterpriseConnectorRun extends BaseEntity {
     private String errorCode;
     @Column(name = "requested_by", nullable = false, length = 96)
     private String requestedBy;
-    /** Failed run this RETRY run re-executes (V135); the parent itself is never mutated. */
+    /** Failed run this RETRY run re-executes (V122); the parent itself is never mutated. */
     @Column(name = "parent_run_id", length = 36)
     private String parentRunId;
     @Version

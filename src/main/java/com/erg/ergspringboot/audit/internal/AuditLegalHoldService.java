@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Places or releases a legal hold on one audit event (C11). Requires {@code audit.manage};
  * the tenant always comes from the authenticated access context. The change itself is
- * audited, and the database trigger (V134) permits no other column to change.
+ * audited, and the database trigger (V121) permits no other column to change.
  */
 @Service
 public class AuditLegalHoldService {

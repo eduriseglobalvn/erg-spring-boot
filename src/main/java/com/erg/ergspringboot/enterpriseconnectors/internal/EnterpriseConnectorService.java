@@ -69,7 +69,7 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
     private static final String DEPROVISION = "DEPROVISION";
     private static final String PREVIEW = "PREVIEW";
     private static final String SUCCEEDED = "SUCCEEDED";
-    /** Claimed run whose provider call is in flight (V135); replays of the same key return it. */
+    /** Claimed run whose provider call is in flight (V122); replays of the same key return it. */
     private static final String RUNNING = "RUNNING";
     private static final String FAILED = "FAILED";
     private static final String RETRYABLE_FAILED = "RETRYABLE_FAILED";
