@@ -88,11 +88,21 @@ spring:
       mail:
         smtp:
           auth: ${SPRING_MAIL_SMTP_AUTH:${SMTP__AUTH:true}}
+          # JavaMail defaults to infinite socket timeouts; a hung relay would block the
+          # shared scheduler thread that drives the outbox and every other background job.
+          connectiontimeout: ${SPRING_MAIL_SMTP_CONNECTION_TIMEOUT:5000}
+          timeout: ${SPRING_MAIL_SMTP_TIMEOUT:5000}
+          writetimeout: ${SPRING_MAIL_SMTP_WRITE_TIMEOUT:5000}
           ssl:
-            enable: ${SPRING_MAIL_SSL_ENABLED:${SMTP__SSL:true}}
+            enable: ${SPRING_MAIL_SSL_ENABLED:${SMTP__SSL:false}}
           starttls:
-            enable: ${SPRING_MAIL_STARTTLS_ENABLED:${SMTP__STARTTLS:false}}
+            enable: ${SPRING_MAIL_STARTTLS_ENABLED:${SMTP__STARTTLS:true}}
             required: ${SPRING_MAIL_STARTTLS_REQUIRED:false}
+  task:
+    scheduling:
+      pool:
+        # Ten @Scheduled workers share this pool; one slow job must not stall the rest.
+        size: ${SPRING_TASK_SCHEDULING_POOL_SIZE:4}
   graphql:
     http:
       path: ${SPRING_GRAPHQL_PATH:/api/v1/graphql}
@@ -106,30 +116,20 @@ spring:
       introspection:
         enabled: ${SPRING_GRAPHQL_SCHEMA_INTROSPECTION_ENABLED:${ERG_GRAPHQL_INTROSPECTION_ENABLED:false}}
 
-# These bindings must be common, not hidden inside the staging-only document below.
+# Shared bindings. Profile documents below only carry profile-specific overrides;
+# anything placed in a profile document is invisible to every other profile.
 # A Spring-imported .env is a property source, not a process environment, so
 # SERVER_PORT must be referenced explicitly for IDE launches to reach the Nginx
 # dev upstream on port 1606.
 server:
   address: ${SERVER_ADDRESS:${HTTP__HOST:${APP__HOST:0.0.0.0}}}
   port: ${SERVER_PORT:${HTTP__PORT:${APP__PORT:1606}}}
-  forward-headers-strategy: framework
-  shutdown: graceful
-
----
-spring:
-  config:
-    activate:
-      on-profile: staging
-  modulith:
-    detection-strategy: explicitly-annotated
-    runtime:
-      verification-enabled: true
-
-server:
-  address: ${SERVER_ADDRESS:${HTTP__HOST:${APP__HOST:0.0.0.0}}}
-  port: ${SERVER_PORT:${HTTP__PORT:${APP__PORT:1606}}}
-  forward-headers-strategy: framework
+  # Tomcat's RemoteIpValve honours X-Forwarded-For/-Proto only when the direct peer
+  # matches server.tomcat.remoteip.internal-proxies (Spring Boot default: loopback and
+  # private ranges; override with SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES). The
+  # `framework` strategy trusted the left-most XFF entry from any peer, so clients
+  # could spoof their IP.
+  forward-headers-strategy: native
   shutdown: graceful
   tomcat:
     # Cap how much of an aborted/rejected request body Tomcat will swallow to keep the
@@ -194,14 +194,6 @@ scalar:
   path: /scalar
   url: /v3/api-docs
 
-logging:
-  level:
-    root: ${ROOT_LOG_LEVEL:INFO}
-    com.erg.ergspringboot: ${LOGGING__LEVEL:DEBUG}
-    com.erg.ergspringboot.config.persistence.TenantAwareJpaTransactionManager: ${TENANT_TX_LOG_LEVEL:INFO}
-    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:OFF}
-    org.hibernate.orm.jdbc.bind: ${HIBERNATE_BIND_LOG_LEVEL:OFF}
-    org.springframework.jdbc.core: ${SPRING_JDBC_LOG_LEVEL:OFF}
 
 erg:
   mail:
@@ -316,28 +308,24 @@ erg:
         initial-backoff: ${NOTIFICATIONS__WORKER__INITIAL_BACKOFF:10s}
         max-backoff: ${NOTIFICATIONS__WORKER__MAX_BACKOFF:60m}
   auth:
-    jwt-issuer: ${AUTH__JWT_ISSUER:erg-server}
-    jwt-algorithms: ${AUTH__JWT_ALGORITHMS:HS256}
-    jwt-public-key: ${AUTH__JWT_PUBLIC_KEY:}
     bearer-prefix: ${AUTH__BEARER_PREFIX:Bearer}
-    jwt-secret: ${SECRET_AUTH__JWT_SECRET:}
-    jwt-refresh-secret: ${SECRET_AUTH__JWT_REFRESH_SECRET:}
     refresh-token-ttl: ${AUTH__REFRESH_TOKEN_TTL:7d}
     admin-email: ${AUTH__ADMIN_EMAIL:admin@erg.edu.vn}
-    argon2-memory: ${AUTH__ARGON2_MEMORY:32768}
-    argon2-iterations: ${AUTH__ARGON2_ITERATIONS:2}
+    # Per-account lockout (LoginFailureEnforcementService): after max-failed-login wrong
+    # passwords within failed-login-window the account is refused for block-duration.
     max-failed-login: ${AUTH__MAX_FAILED_LOGIN:5}
     failed-login-window: ${AUTH__FAILED_LOGIN_WINDOW:15m}
     block-duration: ${AUTH__BLOCK_DURATION:15m}
-    geo-block-enabled: ${AUTH__GEO_BLOCK_ENABLED:true}
-    block-unknown-geo: ${AUTH__BLOCK_UNKNOWN_GEO:false}
-    allowed-continents: ${AUTH__ALLOWED_CONTINENTS:AS}
-    cookie:
-      enabled: ${AUTH__COOKIE__ENABLED:true}
-      domain: ${AUTH__COOKIE__DOMAIN:}
-      secure: ${AUTH__COOKIE__SECURE:true}
-      same-site: ${AUTH__COOKIE__SAME_SITE:lax}
-      session-name: ${AUTH__COOKIE__SESSION_NAME:__Host-erg_session}
+    login-rate-limit:
+      enabled: ${ERG_AUTH_LOGIN_RATE_LIMIT_ENABLED:true}
+      source-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE:30}
+      account-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_ACCOUNT_PER_MINUTE:10}
+      device-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_DEVICE_PER_MINUTE:20}
+    rapid-session-replacement:
+      threshold: ${ERG_AUTH_RAPID_SESSION_REPLACEMENT_THRESHOLD:5}
+      window-minutes: ${ERG_AUTH_RAPID_SESSION_REPLACEMENT_WINDOW_MINUTES:10}
+    refresh-token-history:
+      retention-cron: ${ERG_AUTH_REFRESH_TOKEN_HISTORY_RETENTION_CRON:0 20 3 * * *}
   http:
     host: ${HTTP__HOST:${APP__HOST:0.0.0.0}}
     port: ${HTTP__PORT:${APP__PORT:8080}}
@@ -346,10 +334,6 @@ erg:
     idle-timeout: ${HTTP__IDLE_TIMEOUT:${APP__IDLE_TIMEOUT:60s}}
     shutdown-timeout: ${HTTP__SHUTDOWN_TIMEOUT:${APP__SHUTDOWN_TIME:30s}}
     trusted-proxy-cidrs: ${HTTP__TRUSTED_PROXY_CIDRS:}
-    rate-limit:
-      enabled: ${HTTP__RATE_LIMIT__ENABLED:true}
-      requests-per-minute: ${HTTP__RATE_LIMIT__REQUESTS_PER_MINUTE:100}
-      burst: ${HTTP__RATE_LIMIT__BURST:20}
     cors:
       allowed-origins: ${HTTP__CORS__ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3003,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3003,http://crm.erg.edu.vn:3001,http://lcms.erg.edu.vn:3001,http://lms.erg.edu.vn:3001,http://elearning.erg.edu.vn:3001,https://crm.erg.edu.vn:3001,https://lcms.erg.edu.vn:3001,https://lms.erg.edu.vn:3001,https://elearning.erg.edu.vn:3001}
       allowed-methods: ${HTTP__CORS__ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
@@ -419,13 +403,13 @@ erg:
     require-operation-name: ${ERG_GRAPHQL_REQUIRE_OPERATION_NAME:true}
     introspection-enabled: ${ERG_GRAPHQL_INTROSPECTION_ENABLED:false}
     max-query-length: ${ERG_GRAPHQL_MAX_QUERY_LENGTH:20000}
-    max-request-body-bytes: ${ERG_GRAPHQL_MAX_REQUEST_BODY_BYTES:262144}
+    max-request-body-bytes: ${ERG_GRAPHQL_MAX_REQUEST_BODY_BYTES:65536}
     max-depth: ${ERG_GRAPHQL_MAX_DEPTH:8}
     max-complexity: ${ERG_GRAPHQL_MAX_COMPLEXITY:500}
     execution-timeout: ${ERG_GRAPHQL_EXECUTION_TIMEOUT:5s}
     max-aliases: ${ERG_GRAPHQL_MAX_ALIASES:20}
     reject-sensitive-variables: ${ERG_GRAPHQL_REJECT_SENSITIVE_VARIABLES:true}
-    max-variable-array-items: ${ERG_GRAPHQL_MAX_VARIABLE_ARRAY_ITEMS:500}
+    max-variable-array-items: ${ERG_GRAPHQL_MAX_VARIABLE_ARRAY_ITEMS:100}
     rate-limit:
       enabled: ${ERG_GRAPHQL_RATE_LIMIT_ENABLED:true}
       redis-enabled: ${ERG_GRAPHQL_RATE_LIMIT_REDIS_ENABLED:false}
@@ -449,10 +433,6 @@ erg:
   compose:
     enabled: ${COMPOSE__ENABLED:false}
     deploy-manifest-path: ${COMPOSE__DEPLOY_MANIFEST_PATH:deploy.yaml}
-  tenant:
-    enabled: ${TENANT__ENABLED:false}
-    isolation: ${TENANT__ISOLATION:field}
-    default-id: ${TENANT__DEFAULT_ID:default}
   lifecycle:
     auth-bootstrap-admin-on-startup: ${LIFECYCLE__AUTH_BOOTSTRAP_ADMIN_ON_STARTUP:false}
     profile-backfill-on-startup: ${LIFECYCLE__PROFILE_BACKFILL_ON_STARTUP:false}
@@ -466,6 +446,26 @@ erg:
 spring:
   config:
     activate:
+      on-profile: staging
+  modulith:
+    detection-strategy: explicitly-annotated
+    runtime:
+      verification-enabled: true
+
+logging:
+  level:
+    root: ${ROOT_LOG_LEVEL:INFO}
+    com.erg.ergspringboot: ${LOGGING__LEVEL:DEBUG}
+    com.erg.ergspringboot.config.persistence.TenantAwareJpaTransactionManager: ${TENANT_TX_LOG_LEVEL:INFO}
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:OFF}
+    org.hibernate.orm.jdbc.bind: ${HIBERNATE_BIND_LOG_LEVEL:OFF}
+    org.springframework.jdbc.core: ${SPRING_JDBC_LOG_LEVEL:OFF}
+
+
+---
+spring:
+  config:
+    activate:
       on-profile: dev
   jpa:
     hibernate:
@@ -473,6 +473,9 @@ spring:
     properties:
       hibernate:
         generate_statistics: true
+erg:
+  process-local:
+    enabled: ${ERG_PROCESS_LOCAL_ENABLED:true}
 
 ---
 spring:
@@ -505,6 +508,8 @@ spring:
     hibernate:
       ddl-auto: validate
 erg:
+  process-local:
+    enabled: true
   outbox:
     worker:
       enabled: false
@@ -546,32 +551,15 @@ spring:
         enabled: false
 
 erg:
-  process-local:
-    enabled: ${ERG_PROCESS_LOCAL_ENABLED:false}
-  auth:
-    login-rate-limit:
-      enabled: ${ERG_AUTH_LOGIN_RATE_LIMIT_ENABLED:true}
-      source-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE:30}
-      account-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_ACCOUNT_PER_MINUTE:10}
-      device-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_DEVICE_PER_MINUTE:20}
-    rapid-session-replacement:
-      threshold: ${ERG_AUTH_RAPID_SESSION_REPLACEMENT_THRESHOLD:5}
-      window-minutes: ${ERG_AUTH_RAPID_SESSION_REPLACEMENT_WINDOW_MINUTES:10}
-    refresh-token-history:
-      retention-cron: ${ERG_AUTH_REFRESH_TOKEN_HISTORY_RETENTION_CRON:0 20 3 * * *}
-    cookie:
-      secure: true
-      same-site: strict
+  notifications:
+    push:
+      credentials:
+        # Production refuses to store FCM registration tokens in clear text.
+        registration-token-encryption-required: ${NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_REQUIRED:true}
 
 springdoc:
   api-docs:
     enabled: false
-
-server:
-  error:
-    include-message: never
-    include-binding-errors: never
-    include-stacktrace: never
 
 scalar:
   enabled: false
