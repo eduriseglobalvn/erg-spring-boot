@@ -72,7 +72,7 @@ public class UserController {
     @Deprecated
     UserController(UserOperations users,
             com.erg.ergspringboot.service.auth.AccountVerificationService verification) {
-        this(users, new AuthOperations(null, verification));
+        this(users, new AuthOperations(null, null, null, null, verification));
     }
 
     @GetMapping("/me")

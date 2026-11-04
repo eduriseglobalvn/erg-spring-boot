@@ -100,12 +100,10 @@ class ModulePublicApiContractTest {
                 com.erg.ergspringboot.service.elearning.engagement.StudentEngagementService.class))
                 .isNotNull();
 
-        String authAdapter = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"));
+        assertThat(Files.exists(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"))).isFalse();
         String curriculumAdapter = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java"));
-        assertThat(authAdapter).contains("@Deprecated", "AuthOperations operations")
-                .doesNotContain(".internal.");
         assertThat(curriculumAdapter).contains("@Deprecated", "CurriculumOperations operations")
                 .doesNotContain(".internal.");
         String authorizationAdapter = Files.readString(Path.of(
