@@ -3,8 +3,6 @@ package com.erg.ergspringboot.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.calendar.CalendarReadPort;
-import com.erg.ergspringboot.calendar.CalendarReadCompatibilityPort;
-import com.erg.ergspringboot.calendar.CalendarReferenceMaps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,12 +57,12 @@ class ModulePublicPackageDirectionTest {
                 .noneMatch(name -> name.startsWith("com.erg.ergspringboot.model.")))
                 .as("CalendarReadPort must expose only module-owned contracts")
                 .isTrue();
-        assertThat(CalendarReadCompatibilityPort.class.isAnnotationPresent(Deprecated.class))
-                .as("entity projection must be isolated behind a deprecated compatibility port")
-                .isTrue();
-        assertThat(CalendarReferenceMaps.class.isAnnotationPresent(Deprecated.class))
-                .as("CalendarReferenceMaps must not become a new public persistence contract")
-                .isTrue();
+        assertThat(SOURCE_ROOT.resolve("calendar/CalendarReadCompatibilityPort.java"))
+                .as("the entity-projection compatibility port was retired")
+                .doesNotExist();
+        assertThat(SOURCE_ROOT.resolve("calendar/CalendarReferenceMaps.java"))
+                .as("CalendarReferenceMaps must stay module-internal, not a public persistence contract")
+                .doesNotExist();
     }
 
     private boolean isLegacyOrPersistenceImport(String imported) {

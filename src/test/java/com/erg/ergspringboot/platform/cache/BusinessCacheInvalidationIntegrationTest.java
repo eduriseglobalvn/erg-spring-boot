@@ -2,8 +2,8 @@ package com.erg.ergspringboot.platform.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.erg.ergspringboot.service.calendar.CalendarCommandService;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
+import com.erg.ergspringboot.calendar.internal.command.CalendarCommandUseCase;
+import com.erg.ergspringboot.calendar.internal.readmodel.CalendarReadUseCase;
 import com.erg.ergspringboot.service.quiz.report.QuizReportService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -15,7 +15,7 @@ class BusinessCacheInvalidationIntegrationTest {
 
     @Test
     void calendarReadsAreUserScopedAndEveryMutationInvalidatesTenantGeneration() {
-        assertThat(Arrays.stream(CalendarReadService.class.getDeclaredMethods())
+        assertThat(Arrays.stream(CalendarReadUseCase.class.getDeclaredMethods())
                 .filter(method -> method.getName().endsWith("TeachingCalendarWorkspace")))
                 .allSatisfy(method -> {
                     Cacheable cacheable = method.getAnnotation(Cacheable.class);
@@ -46,7 +46,7 @@ class BusinessCacheInvalidationIntegrationTest {
     }
 
     private void assertMutationInvalidates(String methodName) {
-        Method method = Arrays.stream(CalendarCommandService.class.getDeclaredMethods())
+        Method method = Arrays.stream(CalendarCommandUseCase.class.getDeclaredMethods())
                 .filter(candidate -> candidate.getName().equals(methodName))
                 .findFirst().orElseThrow();
         CacheEvict evict = method.getAnnotation(CacheEvict.class);

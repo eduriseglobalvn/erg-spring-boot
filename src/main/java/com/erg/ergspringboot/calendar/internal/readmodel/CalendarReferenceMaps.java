@@ -1,0 +1,22 @@
+package com.erg.ergspringboot.calendar.internal.readmodel;
+
+import com.erg.ergspringboot.model.lms.Classroom;
+import com.erg.ergspringboot.model.lms.Level;
+import com.erg.ergspringboot.model.lms.Subject;
+import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.model.users.User;
+import java.util.Map;
+
+/**
+ * Module-internal reference projection used while assembling Calendar read
+ * models. It holds persistence entities, so it stays inside
+ * {@code calendar.internal.readmodel} and must never appear on a public port.
+ */
+public record CalendarReferenceMaps(
+        Map<String, EducationUnit> schoolMap,
+        Map<String, Classroom> classMap,
+        Map<String, Subject> subjectMap,
+        Map<String, Level> levelMap,
+        Map<String, User> userMap,
+        Map<String, String> teacherColorKeyMap
+) { }

@@ -108,14 +108,11 @@ class ModulePublicApiContractTest {
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(usersAdapter).contains("@Deprecated", "UserOperations operations")
                 .doesNotContain(".internal.");
-        assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarCommandService.java")))
-                .contains("@Deprecated", "CalendarCommandPort operations")
-                .doesNotContain(".internal.");
-        assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarReadService.java")))
-                .contains("@Deprecated", "CalendarReadPort operations")
-                .doesNotContain(".internal.");
+        // The deprecated CalendarCommandService/CalendarReadService pass-through beans were removed.
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/calendar/CalendarCommandService.java"))
+                .doesNotExist();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/calendar/CalendarReadService.java"))
+                .doesNotExist();
         assertThat(Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/lcms/LcmsOperations.java")))
                 .contains("LcmsCommandPort commands")

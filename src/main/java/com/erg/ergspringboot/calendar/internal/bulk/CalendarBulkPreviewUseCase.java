@@ -50,7 +50,7 @@ public class CalendarBulkPreviewUseCase {
         this.conflicts = conflicts;
     }
 
-    /** Compatibility constructor for direct CalendarCommandService tests. */
+    /** Direct constructor for unit tests that wire the command graph without Spring. */
     public CalendarBulkPreviewUseCase(
             CalendarBulkInputNormalizer normalizer,
             CalendarBulkReferenceDataUseCase referenceData,

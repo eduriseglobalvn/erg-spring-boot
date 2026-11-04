@@ -10,7 +10,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
+import com.erg.ergspringboot.calendar.CalendarReadPort;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class CalendarLmsQueryGraphQlControllerTest {
 
     @Mock
-    private CalendarReadService readService;
+    private CalendarReadPort readService;
 
     private CalendarLmsQueryGraphQlController controller;
 
