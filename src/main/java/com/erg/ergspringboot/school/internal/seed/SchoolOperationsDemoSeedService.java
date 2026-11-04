@@ -4,7 +4,7 @@ import com.erg.ergspringboot.school.internal.command.SchoolCommandService;
 
 import com.erg.ergspringboot.common.request.school.SchoolRequests.CreateSchoolRequest;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.model.lms.ContentScope;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.users.persistence.UserRepository;

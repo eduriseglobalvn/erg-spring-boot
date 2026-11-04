@@ -8,7 +8,7 @@ import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.model.lms.ContentScope;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
 import com.erg.ergspringboot.lms.persistence.Subject;

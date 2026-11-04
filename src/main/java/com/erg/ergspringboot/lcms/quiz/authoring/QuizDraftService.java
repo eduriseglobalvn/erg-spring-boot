@@ -8,7 +8,7 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.StaleDraftException;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.repository.lms.QuizRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.platform.security.TenantContext;

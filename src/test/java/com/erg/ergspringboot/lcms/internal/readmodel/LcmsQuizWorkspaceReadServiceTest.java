@@ -9,7 +9,7 @@ import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
-import com.erg.ergspringboot.repository.lms.QuizRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
 import tools.jackson.databind.ObjectMapper;
 import java.util.List;

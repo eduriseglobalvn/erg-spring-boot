@@ -3,9 +3,9 @@ package com.erg.ergspringboot.lcms.persistence.quiz.authoring;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.repository.lms.QuizRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

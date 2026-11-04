@@ -1,7 +1,7 @@
-package com.erg.ergspringboot.repository.lms.projection;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank.projection;
 
-import com.erg.ergspringboot.model.lms.QuestionChoice;
-import com.erg.ergspringboot.model.lms.ContentScope;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import java.time.OffsetDateTime;
 import java.util.List;
 

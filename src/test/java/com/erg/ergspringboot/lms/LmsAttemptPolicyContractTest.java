@@ -14,7 +14,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lms.persistence.Assignment;
 import com.erg.ergspringboot.lms.persistence.Attempt;
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsAssignmentService;

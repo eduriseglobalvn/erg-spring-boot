@@ -7,12 +7,12 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.SaveDraftRequest;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDraftResponse;
 import com.erg.ergspringboot.exception.StaleDraftException;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.repository.lms.QuizRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import java.util.List;
 import java.util.Map;

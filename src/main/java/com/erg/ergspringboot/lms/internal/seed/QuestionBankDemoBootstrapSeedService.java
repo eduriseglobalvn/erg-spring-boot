@@ -1,12 +1,12 @@
 package com.erg.ergspringboot.lms.internal.seed;
 
 import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.model.lms.Question;
-import com.erg.ergspringboot.model.lms.QuestionChoice;
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.repository.lms.QuestionRepository;
-import com.erg.ergspringboot.repository.lms.QuizRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.lms.persistence.Topic;

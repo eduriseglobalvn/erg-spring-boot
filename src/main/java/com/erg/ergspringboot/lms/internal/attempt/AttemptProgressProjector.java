@@ -4,7 +4,7 @@ import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.lms.persistence.Assignment;
 import com.erg.ergspringboot.lms.persistence.Attempt;
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService;
 import java.math.BigDecimal;

@@ -7,7 +7,7 @@ import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.lms.persistence.*;
-import com.erg.ergspringboot.model.lms.*;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.*;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import java.util.*;

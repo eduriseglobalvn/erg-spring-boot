@@ -12,7 +12,7 @@ import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.lms.internal.resource.LmsResourceQueryUseCase;
 import com.erg.ergspringboot.lms.persistence.Assignment;
 import com.erg.ergspringboot.lms.persistence.AssignmentResource;
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import java.util.List;
 import java.util.Map;

@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.common.request.quiz;
 
-import com.erg.ergspringboot.model.lms.QuestionChoice;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
 import java.util.List;
 import java.util.Map;
 

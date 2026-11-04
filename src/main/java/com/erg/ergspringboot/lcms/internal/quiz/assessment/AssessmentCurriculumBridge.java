@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.lcms.internal.quiz.assessment;
 
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import java.util.Map;
 
 /**

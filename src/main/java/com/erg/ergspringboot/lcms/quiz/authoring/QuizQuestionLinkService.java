@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.lcms.quiz.authoring;
 
-import com.erg.ergspringboot.model.lms.QuizQuestion;
-import com.erg.ergspringboot.repository.lms.QuestionRepository;
-import com.erg.ergspringboot.repository.lms.QuizQuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestion;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestionRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -88,7 +88,7 @@ public class QuizQuestionLinkService {
         }
         if (ids.isEmpty()) return result;
         java.util.Set<String> existingIds = questionRepository.findByTenantIdAndIdIn(tenantId, new ArrayList<>(ids))
-                .stream().map(com.erg.ergspringboot.model.lms.Question::getId)
+                .stream().map(com.erg.ergspringboot.lcms.persistence.quiz.bank.Question::getId)
                 .collect(java.util.stream.Collectors.toSet());
         candidates.stream()
                 .filter(candidate -> existingIds.contains(candidate.questionId()))

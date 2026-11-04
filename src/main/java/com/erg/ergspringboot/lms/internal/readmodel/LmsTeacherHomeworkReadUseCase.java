@@ -11,7 +11,7 @@ import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.lms.persistence.projection.*;
-import com.erg.ergspringboot.repository.lms.projection.*;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;

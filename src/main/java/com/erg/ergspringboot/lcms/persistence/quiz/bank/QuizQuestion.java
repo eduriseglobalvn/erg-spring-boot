@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.lms;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;

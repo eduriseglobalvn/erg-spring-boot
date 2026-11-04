@@ -1,7 +1,7 @@
-package com.erg.ergspringboot.repository.lms;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
-import com.erg.ergspringboot.model.lms.QuizQuestion;
-import com.erg.ergspringboot.repository.lms.projection.QuestionUsageCountProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestion;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionUsageCountProjection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

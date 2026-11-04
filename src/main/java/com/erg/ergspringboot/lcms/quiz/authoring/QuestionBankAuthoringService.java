@@ -5,11 +5,11 @@ import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.lms.ContentScope;
-import com.erg.ergspringboot.model.lms.Question;
-import com.erg.ergspringboot.model.lms.QuestionChoice;
-import com.erg.ergspringboot.repository.lms.QuestionRepository;
-import com.erg.ergspringboot.repository.lms.QuestionTypeRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionTypeRepository;
 import com.erg.ergspringboot.lcms.internal.quiz.assessment.AssessmentCurriculumBridge;
 import java.time.OffsetDateTime;
 import java.util.List;

@@ -9,7 +9,7 @@ import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lms.persistence.projection.*;
-import com.erg.ergspringboot.repository.lms.projection.*;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.*;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;

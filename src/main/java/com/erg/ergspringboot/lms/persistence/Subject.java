@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.lms.persistence;
 
-import com.erg.ergspringboot.model.lms.ContentScope;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

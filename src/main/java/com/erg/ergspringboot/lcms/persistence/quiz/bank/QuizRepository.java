@@ -1,8 +1,8 @@
-package com.erg.ergspringboot.repository.lms;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
-import com.erg.ergspringboot.model.lms.Quiz;
-import com.erg.ergspringboot.repository.lms.projection.QuestionBankQuizOptionProjection;
-import com.erg.ergspringboot.repository.lms.projection.QuestionUsageCountProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionUsageCountProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.projection.QuizSummaryProjection;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -150,7 +150,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
     );
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankQuizOptionProjection(
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection(
                 q.id,
                 q.title,
                 q.status,
@@ -184,7 +184,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
     );
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankQuizOptionProjection(
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection(
                 q.id,
                 q.title,
                 q.status,
@@ -216,7 +216,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
     );
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankQuizOptionProjection(
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection(
                 q.id,
                 q.title,
                 q.status,
@@ -248,7 +248,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
     );
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankQuizOptionProjection(
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection(
                 q.id,
                 q.title,
                 q.status,

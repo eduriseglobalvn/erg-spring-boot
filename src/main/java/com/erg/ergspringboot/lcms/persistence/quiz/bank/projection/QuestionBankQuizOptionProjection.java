@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.repository.lms.projection;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank.projection;
 
 import java.util.List;
 import java.time.OffsetDateTime;

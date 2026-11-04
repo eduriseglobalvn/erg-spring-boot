@@ -6,7 +6,7 @@ import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsCallerPermissions;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.Assignment;
-import com.erg.ergspringboot.model.lms.Quiz;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsQuizService;

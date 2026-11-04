@@ -4,7 +4,7 @@ import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import com.erg.ergspringboot.repository.lms.projection.QuestionBankOptionProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,7 +33,7 @@ public interface CurriculumLevelRepository extends JpaRepository<CurriculumLevel
     boolean existsByTenantIdAndSubjectIdAndCodeIgnoreCase(String tenantId, String subjectId, String code);
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankOptionProjection(l.id, l.name, l.subjectId, null, l.code)
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection(l.id, l.name, l.subjectId, null, l.code)
             from CurriculumLevel l
             where l.tenantId = :tenantId and (:subjectId is null or l.subjectId = :subjectId)
               and (:status is null or lower(l.status) = lower(:status))
@@ -42,7 +42,7 @@ public interface CurriculumLevelRepository extends JpaRepository<CurriculumLevel
     List<QuestionBankOptionProjection> findAssessmentOptions(@Param("tenantId") String tenantId, @Param("subjectId") String subjectId, @Param("status") String status);
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankOptionProjection(l.id, l.name, l.subjectId, null, l.code)
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection(l.id, l.name, l.subjectId, null, l.code)
             from CurriculumLevel l
             where l.tenantId = :tenantId and (:subjectId is null or l.subjectId = :subjectId)
               and (:status is null or lower(l.status) = lower(:status))

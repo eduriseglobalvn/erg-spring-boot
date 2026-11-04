@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.lms;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import com.erg.ergspringboot.users.persistence.User;
@@ -32,29 +32,21 @@ import org.hibernate.type.SqlTypes;
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @Entity
 @Table(
-        name = "lms_quizzes",
+        name = "lms_questions",
         indexes = {
-                @Index(name = "idx_lms_quizzes_tenant_status", columnList = "tenant_id, status"),
-                @Index(name = "idx_lms_quizzes_tenant_subject", columnList = "tenant_id, subject_id")
+                @Index(name = "idx_lms_questions_tenant_status", columnList = "tenant_id, status"),
+                @Index(name = "idx_lms_questions_tenant_subject", columnList = "tenant_id, subject_id"),
+                @Index(name = "idx_lms_questions_tenant_topic", columnList = "tenant_id, topic_id")
         }
 )
-public class Quiz extends BaseEntity {
+public class Question extends BaseEntity {
 
     @Column(name = "tenant_id")
     private String tenantId;
 
-    @Column(name = "portal")
-    private String portal;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "scope", columnDefinition = "jsonb")
     private ContentScope scope;
-
-    private String title;
-
-    private String subtitle;
-
-    private String kind;
 
     @Column(name = "subject_id")
     private String subjectId;
@@ -72,59 +64,62 @@ public class Quiz extends BaseEntity {
     @ToString.Exclude
     private CurriculumLevel level;
 
+    @Column(name = "topic_id")
+    private String topicId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @ToString.Exclude
+    private CurriculumTopic topic;
+
     @Column(name = "category_id")
     private String categoryId;
 
+    private String type;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @JoinColumn(name = "type", referencedColumnName = "id", insertable = false, updatable = false)
     @ToString.Exclude
-    private CurriculumTopic category;
+    private QuestionType questionType;
+
+    private String stem;
+
+    private String objective;
+
+    private String difficulty;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "topic_ids", columnDefinition = "jsonb")
-    private List<String> topicIds;
+    @Column(name = "tags", columnDefinition = "jsonb")
+    private List<String> tags;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "question_ids", columnDefinition = "jsonb")
-    private List<String> questionIds;
+    @Column(name = "choices", columnDefinition = "jsonb")
+    private List<QuestionChoice> choices;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "slides", columnDefinition = "jsonb")
-    private List<Object> slides;
+    @Column(name = "answer", columnDefinition = "jsonb")
+    private Object answer;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "content", columnDefinition = "jsonb")
+    private Map<String, Object> content;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "settings", columnDefinition = "jsonb")
     private Map<String, Object> settings;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "result", columnDefinition = "jsonb")
-    private Map<String, Object> result;
+    @Column(name = "metadata", columnDefinition = "jsonb")
+    private Map<String, Object> metadata;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "theme", columnDefinition = "jsonb")
-    private Map<String, Object> theme;
+    @Column(name = "mastery_rate")
+    private Double masteryRate;
 
-    @Column(name = "theme_id")
-    private String themeId;
+    @Column(name = "usage_count")
+    private Integer usageCount;
 
-    private String status;
-
-    @Column(name = "lifecycle_state", nullable = false, length = 32)
-    private String lifecycleState = "DRAFT";
-
-    private Integer version;
-
-    @Column(name = "package_hash")
-    private String packageHash;
-
-    @Column(name = "published_at")
-    private OffsetDateTime publishedAt;
-
-    @Column(name = "current_version_id")
-    private String currentVersionId;
-
-    @Column(name = "latest_draft_id")
-    private String latestDraftId;
+    @Column(name = "schools_using")
+    private Integer schoolsUsing;
 
     @Column(name = "owner_user_id")
     private String ownerUserId;
@@ -134,15 +129,16 @@ public class Quiz extends BaseEntity {
     @ToString.Exclude
     private User owner;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "content_scope", columnDefinition = "jsonb")
-    private Map<String, Object> contentScope;
-
     @Column(name = "schema_version")
     private Integer schemaVersion;
 
-    @Column(name = "idempotency_key")
-    private String idempotencyKey;
+    private String status;
+
+    @Column(name = "lifecycle_state", nullable = false, length = 32)
+    private String lifecycleState = "DRAFT";
+
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;

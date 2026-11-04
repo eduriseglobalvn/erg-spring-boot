@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.lms;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,9 +10,11 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class ContentScope {
+public class QuestionChoice {
 
-    private String type;
+    private String id;
 
-    private String schoolId;
+    private String label;
+
+    private Boolean correct;
 }

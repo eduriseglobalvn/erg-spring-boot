@@ -11,7 +11,7 @@ import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.*;
-import com.erg.ergspringboot.model.lms.*;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.*;
 import com.erg.ergspringboot.lms.persistence.AttemptAnswer;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;

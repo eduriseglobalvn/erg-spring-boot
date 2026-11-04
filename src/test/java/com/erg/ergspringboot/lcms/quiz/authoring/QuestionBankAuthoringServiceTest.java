@@ -8,10 +8,10 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.request.quiz.QuestionBankAuthoringRequests.SaveQuestionRequest;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.lms.Question;
-import com.erg.ergspringboot.model.lms.QuestionChoice;
-import com.erg.ergspringboot.repository.lms.QuestionRepository;
-import com.erg.ergspringboot.repository.lms.QuestionTypeRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionTypeRepository;
 import com.erg.ergspringboot.lcms.internal.quiz.assessment.AssessmentCurriculumBridge;
 import java.util.List;
 import java.util.Map;

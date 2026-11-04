@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.lms.persistence;
 
-import com.erg.ergspringboot.repository.lms.projection.QuestionBankOptionProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,7 +17,7 @@ public interface LevelRepository extends JpaRepository<Level, String> {
             String tenantId, java.util.Set<String> subjectIds, String status, Pageable pageable);
 
     @Query("""
-            select new com.erg.ergspringboot.repository.lms.projection.QuestionBankOptionProjection(l.id, l.name, l.subjectId, null, l.code)
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection(l.id, l.name, l.subjectId, null, l.code)
             from Level l
             where l.tenantId = :tenantId
             and (:subjectId is null or l.subjectId = :subjectId)

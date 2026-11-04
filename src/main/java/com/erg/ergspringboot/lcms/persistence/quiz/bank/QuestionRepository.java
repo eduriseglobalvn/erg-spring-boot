@@ -1,7 +1,7 @@
-package com.erg.ergspringboot.repository.lms;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
-import com.erg.ergspringboot.model.lms.Question;
-import com.erg.ergspringboot.repository.lms.projection.QuestionBankQuestionProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -47,7 +47,7 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
 
     @Query(
             value = """
-                    select new com.erg.ergspringboot.repository.lms.projection.QuestionBankQuestionProjection(
+                    select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection(
                         q.id,
                         q.scope,
                         q.subjectId,
@@ -108,7 +108,7 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
 
     @Query(
             value = """
-                    select new com.erg.ergspringboot.repository.lms.projection.QuestionBankQuestionProjection(
+                    select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection(
                         q.id,
                         q.scope,
                         q.subjectId,
