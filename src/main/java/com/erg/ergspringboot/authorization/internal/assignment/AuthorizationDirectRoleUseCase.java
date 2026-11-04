@@ -4,9 +4,9 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.BulkAssi
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RoleResponse;
 import com.erg.ergspringboot.exception.*;
 import com.erg.ergspringboot.model.authorization.*;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.*;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.authorization.internal.audit.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.users.RoleAssignmentAudit.UserRef;

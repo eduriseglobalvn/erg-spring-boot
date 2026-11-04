@@ -13,7 +13,7 @@ import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.EffectivePermissionResolver;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;

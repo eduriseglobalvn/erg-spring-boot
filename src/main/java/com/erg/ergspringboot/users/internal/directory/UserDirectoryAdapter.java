@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.users.internal.directory;
 
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.UserAccountProjection;
 import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.util.Collection;

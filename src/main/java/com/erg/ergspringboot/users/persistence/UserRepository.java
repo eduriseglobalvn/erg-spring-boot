@@ -1,10 +1,10 @@
-package com.erg.ergspringboot.repository.auth.user;
+package com.erg.ergspringboot.users.persistence;
 
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.repository.auth.user.projection.UserAccessRowProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserEffectivePermissionProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserListItemProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserRoleNameProjection;
+import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
+import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
+import com.erg.ergspringboot.users.persistence.UserListItemProjection;
+import com.erg.ergspringboot.users.persistence.UserRoleNameProjection;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -84,7 +84,7 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     @Query(
             value = """
-                    select new com.erg.ergspringboot.repository.auth.user.projection.UserListItemProjection(
+                    select new com.erg.ergspringboot.users.persistence.UserListItemProjection(
                         u.id,
                         u.email,
                         u.fullName,
@@ -137,7 +137,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     );
 
     @Query("""
-            select new com.erg.ergspringboot.repository.auth.user.projection.UserRoleNameProjection(u.id, r.name)
+            select new com.erg.ergspringboot.users.persistence.UserRoleNameProjection(u.id, r.name)
             from User u
             join u.roles r
             where u.id in :userIds
@@ -209,7 +209,7 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     @Query(
             value = """
-                    select new com.erg.ergspringboot.repository.auth.user.projection.UserAccessRowProjection(
+                    select new com.erg.ergspringboot.users.persistence.UserAccessRowProjection(
                         u.id,
                         u.fullName,
                         u.email,
@@ -260,7 +260,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     );
 
     @Query("""
-            select distinct new com.erg.ergspringboot.repository.auth.user.projection.UserEffectivePermissionProjection(
+            select distinct new com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection(
                 u.id,
                 p.name,
                 concat('role:', r.name)
@@ -276,7 +276,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     );
 
     @Query("""
-            select new com.erg.ergspringboot.repository.auth.user.projection.UserEffectivePermissionProjection(
+            select new com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection(
                 u.id,
                 override.permission,
                 concat('override:', override.grantType)

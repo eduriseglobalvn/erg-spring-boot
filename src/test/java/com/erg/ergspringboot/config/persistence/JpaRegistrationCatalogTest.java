@@ -18,7 +18,7 @@ class JpaRegistrationCatalogTest {
     @Test
     void everyEntityPackageIsExplicitlyEnabledOrExplicitlyDormant() throws IOException {
         for (JpaRegistrationCatalog.Module module : JpaRegistrationCatalog.modules()) {
-            assertThat(count(module.modelPackage(), source -> source.contains("@Entity")))
+            assertThat(count(module.modelPackage(), ENTITY))
                     .as("entity inventory for %s", module.name())
                     .isEqualTo(module.entityCount());
             assertThat(count(module.repositoryPackage(), REPOSITORY))
@@ -69,6 +69,9 @@ class JpaRegistrationCatalogTest {
                 .contains("JpaRegistrationCatalog.entityScanPackages()")
                 .contains("JpaRegistrationCatalog::isManagedEntityClass");
     }
+
+    // "@Entity" followed by whitespace/paren, so co-located repositories using @EntityGraph do not count.
+    private static final Predicate<String> ENTITY = source -> source.matches("(?s).*@Entity[\\s(].*");
 
     private static final Predicate<String> REPOSITORY =
             source -> source.matches("(?s).*interface\\s+\\w+Repository\\b.*");

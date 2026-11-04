@@ -14,11 +14,11 @@ import com.erg.ergspringboot.common.response.users.UserResponses.Meta;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.auth.SecurityEvent;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
-import com.erg.ergspringboot.model.users.EmployeeProfile;
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.users.EmployeeProfileRepository;
-import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.users.persistence.EmployeeProfile;
+import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.EmployeeProfileRepository;
+import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
@@ -112,7 +112,7 @@ class EmployeeManagementServiceTest {
         assertThat(response.profile().experienceYears()).isEqualByComparingTo("7.5");
         verify(userRepository).save(user);
         verify(profileRepository).save(profile);
-        verify(activityRepository).save(ArgumentCaptor.forClass(com.erg.ergspringboot.model.users.UserActivity.class).capture());
+        verify(activityRepository).save(ArgumentCaptor.forClass(com.erg.ergspringboot.users.persistence.UserActivity.class).capture());
     }
 
     @Test

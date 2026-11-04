@@ -31,7 +31,7 @@ import com.erg.ergspringboot.common.response.auth.AuthResponses.LoginAttemptResp
 import com.erg.ergspringboot.exception.auth.AuthFailure;
 import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
@@ -41,7 +41,7 @@ import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository;
 import com.erg.ergspringboot.model.auth.RefreshTokenHistory;
 import com.erg.ergspringboot.model.auth.SecurityEvent;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import java.time.OffsetDateTime;
 import java.time.Duration;

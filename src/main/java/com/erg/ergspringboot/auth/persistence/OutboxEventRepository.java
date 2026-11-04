@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.outbox;
+package com.erg.ergspringboot.auth.persistence;
 
-import com.erg.ergspringboot.model.outbox.OutboxEvent;
+import com.erg.ergspringboot.auth.persistence.OutboxEvent;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;

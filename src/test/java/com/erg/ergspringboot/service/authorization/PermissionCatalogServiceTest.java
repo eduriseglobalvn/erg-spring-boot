@@ -13,7 +13,7 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.PermissionBinding;
 import com.erg.ergspringboot.model.authorization.PermissionGroup;
 import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionGroupRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionBindingRepository;

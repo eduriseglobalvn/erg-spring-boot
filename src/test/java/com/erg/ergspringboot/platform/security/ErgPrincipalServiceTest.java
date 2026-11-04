@@ -9,7 +9,7 @@ import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;

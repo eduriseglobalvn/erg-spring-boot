@@ -10,7 +10,7 @@ import com.erg.ergspringboot.model.lms.Attempt;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.organization.EducationUnit;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.OffsetDateTime;

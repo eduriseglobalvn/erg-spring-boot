@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.repository.auth.user.projection;
+package com.erg.ergspringboot.users.persistence;
 
 public record UserEffectivePermissionProjection(
         String userId,

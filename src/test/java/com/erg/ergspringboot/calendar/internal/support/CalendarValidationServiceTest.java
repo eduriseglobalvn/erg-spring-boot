@@ -10,7 +10,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;
 import com.erg.ergspringboot.calendar.internal.support.CalendarValidationService.RowValidationResult;
 import java.util.List;

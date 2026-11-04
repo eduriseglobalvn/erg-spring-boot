@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;

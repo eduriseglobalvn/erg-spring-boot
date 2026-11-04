@@ -17,11 +17,11 @@ class UserAccountBoundaryTest {
                 "src/main/java/com/erg/ergspringboot/users/UserAccountProjection.java"));
 
         assertThat(port)
-                .doesNotContain("model.users.User")
+                .doesNotContain("users.persistence.User")
                 .doesNotContain("UserRepository")
                 .doesNotContain("@Entity");
         assertThat(projection)
-                .doesNotContain("model.users.User")
+                .doesNotContain("users.persistence.User")
                 .doesNotContain("UserRepository")
                 .doesNotContain("@Entity");
     }
@@ -44,6 +44,6 @@ class UserAccountBoundaryTest {
                 "src/main/java/com/erg/ergspringboot/users/internal/directory/UserDirectoryAdapter.java"));
         assertThat(adapter)
                 .contains("UserRepository")
-                .contains("model.users.User");
+                .contains("users.persistence.User");
     }
 }

@@ -7,11 +7,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.model.auth.SecurityEvent;
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.model.users.UserActivity;
+import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.UserAuditContext;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

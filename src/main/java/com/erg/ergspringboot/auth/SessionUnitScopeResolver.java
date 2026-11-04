@@ -8,7 +8,7 @@ import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.organization.UserAccessScope;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;

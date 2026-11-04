@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.repository.auth.user;
+package com.erg.ergspringboot.users.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

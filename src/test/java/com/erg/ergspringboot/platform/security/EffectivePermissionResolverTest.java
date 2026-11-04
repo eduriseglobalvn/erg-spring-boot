@@ -6,7 +6,7 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashSet;

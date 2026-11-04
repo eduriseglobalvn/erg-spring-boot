@@ -9,7 +9,7 @@ import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.springframework.stereotype.Service;

@@ -9,7 +9,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import com.erg.ergspringboot.model.BaseEntity;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AttemptRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;

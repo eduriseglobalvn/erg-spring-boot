@@ -17,7 +17,7 @@ import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.lms.StudentEnrollment;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AttemptRepository;
 import com.erg.ergspringboot.repository.lms.ClassroomRepository;

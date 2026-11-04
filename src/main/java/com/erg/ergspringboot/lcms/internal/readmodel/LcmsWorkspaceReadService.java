@@ -11,9 +11,9 @@ import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.Questio
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.RoleOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.ScopeOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.UserAccessRowResponse;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.auth.user.projection.UserAccessRowProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserEffectivePermissionProjection;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
+import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;

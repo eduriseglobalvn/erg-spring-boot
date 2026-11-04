@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.auth.internal.outbox;
 
-import com.erg.ergspringboot.model.outbox.OutboxEvent;
+import com.erg.ergspringboot.auth.persistence.OutboxEvent;
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.repository.outbox.OutboxEventRepository;
+import com.erg.ergspringboot.auth.persistence.OutboxEventRepository;
 import com.erg.ergspringboot.auth.SmtpAccountMailSender;
 import java.time.Duration;
 import java.time.OffsetDateTime;

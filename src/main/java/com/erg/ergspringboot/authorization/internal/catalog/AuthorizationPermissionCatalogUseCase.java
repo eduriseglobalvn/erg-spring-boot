@@ -2,7 +2,7 @@ package com.erg.ergspringboot.authorization.internal.catalog;
 
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.*;
 import com.erg.ergspringboot.model.authorization.*;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.repository.authorization.*;
 import java.util.*;
 import java.util.stream.Collectors;
