@@ -297,6 +297,9 @@ class LmsAttemptOwnershipAndGradingTest {
         assertThat(response.status()).isEqualTo("graded");
         assertThat(response.percent()).isEqualTo(100.0);
         assertThat(response.passed()).isTrue();
+        // P2-4: the manual score reaches the class progress projection (the class grade), not only the attempt.
+        verify(fixture.grading).projectProgress(any(), any(), any(), any(), any(), any(), any(), any(),
+                eq("graded"), anyInt(), anyInt(), eq(BigDecimal.valueOf(10.0)), eq(true), any(), any());
     }
 
     @Test
