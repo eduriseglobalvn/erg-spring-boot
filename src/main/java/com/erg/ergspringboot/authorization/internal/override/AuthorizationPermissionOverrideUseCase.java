@@ -13,7 +13,7 @@ import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -43,7 +43,7 @@ public class AuthorizationPermissionOverrideUseCase {
 
     @Transactional
     public PermissionOverrideResponse add(String userId, AddPermissionOverrideRequest request,
-                                          String actorId, String tenantId, AuditContext context) {
+                                          String actorId, String tenantId, UserAuditContext context) {
         scopedUser(userId, tenantId);
         Permission permission = permissions.findByNameInIgnoreCase(List.of(request.permission()))
                 .stream().findFirst().orElseThrow(() -> new ResourceNotFoundException("permission not found"));
@@ -64,7 +64,7 @@ public class AuthorizationPermissionOverrideUseCase {
     }
 
     @Transactional
-    public void delete(String userId, String overrideId, String tenantId, AuditContext context) {
+    public void delete(String userId, String overrideId, String tenantId, UserAuditContext context) {
         scopedUser(userId, tenantId);
         UserPermissionOverride override = overrides.findById(overrideId)
                 .filter(item -> item.getUserId().equals(userId))
@@ -93,7 +93,7 @@ public class AuthorizationPermissionOverrideUseCase {
         if (audit == null) throw new IllegalStateException("authorization mutation audit service is not configured");
         return audit;
     }
-    private AuditContext requiredContext(AuditContext context) {
+    private UserAuditContext requiredContext(UserAuditContext context) {
         if (context == null || context.actorUserId() == null || context.actorUserId().isBlank())
             throw new BadRequestException("authorization mutation actor is required");
         return context;

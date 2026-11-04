@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.users;
+package com.erg.ergspringboot.users.internal.employee;
 
 import com.erg.ergspringboot.common.dto.users.EmployeeDtos.EmployeeDetailResponse;
 import com.erg.ergspringboot.common.dto.users.EmployeeDtos.EmployeeListItemResponse;
@@ -23,6 +23,8 @@ import com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRe
 import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
 import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.users.UserAuditContext;
+import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
@@ -44,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmployeeManagementService {
 
-    private final UserService userService;
+    private final UserOperations userOperations;
     private final EmployeeProfileRepository profileRepository;
     private final UserRepository userRepository;
     private final UserActivityRepository activityRepository;
@@ -54,7 +56,7 @@ public class EmployeeManagementService {
     private final ScopedRoleAssignmentService scopedRoleAssignmentService;
 
     public EmployeeManagementService(
-            UserService userService,
+            UserOperations userOperations,
             EmployeeProfileRepository profileRepository,
             UserRepository userRepository,
             UserActivityRepository activityRepository,
@@ -63,7 +65,7 @@ public class EmployeeManagementService {
             UserRoleAssignmentRepository roleAssignmentRepository,
             ScopedRoleAssignmentService scopedRoleAssignmentService
     ) {
-        this.userService = userService;
+        this.userOperations = userOperations;
         this.profileRepository = profileRepository;
         this.userRepository = userRepository;
         this.activityRepository = activityRepository;
@@ -83,7 +85,7 @@ public class EmployeeManagementService {
             String role
     ) {
         String normalizedTenant = normalizeTenant(tenantId);
-        UserListResponse base = userService.listUsers(normalizedTenant, page, limit, search, status, role);
+        UserListResponse base = userOperations.listUsers(normalizedTenant, page, limit, search, status, role);
         List<String> userIds = base.users().stream().map(UserItemResponse::id).toList();
         if (userIds.isEmpty()) return new EmployeeListResponse(List.of(), base.meta());
 
@@ -116,7 +118,7 @@ public class EmployeeManagementService {
     public EmployeeCreatedResponse createEmployee(
             String tenantId,
             CreateEmployeeRequest request,
-            UserService.AuditContext auditContext
+            UserAuditContext auditContext
     ) {
         String normalizedTenant = normalizeTenant(tenantId);
         String employeeCode = trimToNull(request.profile().employeeCode());
@@ -132,7 +134,7 @@ public class EmployeeManagementService {
                         List.of("lms")
                 ))
                 .toList();
-        UserCreatedResponse account = userService.createUser(new AdminCreateUserRequest(
+        UserCreatedResponse account = userOperations.createUser(new AdminCreateUserRequest(
                 request.primaryEmail(), request.fullName(), request.phone(), request.recoveryEmail(),
                 request.roleGroupIds(), userPolicies, request.credentialDelivery()), auditContext);
         request.policies().forEach(policy -> scopedRoleAssignmentService.assign(
@@ -152,7 +154,7 @@ public class EmployeeManagementService {
     public EmployeeDetailResponse getEmployee(String userId, String tenantId) {
         String normalizedTenant = normalizeTenant(tenantId);
         return new EmployeeDetailResponse(
-                userService.getUserDetail(userId, normalizedTenant),
+                userOperations.getUserDetail(userId, normalizedTenant),
                 profileRepository.findByUserIdAndTenantId(userId, normalizedTenant)
                         .map(this::toProfileResponse)
                         .orElse(null)
@@ -164,7 +166,7 @@ public class EmployeeManagementService {
             String userId,
             String tenantId,
             UpdateEmployeeRequest request,
-            UserService.AuditContext auditContext
+            UserAuditContext auditContext
     ) {
         String normalizedTenant = normalizeTenant(tenantId);
         User user = userRepository.findByIdAndTenantId(userId, normalizedTenant)
@@ -180,7 +182,7 @@ public class EmployeeManagementService {
         }
         recordAudit(user, auditContext, before, snapshot(user, profile));
         return new EmployeeDetailResponse(
-                userService.getUserDetail(userId, normalizedTenant),
+                userOperations.getUserDetail(userId, normalizedTenant),
                 profile == null
                         ? profileRepository.findByUserIdAndTenantId(userId, normalizedTenant)
                                 .map(this::toProfileResponse).orElse(null)
@@ -221,7 +223,7 @@ public class EmployeeManagementService {
 
     private void recordAudit(
             User target,
-            UserService.AuditContext context,
+            UserAuditContext context,
             Map<String, Object> before,
             Map<String, Object> after
     ) {
@@ -243,7 +245,7 @@ public class EmployeeManagementService {
     private void recordCreatedAudit(
             User target,
             EmployeeProfile profile,
-            UserService.AuditContext context
+            UserAuditContext context
     ) {
         UserActivity activity = new UserActivity();
         activity.setId(IdGenerator.newId());

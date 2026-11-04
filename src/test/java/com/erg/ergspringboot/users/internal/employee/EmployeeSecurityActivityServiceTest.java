@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.users;
+package com.erg.ergspringboot.users.internal.employee;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

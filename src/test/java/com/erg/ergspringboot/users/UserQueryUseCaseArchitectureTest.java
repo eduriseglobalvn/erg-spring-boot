@@ -16,8 +16,7 @@ class UserQueryUseCaseArchitectureTest {
                 "com.erg.ergspringboot.users.internal.query.UserQueryUseCase"))
                 .doesNotThrowAnyException();
 
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy)
                 .doesNotContain("findAdminListItems(")
                 .doesNotContain("findByTargetUserIdAndTenantIdOrderByCreatedAtDescIdDesc(");
@@ -29,8 +28,7 @@ class UserQueryUseCaseArchitectureTest {
                 "com.erg.ergspringboot.users.internal.profile.UserProfileUseCase"))
                 .doesNotThrowAnyException();
 
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy).doesNotContain("applyProfileUpdate(");
     }
 
@@ -39,8 +37,7 @@ class UserQueryUseCaseArchitectureTest {
         assertThatCode(() -> Class.forName(
                 "com.erg.ergspringboot.users.internal.password.UserPasswordUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy).doesNotContain("passwordService.matches(");
     }
 
@@ -49,8 +46,7 @@ class UserQueryUseCaseArchitectureTest {
         assertThatCode(() -> Class.forName(
                 "com.erg.ergspringboot.users.internal.session.UserSessionUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy)
                 .doesNotContain("findByUserIdAndTenantIdOrderByLastActiveAtDesc(")
                 .doesNotContain("findBySessionIdAndUserIdAndTenantId(");
@@ -61,8 +57,7 @@ class UserQueryUseCaseArchitectureTest {
         assertThatCode(() -> Class.forName(
                 "com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy).doesNotContain("request.primaryEmail().trim().toLowerCase()");
     }
 
@@ -71,8 +66,7 @@ class UserQueryUseCaseArchitectureTest {
         assertThatCode(() -> Class.forName(
                 "com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy).doesNotContain("normalizeStatus(request.status())");
     }
 
@@ -81,9 +75,14 @@ class UserQueryUseCaseArchitectureTest {
         assertThatCode(() -> Class.forName(
                 "com.erg.ergspringboot.users.internal.roleassignment.UserRoleAssignmentUseCase"))
                 .doesNotThrowAnyException();
-        String legacy = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
+        String legacy = legacyUserServiceSource();
         assertThat(legacy).doesNotContain("permissionOverrideRepository.deleteByUserId(");
+    }
+
+    // The deprecated UserService adapter was retired (P3-4); an absent file reads as empty so the guards still apply.
+    private static String legacyUserServiceSource() throws java.io.IOException {
+        Path legacy = Path.of("src/main/java/com/erg/ergspringboot/service/users/UserService.java");
+        return Files.exists(legacy) ? Files.readString(legacy) : "";
     }
 
     @Test

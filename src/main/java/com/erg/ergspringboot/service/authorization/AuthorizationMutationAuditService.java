@@ -10,7 +10,7 @@ import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.util.Collection;
@@ -58,7 +58,7 @@ public class AuthorizationMutationAuditService {
             Collection<UserRef> users,
             String roleId,
             String reason,
-            AuditContext context
+            UserAuditContext context
     ) {
         if (users == null || users.isEmpty()) return;
         Map<String, LinkedHashSet<String>> idsByTenant = new LinkedHashMap<>();
@@ -77,7 +77,7 @@ public class AuthorizationMutationAuditService {
     }
 
     private void applyBatch(
-            String tenantId, List<String> userIds, String roleId, String reason, AuditContext context) {
+            String tenantId, List<String> userIds, String roleId, String reason, UserAuditContext context) {
         List<User> targets = userRepository.lockAuthzVersions(tenantId, userIds);
         Map<String, User> byId = targets.stream().collect(java.util.stream.Collectors.toMap(User::getId, user -> user));
         if (userIds.stream().anyMatch(id -> !byId.containsKey(id))) {
@@ -126,7 +126,7 @@ public class AuthorizationMutationAuditService {
             String tenantId,
             String roleId,
             String action,
-            AuditContext context,
+            UserAuditContext context,
             Map<String, Object> details
     ) {
         UserActivity activity = new UserActivity();
@@ -174,7 +174,7 @@ public class AuthorizationMutationAuditService {
             String reason,
             long oldVersion,
             long newVersion,
-            AuditContext context
+            UserAuditContext context
     ) {
         UserActivity activity = new UserActivity();
         activity.setId(IdGenerator.newId());
@@ -197,7 +197,7 @@ public class AuthorizationMutationAuditService {
             String reason,
             long oldVersion,
             long newVersion,
-            AuditContext context
+            UserAuditContext context
     ) {
         SecurityEvent event = new SecurityEvent();
         event.setId(IdGenerator.newId());
@@ -218,7 +218,7 @@ public class AuthorizationMutationAuditService {
             String reason,
             long oldVersion,
             long newVersion,
-            AuditContext context
+            UserAuditContext context
     ) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("actorUserId", requiredActor(context));
@@ -230,7 +230,7 @@ public class AuthorizationMutationAuditService {
         return metadata;
     }
 
-    private String requiredActor(AuditContext context) {
+    private String requiredActor(UserAuditContext context) {
         if (context == null || context.actorUserId() == null || context.actorUserId().isBlank()) {
             throw new IllegalArgumentException("authorization mutation actor is required");
         }
@@ -246,7 +246,7 @@ public class AuthorizationMutationAuditService {
             String tenantId,
             String roleId,
             String action,
-            AuditContext context,
+            UserAuditContext context,
             List<String> userIds
     ) {
         String requestId = context == null ? null : context.requestId();

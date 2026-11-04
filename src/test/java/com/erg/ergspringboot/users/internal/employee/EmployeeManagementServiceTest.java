@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.users;
+package com.erg.ergspringboot.users.internal.employee;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -23,6 +23,8 @@ import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.users.UserAuditContext;
+import com.erg.ergspringboot.users.UserOperations;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
@@ -38,7 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class EmployeeManagementServiceTest {
 
-    @Mock private UserService userService;
+    @Mock private UserOperations userOperations;
     @Mock private EmployeeProfileRepository profileRepository;
     @Mock private UserRepository userRepository;
     @Mock private UserActivityRepository activityRepository;
@@ -51,7 +53,7 @@ class EmployeeManagementServiceTest {
     @BeforeEach
     void setUp() {
         service = new EmployeeManagementService(
-                userService,
+                userOperations,
                 profileRepository,
                 userRepository,
                 activityRepository,
@@ -65,7 +67,7 @@ class EmployeeManagementServiceTest {
     void detailUsesTenantQualifiedAccountAndProfessionalProfile() {
         UserDetailResponse account = mock(UserDetailResponse.class);
         EmployeeProfile profile = profile("profile-1", "tenant-a", "user-1", "GV-001");
-        when(userService.getUserDetail("user-1", "tenant-a")).thenReturn(account);
+        when(userOperations.getUserDetail("user-1", "tenant-a")).thenReturn(account);
         when(profileRepository.findByUserIdAndTenantId("user-1", "tenant-a")).thenReturn(Optional.of(profile));
 
         var response = service.getEmployee("user-1", "tenant-a");
@@ -86,7 +88,7 @@ class EmployeeManagementServiceTest {
         when(profileRepository.findByUserIdAndTenantId("user-1", "tenant-a")).thenReturn(Optional.of(profile));
         when(profileRepository.existsByTenantIdAndEmployeeCodeIgnoreCaseAndUserIdNot("tenant-a", "GV-002", "user-1"))
                 .thenReturn(false);
-        when(userService.getUserDetail("user-1", "tenant-a")).thenReturn(mock(UserDetailResponse.class));
+        when(userOperations.getUserDetail("user-1", "tenant-a")).thenReturn(mock(UserDetailResponse.class));
         UpdateEmployeeRequest request = new UpdateEmployeeRequest(
                 "Teacher Two",
                 "0909000000",
@@ -101,7 +103,7 @@ class EmployeeManagementServiceTest {
                 "user-1",
                 "tenant-a",
                 request,
-                new UserService.AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit")
+                new UserAuditContext("admin-1", "request-1", "127.0.0.1", "JUnit")
         );
 
         assertThat(user.getFullName()).isEqualTo("Teacher Two");
@@ -119,7 +121,7 @@ class EmployeeManagementServiceTest {
                 "user-1", "teacher@erg.edu.vn", "Teacher One", null, "0909", "ACTIVE",
                 "internal", "employee", "password", List.of("lms_teacher"), true,
                 "2026-07-15T08:00:00Z", "2024-01-01T00:00:00Z");
-        when(userService.listUsers("tenant-a", 1, 25, null, null, null))
+        when(userOperations.listUsers("tenant-a", 1, 25, null, null, null))
                 .thenReturn(new UserListResponse(List.of(user), new Meta(1, 25, 1, 1)));
         EmployeeProfile profile = profile("profile-1", "tenant-a", "user-1", "GV-001");
         profile.setDepartmentId("training"); profile.setJobTitle("Senior Teacher");

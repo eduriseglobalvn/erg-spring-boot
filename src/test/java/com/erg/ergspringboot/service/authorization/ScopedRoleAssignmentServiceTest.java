@@ -68,7 +68,7 @@ class ScopedRoleAssignmentServiceTest {
                 List.of(new AuthorizationMutationAuditService.UserRef("user-1", "tenant-a")),
                 "role-teacher",
                 "SCOPED_ROLE_ASSIGNED",
-                new com.erg.ergspringboot.service.users.UserService.AuditContext("admin-1", null, null, null)
+                new com.erg.ergspringboot.users.UserAuditContext("admin-1", null, null, null)
         );
     }
 
@@ -91,7 +91,7 @@ class ScopedRoleAssignmentServiceTest {
         var response = service.revoke(
                 "user-1", "assignment-1", "tenant-a",
                 new RevokeScopedRoleRequest("left department"), actor,
-                new com.erg.ergspringboot.service.users.UserService.AuditContext(
+                new com.erg.ergspringboot.users.UserAuditContext(
                         "admin-1", "request-1", "127.0.0.1", "JUnit")
         );
 
@@ -104,7 +104,7 @@ class ScopedRoleAssignmentServiceTest {
                 List.of(new AuthorizationMutationAuditService.UserRef("user-1", "tenant-a")),
                 "role-teacher",
                 "SCOPED_ROLE_REVOKED",
-                new com.erg.ergspringboot.service.users.UserService.AuditContext(
+                new com.erg.ergspringboot.users.UserAuditContext(
                         "admin-1", "request-1", "127.0.0.1", "JUnit")
         );
     }

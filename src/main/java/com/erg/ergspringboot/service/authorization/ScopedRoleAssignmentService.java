@@ -14,7 +14,7 @@ import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -59,7 +59,7 @@ public class ScopedRoleAssignmentService {
             String tenantId,
             AssignScopedRoleRequest request,
             ErgPrincipal actor,
-            AuditContext auditContext
+            UserAuditContext auditContext
     ) {
         String normalizedTenant = normalizeTenant(tenantId);
         User user = userRepository.findByIdAndTenantId(userId, normalizedTenant)
@@ -77,7 +77,7 @@ public class ScopedRoleAssignmentService {
         if (request.expiresAt() != null && !request.expiresAt().isAfter(OffsetDateTime.now())) {
             throw new BadRequestException("role assignment expiry must be in the future");
         }
-        AuditContext context = auditContext == null ? actorContext(actor) : auditContext;
+        UserAuditContext context = auditContext == null ? actorContext(actor) : auditContext;
         if (context.actorUserId() == null || context.actorUserId().isBlank()) {
             throw new BadRequestException("assignment actor is required");
         }
@@ -107,7 +107,7 @@ public class ScopedRoleAssignmentService {
             String tenantId,
             RevokeScopedRoleRequest request,
             ErgPrincipal actor,
-            AuditContext auditContext
+            UserAuditContext auditContext
     ) {
         String normalizedTenant = normalizeTenant(tenantId);
         userRepository.findByIdAndTenantId(userId, normalizedTenant)
@@ -123,7 +123,7 @@ public class ScopedRoleAssignmentService {
         if (assignment.getRevokedAt() != null) {
             return toResponse(assignment, role);
         }
-        AuditContext context = auditContext == null ? actorContext(actor) : auditContext;
+        UserAuditContext context = auditContext == null ? actorContext(actor) : auditContext;
         if (context.actorUserId() == null || context.actorUserId().isBlank()) {
             throw new BadRequestException("revocation actor is required");
         }
@@ -149,8 +149,8 @@ public class ScopedRoleAssignmentService {
         );
     }
 
-    private AuditContext actorContext(ErgPrincipal actor) {
-        return new AuditContext(actor == null ? null : actor.userId(), null, null, null);
+    private UserAuditContext actorContext(ErgPrincipal actor) {
+        return new UserAuditContext(actor == null ? null : actor.userId(), null, null, null);
     }
 
     private String revokeReason(RevokeScopedRoleRequest request) {

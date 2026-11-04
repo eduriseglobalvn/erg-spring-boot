@@ -104,10 +104,9 @@ class ModulePublicApiContractTest {
                 "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"))).isFalse();
         assertThat(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java")).doesNotExist();
-        String usersAdapter = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
-        assertThat(usersAdapter).contains("@Deprecated", "UserOperations operations")
-                .doesNotContain(".internal.");
+        // The deprecated UserService pass-through adapter was retired (P3-4); callers use UserOperations directly.
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/users/UserService.java")).doesNotExist();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/users")).doesNotExist();
         // The deprecated CalendarCommandService/CalendarReadService pass-through beans were removed.
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/calendar/CalendarCommandService.java"))
                 .doesNotExist();

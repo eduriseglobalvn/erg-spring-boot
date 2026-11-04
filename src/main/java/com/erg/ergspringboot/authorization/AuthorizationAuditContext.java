@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.authorization;
 
-import com.erg.ergspringboot.service.users.UserService;
+import com.erg.ergspringboot.users.UserAuditContext;
 
 /** Boundary audit metadata; legacy service types do not cross the module API. */
 public record AuthorizationAuditContext(
@@ -9,7 +9,7 @@ public record AuthorizationAuditContext(
         String ipAddress,
         String userAgent
 ) {
-    UserService.AuditContext toLegacy() {
-        return new UserService.AuditContext(actorUserId, requestId, ipAddress, userAgent);
+    UserAuditContext toLegacy() {
+        return new UserAuditContext(actorUserId, requestId, ipAddress, userAgent);
     }
 }

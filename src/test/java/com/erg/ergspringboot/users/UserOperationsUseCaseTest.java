@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.users;
+package com.erg.ergspringboot.users;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -50,7 +50,6 @@ import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
-import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
 import com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase;
 import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
@@ -73,7 +72,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class UserServiceTest {
+// Exercises UserOperations end-to-end over the real use cases (formerly via the retired UserService adapter).
+class UserOperationsUseCaseTest {
 
     @Mock
     private UserRepository userRepository;
@@ -103,12 +103,12 @@ class UserServiceTest {
     private AuthorizationMutationAuditService authorizationMutationAuditService;
 
     private PasswordService passwordService;
-    private UserService userService;
+    private UserOperations operations;
 
     @BeforeEach
     void setUp() {
         passwordService = new PasswordService();
-        userService = new UserService(new UserOperations(
+        operations = new UserOperations(
                 new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository),
                 new UserProfileUseCase(userRepository, userActivityRepository),
                 new UserPasswordUseCase(userRepository, sessionRepository, userActivityRepository, passwordService),
@@ -117,7 +117,7 @@ class UserServiceTest {
                         userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender),
                 new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository),
                 new UserRoleAssignmentUseCase(userRepository, roleRepository, permissionRepository,
-                        permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService)));
+                        permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService));
     }
 
     @Test
@@ -126,7 +126,7 @@ class UserServiceTest {
         user.setPhone("0909000000");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
-        UserResponse response = userService.getCurrentUser("user-1", "erg");
+        UserResponse response = operations.current("user-1", "erg");
 
         assertEquals("user-1", response.id());
         assertEquals("user-1@example.com", response.email());
@@ -141,7 +141,7 @@ class UserServiceTest {
     void getCurrentUserThrowsWhenUserMissing() {
         when(userRepository.findByIdAndTenantId("missing", "erg")).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> userService.getCurrentUser("missing", "erg"));
+        assertThrows(ResourceNotFoundException.class, () -> operations.current("missing", "erg"));
     }
 
     @Test
@@ -149,7 +149,7 @@ class UserServiceTest {
         User user = user("user-1");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
-        UserResponse response = userService.updateProfile(
+        UserResponse response = operations.updateProfile(
                 "user-1",
                 "erg",
                 new UpdateProfileRequest(
@@ -165,8 +165,8 @@ class UserServiceTest {
                         null,
                         Map.of("website", "https://erg.edu.vn"),
                         "https://cdn.example/avatar.png"
-                )
-        );
+                ),
+                null);
 
         assertEquals("Updated User", response.fullName());
         assertEquals("0909000000", response.phone());
@@ -185,7 +185,7 @@ class UserServiceTest {
         User user = user("user-1");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
-        OnboardingResponse response = userService.completeOnboarding(
+        OnboardingResponse response = operations.completeOnboarding(
                 "user-1",
                 "erg",
                 new OnboardingRequest(
@@ -214,7 +214,7 @@ class UserServiceTest {
         when(sessionRepository.findByUserIdAndTenantIdOrderByLastActiveAtDesc("user-1", "erg"))
                 .thenReturn(List.of(session));
 
-        SessionListResponse response = userService.listSessions("user-1", "erg", "session-1");
+        SessionListResponse response = operations.listSessions("user-1", "erg", "session-1");
 
         assertEquals(1, response.items().size());
         assertTrue(response.items().getFirst().current());
@@ -226,7 +226,7 @@ class UserServiceTest {
         when(sessionRepository.findBySessionIdAndUserIdAndTenantId("session-1", "user-1", "erg"))
                 .thenReturn(Optional.of(session));
 
-        RevokeSessionResponse response = userService.revokeSession("user-1", "erg", "session-1");
+        RevokeSessionResponse response = operations.revokeSession("user-1", "erg", "session-1");
 
         assertTrue(response.success());
         assertEquals("user_revoked", session.getRevokedReason());
@@ -239,9 +239,9 @@ class UserServiceTest {
         when(sessionRepository.findBySessionIdAndUserIdAndTenantId("session-1", "user-1", "erg"))
                 .thenReturn(Optional.of(session));
 
-        userService.revokeSession(
+        operations.revokeSession(
                 "user-1", "erg", "session-1",
-                new UserService.AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit"));
+                new UserAuditContext("admin-1", "request-1", "127.0.0.1", "JUnit"));
 
         verify(userActivityRepository).save(org.mockito.ArgumentMatchers.argThat(activity ->
                 "EMPLOYEE_SESSION_REVOKED".equals(activity.getAction())
@@ -264,8 +264,8 @@ class UserServiceTest {
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-1", "erg"))
                 .thenReturn(List.of(currentSession, otherSession));
 
-        var response = userService.changePassword(
-                "user-1", "erg", "session-1", new ChangePasswordRequest("old-secret", "new-secret"));
+        var response = operations.changePassword(
+                "user-1", "erg", "session-1", new ChangePasswordRequest("old-secret", "new-secret"), null);
 
         assertTrue(passwordService.matches("new-secret", user.getPasswordHash()));
         assertFalse(user.getMustChangePassword());
@@ -289,7 +289,7 @@ class UserServiceTest {
 
         assertThrows(
                 BadRequestException.class,
-                () -> userService.changePassword("user-1", "erg", new ChangePasswordRequest("wrong", "new-secret"))
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("wrong", "new-secret"), null)
         );
     }
 
@@ -304,7 +304,7 @@ class UserServiceTest {
         when(userRepository.findRoleNamesByUserIds(List.of("user-1")))
                 .thenReturn(List.of(new UserRoleNameProjection("user-1", "teacher")));
 
-        UserListResponse response = userService.listUsers(1, 1, null, null, null);
+        UserListResponse response = operations.listUsers("erg", 1, 1, null, null, null);
 
         assertEquals(1, response.users().size());
         assertEquals(2, response.meta().total());
@@ -318,7 +318,7 @@ class UserServiceTest {
         when(userRepository.findAdminListItems("tenant-a", null, null, null, PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
-        userService.listUsers("tenant-a", 1, 20, null, null, null);
+        operations.listUsers("tenant-a", 1, 20, null, null, null);
 
         verify(userRepository).findAdminListItems("tenant-a", null, null, null, PageRequest.of(0, 20));
     }
@@ -331,7 +331,7 @@ class UserServiceTest {
         when(sessionRepository.findByUserIdAndTenantIdOrderByLastActiveAtDesc("user-1", "erg"))
                 .thenReturn(List.of(session));
 
-        UserDetailResponse response = userService.getUserDetail("user-1", "erg");
+        UserDetailResponse response = operations.getUserDetail("user-1", "erg");
 
         assertEquals("user-1", response.user().id());
         assertEquals(1, response.sessions().size());
@@ -352,7 +352,7 @@ class UserServiceTest {
                 eq("user-1"), eq("erg"), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(activity), PageRequest.of(0, 20), 1));
 
-        ActivityListResponse response = userService.listActivity("user-1", "erg", 1, 20);
+        ActivityListResponse response = operations.listActivity("user-1", "erg", 1, 20);
 
         assertEquals(1, response.items().size());
         assertEquals("USER_STATUS_UPDATED", response.items().getFirst().action());
@@ -366,7 +366,7 @@ class UserServiceTest {
         when(roleRepository.findByNameInIgnoreCase(List.of("lms_teacher_standard")))
                 .thenReturn(List.of(role("lms_teacher_standard")));
 
-        UserCreatedResponse response = userService.createUser(
+        UserCreatedResponse response = operations.createUser(
                 new AdminCreateUserRequest(
                         "New@Example.com", "New User", "0909", "Recovery@Example.com",
                         List.of("lms_teacher_standard"),
@@ -374,8 +374,8 @@ class UserServiceTest {
                                 "school", "school-1", "lms_teacher_standard", List.of("lms")
                         )),
                         "ONE_TIME_PASSWORD"
-                )
-        );
+                ),
+                null);
 
         assertEquals("new@example.com", response.user().primaryEmail());
         assertEquals("INVITED", response.user().status());
@@ -398,14 +398,14 @@ class UserServiceTest {
         when(userRepository.existsByUsernameIgnoreCase("teacher@example.com")).thenReturn(false);
         when(roleRepository.findByNameInIgnoreCase(List.of("lms_teacher_standard"))).thenReturn(List.of(teacherRole));
 
-        UserCreatedResponse response = userService.createUser(new AdminCreateUserRequest(
+        UserCreatedResponse response = operations.createUser(new AdminCreateUserRequest(
                 "Teacher@Example.com", "Teacher One", "0909", "Recovery@Example.com",
                 List.of("lms_teacher_standard"),
                 List.of(new com.erg.ergspringboot.common.request.users.UserRequests.AccessPolicyRequest(
                         "school", "school-1", "lms_teacher_standard", List.of("lms")
                 )),
                 "EMAIL_INVITE"
-        ));
+        ), null);
 
         assertEquals("QUEUED_FOR_DELIVERY", response.deliveryStatus());
         assertEquals(null, response.oneTimePassword());
@@ -431,7 +431,7 @@ class UserServiceTest {
                 List.of("users.manage"), List.of(), List.of("admin"), "erg", "admin", Map.of()
         );
 
-        userService.createUser(
+        operations.createUser(
                 new AdminCreateUserRequest(
                         "tenant-user@example.com", "Tenant User", null, null,
                         List.of("teacher"),
@@ -464,7 +464,7 @@ class UserServiceTest {
                 "ONE_TIME_PASSWORD"
         );
 
-        assertThrows(ForbiddenException.class, () -> userService.createUser(request));
+        assertThrows(ForbiddenException.class, () -> operations.createUser(request, null));
     }
 
     @Test
@@ -476,7 +476,7 @@ class UserServiceTest {
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-1", "erg"))
                 .thenReturn(List.of(session));
 
-        var response = userService.resetCredential("user-1", "erg", "ONE_TIME_PASSWORD");
+        var response = operations.resetCredential("user-1", "erg", "ONE_TIME_PASSWORD", null);
 
         assertEquals("READY", response.deliveryStatus());
         assertFalse(response.oneTimePassword().isBlank());
@@ -494,7 +494,7 @@ class UserServiceTest {
         User user = user("user-1");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
-        UserResponse response = userService.updateUserStatus("user-1", "erg", new AdminUpdateUserStatusRequest("BLOCKED"));
+        UserResponse response = operations.updateUserStatus("user-1", "erg", new AdminUpdateUserStatusRequest("BLOCKED"));
 
         assertEquals("BLOCKED", response.status());
         verify(userRepository).save(user);
@@ -506,9 +506,9 @@ class UserServiceTest {
         user.setStatus("ACTIVE");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
-        userService.updateUserStatus(
+        operations.updateUserStatus(
                 "user-1", "erg", new AdminUpdateUserStatusRequest("INACTIVE"),
-                new UserService.AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit"));
+                new UserAuditContext("admin-1", "request-1", "127.0.0.1", "JUnit"));
 
         verify(userActivityRepository).save(org.mockito.ArgumentMatchers.argThat(activity ->
                 "EMPLOYEE_STATUS_CHANGED".equals(activity.getAction())
@@ -527,7 +527,7 @@ class UserServiceTest {
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-1", "erg"))
                 .thenReturn(List.of(session));
 
-        UserResponse response = userService.updateUserStatus("user-1", "erg", new AdminUpdateUserStatusRequest("BANNED"));
+        UserResponse response = operations.updateUserStatus("user-1", "erg", new AdminUpdateUserStatusRequest("BANNED"));
 
         assertEquals("BANNED", response.status());
         assertEquals("status_changed_banned", session.getRevokedReason());
@@ -541,7 +541,7 @@ class UserServiceTest {
         user.setStatus("BANNED");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
-        UserResponse response = userService.updateUserStatus("user-1", "erg", new AdminUpdateUserStatusRequest("ACTIVE"));
+        UserResponse response = operations.updateUserStatus("user-1", "erg", new AdminUpdateUserStatusRequest("ACTIVE"));
 
         assertEquals("ACTIVE", response.status());
         verify(userRepository).save(user);
@@ -556,7 +556,7 @@ class UserServiceTest {
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(userOne));
         when(userRepository.findByIdAndTenantId("user-2", "erg")).thenReturn(Optional.of(userTwo));
 
-        var response = userService.bulkUpdateStatus(
+        var response = operations.bulkUpdateStatus(
                 "erg",
                 new BulkStatusRequest(List.of("user-1", "user-2"), "blocked")
         );
@@ -580,7 +580,7 @@ class UserServiceTest {
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-2", "erg"))
                 .thenReturn(List.of(sessionTwo));
 
-        var response = userService.bulkUpdateStatus(
+        var response = operations.bulkUpdateStatus(
                 "erg",
                 new BulkStatusRequest(List.of("user-1", "user-2"), "banned")
         );
@@ -599,7 +599,7 @@ class UserServiceTest {
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(userOne));
         when(userRepository.findByIdAndTenantId("user-2", "erg")).thenReturn(Optional.of(userTwo));
 
-        var response = userService.bulkDelete("erg", new BulkDeleteRequest(List.of("user-1", "user-2")));
+        var response = operations.bulkDelete("erg", new BulkDeleteRequest(List.of("user-1", "user-2")));
 
         assertEquals(2, response.modifiedCount());
         verify(userRepository).saveAll(List.of(userOne, userTwo));
@@ -615,10 +615,10 @@ class UserServiceTest {
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
         when(roleRepository.findByNameInIgnoreCase(List.of("admin", "teacher"))).thenReturn(List.of(admin, teacher));
 
-        UserResponse response = userService.assignRoles(
+        UserResponse response = operations.assignRoles(
                 "user-1",
                 "erg",
-                new AdminAssignRolesRequest(List.of("admin", "teacher"))
+                new AdminAssignRolesRequest(List.of("admin", "teacher")), null
         );
 
         assertTrue(response.roles().contains("admin"));
@@ -632,7 +632,7 @@ class UserServiceTest {
                 List.of(new UserRef("user-1", "erg")),
                 "role-admin,role-teacher",
                 "USER_ROLES_CHANGED",
-                new UserService.AuditContext("user-1", null, null, null));
+                new UserAuditContext("user-1", null, null, null));
     }
 
     @Test
@@ -645,8 +645,8 @@ class UserServiceTest {
 
         assertThrows(
                 ForbiddenException.class,
-                () -> userService.assignRoles(
-                        "user-1", "erg", new AdminAssignRolesRequest(List.of("system.super_admin"))
+                () -> operations.assignRoles(
+                        "user-1", "erg", new AdminAssignRolesRequest(List.of("system.super_admin")), null
                 )
         );
     }
@@ -661,10 +661,10 @@ class UserServiceTest {
         when(permissionRepository.findByNameInIgnoreCase(List.of("users.read"))).thenReturn(List.of(permission));
         authenticate(tenantAdmin());
 
-        PermissionOverrideResponse response = userService.assignPermissions(
+        PermissionOverrideResponse response = operations.assignPermissions(
                 "user-1",
                 "erg",
-                new AdminAssignPermissionsRequest(List.of("users.read"), "grant", "Manual access", null)
+                new AdminAssignPermissionsRequest(List.of("users.read"), "grant", "Manual access", null), null
         );
 
         assertEquals("user-1", response.userId());
@@ -679,7 +679,7 @@ class UserServiceTest {
                 List.of(new UserRef("user-1", "erg")),
                 "permission-1",
                 "USER_PERMISSIONS_CHANGED",
-                new UserService.AuditContext("user-1", null, null, null));
+                new UserAuditContext("user-1", null, null, null));
     }
 
     @Test
@@ -692,10 +692,10 @@ class UserServiceTest {
         when(permissionRepository.findByNameInIgnoreCase(List.of("*"))).thenReturn(List.of(wildcard));
         authenticate(tenantAdmin());
 
-        assertThrows(ForbiddenException.class, () -> userService.assignPermissions(
-                "admin-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null)));
-        assertThrows(ForbiddenException.class, () -> userService.assignPermissions(
-                "user-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null)));
+        assertThrows(ForbiddenException.class, () -> operations.assignPermissions(
+                "admin-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null), null));
+        assertThrows(ForbiddenException.class, () -> operations.assignPermissions(
+                "user-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null), null));
         org.mockito.Mockito.verify(permissionOverrideRepository, org.mockito.Mockito.never()).deleteByUserId(any());
     }
 
