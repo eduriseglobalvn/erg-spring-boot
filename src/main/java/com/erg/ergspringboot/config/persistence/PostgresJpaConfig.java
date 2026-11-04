@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableTransactionManagement
 @EnableConfigurationProperties(PostgresHikariProperties.class)
 @EnableJpaRepositories(
-        basePackages = JpaRegistrationCatalog.REPOSITORY_ROOT,
+        basePackages = JpaRegistrationCatalog.REPOSITORY_SCAN_ROOT,
         entityManagerFactoryRef = "postgresEntityManagerFactory",
         transactionManagerRef = "postgresTransactionManager"
 )

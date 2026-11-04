@@ -13,6 +13,8 @@ import java.util.Set;
 public final class JpaRegistrationCatalog {
 
     public static final String REPOSITORY_ROOT = "com.erg.ergspringboot.repository";
+    /** Repository scan root: horizontal {@code repository.*} plus module-owned {@code <module>.persistence}. */
+    public static final String REPOSITORY_SCAN_ROOT = "com.erg.ergspringboot";
 
     private static final List<Module> MODULES = List.of(
             enabled("auth", 5, 6),
@@ -86,6 +88,7 @@ public final class JpaRegistrationCatalog {
     public record Module(
             String name,
             String modelPackage,
+            String repositoryPackage,
             boolean enabled,
             int entityCount,
             int repositoryCount,
@@ -102,14 +105,28 @@ public final class JpaRegistrationCatalog {
     }
 
     private static Module enabled(String name, int entities, int repositories) {
-        return new Module(name, "com.erg.ergspringboot.model." + name, true, entities, repositories, Set.of());
+        return new Module(name, model(name), repository(name), true, entities, repositories, Set.of());
+    }
+
+    /** P3-4: entities and repositories live in the owning module at {@code <module>.persistence}. */
+    private static Module owned(String name, int entities, int repositories) {
+        String persistence = "com.erg.ergspringboot." + name + ".persistence";
+        return new Module(name, persistence, persistence, true, entities, repositories, Set.of());
     }
 
     private static Module dormant(String name, int entities) {
-        return new Module(name, "com.erg.ergspringboot.model." + name, false, entities, 0, Set.of());
+        return new Module(name, model(name), repository(name), false, entities, 0, Set.of());
     }
 
     private static Module partiallyManaged(String name, int entities, int repositories, String... classes) {
-        return new Module(name, "com.erg.ergspringboot.model." + name, false, entities, repositories, Set.of(classes));
+        return new Module(name, model(name), repository(name), false, entities, repositories, Set.of(classes));
+    }
+
+    private static String model(String name) {
+        return "com.erg.ergspringboot.model." + name;
+    }
+
+    private static String repository(String name) {
+        return REPOSITORY_ROOT + "." + name;
     }
 }
