@@ -20,7 +20,7 @@ import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import java.time.OffsetDateTime;
 import java.util.Collection;

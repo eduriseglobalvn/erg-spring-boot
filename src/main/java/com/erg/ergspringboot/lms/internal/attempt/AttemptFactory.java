@@ -2,8 +2,8 @@ package com.erg.ergspringboot.lms.internal.attempt;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StartAttemptRequest;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.model.lms.Assignment;
-import com.erg.ergspringboot.model.lms.Attempt;
+import com.erg.ergspringboot.lms.persistence.Assignment;
+import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.utils.IdGenerator;

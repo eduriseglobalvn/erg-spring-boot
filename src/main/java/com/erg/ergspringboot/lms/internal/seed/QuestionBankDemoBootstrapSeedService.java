@@ -1,17 +1,17 @@
 package com.erg.ergspringboot.lms.internal.seed;
 
-import com.erg.ergspringboot.model.lms.Level;
+import com.erg.ergspringboot.lms.persistence.Level;
 import com.erg.ergspringboot.model.lms.Question;
 import com.erg.ergspringboot.model.lms.QuestionChoice;
 import com.erg.ergspringboot.model.lms.Quiz;
-import com.erg.ergspringboot.model.lms.Subject;
-import com.erg.ergspringboot.model.lms.Topic;
+import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.lms.persistence.Topic;
 import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.repository.lms.LevelRepository;
+import com.erg.ergspringboot.lms.persistence.LevelRepository;
 import com.erg.ergspringboot.repository.lms.QuestionRepository;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
-import com.erg.ergspringboot.repository.lms.SubjectRepository;
-import com.erg.ergspringboot.repository.lms.TopicRepository;
+import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.lms.persistence.TopicRepository;
 import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.lcms.quiz.authoring.QuizQuestionLinkService;
 import java.util.LinkedHashMap;

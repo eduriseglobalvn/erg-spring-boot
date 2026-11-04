@@ -1,10 +1,10 @@
 package com.erg.ergspringboot.lms.internal.core;
 
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.model.lms.StudentGroupMember;
-import com.erg.ergspringboot.repository.lms.StudentGroupMemberRepository;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMember;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;

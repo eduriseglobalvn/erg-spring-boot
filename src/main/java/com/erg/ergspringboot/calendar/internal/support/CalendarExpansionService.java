@@ -4,9 +4,9 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBu
 import com.erg.ergspringboot.model.calendar.CalendarEvent;
 import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
 import com.erg.ergspringboot.model.calendar.CalendarRoom;
-import com.erg.ergspringboot.model.lms.Classroom;
-import com.erg.ergspringboot.model.lms.Level;
-import com.erg.ergspringboot.model.lms.Subject;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.Level;
+import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.utils.IdGenerator;

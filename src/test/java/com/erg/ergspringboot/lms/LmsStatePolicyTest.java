@@ -45,7 +45,7 @@ class LmsStatePolicyTest {
         // SQ-03: JPQL read models take the state list as a parameter instead of re-declaring it.
         for (String repository : java.util.List.of("AttemptRepository", "AssignmentRepository", "StudentRepository")) {
             String source = java.nio.file.Files.readString(java.nio.file.Path.of(
-                    "src/main/java/com/erg/ergspringboot/repository/lms/" + repository + ".java"));
+                    "src/main/java/com/erg/ergspringboot/lms/persistence/" + repository + ".java"));
             assertThat(source).as(repository).doesNotContain("('submitted', 'graded', 'completed')")
                     .doesNotContain("('submitted', 'needs_review', 'review_required')");
         }

@@ -1,11 +1,11 @@
 package com.erg.ergspringboot.lms.internal.notification;
 
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
-import com.erg.ergspringboot.model.lms.AssignmentRecipient;
-import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.repository.lms.AssignmentRecipientRepository;
-import com.erg.ergspringboot.repository.lms.AssignmentRepository;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentRecipient;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Component;

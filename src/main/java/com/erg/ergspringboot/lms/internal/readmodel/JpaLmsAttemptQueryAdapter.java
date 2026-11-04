@@ -1,11 +1,11 @@
 package com.erg.ergspringboot.lms.internal.readmodel;
 
 import com.erg.ergspringboot.lms.LmsAttemptQueryPort;
-import com.erg.ergspringboot.repository.lms.AttemptRepository;
-import com.erg.ergspringboot.repository.lms.projection.AssignmentProgressProjection;
-import com.erg.ergspringboot.repository.lms.projection.AttemptScoreProjection;
-import com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection;
-import com.erg.ergspringboot.repository.lms.projection.PendingReviewProjection;
+import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.projection.AssignmentProgressProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AttemptScoreProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection;
+import com.erg.ergspringboot.lms.persistence.projection.PendingReviewProjection;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;

@@ -5,9 +5,10 @@ import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.*
 import com.erg.ergspringboot.lms.LmsAssignmentQueryPort;
 import com.erg.ergspringboot.lms.LmsAttemptQueryPort;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.repository.lms.AssignmentRepository;
-import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
-import com.erg.ergspringboot.repository.lms.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
+import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.projection.*;
 import com.erg.ergspringboot.repository.lms.projection.*;
 import java.util.*;
 import java.util.function.Function;

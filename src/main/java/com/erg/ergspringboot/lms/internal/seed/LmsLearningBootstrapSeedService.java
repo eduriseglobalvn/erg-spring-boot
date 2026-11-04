@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.lms.internal.seed;
 
-import com.erg.ergspringboot.model.lms.Classroom;
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

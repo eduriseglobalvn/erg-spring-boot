@@ -11,7 +11,7 @@ import com.erg.ergspringboot.common.response.school.SchoolResponses.SchoolRespon
 import com.erg.ergspringboot.model.school.SchoolAcademicYear;
 import com.erg.ergspringboot.model.school.SchoolGrade;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import com.erg.ergspringboot.repository.school.SchoolAcademicYearRepository;
 import com.erg.ergspringboot.repository.school.SchoolGradeRepository;

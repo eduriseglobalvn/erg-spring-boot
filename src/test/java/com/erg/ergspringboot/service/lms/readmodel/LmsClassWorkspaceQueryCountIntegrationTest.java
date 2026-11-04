@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.ClassWorkspaceResponse;
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
-import com.erg.ergspringboot.model.lms.Assignment;
-import com.erg.ergspringboot.model.lms.Attempt;
-import com.erg.ergspringboot.model.lms.Classroom;
-import com.erg.ergspringboot.model.lms.Student;
+import com.erg.ergspringboot.lms.persistence.Assignment;
+import com.erg.ergspringboot.lms.persistence.Attempt;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
 import jakarta.persistence.EntityManager;

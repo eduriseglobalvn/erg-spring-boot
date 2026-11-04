@@ -4,10 +4,10 @@ import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.StudentGroup
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.StudentGroupResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.lms.StudentGroup;
-import com.erg.ergspringboot.model.lms.StudentGroupMember;
-import com.erg.ergspringboot.repository.lms.StudentGroupMemberRepository;
-import com.erg.ergspringboot.repository.lms.StudentGroupRepository;
+import com.erg.ergspringboot.lms.persistence.StudentGroup;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMember;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
+import com.erg.ergspringboot.lms.persistence.StudentGroupRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;

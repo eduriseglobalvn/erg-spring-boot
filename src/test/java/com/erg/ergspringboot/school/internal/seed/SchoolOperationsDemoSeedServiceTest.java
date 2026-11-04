@@ -8,9 +8,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
-import com.erg.ergspringboot.repository.lms.SubjectRepository;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import com.erg.ergspringboot.repository.school.SchoolOperationalProfileRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.model.users.User;

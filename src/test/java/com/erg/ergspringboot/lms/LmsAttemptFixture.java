@@ -5,11 +5,11 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
 import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
-import com.erg.ergspringboot.model.lms.Attempt;
+import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.platform.cache.CacheInvalidationService;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
-import com.erg.ergspringboot.repository.lms.AssignmentRecipientRepository;
-import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.internal.core.LmsAssignmentService;
 import com.erg.ergspringboot.lms.internal.core.LmsAttemptService;
 import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;

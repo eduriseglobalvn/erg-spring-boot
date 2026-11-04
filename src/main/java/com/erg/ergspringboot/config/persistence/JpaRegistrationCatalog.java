@@ -31,7 +31,9 @@ public final class JpaRegistrationCatalog {
             enabled("learningcontent", 4, 5),
             enabled("learningoutcomes", 7, 7),
             enabled("learningstandards", 4, 4),
-            enabled("lms", 16, 16),
+            owned("lms", 12, 12),
+            // Quiz-bank entities stay horizontal: lcms uses them and lms depends on lcms, so lms.persistence would form a cycle.
+            enabled("lms", 4, 4),
             enabled("notifications", 7, 7),
             enabled("organization", 3, 2),
             enabled("outbox", 1, 1),

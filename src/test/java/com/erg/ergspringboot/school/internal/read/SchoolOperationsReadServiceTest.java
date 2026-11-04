@@ -6,12 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.lms.Student;
+import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.school.SchoolOperationalProfile;
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
-import com.erg.ergspringboot.repository.lms.SubjectRepository;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import com.erg.ergspringboot.repository.school.SchoolAcademicYearRepository;
 import com.erg.ergspringboot.repository.school.SchoolGradeRepository;

@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.elearning.internal.readmodel;
 
-import com.erg.ergspringboot.repository.lms.projection.AnnouncementCardProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AnnouncementCardProjection;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

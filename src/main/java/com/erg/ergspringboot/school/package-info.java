@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "School",
-        allowedDependencies = {"organization"})
+        allowedDependencies = {"organization", "lms :: persistence"})
 package com.erg.ergspringboot.school;

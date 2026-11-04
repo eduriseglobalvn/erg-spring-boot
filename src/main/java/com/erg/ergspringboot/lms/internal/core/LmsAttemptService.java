@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.lms.internal.core;
 
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.model.lms.Attempt;
-import com.erg.ergspringboot.repository.lms.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.Attempt;
+import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -77,7 +77,7 @@ public class LmsAttemptService {
         return repository.findByTenantIdAndAssignmentIdOrderByUpdatedAtDesc(tenantId, assignmentId);
     }
 
-    public com.erg.ergspringboot.repository.lms.projection.AssignmentProgressProjection summarizeAssignmentProgress(
+    public com.erg.ergspringboot.lms.persistence.projection.AssignmentProgressProjection summarizeAssignmentProgress(
             String tenantId, String assignmentId) {
         return repository.summarizeAssignmentProgress(tenantId, assignmentId);
     }
@@ -88,13 +88,13 @@ public class LmsAttemptService {
 
     // Summary projection (no jsonb blobs) capped for the quiz-students list view; the full answers
     // payload belongs to the single-attempt detail endpoint, not this roster.
-    public List<com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection> findQuizAttemptSummaries(
+    public List<com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection> findQuizAttemptSummaries(
             String tenantId, String quizId) {
         return repository.findQuizAttemptSummaries(
                 tenantId, quizId, org.springframework.data.domain.PageRequest.of(0, 500));
     }
 
-    public org.springframework.data.domain.Page<com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection>
+    public org.springframework.data.domain.Page<com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection>
             findScopedQuizAttemptSummaries(String tenantId, String quizId, boolean allClasses,
                     java.util.Collection<String> classIds, boolean allUnits, java.util.Collection<String> unitIds,
                     org.springframework.data.domain.Pageable pageable) {
