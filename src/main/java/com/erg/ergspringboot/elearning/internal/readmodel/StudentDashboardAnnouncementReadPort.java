@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.elearning.readmodel;
+package com.erg.ergspringboot.elearning.internal.readmodel;
 
 import com.erg.ergspringboot.repository.lms.projection.AnnouncementCardProjection;
 import java.util.List;

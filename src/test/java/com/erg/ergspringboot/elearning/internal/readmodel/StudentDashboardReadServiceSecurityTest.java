@@ -1,5 +1,6 @@
-package com.erg.ergspringboot.service.elearning.readmodel;
+package com.erg.ergspringboot.elearning.internal.readmodel;
 
+import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;

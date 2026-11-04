@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.elearning.engagement;
+package com.erg.ergspringboot.elearning.internal.engagement;
 
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
@@ -28,8 +28,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Explicit persistent compatibility adapter; callers should use {@code ElearningOperations}. */
-@Deprecated(since = "2026-08-08", forRemoval = false)
+/** Module-internal persistent engagement service; callers outside ELEARNING use {@code ElearningOperations}. */
 @Service
 public class StudentEngagementService {
 

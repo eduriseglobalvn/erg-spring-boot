@@ -29,6 +29,7 @@ class ElearningBoundaryTest {
         Path root = Path.of("src/main/java/com/erg/ergspringboot/elearning");
         try (var files = Files.walk(root)) {
             assertThat(files.filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> !root.relativize(path).startsWith("internal"))
                     .map(path -> {
                         try {
                             return Files.readString(path);
@@ -44,12 +45,14 @@ class ElearningBoundaryTest {
     }
 
     @Test
-    void persistentServicesAreDeprecatedCompatibilityAdapters() throws Exception {
+    void persistentServicesLiveInsideTheModuleAndNoHorizontalServiceRemains() throws Exception {
+        // P3-4: the persistent services moved into elearning/internal; no horizontal service/elearning exists.
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/elearning")).doesNotExist();
         assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/elearning/engagement/StudentEngagementService.java")))
-                .contains("@Deprecated", "persistent");
+                "src/main/java/com/erg/ergspringboot/elearning/internal/engagement/StudentEngagementService.java")))
+                .contains("persistent").doesNotContain("@Deprecated");
         assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/elearning/readmodel/StudentDashboardReadService.java")))
-                .contains("@Deprecated", "persistent");
+                "src/main/java/com/erg/ergspringboot/elearning/internal/readmodel/StudentDashboardReadService.java")))
+                .contains("persistent").doesNotContain("@Deprecated");
     }
 }

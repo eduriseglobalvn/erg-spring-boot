@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.elearning.readmodel;
+package com.erg.ergspringboot.elearning.internal.readmodel;
 
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
