@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.crm;
+package com.erg.ergspringboot.crm.internal;
 
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.ApproveHandoverRequest;
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.CostLine;
@@ -52,8 +52,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Explicit legacy CRM persistence adapter; new callers must use {@code CrmOperations}. */
-@Deprecated(since = "2026-08-08", forRemoval = false)
+/** CRM workspace persistence behind {@code CrmOperations}. */
 @Service
 public class CrmWorkspaceService {
 

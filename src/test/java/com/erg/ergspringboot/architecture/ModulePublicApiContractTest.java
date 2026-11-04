@@ -92,8 +92,8 @@ class ModulePublicApiContractTest {
         assertThat(LearningContentOperations.class.getDeclaredConstructor(LearningContentPort.class))
                 .isNotNull();
         assertThat(CrmOperations.class.getDeclaredConstructor(
-                com.erg.ergspringboot.service.crm.CrmWorkspaceService.class,
-                com.erg.ergspringboot.service.crm.CrmSchoolService.class))
+                com.erg.ergspringboot.crm.internal.CrmWorkspaceService.class,
+                com.erg.ergspringboot.crm.internal.CrmSchoolService.class))
                 .isNotNull();
         assertThat(ElearningOperations.class.getDeclaredConstructor(
                 com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardReadService.class,
@@ -107,6 +107,7 @@ class ModulePublicApiContractTest {
         // The deprecated UserService pass-through adapter was retired (P3-4); callers use UserOperations directly.
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/users/UserService.java")).doesNotExist();
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/users")).doesNotExist();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/crm")).doesNotExist();
         // The deprecated CalendarCommandService/CalendarReadService pass-through beans were removed.
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/calendar/CalendarCommandService.java"))
                 .doesNotExist();

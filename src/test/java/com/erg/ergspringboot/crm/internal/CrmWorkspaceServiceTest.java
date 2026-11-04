@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.crm;
+package com.erg.ergspringboot.crm.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

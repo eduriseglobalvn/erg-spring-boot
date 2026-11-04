@@ -25,7 +25,8 @@ class CrmBoundaryTest {
     @Test
     void publicCrmPackageDoesNotImportPersistenceTypes() throws Exception {
         Path root = Path.of("src/main/java/com/erg/ergspringboot/crm");
-        try (var files = Files.walk(root)) {
+        // Top-level public package only; crm.internal legitimately owns persistence.
+        try (var files = Files.list(root)) {
             assertThat(files.filter(path -> path.toString().endsWith(".java"))
                     .map(path -> {
                         try {
@@ -42,12 +43,10 @@ class CrmBoundaryTest {
     }
 
     @Test
-    void legacyServicesAreExplicitlyAdapters() throws Exception {
-        assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/crm/CrmWorkspaceService.java")))
-                .contains("@Deprecated", "legacy CRM");
-        assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/crm/CrmSchoolService.java")))
-                .contains("@Deprecated", "legacy CRM");
+    void noHorizontalCrmServicePackageExists() {
+        // P3-4: CRM services live in crm.internal behind CrmOperations.
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/crm")).doesNotExist();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/crm/internal/CrmWorkspaceService.java")).exists();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/crm/internal/CrmSchoolService.java")).exists();
     }
 }

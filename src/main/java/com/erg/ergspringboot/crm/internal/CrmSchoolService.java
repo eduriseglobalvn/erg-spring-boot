@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.crm;
+package com.erg.ergspringboot.crm.internal;
 
 import com.erg.ergspringboot.authorization.AuthorizationOperations;
 import com.erg.ergspringboot.common.dto.crm.CrmSchoolDtos.CrmSchoolPerformanceResponse;
@@ -33,8 +33,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Explicit legacy CRM reporting adapter; new callers must use {@code CrmOperations}. */
-@Deprecated(since = "2026-08-08", forRemoval = false)
+/** CRM reporting reads behind {@code CrmOperations}. */
 @Service
 public class CrmSchoolService {
 
