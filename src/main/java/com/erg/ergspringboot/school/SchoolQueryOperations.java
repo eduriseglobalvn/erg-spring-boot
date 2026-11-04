@@ -2,7 +2,7 @@ package com.erg.ergspringboot.school;
 
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolDirectoryWorkspace;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
-import com.erg.ergspringboot.service.school.SchoolOperationsReadService;
+import com.erg.ergspringboot.school.internal.read.SchoolOperationsReadService;
 import java.util.Collection;
 import java.util.Set;
 import org.springframework.stereotype.Service;

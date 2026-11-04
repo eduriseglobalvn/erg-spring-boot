@@ -13,7 +13,7 @@ class GraphQlBusinessCachePolicyTest {
         String learning = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/learningcontent/library/LearningResourceLibraryReadService.java"));
         String school = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/school/SchoolOperationsReadService.java"));
+                "src/main/java/com/erg/ergspringboot/school/internal/read/SchoolOperationsReadService.java"));
         String config = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/config/PlatformCacheDescriptorContributor.java"));
 

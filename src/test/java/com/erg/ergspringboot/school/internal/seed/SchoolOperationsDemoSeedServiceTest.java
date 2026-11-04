@@ -1,4 +1,6 @@
-package com.erg.ergspringboot.service.school;
+package com.erg.ergspringboot.school.internal.seed;
+
+import com.erg.ergspringboot.school.internal.command.SchoolCommandService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
