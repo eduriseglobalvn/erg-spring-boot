@@ -23,7 +23,7 @@ import com.erg.ergspringboot.calendar.authorization.CalendarDelete;
 import com.erg.ergspringboot.calendar.authorization.CalendarImport;
 import com.erg.ergspringboot.calendar.authorization.CalendarPublish;
 import com.erg.ergspringboot.calendar.authorization.CalendarUpdate;
-import com.erg.ergspringboot.service.calendar.CalendarScopeService;
+import com.erg.ergspringboot.calendar.CalendarScopeService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;

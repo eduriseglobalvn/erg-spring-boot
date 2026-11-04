@@ -12,7 +12,7 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.calendar.authorization.CalendarRead;
-import com.erg.ergspringboot.service.calendar.CalendarScopeService;
+import com.erg.ergspringboot.calendar.CalendarScopeService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;

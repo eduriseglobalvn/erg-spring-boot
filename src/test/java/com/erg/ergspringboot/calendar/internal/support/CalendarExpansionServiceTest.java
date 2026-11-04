@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -13,8 +13,8 @@ import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ExpansionResult;
-import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
+import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ExpansionResult;
+import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;

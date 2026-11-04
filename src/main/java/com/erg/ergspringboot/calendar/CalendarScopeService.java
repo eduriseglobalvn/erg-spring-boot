@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar;
 
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.model.calendar.CalendarBatch;

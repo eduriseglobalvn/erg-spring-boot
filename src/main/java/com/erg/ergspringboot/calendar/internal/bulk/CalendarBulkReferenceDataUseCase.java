@@ -14,7 +14,7 @@ import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.lms.LevelRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
-import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
+import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;

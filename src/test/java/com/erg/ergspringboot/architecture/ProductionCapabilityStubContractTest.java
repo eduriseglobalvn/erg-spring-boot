@@ -15,7 +15,7 @@ class ProductionCapabilityStubContractTest {
         String graphql = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/controller/calendar/graphql/CalendarMutationGraphQlController.java"));
         String service = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/calendar/CalendarExcelImportService.java"));
+                "src/main/java/com/erg/ergspringboot/calendar/internal/support/CalendarExcelImportService.java"));
 
         assertThat(rest).contains("NotImplementedException", "CALENDAR_EXCEL_IMPORT_NOT_IMPLEMENTED")
                 .doesNotContain("throw new UnsupportedOperationException");

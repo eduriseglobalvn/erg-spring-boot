@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.support;
 
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
 import com.erg.ergspringboot.model.calendar.CalendarConflict;

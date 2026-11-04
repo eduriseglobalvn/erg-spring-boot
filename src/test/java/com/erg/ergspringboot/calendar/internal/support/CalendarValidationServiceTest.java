@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -11,8 +11,8 @@ import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
-import com.erg.ergspringboot.service.calendar.CalendarValidationService.RowValidationResult;
+import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;
+import com.erg.ergspringboot.calendar.internal.support.CalendarValidationService.RowValidationResult;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
