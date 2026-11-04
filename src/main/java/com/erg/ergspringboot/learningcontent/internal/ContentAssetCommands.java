@@ -10,13 +10,13 @@ import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupp
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.learningcontent.ContentAsset;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAsset;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAsset;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
-import com.erg.ergspringboot.repository.learningcontent.ContentAssetRepository;
-import com.erg.ergspringboot.repository.learningcontent.ContentItemAssetRepository;
-import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAssetRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAssetRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemRepository;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentAssetRequest;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.UpdateContentAssetRequest;

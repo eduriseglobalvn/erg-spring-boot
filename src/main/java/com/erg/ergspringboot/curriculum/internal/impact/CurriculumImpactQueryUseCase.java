@@ -7,7 +7,7 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
-import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository;
 import com.erg.ergspringboot.repository.lms.AssignmentRepository;
 import com.erg.ergspringboot.repository.lms.AttemptRepository;
 import com.erg.ergspringboot.repository.lms.QuestionRepository;

@@ -11,7 +11,7 @@ import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.Certificate;
-import com.erg.ergspringboot.model.content.Post;
+import com.erg.ergspringboot.content.persistence.Post;
 import com.erg.ergspringboot.model.users.Profile;
 import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.model.organization.UserAccessScope;
@@ -105,7 +105,7 @@ class RelationalModelMappingTest {
         assertOneToManyInverse(User.class, "accessScopes", "user");
         assertOneToManyInverse(User.class, "loginAttempts", "user");
         assertOneToManyInverse(EducationUnit.class, "children", "parent");
-        assertOneToManyInverse(com.erg.ergspringboot.model.content.PostCategory.class, "posts", "category");
+        assertOneToManyInverse(com.erg.ergspringboot.content.persistence.PostCategory.class, "posts", "category");
 
         assertThat(classExists("com.erg.ergspringboot.model.core.UserRole")).isFalse();
         assertThat(classExists("com.erg.ergspringboot.model.core.RolePermission")).isFalse();

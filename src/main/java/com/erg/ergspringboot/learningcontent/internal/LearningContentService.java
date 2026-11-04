@@ -1,14 +1,14 @@
 package com.erg.ergspringboot.learningcontent.internal;
 
-import com.erg.ergspringboot.model.learningcontent.ContentAsset;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
-import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
-import com.erg.ergspringboot.repository.learningcontent.ContentAssetRepository;
-import com.erg.ergspringboot.repository.learningcontent.ContentItemAssetRepository;
-import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
-import com.erg.ergspringboot.repository.learningcontent.CurriculumTopicLookupRepository;
-import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAsset;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAsset;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAssetRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAssetRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemRepository;
+import com.erg.ergspringboot.learningcontent.persistence.CurriculumTopicLookupRepository;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.ContentItemListResponse;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.GoogleSlidesLectureResponse;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;

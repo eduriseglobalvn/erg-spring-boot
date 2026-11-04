@@ -50,7 +50,7 @@ class LcmsMediaControllerUploadTest {
     private static LcmsOperations operationsFor(LocalMediaStorageAdapter storage) {
         MediaService media = new MediaService(
                 org.mockito.Mockito.mock(
-                        com.erg.ergspringboot.repository.quiz.media.MediaAssetRepository.class),
+                        com.erg.ergspringboot.lcms.persistence.quiz.media.MediaAssetRepository.class),
                 storage);
         return new LcmsOperations(new LcmsCommandUseCase(
                 org.mockito.Mockito.mock(

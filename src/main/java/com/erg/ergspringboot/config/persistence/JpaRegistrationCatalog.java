@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.config.persistence;
 
-import com.erg.ergspringboot.model.content.ContentLifecycleTransition;
+import com.erg.ergspringboot.content.persistence.ContentLifecycleTransition;
 import java.util.List;
 import java.util.Set;
 
@@ -21,18 +21,19 @@ public final class JpaRegistrationCatalog {
             owned("audit", 1, 1),
             enabled("authorization", 6, 6),
             owned("calendar", 5, 5),
-            partiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
+            ownedPartiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
             owned("crm", 6, 6),
             enabled("curriculum", 6, 6),
             enabled("enterpriseconnectors", 3, 3),
-            enabled("learningcontent", 4, 5),
+            owned("lcms", 7, 7),
+            owned("learningcontent", 4, 5),
             enabled("learningoutcomes", 7, 7),
             enabled("learningstandards", 4, 4),
             enabled("lms", 16, 16),
             enabled("notifications", 7, 7),
             enabled("organization", 3, 2),
             enabled("outbox", 1, 1),
-            enabled("quiz", 14, 14),
+            enabled("quiz", 7, 7),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
             enabled("users", 5, 3)
@@ -109,12 +110,14 @@ public final class JpaRegistrationCatalog {
         return new Module(name, persistence, persistence, true, entities, repositories, Set.of());
     }
 
-    private static Module dormant(String name, int entities) {
-        return new Module(name, model(name), repository(name), false, entities, 0, Set.of());
+    /** Module-owned package where only the allow-listed classes are managed; the rest stay dormant. */
+    private static Module ownedPartiallyManaged(String name, int entities, int repositories, String... classes) {
+        String persistence = "com.erg.ergspringboot." + name + ".persistence";
+        return new Module(name, persistence, persistence, false, entities, repositories, Set.of(classes));
     }
 
-    private static Module partiallyManaged(String name, int entities, int repositories, String... classes) {
-        return new Module(name, model(name), repository(name), false, entities, repositories, Set.of(classes));
+    private static Module dormant(String name, int entities) {
+        return new Module(name, model(name), repository(name), false, entities, 0, Set.of());
     }
 
     private static String model(String name) {

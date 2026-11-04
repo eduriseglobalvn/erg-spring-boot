@@ -3,7 +3,7 @@ package com.erg.ergspringboot.repository.lms;
 import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.repository.lms.projection.QuestionBankQuizOptionProjection;
 import com.erg.ergspringboot.repository.lms.projection.QuestionUsageCountProjection;
-import com.erg.ergspringboot.repository.quiz.authoring.projection.QuizSummaryProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.projection.QuizSummaryProjection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -56,7 +56,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
 
     @Query(
             value = """
-                    select new com.erg.ergspringboot.repository.quiz.authoring.projection.QuizSummaryProjection(
+                    select new com.erg.ergspringboot.lcms.persistence.quiz.authoring.projection.QuizSummaryProjection(
                         q.id,
                         q.title,
                         q.subtitle,
@@ -105,7 +105,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
 
     @Query(
             value = """
-                    select new com.erg.ergspringboot.repository.quiz.authoring.projection.QuizSummaryProjection(
+                    select new com.erg.ergspringboot.lcms.persistence.quiz.authoring.projection.QuizSummaryProjection(
                         q.id,
                         q.title,
                         q.subtitle,

@@ -5,10 +5,10 @@ import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.Conten
 import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.ContentItemResponse;
 import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.GoogleSlidesLectureResponse;
 import com.erg.ergspringboot.learningcontent.api.LearningContentResponses.TopicContentItemResponse;
-import com.erg.ergspringboot.model.learningcontent.ContentAsset;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
-import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAsset;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAsset;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItem;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos;
 import java.util.LinkedHashMap;
 import java.util.Map;

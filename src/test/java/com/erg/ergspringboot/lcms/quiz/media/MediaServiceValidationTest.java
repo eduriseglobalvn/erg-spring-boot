@@ -7,8 +7,8 @@ import com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaPresignReque
 import com.erg.ergspringboot.common.request.quiz.MediaRequests.MediaCommitRequest;
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaPresignResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.quiz.media.MediaAsset;
-import com.erg.ergspringboot.repository.quiz.media.MediaAssetRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.media.MediaAsset;
+import com.erg.ergspringboot.lcms.persistence.quiz.media.MediaAssetRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

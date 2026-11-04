@@ -7,9 +7,9 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDra
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.StaleDraftException;
-import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
-import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import com.erg.ergspringboot.lcms.quiz.authoring.QuizQuestionLinkService.QuestionLinkInput;

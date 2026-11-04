@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.learningcontent.internal;
 
-import com.erg.ergspringboot.model.learningcontent.ContentAsset;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
-import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAsset;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAsset;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItem;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;

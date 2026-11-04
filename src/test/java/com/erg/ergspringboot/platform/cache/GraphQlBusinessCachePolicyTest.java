@@ -28,7 +28,7 @@ class GraphQlBusinessCachePolicyTest {
     @Test
     void learningResourceNativeQueryOrdersByItsQuotedProjectionAlias() throws Exception {
         String repository = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/repository/learningcontent/ContentItemRepository.java"));
+                "src/main/java/com/erg/ergspringboot/learningcontent/persistence/ContentItemRepository.java"));
 
         assertThat(repository).contains("cards.\"updatedAt\" desc");
         assertThat(repository).doesNotContain("cards.updated_at");
