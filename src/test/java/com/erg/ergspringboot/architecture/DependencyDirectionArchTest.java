@@ -72,4 +72,18 @@ class DependencyDirectionArchTest {
                 .resideInAnyPackage("..repository..", "..model..", "jakarta.persistence..", "..service..")
                 .check(classes);
     }
+
+    @Test
+    void moduleInternalsDoNotDependOnTheHorizontalServicePackage() {
+        // P3-4: module internals own their behaviour; the horizontal service package may only shrink.
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("com.erg.ergspringboot");
+
+        noClasses()
+                .that().resideInAPackage("com.erg.ergspringboot.*.internal..")
+                .should().dependOnClassesThat()
+                .resideInAPackage("com.erg.ergspringboot.service..")
+                .check(classes);
+    }
 }
