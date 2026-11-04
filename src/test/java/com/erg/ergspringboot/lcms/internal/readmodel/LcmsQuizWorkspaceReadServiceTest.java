@@ -5,9 +5,9 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
-import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;

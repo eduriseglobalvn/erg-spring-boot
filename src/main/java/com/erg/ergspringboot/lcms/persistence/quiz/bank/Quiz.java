@@ -2,9 +2,9 @@ package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import com.erg.ergspringboot.users.persistence.User;
-import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
-import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
-import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

@@ -55,7 +55,7 @@ class PostgresJpaConfigTest {
         assertThat(entityManagerFactory).isNotNull();
         assertThat(managedTypes.getManagedClassNames())
                 .contains(
-                        "com.erg.ergspringboot.model.auth.AuthSession",
+                        "com.erg.ergspringboot.users.persistence.auth.AuthSession",
                         "com.erg.ergspringboot.reporting.persistence.ReportJob"
                 );
     }

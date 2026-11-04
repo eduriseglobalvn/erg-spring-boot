@@ -1,13 +1,13 @@
 package com.erg.ergspringboot.platform.security;
 
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
-import com.erg.ergspringboot.model.organization.UserAccessScope;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScope;
 import com.erg.ergspringboot.users.persistence.User;
-import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.UserRepository;
-import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import jakarta.servlet.FilterChain;

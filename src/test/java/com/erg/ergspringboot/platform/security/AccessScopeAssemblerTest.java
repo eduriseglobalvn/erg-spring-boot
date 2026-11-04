@@ -2,7 +2,7 @@ package com.erg.ergspringboot.platform.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.erg.ergspringboot.model.organization.UserAccessScope;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScope;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

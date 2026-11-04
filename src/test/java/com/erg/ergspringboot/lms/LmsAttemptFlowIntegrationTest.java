@@ -13,7 +13,7 @@ import com.erg.ergspringboot.lms.persistence.AssignmentResource;
 import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;

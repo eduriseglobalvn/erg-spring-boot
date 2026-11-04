@@ -7,7 +7,7 @@ import com.erg.ergspringboot.calendar.persistence.CalendarRoom;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Level;
 import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.DayOfWeek;

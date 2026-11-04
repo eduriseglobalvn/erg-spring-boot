@@ -8,11 +8,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
-import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
-import com.erg.ergspringboot.model.auth.AuthSession;
+import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttempt;
+import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.User;
-import com.erg.ergspringboot.repository.auth.AuthLoginAttemptRepository;
-import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository;
+import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

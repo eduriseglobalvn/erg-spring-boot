@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.auth.internal.refresh;
 
-import com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository;
+import com.erg.ergspringboot.users.persistence.auth.RefreshTokenHistoryRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.scheduling.annotation.Scheduled;

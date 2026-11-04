@@ -14,7 +14,7 @@ import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.LevelRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.lms.persistence.SubjectRepository;
-import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.util.List;
 import org.springframework.cache.annotation.Cacheable;

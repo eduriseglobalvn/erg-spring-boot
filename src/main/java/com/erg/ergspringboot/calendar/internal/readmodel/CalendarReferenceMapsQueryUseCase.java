@@ -2,7 +2,7 @@ package com.erg.ergspringboot.calendar.internal.readmodel;
 
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lms.persistence.Classroom;
@@ -11,7 +11,7 @@ import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.LevelRepository;
 import com.erg.ergspringboot.lms.persistence.SubjectRepository;
-import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;

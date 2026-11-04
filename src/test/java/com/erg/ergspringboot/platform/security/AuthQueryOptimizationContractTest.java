@@ -2,7 +2,7 @@ package com.erg.ergspringboot.platform.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;

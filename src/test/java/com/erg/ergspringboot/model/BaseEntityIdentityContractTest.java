@@ -2,8 +2,8 @@ package com.erg.ergspringboot.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import java.lang.reflect.Method;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;

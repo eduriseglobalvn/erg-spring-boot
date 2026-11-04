@@ -10,9 +10,9 @@ class PostgresJpaCanonicalPackageContractTest {
     @Test
     void canonicalCurriculumAndLearningContentRegistrationIsCataloged() {
         assertThat(JpaRegistrationCatalog.enabledEntityPackages())
-                .contains("com.erg.ergspringboot.model.curriculum")
+                .contains("com.erg.ergspringboot.curriculum.persistence")
                 .contains("com.erg.ergspringboot.learningcontent.persistence");
-        assertThat(JpaRegistrationCatalog.REPOSITORY_ROOT)
-                .isEqualTo("com.erg.ergspringboot.repository");
+        assertThat(JpaRegistrationCatalog.REPOSITORY_SCAN_ROOT)
+                .isEqualTo("com.erg.ergspringboot");
     }
 }

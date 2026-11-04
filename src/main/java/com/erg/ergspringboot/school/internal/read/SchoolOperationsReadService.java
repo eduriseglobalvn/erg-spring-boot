@@ -5,7 +5,7 @@ import static com.erg.ergspringboot.common.response.school.SchoolResponses.*;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.school.persistence.SchoolAcademicYear;
 import com.erg.ergspringboot.school.persistence.SchoolGrade;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
@@ -15,7 +15,7 @@ import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.lms.persistence.SubjectRepository;
-import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.school.persistence.SchoolAcademicYearRepository;
 import com.erg.ergspringboot.school.persistence.SchoolGradeRepository;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfileRepository;

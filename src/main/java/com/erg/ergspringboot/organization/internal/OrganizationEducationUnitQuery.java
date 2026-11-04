@@ -2,9 +2,9 @@ package com.erg.ergspringboot.organization.internal;
 
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitListResponse;
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitResponse;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;

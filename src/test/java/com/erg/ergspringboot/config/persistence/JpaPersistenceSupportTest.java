@@ -18,7 +18,7 @@ class JpaPersistenceSupportTest {
                 "test",
                 mock(DataSource.class),
                 new JpaProperties(),
-                PersistenceManagedTypes.of("com.erg.ergspringboot.model.auth.AuthSession")
+                PersistenceManagedTypes.of("com.erg.ergspringboot.users.persistence.auth.AuthSession")
         );
 
         assertThat(factory.getJpaPropertyMap().get(AvailableSettings.STATEMENT_INSPECTOR))

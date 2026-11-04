@@ -1,15 +1,15 @@
 package com.erg.ergspringboot.lms.internal.seed;
 
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.organization.EducationUnit;
-import com.erg.ergspringboot.model.organization.UserAccessScope;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScope;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserRepository;
-import com.erg.ergspringboot.repository.authorization.PermissionRepository;
-import com.erg.ergspringboot.repository.authorization.RoleRepository;
-import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
-import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
+import com.erg.ergspringboot.users.persistence.authorization.PermissionRepository;
+import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;

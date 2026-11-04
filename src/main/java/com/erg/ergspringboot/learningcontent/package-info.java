@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Learning Content",
-        allowedDependencies = {"curriculum"})
+        allowedDependencies = {"curriculum", "curriculum :: persistence"})
 package com.erg.ergspringboot.learningcontent;

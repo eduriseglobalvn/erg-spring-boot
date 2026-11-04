@@ -4,7 +4,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository;
+import com.erg.ergspringboot.users.persistence.auth.RefreshTokenHistoryRepository;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
 

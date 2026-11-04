@@ -2,7 +2,7 @@ package com.erg.ergspringboot.platform.security;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import java.util.Collection;
 import java.util.Locale;
 

@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.request.users.UserRequests.BulkDeleteRequest;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.auth.AuthSession;
+import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.User;
-import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import java.util.List;

@@ -1,21 +1,18 @@
 package com.erg.ergspringboot.curriculum.internal.impact;
 
-import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
-import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
-import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
-import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository;
-import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
-import com.erg.ergspringboot.lms.persistence.AttemptRepository;
-import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
-import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumImpactCounts;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumImpactResponse;
 import com.erg.ergspringboot.curriculum.CurriculumException;
+import com.erg.ergspringboot.curriculum.CurriculumUsageCounter;
+import com.erg.ergspringboot.curriculum.CurriculumUsageCounter.Node;
+import com.erg.ergspringboot.curriculum.CurriculumUsageCounter.Usage;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -31,32 +28,21 @@ public class CurriculumImpactQueryUseCase {
     private final CurriculumSubjectRepository subjects;
     private final CurriculumLevelRepository levels;
     private final CurriculumTopicRepository topics;
-    private final TopicContentItemRepository contentItems;
-    private final QuestionRepository questions;
-    private final QuizRepository quizzes;
-    private final QuizVersionRepository quizVersions;
-    private final AssignmentRepository assignments;
-    private final AttemptRepository attempts;
+    private final List<CurriculumUsageCounter> usageCounters;
 
     public CurriculumImpactQueryUseCase(
             CurriculumSubjectRepository subjects,
             CurriculumLevelRepository levels,
             CurriculumTopicRepository topics,
-            TopicContentItemRepository contentItems,
-            QuestionRepository questions,
-            QuizRepository quizzes,
-            QuizVersionRepository quizVersions,
-            AssignmentRepository assignments,
-            AttemptRepository attempts) {
+            List<CurriculumUsageCounter> usageCounters) {
         this.subjects = subjects;
         this.levels = levels;
         this.topics = topics;
-        this.contentItems = contentItems;
-        this.questions = questions;
-        this.quizzes = quizzes;
-        this.quizVersions = quizVersions;
-        this.assignments = assignments;
-        this.attempts = attempts;
+        if (usageCounters.isEmpty()) {
+            // Fail closed: with no counters every node would look unused and become hard-deletable.
+            throw new IllegalStateException("no CurriculumUsageCounter beans registered");
+        }
+        this.usageCounters = List.copyOf(usageCounters);
     }
 
     public CurriculumImpactResponse subjectImpact(String id, UserAccessContext access) {
@@ -64,13 +50,14 @@ public class CurriculumImpactQueryUseCase {
         CurriculumSubject subject = requireSubject(id, tenantId);
         long childLevels = levels.countByTenantIdAndSubjectId(tenantId, id);
         List<String> topicIds = topicIdsForSubject(tenantId, id);
+        Usage usage = usage(tenantId, Node.SUBJECT, id, topicIds);
         CurriculumImpactCounts counts = new CurriculumImpactCounts(
-                questions.countImpactByTenantAndSubject(tenantId, id),
-                quizzes.countImpactByTenantAndSubject(tenantId, id),
-                quizVersions.countPublishedImpactByTenantAndSubject(tenantId, id),
-                contentItemCount(tenantId, topicIds),
-                assignments.countImpactByTenantAndSubject(tenantId, id),
-                attempts.countImpactByTenantAndSubject(tenantId, id),
+                usage.questions(),
+                usage.quizzes(),
+                usage.publishedQuizVersions(),
+                usage.contentItems(),
+                usage.assignments(),
+                usage.studentAttempts(),
                 childLevels,
                 topicIds.size());
         return impact(subject.getId(), "subject", subject.getStatus(), counts);
@@ -81,13 +68,14 @@ public class CurriculumImpactQueryUseCase {
         CurriculumLevel level = requireLevel(id, tenantId);
         long childTopics = topics.countByTenantIdAndLevelId(tenantId, id);
         List<String> topicIds = topicIdsForLevel(tenantId, id);
+        Usage usage = usage(tenantId, Node.LEVEL, id, topicIds);
         CurriculumImpactCounts counts = new CurriculumImpactCounts(
-                questions.countImpactByTenantAndLevel(tenantId, id),
-                quizzes.countImpactByTenantAndLevel(tenantId, id),
-                quizVersions.countPublishedImpactByTenantAndLevel(tenantId, id),
-                contentItemCount(tenantId, topicIds),
-                assignments.countImpactByTenantAndLevel(tenantId, id),
-                attempts.countImpactByTenantAndLevel(tenantId, id),
+                usage.questions(),
+                usage.quizzes(),
+                usage.publishedQuizVersions(),
+                usage.contentItems(),
+                usage.assignments(),
+                usage.studentAttempts(),
                 0,
                 childTopics);
         return impact(level.getId(), "level", level.getStatus(), counts);
@@ -96,13 +84,14 @@ public class CurriculumImpactQueryUseCase {
     public CurriculumImpactResponse topicImpact(String id, UserAccessContext access) {
         String tenantId = tenantId(access);
         CurriculumTopic topic = requireTopic(id, tenantId);
+        Usage usage = usage(tenantId, Node.TOPIC, id, List.of(id));
         CurriculumImpactCounts counts = new CurriculumImpactCounts(
-                questions.countImpactByTenantAndTopic(tenantId, id),
-                quizzes.countImpactByTenantAndTopic(tenantId, id),
-                quizVersions.countPublishedImpactByTenantAndTopic(tenantId, id),
-                contentItems.countByTenantIdAndTopicId(tenantId, id),
-                assignments.countImpactByTenantAndTopic(tenantId, id),
-                attempts.countImpactByTenantAndTopic(tenantId, id),
+                usage.questions(),
+                usage.quizzes(),
+                usage.publishedQuizVersions(),
+                usage.contentItems(),
+                usage.assignments(),
+                usage.studentAttempts(),
                 0,
                 0);
         return impact(topic.getId(), "topic", topic.getStatus(), counts);
@@ -155,8 +144,12 @@ public class CurriculumImpactQueryUseCase {
                 .stream().map(CurriculumTopic::getId).toList();
     }
 
-    private long contentItemCount(String tenantId, List<String> topicIds) {
-        return topicIds.isEmpty() ? 0 : contentItems.countByTenantIdAndTopicIdIn(tenantId, topicIds);
+    private Usage usage(String tenantId, Node node, String id, List<String> topicIds) {
+        Usage total = Usage.NONE;
+        for (CurriculumUsageCounter counter : usageCounters) {
+            total = total.plus(counter.count(tenantId, node, id, topicIds));
+        }
+        return total;
     }
 
     private CurriculumSubject requireSubject(String id, String tenantId) {

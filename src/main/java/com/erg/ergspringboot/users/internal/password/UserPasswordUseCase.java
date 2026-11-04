@@ -5,10 +5,10 @@ import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycl
 import com.erg.ergspringboot.common.response.users.UserResponses.PasswordChangeResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.auth.AuthSession;
+import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
-import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.CredentialHasher;

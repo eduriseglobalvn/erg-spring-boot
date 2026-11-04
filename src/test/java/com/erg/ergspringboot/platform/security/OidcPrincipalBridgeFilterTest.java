@@ -6,8 +6,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import java.util.List;

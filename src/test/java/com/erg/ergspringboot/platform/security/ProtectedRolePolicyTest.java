@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

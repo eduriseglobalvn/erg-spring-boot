@@ -15,11 +15,11 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.BulkAssi
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.UserRepository;
-import com.erg.ergspringboot.repository.authorization.PermissionRepository;
-import com.erg.ergspringboot.repository.authorization.RoleRepository;
-import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
+import com.erg.ergspringboot.users.persistence.authorization.PermissionRepository;
+import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
 import java.util.List;

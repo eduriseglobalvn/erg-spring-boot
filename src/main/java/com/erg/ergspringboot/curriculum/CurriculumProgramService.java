@@ -1,10 +1,10 @@
 package com.erg.ergspringboot.curriculum;
 
-import com.erg.ergspringboot.model.curriculum.CurriculumProgram;
-import com.erg.ergspringboot.model.curriculum.CurriculumProgramRow;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumProgram;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumProgramRow;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.curriculum.CurriculumProgramRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumProgramRowRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumProgramRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumProgramRowRepository;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumProgramRequest;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumProgramResponse;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumProgramRowRequest;

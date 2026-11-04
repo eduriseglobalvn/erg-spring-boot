@@ -2,7 +2,7 @@ package com.erg.ergspringboot.crm.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;

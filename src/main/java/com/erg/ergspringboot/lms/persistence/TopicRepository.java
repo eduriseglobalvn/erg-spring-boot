@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.lms.persistence;
 
-import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection;
+import com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptionProjection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -11,7 +11,7 @@ public interface TopicRepository extends JpaRepository<Topic, String> {
     List<Topic> findByTenantIdAndLevelIdAndStatusIgnoreCaseOrderByOrderAscNameAsc(String tenantId, String levelId, String status);
 
     @Query("""
-            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection(t.id, t.name, null, t.levelId, t.code)
+            select new com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptionProjection(t.id, t.name, null, t.levelId, t.code)
             from Topic t
             where t.tenantId = :tenantId
             and (:levelId is null or t.levelId = :levelId)

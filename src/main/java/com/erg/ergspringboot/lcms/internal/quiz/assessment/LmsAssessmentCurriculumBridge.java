@@ -1,13 +1,13 @@
 package com.erg.ergspringboot.lcms.internal.quiz.assessment;
 
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
-import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
-import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
-import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Service;

@@ -1,12 +1,12 @@
 package com.erg.ergspringboot.curriculum.internal.validation;
 
-import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
-import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
-import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTopicResponse;
 import com.erg.ergspringboot.curriculum.CurriculumException;
 import org.springframework.stereotype.Service;

@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "Organization",
-        allowedDependencies = {"authorization", "users"})
+        allowedDependencies = {"authorization", "users", "users :: persistence"})
 package com.erg.ergspringboot.organization;

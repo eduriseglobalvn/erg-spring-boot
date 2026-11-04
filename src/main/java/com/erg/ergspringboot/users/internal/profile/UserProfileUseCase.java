@@ -6,7 +6,7 @@ import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycl
 import com.erg.ergspringboot.common.response.users.UserResponses.OnboardingResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.users.persistence.UserRepository;

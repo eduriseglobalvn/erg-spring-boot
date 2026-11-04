@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.auth.internal.session;
 
 import com.erg.ergspringboot.exception.auth.AuthFailure;
-import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
+import com.erg.ergspringboot.users.persistence.auth.AuthSession;
+import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;

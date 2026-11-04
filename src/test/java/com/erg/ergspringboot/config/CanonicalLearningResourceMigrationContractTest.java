@@ -86,13 +86,13 @@ class CanonicalLearningResourceMigrationContractTest {
                 .doesNotContain("REFERENCES lms_levels(id)")
                 .doesNotContain("REFERENCES lms_topics(id)");
         assertThat(questionBankReadModel)
-                .contains("repository.curriculum.CurriculumSubjectRepository")
-                .contains("repository.curriculum.CurriculumLevelRepository")
-                .contains("repository.curriculum.CurriculumTopicRepository");
+                .contains("curriculum.persistence.CurriculumSubjectRepository")
+                .contains("curriculum.persistence.CurriculumLevelRepository")
+                .contains("curriculum.persistence.CurriculumTopicRepository");
         assertThat(quizReadModel)
-                .contains("repository.curriculum.CurriculumSubjectRepository")
-                .contains("repository.curriculum.CurriculumLevelRepository")
-                .contains("repository.curriculum.CurriculumTopicRepository");
+                .contains("curriculum.persistence.CurriculumSubjectRepository")
+                .contains("curriculum.persistence.CurriculumLevelRepository")
+                .contains("curriculum.persistence.CurriculumTopicRepository");
     }
 
     private String readMigration(String fileName) throws IOException {

@@ -10,14 +10,14 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarRoomRepository;
 import com.erg.ergspringboot.calendar.persistence.projection.CalendarTeacherColorProjection;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.LevelRepository;
 import com.erg.ergspringboot.lms.persistence.SubjectRepository;
-import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.users.UserAccountProjection;
 import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.time.OffsetDateTime;

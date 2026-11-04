@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
-import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
-import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
-import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestion;

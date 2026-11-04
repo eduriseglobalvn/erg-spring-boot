@@ -1,12 +1,12 @@
 package com.erg.ergspringboot.users.persistence;
 
 import com.erg.ergspringboot.model.BaseEntity;
-import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
-import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
-import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.model.organization.UserAccessScope;
-import com.erg.ergspringboot.model.organization.WorkShift;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttempt;
+import com.erg.ergspringboot.users.persistence.auth.AuthSession;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScope;
+import com.erg.ergspringboot.users.persistence.organization.WorkShift;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;

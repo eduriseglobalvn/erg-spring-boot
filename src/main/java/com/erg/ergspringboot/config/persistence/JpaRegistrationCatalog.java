@@ -12,18 +12,15 @@ import java.util.Set;
  */
 public final class JpaRegistrationCatalog {
 
-    public static final String REPOSITORY_ROOT = "com.erg.ergspringboot.repository";
-    /** Repository scan root: horizontal {@code repository.*} plus module-owned {@code <module>.persistence}. */
+    /** Repository scan root; every repository lives in its module at {@code <module>.persistence}. */
     public static final String REPOSITORY_SCAN_ROOT = "com.erg.ergspringboot";
 
     private static final List<Module> MODULES = List.of(
-            enabled("auth", 5, 5),
             owned("audit", 1, 1),
-            enabled("authorization", 6, 6),
             owned("calendar", 5, 5),
             ownedPartiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
             owned("crm", 6, 6),
-            enabled("curriculum", 6, 6),
+            owned("curriculum", 6, 6),
             owned("enterpriseconnectors", 3, 3),
             owned("lcms", 18, 18),
             owned("learningcontent", 4, 5),
@@ -31,11 +28,10 @@ public final class JpaRegistrationCatalog {
             owned("learningstandards", 4, 4),
             owned("lms", 12, 12),
             owned("notifications", 7, 7),
-            enabled("organization", 3, 2),
             owned("outbox", "auth", 1, 1),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
-            owned("users", 5, 4)
+            owned("users", 19, 17)
     );
 
     private JpaRegistrationCatalog() {
@@ -99,10 +95,6 @@ public final class JpaRegistrationCatalog {
         }
     }
 
-    private static Module enabled(String name, int entities, int repositories) {
-        return new Module(name, model(name), repository(name), true, entities, repositories, Set.of());
-    }
-
     /** Persistence folded into another module, e.g. outbox lives in {@code auth.persistence}. */
     private static Module owned(String name, String owner, int entities, int repositories) {
         String persistence = "com.erg.ergspringboot." + owner + ".persistence";
@@ -119,17 +111,5 @@ public final class JpaRegistrationCatalog {
     private static Module ownedPartiallyManaged(String name, int entities, int repositories, String... classes) {
         String persistence = "com.erg.ergspringboot." + name + ".persistence";
         return new Module(name, persistence, persistence, false, entities, repositories, Set.of(classes));
-    }
-
-    private static Module dormant(String name, int entities) {
-        return new Module(name, model(name), repository(name), false, entities, 0, Set.of());
-    }
-
-    private static String model(String name) {
-        return "com.erg.ergspringboot.model." + name;
-    }
-
-    private static String repository(String name) {
-        return REPOSITORY_ROOT + "." + name;
     }
 }

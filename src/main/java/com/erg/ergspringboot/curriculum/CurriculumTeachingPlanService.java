@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.curriculum;
 
-import com.erg.ergspringboot.model.curriculum.CurriculumTeachingPlanSetting;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTeachingPlanSetting;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTeachingPlanSettingRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTeachingPlanSettingRepository;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTeachingPlanRequest;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTeachingPlanResponse;
 import java.time.LocalDate;

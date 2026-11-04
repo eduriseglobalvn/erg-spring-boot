@@ -10,9 +10,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.model.auth.AccountVerificationCode;
+import com.erg.ergspringboot.users.persistence.auth.AccountVerificationCode;
 import com.erg.ergspringboot.users.persistence.User;
-import com.erg.ergspringboot.repository.auth.AccountVerificationCodeRepository;
+import com.erg.ergspringboot.users.persistence.auth.AccountVerificationCodeRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import java.util.Optional;

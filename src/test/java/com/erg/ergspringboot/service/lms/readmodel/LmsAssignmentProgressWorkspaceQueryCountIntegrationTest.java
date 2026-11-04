@@ -9,7 +9,7 @@ import com.erg.ergspringboot.lms.persistence.AssignmentResource;
 import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;

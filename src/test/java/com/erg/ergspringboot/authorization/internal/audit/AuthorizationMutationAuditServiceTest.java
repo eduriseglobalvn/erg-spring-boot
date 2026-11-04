@@ -6,10 +6,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.model.auth.SecurityEvent;
+import com.erg.ergspringboot.users.persistence.auth.SecurityEvent;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
-import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
+import com.erg.ergspringboot.users.persistence.auth.SecurityEventRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.UserAuditContext;

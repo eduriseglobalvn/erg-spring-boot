@@ -11,7 +11,7 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.model.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ExpansionResult;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;

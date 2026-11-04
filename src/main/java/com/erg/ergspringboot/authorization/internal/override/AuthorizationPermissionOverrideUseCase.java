@@ -4,13 +4,13 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AddPermi
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionOverrideResponse;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.users.persistence.UserRepository;
-import com.erg.ergspringboot.repository.authorization.PermissionRepository;
-import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
+import com.erg.ergspringboot.users.persistence.authorization.PermissionRepository;
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.authorization.internal.audit.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.users.RoleAssignmentAudit.UserRef;
 import com.erg.ergspringboot.users.UserAuditContext;

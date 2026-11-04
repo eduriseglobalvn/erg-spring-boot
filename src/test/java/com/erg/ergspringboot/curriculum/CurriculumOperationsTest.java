@@ -9,15 +9,18 @@ import static org.mockito.Mockito.when;
 import com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess;
 import com.erg.ergspringboot.curriculum.internal.command.CurriculumCommandUseCase;
 import com.erg.ergspringboot.curriculum.internal.impact.CurriculumImpactQueryUseCase;
+import com.erg.ergspringboot.lcms.internal.curriculum.LcmsCurriculumUsageCounter;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentCurriculumUsageCounter;
+import com.erg.ergspringboot.lms.internal.curriculum.LmsCurriculumUsageCounter;
 import com.erg.ergspringboot.curriculum.internal.query.CurriculumTreeQueryUseCase;
 import com.erg.ergspringboot.curriculum.internal.validation.CurriculumChainValidationUseCase;
-import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
-import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
-import com.erg.ergspringboot.model.curriculum.CurriculumTopic;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
@@ -69,9 +72,10 @@ class CurriculumOperationsTest {
     void setUp() {
         CurriculumReviewAccess review = CurriculumReviewAccess.denyAll();
         CurriculumImpactQueryUseCase impacts = new CurriculumImpactQueryUseCase(
-                subjectRepository, levelRepository, topicRepository, topicContentItemRepository,
-                questionRepository, quizRepository, quizVersionRepository, assignmentRepository,
-                attemptRepository);
+                subjectRepository, levelRepository, topicRepository, List.of(
+                        new LcmsCurriculumUsageCounter(questionRepository, quizRepository, quizVersionRepository),
+                        new LmsCurriculumUsageCounter(assignmentRepository, attemptRepository),
+                        new LearningContentCurriculumUsageCounter(topicContentItemRepository)));
         service = new CurriculumOperations(
                 new CurriculumTreeQueryUseCase(subjectRepository, levelRepository, topicRepository, review),
                 impacts,

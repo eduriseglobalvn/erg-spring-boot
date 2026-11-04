@@ -14,18 +14,18 @@ import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.UserAcc
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
 import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
-import com.erg.ergspringboot.repository.authorization.RoleRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
+import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
-import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection;
+import com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionUsageCountProjection;
-import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -284,16 +284,16 @@ public class LcmsWorkspaceReadService {
         return bounded == null ? topicRepository.findAssessmentOptions(tenantId, levelId, status) : bounded;
     }
 
-    private List<com.erg.ergspringboot.repository.authorization.projection.RoleOptionProjection> boundedRoleOptions() {
+    private List<com.erg.ergspringboot.users.persistence.authorization.projection.RoleOptionProjection> boundedRoleOptions() {
         PageRequest limit = PageRequest.of(0, MAX_OPTION_ROWS);
-        List<com.erg.ergspringboot.repository.authorization.projection.RoleOptionProjection> bounded =
+        List<com.erg.ergspringboot.users.persistence.authorization.projection.RoleOptionProjection> bounded =
                 roleRepository.findAccessManagementRoleOptions(limit);
         return bounded == null ? roleRepository.findAccessManagementRoleOptions() : bounded;
     }
 
-    private List<com.erg.ergspringboot.repository.organization.projection.ScopeOptionProjection> boundedScopeOptions(
+    private List<com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection> boundedScopeOptions(
             String tenantId) {
-        List<com.erg.ergspringboot.repository.organization.projection.ScopeOptionProjection> bounded =
+        List<com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection> bounded =
                 userAccessScopeRepository.findAccessManagementScopeOptions(tenantId, PageRequest.of(0, MAX_OPTION_ROWS));
         return bounded == null ? userAccessScopeRepository.findAccessManagementScopeOptions(tenantId) : bounded;
     }

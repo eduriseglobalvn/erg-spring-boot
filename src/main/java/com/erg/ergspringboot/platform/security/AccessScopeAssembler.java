@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.platform.security;
 
-import com.erg.ergspringboot.model.organization.UserAccessScope;
+import com.erg.ergspringboot.users.persistence.organization.UserAccessScope;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

@@ -7,10 +7,10 @@ import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVe
 import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
 import com.erg.ergspringboot.exception.AccountLifecycleException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.auth.AccountVerificationCode;
+import com.erg.ergspringboot.users.persistence.auth.AccountVerificationCode;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
-import com.erg.ergspringboot.repository.auth.AccountVerificationCodeRepository;
+import com.erg.ergspringboot.users.persistence.auth.AccountVerificationCodeRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.UserAuditContext;

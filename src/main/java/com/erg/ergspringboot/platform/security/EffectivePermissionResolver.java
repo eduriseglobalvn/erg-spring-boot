@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.platform.security;
 
-import com.erg.ergspringboot.model.authorization.Permission;
-import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
-import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.User;
 import java.time.OffsetDateTime;
 import java.util.Collection;

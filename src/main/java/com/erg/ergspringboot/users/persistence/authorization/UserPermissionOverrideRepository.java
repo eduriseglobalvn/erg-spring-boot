@@ -1,0 +1,15 @@
+package com.erg.ergspringboot.users.persistence.authorization;
+
+import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
+import java.util.List;
+import java.util.Collection;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface UserPermissionOverrideRepository extends JpaRepository<UserPermissionOverride, String> {
+
+    void deleteByUserId(String userId);
+
+    List<UserPermissionOverride> findByUserId(String userId);
+
+    List<UserPermissionOverride> findByPermissionIn(Collection<String> permissions);
+}

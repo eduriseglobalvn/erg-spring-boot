@@ -5,9 +5,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.model.curriculum.CurriculumTeachingPlanSetting;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTeachingPlanSetting;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.curriculum.CurriculumTeachingPlanSettingRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumTeachingPlanSettingRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;

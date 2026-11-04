@@ -11,7 +11,7 @@ class SchoolJpaRegistrationTest {
     void postgresPersistenceRegistersSchoolEntitiesThroughCatalog() {
         assertThat(JpaRegistrationCatalog.enabledEntityPackages())
                 .contains("com.erg.ergspringboot.school.persistence");
-        assertThat(JpaRegistrationCatalog.REPOSITORY_ROOT)
-                .startsWith("com.erg.ergspringboot.repository");
+        assertThat(JpaRegistrationCatalog.REPOSITORY_SCAN_ROOT)
+                .isEqualTo("com.erg.ergspringboot");
     }
 }
