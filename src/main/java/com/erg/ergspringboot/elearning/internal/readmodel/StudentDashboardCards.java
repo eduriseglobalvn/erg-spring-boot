@@ -1,5 +1,6 @@
-package com.erg.ergspringboot.service.elearning.readmodel;
+package com.erg.ergspringboot.elearning.internal.readmodel;
 
+import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAnnouncementCardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAssignmentCardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardClassMembershipResponse;

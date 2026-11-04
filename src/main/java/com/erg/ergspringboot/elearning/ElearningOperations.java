@@ -12,15 +12,14 @@ import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery
 import com.erg.ergspringboot.elearning.api.ElearningCommands.MarkAnnouncementReadCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.ReplyCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.SetReactionCommand;
-import com.erg.ergspringboot.service.elearning.engagement.StudentEngagementService;
-import com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadScope;
-import com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadService;
+import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
+import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService;
+import com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardReadService;
 import org.springframework.stereotype.Service;
 
 /**
- * Public ELEARNING application boundary for persistent student flows. The
- * existing services are compatibility adapters until their internals move into
- * this module.
+ * Public ELEARNING application boundary for persistent student flows; it
+ * forwards to the module-internal dashboard and engagement services.
  */
 @Service
 public class ElearningOperations {

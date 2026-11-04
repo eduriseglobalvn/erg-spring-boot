@@ -50,7 +50,7 @@ class LmsStatePolicyTest {
                     .doesNotContain("('submitted', 'needs_review', 'review_required')");
         }
         String dashboard = java.nio.file.Files.readString(java.nio.file.Path.of(
-                "src/main/java/com/erg/ergspringboot/service/elearning/readmodel/StudentDashboardCards.java"));
+                "src/main/java/com/erg/ergspringboot/elearning/internal/readmodel/StudentDashboardCards.java"));
         // SQ-20: the dashboard delegates its pending-action rule here instead of re-implementing it.
         assertThat(dashboard).contains("LmsStatePolicy.assignmentIsPendingAction");
         String policy = java.nio.file.Files.readString(java.nio.file.Path.of(

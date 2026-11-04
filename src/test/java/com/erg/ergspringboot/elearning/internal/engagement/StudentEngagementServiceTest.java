@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.elearning.engagement;
+package com.erg.ergspringboot.elearning.internal.engagement;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
@@ -9,9 +9,9 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
-import com.erg.ergspringboot.service.elearning.engagement.StudentEngagementService.CreateDiscussionCommand;
-import com.erg.ergspringboot.service.elearning.engagement.StudentEngagementService.MarkAnnouncementReadCommand;
-import com.erg.ergspringboot.service.elearning.engagement.StudentEngagementService.SetReactionCommand;
+import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.CreateDiscussionCommand;
+import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.MarkAnnouncementReadCommand;
+import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.SetReactionCommand;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

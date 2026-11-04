@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.elearning.readmodel;
+package com.erg.ergspringboot.elearning.api;
 
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import java.util.List;

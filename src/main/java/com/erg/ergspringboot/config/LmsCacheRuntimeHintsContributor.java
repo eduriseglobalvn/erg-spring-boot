@@ -8,7 +8,7 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.quiz.QuizReportResponses;
 import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses;
 import com.erg.ergspringboot.platform.cache.CacheRuntimeHintsContributor;
-import com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadScope;
+import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.aot.hint.MemberCategory;

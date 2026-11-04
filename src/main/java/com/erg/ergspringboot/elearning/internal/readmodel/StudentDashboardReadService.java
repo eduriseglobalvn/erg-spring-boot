@@ -1,6 +1,7 @@
-package com.erg.ergspringboot.service.elearning.readmodel;
+package com.erg.ergspringboot.elearning.internal.readmodel;
 
-import static com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardCards.*;
+import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
+import static com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardCards.*;
 
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAnnouncementCardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAssignmentCardResponse;
@@ -38,8 +39,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Explicit persistent dashboard read adapter; callers should use {@code ElearningOperations}. */
-@Deprecated(since = "2026-08-08", forRemoval = false)
+/** Module-internal persistent dashboard read service; callers outside ELEARNING use {@code ElearningOperations}. */
 @Service
 @Transactional(readOnly = true)
 public class StudentDashboardReadService {

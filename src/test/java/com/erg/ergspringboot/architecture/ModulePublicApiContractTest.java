@@ -96,8 +96,8 @@ class ModulePublicApiContractTest {
                 com.erg.ergspringboot.service.crm.CrmSchoolService.class))
                 .isNotNull();
         assertThat(ElearningOperations.class.getDeclaredConstructor(
-                com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadService.class,
-                com.erg.ergspringboot.service.elearning.engagement.StudentEngagementService.class))
+                com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardReadService.class,
+                com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.class))
                 .isNotNull();
 
         assertThat(Files.exists(Path.of(
@@ -137,12 +137,14 @@ class ModulePublicApiContractTest {
         assertThat(Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/learningcontent/internal/LearningContentService.java")))
                 .doesNotContain("@Deprecated");
+        // P3-4: the persistent elearning services moved inside the module; no horizontal service/elearning exists.
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/elearning")).doesNotExist();
         assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/elearning/engagement/StudentEngagementService.java")))
-                .contains("@Deprecated", "ElearningOperations");
+                "src/main/java/com/erg/ergspringboot/elearning/internal/engagement/StudentEngagementService.java")))
+                .contains("ElearningOperations").doesNotContain("@Deprecated");
         assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/elearning/readmodel/StudentDashboardReadService.java")))
-                .contains("@Deprecated", "ElearningOperations");
+                "src/main/java/com/erg/ergspringboot/elearning/internal/readmodel/StudentDashboardReadService.java")))
+                .contains("ElearningOperations").doesNotContain("@Deprecated");
     }
 
     @Test

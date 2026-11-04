@@ -6,7 +6,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.elearning.readmodel.StudentDashboardReadScope;
+import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import org.junit.jupiter.api.Test;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
