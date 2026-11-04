@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth.internal.login;
 
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.platform.graphql.ratelimit.GraphQlRateLimitCounterRouter;

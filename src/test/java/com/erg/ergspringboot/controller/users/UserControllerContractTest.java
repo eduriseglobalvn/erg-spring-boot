@@ -304,7 +304,7 @@ class UserControllerContractTest {
         );
                 return MockMvcBuilders.standaloneSetup(new UserController(
                         userService,
-                        mock(com.erg.ergspringboot.service.auth.AccountVerificationService.class)
+                        mock(com.erg.ergspringboot.auth.AccountVerificationService.class)
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .addFilter(new RequestIdFilter())

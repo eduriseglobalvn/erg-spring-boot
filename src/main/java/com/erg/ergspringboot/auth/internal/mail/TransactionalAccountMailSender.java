@@ -1,5 +1,6 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth.internal.mail;
 
+import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.model.outbox.OutboxEvent;
 import com.erg.ergspringboot.repository.outbox.OutboxEventRepository;
 import com.erg.ergspringboot.service.outbox.OutboxPayloadCipher;

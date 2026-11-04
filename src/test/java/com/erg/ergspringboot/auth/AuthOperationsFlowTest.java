@@ -1,5 +1,8 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth;
 
+import com.erg.ergspringboot.auth.internal.login.AuthLoginRateLimiter;
+import com.erg.ergspringboot.auth.internal.login.LoginFailureEnforcementService;
+import com.erg.ergspringboot.service.auth.PasswordService;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -15,7 +18,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
-import com.erg.ergspringboot.auth.AuthOperations;
 import com.erg.ergspringboot.auth.internal.login.AuthLoginUseCase;
 import com.erg.ergspringboot.auth.internal.refresh.AuthRefreshUseCase;
 import com.erg.ergspringboot.auth.internal.security.AuthSecurityQueryUseCase;

@@ -13,7 +13,7 @@ import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
-import com.erg.ergspringboot.service.auth.AuthTokenService;
+import com.erg.ergspringboot.auth.AuthTokenService;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.Duration;
 import java.time.OffsetDateTime;

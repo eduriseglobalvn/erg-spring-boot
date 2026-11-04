@@ -3,7 +3,6 @@ package com.erg.ergspringboot.auth.internal.login;
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.exception.auth.AuthFailure;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.service.auth.LoginFailureEnforcementService;
 import com.erg.ergspringboot.service.auth.PasswordService;
 import java.util.Objects;
 import java.util.Optional;

@@ -8,7 +8,7 @@ import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
-import com.erg.ergspringboot.service.auth.AuthTokenService;
+import com.erg.ergspringboot.auth.AuthTokenService;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;

@@ -4,7 +4,6 @@ import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.users.User;
 import com.erg.ergspringboot.repository.auth.AuthLoginAttemptRepository;
-import com.erg.ergspringboot.service.auth.LoginFailureEnforcementService;
 import com.erg.ergspringboot.utils.IdGenerator;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.OffsetDateTime;

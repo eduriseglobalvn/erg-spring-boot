@@ -3,7 +3,7 @@ package com.erg.ergspringboot.service.outbox;
 import com.erg.ergspringboot.model.outbox.OutboxEvent;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import com.erg.ergspringboot.repository.outbox.OutboxEventRepository;
-import com.erg.ergspringboot.service.auth.SmtpAccountMailSender;
+import com.erg.ergspringboot.auth.SmtpAccountMailSender;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;

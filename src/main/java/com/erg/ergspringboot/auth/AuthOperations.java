@@ -7,7 +7,6 @@ import com.erg.ergspringboot.common.response.auth.AuthResponses.AuthResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.IpSecurityStatusResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.LoginAttemptResponse;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.TokenResponse;
-import com.erg.ergspringboot.service.auth.AccountVerificationService;
 import com.erg.ergspringboot.common.request.users.UserRequests.RecoveryEmailChallengeRequest;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailChallengeResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVerificationResponse;

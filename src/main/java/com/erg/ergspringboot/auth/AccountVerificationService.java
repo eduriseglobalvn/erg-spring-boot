@@ -1,5 +1,7 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth;
 
+import com.erg.ergspringboot.service.auth.AccountMailSender;
+import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailChallengeResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.RecoveryEmailVerificationResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
