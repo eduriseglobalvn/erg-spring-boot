@@ -10,17 +10,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 /**
- * Compatibility implementation of the user directory port over the legacy
- * JPA repository.  This is the only calendar-directory adapter that may know
+ * JPA-backed implementation of the user directory port.  This is the only
+ * calendar-directory adapter that may know
  * about {@code model.users.User} or {@code UserRepository}.
  */
 @Service
-@Deprecated(since = "2026-08-08", forRemoval = false)
-public final class LegacyUserDirectoryAdapter implements UserDirectoryPort {
+public final class UserDirectoryAdapter implements UserDirectoryPort {
 
     private final UserRepository users;
 
-    public LegacyUserDirectoryAdapter(UserRepository users) {
+    public UserDirectoryAdapter(UserRepository users) {
         this.users = users;
     }
 

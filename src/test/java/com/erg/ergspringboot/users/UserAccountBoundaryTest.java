@@ -39,12 +39,11 @@ class UserAccountBoundaryTest {
     }
 
     @Test
-    void legacyDirectoryAdapterIsTheNamedPersistenceSeam() throws Exception {
+    void directoryAdapterIsTheNamedPersistenceSeam() throws Exception {
         String adapter = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/users/internal/directory/LegacyUserDirectoryAdapter.java"));
+                "src/main/java/com/erg/ergspringboot/users/internal/directory/UserDirectoryAdapter.java"));
         assertThat(adapter)
                 .contains("UserRepository")
-                .contains("model.users.User")
-                .contains("@Deprecated");
+                .contains("model.users.User");
     }
 }

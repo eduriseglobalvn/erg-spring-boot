@@ -11,9 +11,9 @@ read queries. Calendar consumes `UserDirectoryPort` and
 display, role and permission values. Credential material, access scopes and
 JPA associations are intentionally absent from the public projections.
 
-`users.internal.directory.LegacyUserDirectoryAdapter` and
-`users.internal.authorization.LegacyUserAuthorizationAdapter` are the explicit
-compatibility seams over the current repositories. The directory adapter
+`users.internal.directory.UserDirectoryAdapter` and
+`users.internal.authorization.UserAuthorizationAdapter` are the explicit
+persistence seams over the current repositories. The directory adapter
 applies the request tenant to every projection and uses tenant-scoped ID
 lookup for assignment-only teachers. The authorization adapter requires a
 tenant-scoped account before reading role/override rows. These rules prevent a

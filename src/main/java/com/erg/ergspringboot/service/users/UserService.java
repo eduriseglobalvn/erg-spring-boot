@@ -3,20 +3,8 @@ package com.erg.ergspringboot.service.users;
 import com.erg.ergspringboot.common.request.users.UserRequests.*;
 import com.erg.ergspringboot.common.response.users.UserResponses.*;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.authorization.PermissionRepository;
-import com.erg.ergspringboot.repository.authorization.RoleRepository;
-import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
-import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
-import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.auth.AccountMailSender;
-import com.erg.ergspringboot.service.auth.PasswordService;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserOperations;
-import com.erg.ergspringboot.users.UserOperationsCompatibility;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -29,30 +17,8 @@ public class UserService {
     private static final String DEFAULT_TENANT = "erg";
     private final UserOperations operations;
 
-    @Autowired
     public UserService(UserOperations operations) {
         this.operations = operations;
-    }
-
-    /** Compatibility constructor retained for legacy tests/callers. */
-    @Deprecated
-    public UserService(UserRepository users,
-            AuthSessionRepository sessions,
-            RoleRepository roles,
-            PermissionRepository permissions,
-            UserPermissionOverrideRepository overrides,
-            UserActivityRepository activities,
-            PasswordService passwordService,
-            UserAccessScopeRepository scopes,
-            AccountMailSender mail) {
-        this(UserOperationsCompatibility.fromRepositories(
-                users, sessions, roles, permissions, overrides, activities,
-                passwordService, scopes, mail));
-    }
-
-    @Autowired(required = false)
-    void setAuthorizationMutationAuditService(AuthorizationMutationAuditService value) {
-        UserOperationsCompatibility.setAuthorizationMutationAuditService(operations, value);
     }
 
     public UserResponse getCurrentUser(String id, String tenant) {

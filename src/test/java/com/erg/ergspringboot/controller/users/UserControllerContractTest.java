@@ -27,7 +27,6 @@ import com.erg.ergspringboot.common.response.users.UserResponses.PermissionOverr
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.GlobalExceptionHandler;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
-import com.erg.ergspringboot.service.users.UserService;
 import com.erg.ergspringboot.users.UserOperations;
 import java.util.List;
 import java.util.Map;
@@ -79,8 +78,8 @@ class UserControllerContractTest {
 
     @Test
     void getMeReturnsCurrentUserEnvelope() throws Exception {
-        UserService userService = mock(UserService.class);
-        when(userService.getCurrentUser("user-1", "erg")).thenReturn(userResponse("Active User"));
+        UserOperations userService = mock(UserOperations.class);
+        when(userService.current("user-1", "erg")).thenReturn(userResponse("Active User"));
         MockMvc mockMvc = mockMvc(userService);
 
         mockMvc.perform(get("/api/v1/users/me")
@@ -97,8 +96,8 @@ class UserControllerContractTest {
 
     @Test
     void authProfileAliasIsNotMounted() throws Exception {
-        UserService userService = mock(UserService.class);
-        when(userService.getCurrentUser("user-1", "erg")).thenReturn(userResponse("Active User"));
+        UserOperations userService = mock(UserOperations.class);
+        when(userService.current("user-1", "erg")).thenReturn(userResponse("Active User"));
         MockMvc mockMvc = mockMvc(userService);
 
         mockMvc.perform(get("/api/auth/profile")
@@ -109,10 +108,10 @@ class UserControllerContractTest {
 
     @Test
     void patchMeUpdatesProfile() throws Exception {
-        UserService userService = mock(UserService.class);
+        UserOperations userService = mock(UserOperations.class);
         when(userService.updateProfile(eq("user-1"), eq("erg"),
                 org.mockito.ArgumentMatchers.any(UpdateProfileRequest.class),
-                org.mockito.ArgumentMatchers.any(UserService.AuditContext.class)))
+                org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))
                 .thenReturn(userResponse("Updated User"));
         MockMvc mockMvc = mockMvc(userService);
 
@@ -133,7 +132,7 @@ class UserControllerContractTest {
 
     @Test
     void onboardingReturnsCompletedProfileSignal() throws Exception {
-        UserService userService = mock(UserService.class);
+        UserOperations userService = mock(UserOperations.class);
         when(userService.completeOnboarding(eq("user-1"), eq("erg"), org.mockito.ArgumentMatchers.any(OnboardingRequest.class)))
                 .thenReturn(new OnboardingResponse(
                         "user-1",
@@ -160,7 +159,7 @@ class UserControllerContractTest {
 
     @Test
     void selfServiceOnboardingIsMountedUnderMe() throws Exception {
-        UserService userService = mock(UserService.class);
+        UserOperations userService = mock(UserOperations.class);
         when(userService.completeOnboarding(eq("user-1"), eq("erg"), org.mockito.ArgumentMatchers.any(OnboardingRequest.class)))
                 .thenReturn(new OnboardingResponse("user-1", "active@example.com", "Learner One", null, true));
         MockMvc mockMvc = mockMvc(userService);
@@ -190,7 +189,7 @@ class UserControllerContractTest {
 
     @Test
     void missingUserHeaderReturnsUnauthorized() throws Exception {
-        MockMvc mockMvc = mockMvc(mock(UserService.class));
+        MockMvc mockMvc = mockMvc(mock(UserOperations.class));
         SecurityContextHolder.clearContext();
 
         mockMvc.perform(get("/api/v1/users/me"))
@@ -200,14 +199,14 @@ class UserControllerContractTest {
 
     @Test
     void bulkStatusDeleteAndAssignRolesUseVersionedAdminRoutes() throws Exception {
-        UserService userService = mock(UserService.class);
+        UserOperations userService = mock(UserOperations.class);
         when(userService.bulkUpdateStatus(eq("erg"), org.mockito.ArgumentMatchers.any(BulkStatusRequest.class)))
                 .thenReturn(new BulkOperationResponse(2));
         when(userService.bulkDelete(eq("erg"), org.mockito.ArgumentMatchers.any(BulkDeleteRequest.class)))
                 .thenReturn(new BulkOperationResponse(2));
         when(userService.assignRoles(eq("user-1"), eq("erg"),
                 org.mockito.ArgumentMatchers.any(AdminAssignRolesRequest.class),
-                org.mockito.ArgumentMatchers.any(UserService.AuditContext.class)))
+                org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))
                 .thenReturn(userResponse("Active User"));
         MockMvc mockMvc = mockMvc(userService);
 
@@ -251,7 +250,7 @@ class UserControllerContractTest {
 
     @Test
     void adminActivityAndPermissionOverridesUseVersionedRoutes() throws Exception {
-        UserService userService = mock(UserService.class);
+        UserOperations userService = mock(UserOperations.class);
         when(userService.listActivity(eq("user-1"), eq("erg"), eq(1), eq(20)))
                 .thenReturn(new ActivityListResponse(
                         List.of(new ActivityResponse(
@@ -268,7 +267,7 @@ class UserControllerContractTest {
                 ));
         when(userService.assignPermissions(eq("user-1"), eq("erg"),
                 org.mockito.ArgumentMatchers.any(AdminAssignPermissionsRequest.class),
-                org.mockito.ArgumentMatchers.any(UserService.AuditContext.class)))
+                org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))
                 .thenReturn(new PermissionOverrideResponse("user-1", List.of("users.read"), "GRANT"));
         MockMvc mockMvc = mockMvc(userService);
 
@@ -295,7 +294,7 @@ class UserControllerContractTest {
                 .andExpect(jsonPath("$.data.grantType").value("GRANT"));
     }
 
-    private MockMvc mockMvc(UserService userService) {
+    private MockMvc mockMvc(UserOperations userService) {
         ErgPrincipal principal = new ErgPrincipal(
                 "user-1", "session-1", "erg", List.of("system.super_admin"), List.of("*"),
                 List.of(), List.of("*"), "erg", "super_admin", Map.of()
@@ -304,7 +303,7 @@ class UserControllerContractTest {
                 new UsernamePasswordAuthenticationToken(principal, null, List.of())
         );
                 return MockMvcBuilders.standaloneSetup(new UserController(
-                        new UserOperations(userService),
+                        userService,
                         mock(com.erg.ergspringboot.service.auth.AccountVerificationService.class)
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())

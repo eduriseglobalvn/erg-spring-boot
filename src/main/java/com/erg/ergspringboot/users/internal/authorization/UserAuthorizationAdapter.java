@@ -13,15 +13,14 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
-/** Compatibility adapter for authorization reads while users persistence is legacy JPA. */
+/** JPA-backed implementation of the users authorization read port. */
 @Service
-@Deprecated(since = "2026-08-08", forRemoval = false)
-public final class LegacyUserAuthorizationAdapter implements UserAuthorizationPort {
+public final class UserAuthorizationAdapter implements UserAuthorizationPort {
 
     private final UserRepository users;
     private final UserPermissionOverrideRepository overrides;
 
-    public LegacyUserAuthorizationAdapter(
+    public UserAuthorizationAdapter(
             UserRepository users, UserPermissionOverrideRepository overrides) {
         this.users = users;
         this.overrides = overrides;
