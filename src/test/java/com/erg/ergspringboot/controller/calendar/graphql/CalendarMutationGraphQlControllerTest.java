@@ -23,7 +23,7 @@ import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
-import com.erg.ergspringboot.service.calendar.CalendarCommandService;
+import com.erg.ergspringboot.calendar.CalendarCommandPort;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import java.util.Collections;
 import java.util.List;
@@ -43,7 +43,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class CalendarMutationGraphQlControllerTest {
 
     @Mock
-    private CalendarCommandService commandService;
+    private CalendarCommandPort commandService;
 
     @Mock
     private CalendarEventRepository eventRepository;

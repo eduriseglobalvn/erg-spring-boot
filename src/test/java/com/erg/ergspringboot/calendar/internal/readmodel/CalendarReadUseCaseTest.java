@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.readmodel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,7 +34,7 @@ import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.platform.concurrency.ErgReadTaskExecutor;
+import com.erg.ergspringboot.users.internal.directory.LegacyUserDirectoryAdapter;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
@@ -47,14 +47,12 @@ import com.erg.ergspringboot.repository.lms.LevelRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -67,7 +65,7 @@ import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class CalendarReadServiceTest {
+class CalendarReadUseCaseTest {
 
     private static final String TENANT_ID = "tenant-001";
     private static final String SCHOOL_ID_A = "school-a";
@@ -94,14 +92,17 @@ class CalendarReadServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private StudentRepository studentRepository;
     @Mock private CalendarBatchRepository batchRepository;
-    private ErgReadTaskExecutor readTaskExecutor;
-
-    private CalendarReadService service;
+    private final CalendarEventResponseAssembler eventResponses = new CalendarEventResponseAssembler();
+    private final CalendarWorkspaceAssembler workspaceAssembler = new CalendarWorkspaceAssembler();
+    private final CalendarPermissionsQueryUseCase permissionQueries = new CalendarPermissionsQueryUseCase();
+    private CalendarFullCatalogQueryUseCase fullCatalog;
+    private CalendarReadUseCase service;
 
     @BeforeEach
     void setUp() {
-        readTaskExecutor = new ErgReadTaskExecutor(4, 4, 32, Duration.ofSeconds(1));
-        service = new CalendarReadService(
+        // Same wiring Spring uses: the user directory port over the user repository.
+        LegacyUserDirectoryAdapter userDirectory = new LegacyUserDirectoryAdapter(userRepository);
+        service = new CalendarReadUseCase(
                 eventRepository,
                 eventTeacherRepository,
                 classroomRepository,
@@ -109,10 +110,18 @@ class CalendarReadServiceTest {
                 levelRepository,
                 educationUnitRepository,
                 roomRepository,
+                userDirectory,
                 userRepository,
                 studentRepository,
                 batchRepository,
-                readTaskExecutor);
+                new CalendarCatalogQueryUseCase(roomRepository),
+                new CalendarScheduleBatchQueryUseCase(batchRepository, eventRepository),
+                permissionQueries,
+                eventResponses,
+                workspaceAssembler);
+        fullCatalog = new CalendarFullCatalogQueryUseCase(
+                eventTeacherRepository, classroomRepository, subjectRepository, levelRepository,
+                educationUnitRepository, roomRepository, userDirectory);
         // Existing fixtures stub the pre-bounded methods; bridge them to the new DB-limited overloads.
         lenient().when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
                 anyString(), anyList(), any(Pageable.class)))
@@ -142,11 +151,6 @@ class CalendarReadServiceTest {
                 anyString(), anyList(), any(Pageable.class)))
                 .thenAnswer(invocation -> classroomRepository.findHomeroomTeacherIdsByTenantAndSchoolIds(
                         invocation.getArgument(0), invocation.getArgument(1)));
-    }
-
-    @AfterEach
-    void tearDown() {
-        readTaskExecutor.close();
     }
 
     // =========================================================================
@@ -591,13 +595,13 @@ class CalendarReadServiceTest {
             CalendarEventTeacher teacher = assignment(EVENT_ID_A, TEACHER_USER_ID_A, "MAIN",
                     "Teacher Alpha", "blue");
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "School Alpha",
                     CLASS_ID_A, "Class Alpha",
                     SUBJECT_ID_A, "Subject Alpha",
                     LEVEL_ID_A, "Level Alpha");
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(teacher), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(teacher), refMaps);
 
             assertNotNull(response);
             assertEquals(EVENT_ID_A, response.id());
@@ -640,13 +644,13 @@ class CalendarReadServiceTest {
             CalendarEventTeacher teacher = assignment(EVENT_ID_A, TEACHER_USER_ID_A, "MAIN",
                     "Snapshot Name", "red");
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "School A",
                     CLASS_ID_A, "Class A",
                     SUBJECT_ID_A, "Subject A",
                     LEVEL_ID_A, "Level A");
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(teacher), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(teacher), refMaps);
 
             assertEquals("Snapshot Name", response.teachers().get(0).displayName());
         }
@@ -676,14 +680,14 @@ class CalendarReadServiceTest {
             teacherUser.setId(TEACHER_USER_ID_A);
             teacherUser.setFullName("Resolved Teacher");
 
-            CalendarReadService.ReferenceMaps refMaps = mock(CalendarReadService.ReferenceMaps.class);
+            CalendarReferenceMaps refMaps = mock(CalendarReferenceMaps.class);
             when(refMaps.schoolMap()).thenReturn(Map.of(SCHOOL_ID_A, school));
             when(refMaps.classMap()).thenReturn(Map.of(CLASS_ID_A, cls));
             when(refMaps.subjectMap()).thenReturn(Map.of(SUBJECT_ID_A, subj));
             when(refMaps.levelMap()).thenReturn(Map.of(LEVEL_ID_A, lvl));
             when(refMaps.userMap()).thenReturn(Map.of(TEACHER_USER_ID_A, teacherUser));
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(teacher), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(teacher), refMaps);
 
             assertEquals("Resolved Teacher", response.teachers().get(0).displayName());
         }
@@ -695,13 +699,13 @@ class CalendarReadServiceTest {
             event.setStartAt(null);
             event.setEndAt(null);
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "School A",
                     CLASS_ID_A, "Class A",
                     SUBJECT_ID_A, "Subject A",
                     LEVEL_ID_A, "Level A");
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(), refMaps);
 
             assertNull(response.startAt());
             assertNull(response.endAt());
@@ -717,10 +721,10 @@ class CalendarReadServiceTest {
             CalendarEvent event = event(EVENT_ID_A, SCHOOL_ID_A, CLASS_ID_A, SUBJECT_ID_A, LEVEL_ID_A,
                     BASE_TIME, BASE_TIME.plusHours(2), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "S", CLASS_ID_A, "C", SUBJECT_ID_A, "S", LEVEL_ID_A, "L");
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(), refMaps);
 
             assertNotNull(response.colorGroup());
             assertEquals("subject", response.colorGroup().kind());
@@ -733,10 +737,10 @@ class CalendarReadServiceTest {
             CalendarEvent event = event(EVENT_ID_A, SCHOOL_ID_A, CLASS_ID_A, null, LEVEL_ID_A,
                     BASE_TIME, BASE_TIME.plusHours(2), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "S", CLASS_ID_A, "C", "none", "none", LEVEL_ID_A, "L");
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(), refMaps);
 
             assertEquals("default", response.colorGroup().key());
             assertEquals("default", response.colorGroup().label());
@@ -769,7 +773,7 @@ class CalendarReadServiceTest {
                     EVENT_ID_A, List.of(teacherA),
                     EVENT_ID_B, List.of(teacherB1, teacherB2));
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "School A",
                     CLASS_ID_A, "Class A",
                     SUBJECT_ID_A, "Subject A",
@@ -792,7 +796,7 @@ class CalendarReadServiceTest {
             teacherUserB.setFullName("Teacher B");
 
             // Build a new refMaps that includes all needed references
-            CalendarReadService.ReferenceMaps fullRefMaps = new CalendarReadService.ReferenceMaps(
+            CalendarReferenceMaps fullRefMaps = new CalendarReferenceMaps(
                     Map.of(SCHOOL_ID_A, createSchool(SCHOOL_ID_A, "School A")),
                     Map.of(CLASS_ID_A, createClass(CLASS_ID_A, "Class A"),
                            CLASS_ID_B, createClass(CLASS_ID_B, "Class B")),
@@ -803,7 +807,7 @@ class CalendarReadServiceTest {
                     Map.of(TEACHER_USER_ID_A, teacherUserA, TEACHER_USER_ID_B, teacherUserB),
                     Map.of(TEACHER_USER_ID_A, "blue", TEACHER_USER_ID_B, "green"));
 
-            CalendarFilterOptionsResponse filterOptions = service.buildFilterOptions(
+            CalendarFilterOptionsResponse filterOptions = workspaceAssembler.filterOptions(
                     List.of(eventA, eventB), assignmentsByEvent, fullRefMaps, "SCHOOL");
 
             assertNotNull(filterOptions);
@@ -835,7 +839,7 @@ class CalendarReadServiceTest {
 
         @Test
         void shouldReturnEmptyOptionsForEmptyEvents() {
-            CalendarFilterOptionsResponse filterOptions = service.buildFilterOptions(
+            CalendarFilterOptionsResponse filterOptions = workspaceAssembler.filterOptions(
                     List.of(), Map.of(), buildEmptyRefMaps(), "SCHOOL");
 
             assertNotNull(filterOptions);
@@ -861,12 +865,12 @@ class CalendarReadServiceTest {
             CalendarEvent eventB = event(EVENT_ID_B, SCHOOL_ID_B, CLASS_ID_B, SUBJECT_ID_B, LEVEL_ID_B,
                     BASE_TIME.plusDays(1), BASE_TIME.plusDays(1).plusHours(1), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = new CalendarReadService.ReferenceMaps(
+            CalendarReferenceMaps refMaps = new CalendarReferenceMaps(
                     Map.of(SCHOOL_ID_A, createSchool(SCHOOL_ID_A, "School Alpha"),
                            SCHOOL_ID_B, createSchool(SCHOOL_ID_B, "School Beta")),
                     Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     List.of(eventA, eventB), Map.of(), refMaps, "SCHOOL");
 
             assertEquals(2, lanes.size());
@@ -886,13 +890,13 @@ class CalendarReadServiceTest {
             CalendarEvent eventB = event(EVENT_ID_B, SCHOOL_ID_A, CLASS_ID_B, SUBJECT_ID_A, LEVEL_ID_A,
                     BASE_TIME.plusDays(1), BASE_TIME.plusDays(1).plusHours(1), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = new CalendarReadService.ReferenceMaps(
+            CalendarReferenceMaps refMaps = new CalendarReferenceMaps(
                     Map.of(),
                     Map.of(CLASS_ID_A, createClass(CLASS_ID_A, "Class Alpha"),
                            CLASS_ID_B, createClass(CLASS_ID_B, "Class Beta")),
                     Map.of(), Map.of(), Map.of(), Map.of());
 
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     List.of(eventA, eventB), Map.of(), refMaps, "CLASS");
 
             assertEquals(2, lanes.size());
@@ -910,13 +914,13 @@ class CalendarReadServiceTest {
             CalendarEvent eventB = event(EVENT_ID_B, SCHOOL_ID_A, CLASS_ID_A, SUBJECT_ID_B, LEVEL_ID_B,
                     BASE_TIME.plusDays(1), BASE_TIME.plusDays(1).plusHours(1), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = new CalendarReadService.ReferenceMaps(
+            CalendarReferenceMaps refMaps = new CalendarReferenceMaps(
                     Map.of(), Map.of(),
                     Map.of(SUBJECT_ID_A, createSubject(SUBJECT_ID_A, "Subject Alpha"),
                            SUBJECT_ID_B, createSubject(SUBJECT_ID_B, "Subject Beta")),
                     Map.of(), Map.of(), Map.of());
 
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     List.of(eventA, eventB), Map.of(), refMaps, "SUBJECT");
 
             assertEquals(2, lanes.size());
@@ -948,12 +952,12 @@ class CalendarReadServiceTest {
             teacherUserB.setId(TEACHER_USER_ID_B);
             teacherUserB.setFullName("Teacher Beta");
 
-            CalendarReadService.ReferenceMaps refMaps = new CalendarReadService.ReferenceMaps(
+            CalendarReferenceMaps refMaps = new CalendarReferenceMaps(
                     Map.of(), Map.of(), Map.of(), Map.of(),
                     Map.of(TEACHER_USER_ID_A, teacherUserA, TEACHER_USER_ID_B, teacherUserB),
                     Map.of(TEACHER_USER_ID_A, "blue", TEACHER_USER_ID_B, "green"));
 
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     List.of(eventA, eventB), assignmentsByEvent, refMaps, "TEACHER");
 
             assertEquals(2, lanes.size());
@@ -971,11 +975,11 @@ class CalendarReadServiceTest {
             CalendarEvent eventA = event(EVENT_ID_A, SCHOOL_ID_A, CLASS_ID_A, SUBJECT_ID_A, LEVEL_ID_A,
                     BASE_TIME, BASE_TIME.plusHours(2), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = new CalendarReadService.ReferenceMaps(
+            CalendarReferenceMaps refMaps = new CalendarReferenceMaps(
                     Map.of(SCHOOL_ID_A, createSchool(SCHOOL_ID_A, "School A")),
                     Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     List.of(eventA), Map.of(), refMaps, null);
 
             assertEquals(1, lanes.size());
@@ -984,14 +988,14 @@ class CalendarReadServiceTest {
 
         @Test
         void shouldReturnEmptyListForNullEvents() {
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     null, Map.of(), buildEmptyRefMaps(), "SCHOOL");
             assertTrue(lanes.isEmpty());
         }
 
         @Test
         void shouldReturnEmptyListForEmptyEvents() {
-            List<CalendarLaneSummaryResponse> lanes = service.buildLaneSummaries(
+            List<CalendarLaneSummaryResponse> lanes = workspaceAssembler.laneSummaries(
                     List.of(), Map.of(), buildEmptyRefMaps(), "TEACHER");
             assertTrue(lanes.isEmpty());
         }
@@ -1015,7 +1019,7 @@ class CalendarReadServiceTest {
                         return List.of();
                     });
 
-            service.buildCatalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7));
+            fullCatalog.catalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7));
 
             assertSame(requestThread, repositoryThread.get(),
                     "JPA/JDBC reads must retain the request transaction and transaction-local tenant GUCs");
@@ -1030,7 +1034,7 @@ class CalendarReadServiceTest {
                     .thenReturn(subjects);
 
             BadRequestException failure = assertThrows(BadRequestException.class,
-                    () -> service.buildCatalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7)));
+                    () -> fullCatalog.catalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7)));
             assertTrue(failure.getMessage().contains("500"));
             assertTrue(failure.getMessage().contains("subjects"));
         }
@@ -1075,7 +1079,7 @@ class CalendarReadServiceTest {
             when(roomRepository.findByTenantIdAndSchoolIdInAndStatus(TENANT_ID, List.of(SCHOOL_ID_A, SCHOOL_ID_B), "ACTIVE"))
                     .thenReturn(List.of(room));
 
-            CalendarCatalogResponse catalog = service.buildCatalog(
+            CalendarCatalogResponse catalog = fullCatalog.catalog(
                     TENANT_ID, List.of(SCHOOL_ID_A, SCHOOL_ID_B), BASE_TIME, BASE_TIME.plusDays(7));
 
             assertNotNull(catalog);
@@ -1094,7 +1098,7 @@ class CalendarReadServiceTest {
             when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of());
 
-            CalendarCatalogResponse catalog = service.buildCatalog(TENANT_ID, null, BASE_TIME, BASE_TIME.plusDays(7));
+            CalendarCatalogResponse catalog = fullCatalog.catalog(TENANT_ID, null, BASE_TIME, BASE_TIME.plusDays(7));
             assertNotNull(catalog);
             assertTrue(catalog.schools().isEmpty());
             assertTrue(catalog.classes().isEmpty());
@@ -1107,7 +1111,7 @@ class CalendarReadServiceTest {
             when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of());
 
-            CalendarCatalogResponse catalog = service.buildCatalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7));
+            CalendarCatalogResponse catalog = fullCatalog.catalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7));
             assertNotNull(catalog);
             assertTrue(catalog.schools().isEmpty());
             assertTrue(catalog.classes().isEmpty());
@@ -1125,7 +1129,7 @@ class CalendarReadServiceTest {
         @Test
         void shouldGrantFullAccessForWildcardPermission() {
             ErgPrincipal principal = principal(List.of("*"), List.of());
-            CalendarPermissionsResponse permissions = service.buildPermissions(principal);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(principal);
 
             assertTrue(permissions.canCreate());
             assertTrue(permissions.canUpdate());
@@ -1137,7 +1141,7 @@ class CalendarReadServiceTest {
         @Test
         void shouldGrantManagePermissionsForLmsScheduleManage() {
             ErgPrincipal principal = principal(List.of("lms.schedule.manage"), List.of());
-            CalendarPermissionsResponse permissions = service.buildPermissions(principal);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(principal);
 
             assertTrue(permissions.canCreate());
             assertTrue(permissions.canUpdate());
@@ -1149,7 +1153,7 @@ class CalendarReadServiceTest {
         @Test
         void shouldGrantViewAggregateForLmsScheduleRead() {
             ErgPrincipal principal = principal(List.of("lms.schedule.read"), List.of());
-            CalendarPermissionsResponse permissions = service.buildPermissions(principal);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(principal);
 
             assertFalse(permissions.canCreate());
             assertFalse(permissions.canUpdate());
@@ -1163,7 +1167,7 @@ class CalendarReadServiceTest {
             ErgPrincipal principal = principal(
                     List.of("lms.schedule.manage", "lms.schedule.read"),
                     List.of("lms.schedule.manage"));
-            CalendarPermissionsResponse permissions = service.buildPermissions(principal);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(principal);
 
             assertFalse(permissions.canCreate());
             assertFalse(permissions.canUpdate());
@@ -1177,7 +1181,7 @@ class CalendarReadServiceTest {
             ErgPrincipal principal = principal(
                     List.of("lms.schedule.manage", "lms.schedule.read"),
                     List.of("*"));
-            CalendarPermissionsResponse permissions = service.buildPermissions(principal);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(principal);
 
             assertFalse(permissions.canCreate());
             assertFalse(permissions.canUpdate());
@@ -1188,7 +1192,7 @@ class CalendarReadServiceTest {
 
         @Test
         void shouldReturnAllFalseForNullPrincipal() {
-            CalendarPermissionsResponse permissions = service.buildPermissions(null);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(null);
 
             assertFalse(permissions.canCreate());
             assertFalse(permissions.canUpdate());
@@ -1200,7 +1204,7 @@ class CalendarReadServiceTest {
         @Test
         void shouldReturnAllFalseForPrincipalWithNoPermissions() {
             ErgPrincipal principal = principal(List.of(), List.of());
-            CalendarPermissionsResponse permissions = service.buildPermissions(principal);
+            CalendarPermissionsResponse permissions = permissionQueries.permissions(principal);
 
             assertFalse(permissions.canCreate());
             assertFalse(permissions.canUpdate());
@@ -1271,13 +1275,13 @@ class CalendarReadServiceTest {
             CalendarEvent event = event(EVENT_ID_A, SCHOOL_ID_A, CLASS_ID_A, SUBJECT_ID_A, LEVEL_ID_A,
                     BASE_TIME, BASE_TIME.plusHours(2), "PUBLISHED");
 
-            CalendarReadService.ReferenceMaps refMaps = buildRefMapsWithNames(
+            CalendarReferenceMaps refMaps = buildRefMapsWithNames(
                     SCHOOL_ID_A, "School A",
                     CLASS_ID_A, "Class A",
                     SUBJECT_ID_A, "Subject A",
                     LEVEL_ID_A, "Level A");
 
-            CalendarEventResponse response = service.buildEventResponse(event, List.of(), refMaps);
+            CalendarEventResponse response = eventResponses.response(event, List.of(), refMaps);
 
             assertNotNull(response);
             assertTrue(response.teachers().isEmpty());
@@ -1288,7 +1292,7 @@ class CalendarReadServiceTest {
     // Private helpers
     // =========================================================================
 
-    private CalendarReadService.ReferenceMaps buildRefMapsWithNames(
+    private CalendarReferenceMaps buildRefMapsWithNames(
             String schoolId, String schoolName,
             String classId, String className,
             String subjectId, String subjectName,
@@ -1299,7 +1303,7 @@ class CalendarReadServiceTest {
         Subject subj = createSubject(subjectId, subjectName);
         Level lvl = createLevel(levelId, levelName);
 
-        return new CalendarReadService.ReferenceMaps(
+        return new CalendarReferenceMaps(
                 schoolId != null ? Map.of(schoolId, school) : Map.of(),
                 classId != null ? Map.of(classId, cls) : Map.of(),
                 subjectId != null ? Map.of(subjectId, subj) : Map.of(),
@@ -1307,8 +1311,8 @@ class CalendarReadServiceTest {
                 Map.of(), Map.of());
     }
 
-    private CalendarReadService.ReferenceMaps buildEmptyRefMaps() {
-        return new CalendarReadService.ReferenceMaps(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+    private CalendarReferenceMaps buildEmptyRefMaps() {
+        return new CalendarReferenceMaps(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
     }
 
     private EducationUnit createSchool(String id, String name) {

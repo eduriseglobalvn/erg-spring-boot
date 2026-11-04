@@ -17,6 +17,6 @@ class CalendarPermissionsArchitectureTest {
 
         String facade = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarReadUseCase.java"));
-        assertThat(facade).contains("permissionQueries.permissions(");
+        assertThat(facade).contains("permissionQueries::permissions");
     }
 }

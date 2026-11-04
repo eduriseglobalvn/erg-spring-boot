@@ -18,7 +18,7 @@ import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
-import com.erg.ergspringboot.service.calendar.CalendarReadService;
+import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.service.calendar.CalendarScopeService;
 import java.util.Collections;
 import java.util.List;
@@ -38,7 +38,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class CalendarLcmsQueryGraphQlControllerTest {
 
     @Mock
-    private CalendarReadService readService;
+    private CalendarReadPort readService;
 
     @Mock
     private CalendarEventRepository eventRepository;

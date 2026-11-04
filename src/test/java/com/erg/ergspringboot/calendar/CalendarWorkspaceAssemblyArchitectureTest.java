@@ -17,7 +17,7 @@ class CalendarWorkspaceAssemblyArchitectureTest {
         String facade = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarReadUseCase.java"));
         assertThat(facade)
-                .contains("workspaceAssembler.filterOptions(")
-                .contains("workspaceAssembler.laneSummaries(");
+                .contains("workspaceAssembler::filterOptions")
+                .contains("workspaceAssembler::laneSummaries");
     }
 }

@@ -25,8 +25,8 @@ import org.springframework.stereotype.Service;
  *   <li>Each row is converted into a {@link CalendarBulkRowRequest} and wrapped
  *       in a {@link CalendarBulkCreateRequest}</li>
  *   <li>The resulting request is passed to
- *       {@link CalendarCommandService#preview(String, CalendarBulkCreateRequest, String)}
- *       or {@link CalendarCommandService#create(String, CalendarBulkCreateRequest, String)}</li>
+ *       {@link com.erg.ergspringboot.calendar.CalendarCommandPort#preview(String, CalendarBulkCreateRequest, String)}
+ *       or {@link com.erg.ergspringboot.calendar.CalendarCommandPort#create(String, CalendarBulkCreateRequest, String)}</li>
  * </ol>
  *
  * <p>Expected Excel column headers (case-insensitive):

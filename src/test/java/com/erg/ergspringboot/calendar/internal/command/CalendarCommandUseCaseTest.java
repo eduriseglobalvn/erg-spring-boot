@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.command;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -53,9 +53,19 @@ import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.lms.LevelRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
+import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
+import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkCreateUseCase;
+import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkPreviewUseCase;
+import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkReferenceDataUseCase;
+import com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase;
+import com.erg.ergspringboot.calendar.internal.room.CalendarRoomCommandUseCase;
+import com.erg.ergspringboot.service.calendar.CalendarBulkInputNormalizer;
+import com.erg.ergspringboot.service.calendar.CalendarConflictService;
 import com.erg.ergspringboot.service.calendar.CalendarConflictService.ResolveResult;
+import com.erg.ergspringboot.service.calendar.CalendarExpansionService;
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ExpansionResult;
 import com.erg.ergspringboot.service.calendar.CalendarExpansionService.ReferenceData;
+import com.erg.ergspringboot.service.calendar.CalendarValidationService;
 import com.erg.ergspringboot.service.calendar.CalendarValidationService.RowValidationResult;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
@@ -76,7 +86,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
-class CalendarCommandServiceTest {
+class CalendarCommandUseCaseTest {
 
     private static final String TENANT_ID = "tenant-001";
     private static final String SCHOOL_ID = "school-001";
@@ -118,16 +128,23 @@ class CalendarCommandServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    private CalendarCommandService service;
+    private CalendarCommandUseCase service;
 
     @BeforeEach
     void setUp() {
-        service = new CalendarCommandService(
-                batchRepository, eventRepository, eventTeacherRepository,
-                roomRepository, expansionService, validationService, new CalendarBulkInputNormalizer(), conflictService,
-                accessSupport, classroomRepository,
-                subjectRepository, levelRepository, userRepository,
-                educationUnitRepository, entityManager, eventPublisher);
+        CalendarBulkInputNormalizer inputNormalizer = new CalendarBulkInputNormalizer();
+        CalendarBulkReferenceDataUseCase refs = new CalendarBulkReferenceDataUseCase(
+                classroomRepository, subjectRepository, levelRepository, userRepository,
+                roomRepository, educationUnitRepository);
+        service = new CalendarCommandUseCase(
+                new CalendarBatchLifecycleUseCase(
+                        batchRepository, eventRepository, eventTeacherRepository, conflictService, eventPublisher),
+                new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository),
+                new CalendarRoomCommandUseCase(roomRepository),
+                new CalendarBulkPreviewUseCase(inputNormalizer, refs, validationService, expansionService, conflictService),
+                new CalendarBulkCreateUseCase(batchRepository, eventRepository, eventTeacherRepository,
+                        expansionService, validationService, inputNormalizer, conflictService, accessSupport,
+                        refs, entityManager));
     }
 
     // =========================================================================
