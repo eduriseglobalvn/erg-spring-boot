@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.controller.sessions.SessionController;
 import com.erg.ergspringboot.exception.UnauthorizedException;
-import com.erg.ergspringboot.service.sessions.SessionService;
+import com.erg.ergspringboot.auth.SessionService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.outbox;
+package com.erg.ergspringboot.auth.internal.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

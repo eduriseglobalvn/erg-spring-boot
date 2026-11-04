@@ -3,7 +3,7 @@ package com.erg.ergspringboot.auth.internal.mail;
 import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.model.outbox.OutboxEvent;
 import com.erg.ergspringboot.repository.outbox.OutboxEventRepository;
-import com.erg.ergspringboot.service.outbox.OutboxPayloadCipher;
+import com.erg.ergspringboot.auth.internal.outbox.OutboxPayloadCipher;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.nio.charset.StandardCharsets;

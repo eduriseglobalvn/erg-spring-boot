@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.outbox;
+package com.erg.ergspringboot.auth.internal.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -10,7 +10,7 @@ class LegacyOutboxCutoverContractTest {
     @Test
     void legacyWorkerHasAnExplicitOwnerScopeAndShutdownGate() throws Exception {
         String worker = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/outbox/TransactionalOutboxWorker.java"));
+                "src/main/java/com/erg/ergspringboot/auth/internal/outbox/TransactionalOutboxWorker.java"));
         String runbook = Files.readString(Path.of("docs/runbooks/outbox-cutover.md"));
 
         assertThat(worker)

@@ -22,9 +22,6 @@ x-backend-environment: &backend-environment
   ERG_REDIS_CACHE_ENABLED: "true"
   ERG_REDIS_CACHE_URL: redis://:${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}@redis-cache:6379
   ERG_REDIS_CACHE_L2_NAMES: organizationEducationUnits,lcmsSchoolDirectory,quizRuntimePackage,lmsStudentGroups,lmsAssignmentProgress,lmsStudentAssignments,lmsClassWorkspace,lmsHomeworkWorkspace,studentDashboard
-  QUEUE__REDIS_HOST: redis-state
-  QUEUE__REDIS_PORT: 6379
-  SECRET_QUEUE__REDIS_PASSWORD: ${REDIS_STATE_PASSWORD:-erg-benchmark-state}
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
   ERG_OBSERVABILITY_PROMETHEUS_PUBLIC_ENABLED: "true"
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"

@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.sessions;
+package com.erg.ergspringboot.auth;
 
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapClass;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapScope;
