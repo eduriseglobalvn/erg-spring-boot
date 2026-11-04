@@ -8,7 +8,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizDra
 import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizVersionHistoryResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWorkspaceResponse;
 import com.erg.ergspringboot.lcms.LcmsReadPort;
-import com.erg.ergspringboot.service.quiz.report.QuizReportService;
+import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.calendar.internal.command.CalendarCommandUseCase;
 import com.erg.ergspringboot.calendar.internal.readmodel.CalendarReadUseCase;
-import com.erg.ergspringboot.service.quiz.report.QuizReportService;
+import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;

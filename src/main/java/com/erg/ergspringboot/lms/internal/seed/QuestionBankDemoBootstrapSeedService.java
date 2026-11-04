@@ -13,7 +13,7 @@ import com.erg.ergspringboot.repository.lms.QuizRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.lms.TopicRepository;
 import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
-import com.erg.ergspringboot.service.quiz.authoring.QuizQuestionLinkService;
+import com.erg.ergspringboot.lcms.quiz.authoring.QuizQuestionLinkService;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

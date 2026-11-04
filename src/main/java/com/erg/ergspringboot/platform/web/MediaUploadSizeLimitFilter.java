@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.platform.web;
 
-import com.erg.ergspringboot.service.quiz.media.MediaService;
+import com.erg.ergspringboot.lcms.quiz.media.MediaService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

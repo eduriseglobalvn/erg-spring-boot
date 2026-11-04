@@ -10,7 +10,7 @@ import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
-import com.erg.ergspringboot.service.quiz.runtime.QuizRuntimePackageService;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizRuntimePackageService;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import java.util.List;
 import java.util.Map;

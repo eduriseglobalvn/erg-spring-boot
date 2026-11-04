@@ -27,7 +27,7 @@ import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService.GradedAttempt;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService.GradedAttempt;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
