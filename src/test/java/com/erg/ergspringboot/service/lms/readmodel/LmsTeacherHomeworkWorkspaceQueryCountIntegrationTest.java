@@ -55,6 +55,15 @@ class LmsTeacherHomeworkWorkspaceQueryCountIntegrationTest {
     @Qualifier("postgresEntityManagerFactory")
     private EntityManagerFactory entityManagerFactory;
 
+    @Autowired
+    private org.springframework.context.ApplicationContext context;
+
+    @Test
+    void backgroundWorkersAreOffSoTheyCannotSkewStatementCounts() {
+        // A scheduled worker running mid-test adds statements to the shared Hibernate statistics.
+        assertThat(context.containsBean("org.springframework.scheduling.config.internalScheduledAnnotationProcessor")).isFalse();
+    }
+
     @Test
     void teacherHomeworkWorkspaceKeepsQueryCountBoundedAcrossAssignmentsAndAttempts() {
         seedTeacherHomeworkWorkspace("tenant-thwq", "teacher-thwq", 4, 16, 3);

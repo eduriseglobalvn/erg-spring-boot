@@ -109,12 +109,13 @@ class LmsAttemptFlowIntegrationTest {
         attemptRepository.saveAndFlush(stale);
         OffsetDateTime now = OffsetDateTime.now();
 
-        assertThat(expiryRepository.findExpiredCandidates(now, 10)).extracting("id").containsExactly("att-flow-stale");
+        // The sweep query spans every tenant; CI shares one database with other suites, so look at this tenant only.
+        assertThat(staleIdsForThisTenant(now)).containsExactly("att-flow-stale");
         assertThat(attempts.closeIfExpired(TENANT, "att-flow-stale", now)).isTrue();
         entityManager.flush();
         assertThat(attemptRepository.findByTenantIdAndId(TENANT, "att-flow-stale").orElseThrow().getStatus())
                 .isNotEqualTo("in_progress");
-        assertThat(expiryRepository.findExpiredCandidates(now, 10)).isEmpty();
+        assertThat(staleIdsForThisTenant(now)).isEmpty();
     }
 
     @Test
@@ -131,6 +132,11 @@ class LmsAttemptFlowIntegrationTest {
                 false, List.of("class-other"), true, List.of("x"), page).getTotalElements()).isZero();
         assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
                 true, List.of("x"), false, List.of("school-other"), page).getTotalElements()).isZero();
+    }
+
+    private List<String> staleIdsForThisTenant(OffsetDateTime now) {
+        return expiryRepository.findExpiredCandidates(now, 10_000).stream()
+                .filter(ref -> TENANT.equals(ref.getTenantId())).map(ref -> ref.getId()).toList();
     }
 
     private Attempt inProgress(String id) {

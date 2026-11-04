@@ -4,6 +4,9 @@ spring:
   application:
     name: erg-spring
   modulith:
+    # Moments is unused, and its @EnableScheduling would start every @Scheduled worker even when erg.scheduling.enabled=false.
+    moments:
+      enabled: false
     events:
       registry-trigger-annotation: org.springframework.modulith.events.ApplicationModuleListener
       completion-mode: delete
