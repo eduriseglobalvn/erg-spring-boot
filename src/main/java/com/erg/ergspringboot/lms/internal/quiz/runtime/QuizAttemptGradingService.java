@@ -8,7 +8,7 @@ import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRowRepos
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgressRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
-import com.erg.ergspringboot.lms.internal.quiz.runtime.GradingEngine.GradeResult;
+import com.erg.ergspringboot.lcms.quiz.publish.GradeResult;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;

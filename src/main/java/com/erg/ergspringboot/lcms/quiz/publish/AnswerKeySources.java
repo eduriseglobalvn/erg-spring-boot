@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Reads the correctness data out of an authoring slide, in the shapes {@link QuestionKindCompiler} keys on. */
+/** Reads the correctness data out of an authoring slide, in the shapes {@link QuestionKindStrategy} keys on. */
 final class AnswerKeySources {
 
     private AnswerKeySources() {

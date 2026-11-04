@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * Builds the player-facing body of one runtime question from its authoring slide (spec §3): flattens the
  * editor's {@code runtimeQuestion}, drops presentation-only fields, maps editor media, strips correctness
- * markers through {@link QuestionKindCompiler} and merges the layered question settings.
+ * markers through {@link QuestionKindStrategy} and merges the layered question settings.
  *
  * <p>Deterministic and side-effect free; the input slide is never mutated.
  */
@@ -53,7 +53,7 @@ final class QuestionBodyCompiler {
         }
         applyEditorMedia(body, slide, runtimeKind);
         body.remove("answerKey");
-        QuestionKindCompiler.stripAllAnswers(body);
+        QuestionKindStrategy.stripAllAnswers(body);
         applyQuestionSettings(body, slide, bankQuestionId, questionSettings, questionSetSettings);
         return body;
     }

@@ -8,32 +8,6 @@ public record QuestionKindDescriptor(
         Set<String> authoringAliases,
         String gradingPolicy,
         boolean autoGradable,
-        AnswerKeyRule answerKeyRule,
-        GradingRule gradingRule
+        QuestionKindStrategy strategy
 ) {
-    public enum AnswerKeyRule {
-        EXACT_CHOICE,
-        MULTIPLE_RESPONSE,
-        SHORT_ANSWER,
-        NUMERIC,
-        SEQUENCE,
-        MATCHING,
-        BLANKS,
-        HOTSPOT,
-        DRAG_DROP,
-        NONE
-    }
-
-    public enum GradingRule {
-        EXACT_CHOICE,
-        MULTIPLE_RESPONSE,
-        SHORT_ANSWER,
-        NUMERIC,
-        SEQUENCE,
-        PAIR_RATIO,
-        BLANKS,
-        HOTSPOT,
-        SURVEY,
-        MANUAL
-    }
 }

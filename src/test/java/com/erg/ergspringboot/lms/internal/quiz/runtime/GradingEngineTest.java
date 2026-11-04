@@ -3,7 +3,10 @@ package com.erg.ergspringboot.lms.internal.quiz.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.erg.ergspringboot.lms.internal.quiz.runtime.GradingEngine.GradeResult;
+import com.erg.ergspringboot.lcms.quiz.publish.GradeResult;
+import com.erg.ergspringboot.lcms.quiz.publish.QuestionKindDescriptor;
+import com.erg.ergspringboot.lcms.quiz.publish.QuestionKindRegistry;
+import com.erg.ergspringboot.lcms.quiz.publish.QuestionKindStrategy;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -173,5 +176,26 @@ class GradingEngineTest {
         assertThatThrownBy(() -> engine.grade("future_kind", Map.of(), Map.of(), TEN))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsupported question kind");
+    }
+
+    @Test
+    void everyKindIsGradedByItsRegisteredStrategy() {
+        Object answer = Map.of("choiceId", "a", "text", "a", "value", 1, "order", List.of("a"),
+                "pairs", Map.of("a", "a"), "blanks", Map.of("a", "a"), "x", 1, "y", 1);
+        Map<String, Object> key = Map.of("correctChoiceId", "a", "correctChoiceIds", List.of("a"),
+                "correctAnswers", List.of("a"), "value", 1, "order", List.of("a"),
+                "pairs", List.of(Map.of("promptId", "a", "responseId", "a")),
+                "blanks", List.of(Map.of("id", "a", "answers", List.of("a"))),
+                "regions", List.of(Map.of("x", 0, "y", 0, "width", 2, "height", 2)));
+        for (QuestionKindDescriptor descriptor : QuestionKindRegistry.all()) {
+            assertThat(engine.grade(descriptor.runtimeKind(), answer, key, TEN))
+                    .as(descriptor.runtimeKind())
+                    .isEqualTo(descriptor.strategy().grade(answer, key, TEN));
+        }
+        // Kinds sharing a family share one strategy, so their grading cannot drift apart.
+        assertThat(QuestionKindRegistry.requireRuntimeKind("drag_drop").strategy()).isEqualTo(QuestionKindStrategy.DRAG_DROP);
+        assertThat(QuestionKindRegistry.requireRuntimeKind("true_false").strategy()).isEqualTo(QuestionKindStrategy.EXACT_CHOICE);
+        assertThat(engine.grade("drag_drop", answer, key, TEN).awardedPoints()).isEqualByComparingTo(TEN);
+        assertThat(engine.grade("essay", answer, key, TEN).needsManualGrade()).isTrue();
     }
 }
