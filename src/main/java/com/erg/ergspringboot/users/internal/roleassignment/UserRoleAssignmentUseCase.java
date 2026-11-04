@@ -41,11 +41,10 @@ public class UserRoleAssignmentUseCase {
     private static final String DEFAULT_TENANT="erg";
     private final UserRepository users; private final RoleRepository roles; private final PermissionRepository permissions;
     private final UserPermissionOverrideRepository overrides; private final UserActivityRepository activities;
-    private AuthorizationMutationAuditService authz; private final ProtectedRolePolicy rolePolicy=new ProtectedRolePolicy();
+    private final AuthorizationMutationAuditService authz; private final ProtectedRolePolicy rolePolicy=new ProtectedRolePolicy();
     public UserRoleAssignmentUseCase(UserRepository users,RoleRepository roles,PermissionRepository permissions,
             UserPermissionOverrideRepository overrides,UserActivityRepository activities,AuthorizationMutationAuditService authz){
         this.users=users;this.roles=roles;this.permissions=permissions;this.overrides=overrides;this.activities=activities;this.authz=authz;}
-    public void setAuthorizationMutationAuditService(AuthorizationMutationAuditService authz){this.authz=authz;}
     @Transactional public UserResponse assignRoles(String userId,String tenantId,AdminAssignRolesRequest request,
             UserAuditContext audit,ErgPrincipal actor){
         User user=find(userId,tenantId);List<String> before=roleNames(user.getRoles());

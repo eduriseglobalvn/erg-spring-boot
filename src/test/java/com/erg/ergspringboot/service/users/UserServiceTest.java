@@ -50,6 +50,14 @@ import com.erg.ergspringboot.service.auth.AccountMailSender;
 import com.erg.ergspringboot.service.auth.PasswordService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
+import com.erg.ergspringboot.users.UserOperations;
+import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
+import com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase;
+import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
+import com.erg.ergspringboot.users.internal.profile.UserProfileUseCase;
+import com.erg.ergspringboot.users.internal.query.UserQueryUseCase;
+import com.erg.ergspringboot.users.internal.roleassignment.UserRoleAssignmentUseCase;
+import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.List;
@@ -100,18 +108,16 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         passwordService = new PasswordService();
-        userService = new UserService(
-                userRepository,
-                sessionRepository,
-                roleRepository,
-                permissionRepository,
-                permissionOverrideRepository,
-                userActivityRepository,
-                passwordService,
-                userAccessScopeRepository,
-                accountMailSender
-        );
-        userService.setAuthorizationMutationAuditService(authorizationMutationAuditService);
+        userService = new UserService(new UserOperations(
+                new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository),
+                new UserProfileUseCase(userRepository, userActivityRepository),
+                new UserPasswordUseCase(userRepository, sessionRepository, userActivityRepository, passwordService),
+                new UserSessionUseCase(sessionRepository, userActivityRepository),
+                new UserProvisioningUseCase(userRepository, sessionRepository, roleRepository,
+                        userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender),
+                new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository),
+                new UserRoleAssignmentUseCase(userRepository, roleRepository, permissionRepository,
+                        permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService)));
     }
 
     @Test
