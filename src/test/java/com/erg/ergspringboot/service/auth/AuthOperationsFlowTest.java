@@ -15,6 +15,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
+import com.erg.ergspringboot.auth.AuthOperations;
+import com.erg.ergspringboot.auth.internal.login.AuthLoginUseCase;
+import com.erg.ergspringboot.auth.internal.refresh.AuthRefreshUseCase;
+import com.erg.ergspringboot.auth.internal.security.AuthSecurityQueryUseCase;
+import com.erg.ergspringboot.auth.internal.session.AuthSessionLifecycleUseCase;
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.common.request.auth.AuthRequests.LoginRequest;
 import com.erg.ergspringboot.common.request.auth.AuthRequests.RefreshRequest;
@@ -50,7 +55,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.QueryTimeoutException;
 
 @ExtendWith(MockitoExtension.class)
-class AuthServiceTest {
+class AuthOperationsFlowTest {
 
     @Mock
     private UserRepository userRepository;
@@ -73,22 +78,31 @@ class AuthServiceTest {
 
     private PasswordService passwordService;
     private AuthTokenService tokenService;
-    private AuthService authService;
+    private AuthLoginUseCase loginFlow;
+    private AuthOperations authService;
 
     @BeforeEach
     void setUp() {
         passwordService = new PasswordService();
         tokenService = new AuthTokenService();
-        authService = new AuthService(
+        loginFlow = new AuthLoginUseCase(
                 userRepository,
                 sessionRepository,
                 loginAttemptRepository,
                 passwordService,
                 tokenService
         );
-        authService.setSecurityEventRepository(securityEventRepository);
-        authService.setUserRoleAssignmentRepository(userRoleAssignmentRepository);
-        authService.setRefreshTokenHistoryRepository(refreshTokenHistoryRepository);
+        loginFlow.setSecurityEventRepository(securityEventRepository);
+        loginFlow.setUserRoleAssignmentRepository(userRoleAssignmentRepository);
+        AuthRefreshUseCase refreshFlow = new AuthRefreshUseCase(sessionRepository, tokenService, userRepository);
+        refreshFlow.setSecurityEventRepository(securityEventRepository);
+        refreshFlow.setRefreshTokenHistoryRepository(refreshTokenHistoryRepository);
+        authService = new AuthOperations(
+                loginFlow,
+                refreshFlow,
+                new AuthSessionLifecycleUseCase(sessionRepository),
+                new AuthSecurityQueryUseCase(loginAttemptRepository),
+                null);
         lenient().when(userRepository.lockIdForSessionMutation(any(String.class)))
                 .thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
     }
@@ -443,7 +457,7 @@ class AuthServiceTest {
         User user = activeUser("user-1", "active@example.com", "secret123");
         user.setUsername("active.user");
         when(userRepository.findForLogin(any(String.class))).thenReturn(Optional.of(user));
-        authService.setAuthLoginRateLimiter(new AuthLoginRateLimiter(null, true, 100, 2, 100));
+        loginFlow.setAuthLoginRateLimiter(new AuthLoginRateLimiter(null, true, 100, 2, 100));
         AuthClientContext context = new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null);
 
         assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
@@ -597,7 +611,7 @@ class AuthServiceTest {
     void invalidCredentialsDelegateToIndependentFailureTransaction() {
         User user = activeUser("user-1", "active@example.com", "secret123");
         when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
-        authService.setLoginFailureEnforcementService(loginFailureEnforcementService);
+        loginFlow.setLoginFailureEnforcementService(loginFailureEnforcementService);
         AuthClientContext context = new AuthClientContext(
                 "127.0.0.1", "JUnit", "web-1", "Chrome", "fingerprint");
 
@@ -667,7 +681,7 @@ class AuthServiceTest {
         when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(
                 eq("user-1"), any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(attempt));
 
-        List<LoginAttemptResponse> response = authService.listLoginAttempts("user-1", null);
+        List<LoginAttemptResponse> response = authService.loginAttempts("user-1", null);
 
         assertEquals(1, response.size());
         assertEquals("attempt-1", response.getFirst().id());
