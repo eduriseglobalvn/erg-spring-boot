@@ -47,7 +47,8 @@ jobs:
         # Annotations are readable without log access, so a red run names its failing tests.
         run: |
           for f in $(grep -l -E '<(failure|error)' target/surefire-reports/TEST-*.xml target/failsafe-reports/TEST-*.xml 2>/dev/null); do
-            echo "::error title=Test failed::$(basename "$f" .xml | sed 's/^TEST-//')"
+            reason=$(grep -o -m1 -E '<(failure|error) message="[^"]{0,400}' "$f" | sed -E 's/^<(failure|error) message="//' | tr -d '\r\n%')
+            echo "::error title=Test failed::$(basename "$f" .xml | sed 's/^TEST-//') :: $reason"
           done
       - name: Destructive-script host guard (P1-4)
         run: pwsh -NoProfile -File scripts/postgres-target-guard.test.ps1
