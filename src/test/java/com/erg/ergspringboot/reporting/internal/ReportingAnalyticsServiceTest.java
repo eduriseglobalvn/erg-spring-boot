@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.reporting;
+package com.erg.ergspringboot.reporting.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,7 +11,6 @@ import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.Assignment
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.reporting.AssignmentScopeLookup;
 import com.erg.ergspringboot.reporting.AssignmentProgressFilter;
-import com.erg.ergspringboot.reporting.internal.ReportingAnalyticsService;
 import com.erg.ergspringboot.service.quiz.report.QuizReportService;
 import java.time.ZoneId;
 import java.util.List;

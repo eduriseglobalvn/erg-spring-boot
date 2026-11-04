@@ -72,10 +72,10 @@ class CanonicalLearningResourceMigrationContractTest {
     void assessmentsUseTheSameCanonicalCurriculumAsLearningContent() throws IOException {
         String cutover = readMigration("V49__assessment_canonical_curriculum_cutover.sql");
         String questionBankReadModel = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/lcms/readmodel/LcmsWorkspaceReadService.java"
+                "src/main/java/com/erg/ergspringboot/lcms/internal/readmodel/LcmsWorkspaceReadService.java"
         ));
         String quizReadModel = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/lcms/readmodel/LcmsQuizWorkspaceReadService.java"
+                "src/main/java/com/erg/ergspringboot/lcms/internal/readmodel/LcmsQuizWorkspaceReadService.java"
         ));
 
         assertThat(cutover)

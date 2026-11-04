@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.reporting;
+package com.erg.ergspringboot.reporting.internal;
 
 import com.erg.ergspringboot.platform.security.TenantContext;
 import java.util.List;

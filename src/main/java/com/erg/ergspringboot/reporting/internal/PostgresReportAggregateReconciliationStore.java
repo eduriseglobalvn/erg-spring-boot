@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.reporting;
+package com.erg.ergspringboot.reporting.internal;
 
 import java.time.OffsetDateTime;
 import java.util.List;

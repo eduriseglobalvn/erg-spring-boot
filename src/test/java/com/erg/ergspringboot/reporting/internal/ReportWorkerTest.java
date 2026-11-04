@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.reporting;
+package com.erg.ergspringboot.reporting.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
