@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.reporting;
+package com.erg.ergspringboot.reporting.internal;
 
 import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.AssignmentReportResponse;
 import com.erg.ergspringboot.model.reporting.ReportJob;

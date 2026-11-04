@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lcms.readmodel;
+package com.erg.ergspringboot.lcms.internal.readmodel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

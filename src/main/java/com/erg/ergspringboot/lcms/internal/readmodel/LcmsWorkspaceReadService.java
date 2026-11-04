@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.lcms.readmodel;
+package com.erg.ergspringboot.lcms.internal.readmodel;
 
 import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.EffectivePermissionResponse;
