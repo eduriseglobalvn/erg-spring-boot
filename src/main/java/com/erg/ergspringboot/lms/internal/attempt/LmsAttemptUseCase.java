@@ -205,17 +205,35 @@ public class LmsAttemptUseCase {
         Score score = finish(attempt, answers, tenant, submitted, late);
         Attempt saved = attempts.save(attempt);
         log.info("EXAM_ATTEMPT_SUBMIT studentId={} attemptId={} quizId={} assignmentId={} score={}/{} percent={}% passed={} late={}", saved.getStudentId(), saved.getId(), saved.getQuizId(), saved.getAssignmentId(), score.score(), score.max(), score.percent(), score.passed(), late);
-        events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_submitted", null, null, Map.of("score", score.score(), "percent", score.percent(), "passed", score.passed(), "late", late), submitted);
+        afterSubmit(saved, owned.assignment(), tenant, score, submitted, late);
         if (request != null) events.recordClientBatch(saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.clientEvents());
-        progress.projectAfterCommit(saved, owned.assignment(), tenant);
-        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
-        publisher.publishEvent(new LmsAttemptSubmitted("attempt-submitted:" + saved.getId(), tenant, saved.getId(),
-                saved.getAssignmentId(), saved.getStudentId(), saved.getStatus(), score.score(), score.max(), score.passed(),
-                submitted));
         if (sample != null) sample.stop(meterRegistry.timer("erg.lms.attempt.submit", "result", score.passed() ? "passed" : "failed"));
         AttemptSubmitResponse result = new AttemptSubmitResponse(score.score(), score.max(), score.percent(), score.passed());
         complete(receipt, result, version(saved));
         return result;
+    }
+
+    private void afterSubmit(Attempt saved, Assignment assignment, String tenant, Score score, OffsetDateTime submitted, boolean late) {
+        events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_submitted", null, null, Map.of("score", score.score(), "percent", score.percent(), "passed", score.passed(), "late", late), submitted);
+        progress.projectAfterCommit(saved, assignment, tenant);
+        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        publisher.publishEvent(new LmsAttemptSubmitted("attempt-submitted:" + saved.getId(), tenant, saved.getId(), saved.getAssignmentId(),
+                saved.getStudentId(), saved.getStatus(), score.score(), score.max(), score.passed(), submitted));
+    }
+
+    /** Offline import: builds, server-grades and stores the finished attempt (server clock is authoritative). */
+    Attempt saveImported(String tenant, Student student, QuizPackage pkg, Assignment assignment, String key,
+            Map<String, Object> clientMeta, Map<String, Object> answers) {
+        OffsetDateTime now = now();
+        Attempt attempt = factory.newAttempt(tenant, student.getId(), new StartAttemptRequest(assignment.getId(), pkg.getQuizId(),
+                pkg.getId(), pkg.getContentHash()), assignment, quizzes.findByTenantIdAndId(tenant, pkg.getQuizId()).orElse(null),
+                Optional.of(pkg), now, key);
+        attempt.setClassId(blank(assignment.getAcademicClassId()) == null ? student.getAcademicClassId() : assignment.getAcademicClassId());
+        attempt.setSubmitIdempotencyKey(key); attempt.setClient(clientMeta);
+        Map<String, AttemptAnswer> stored = new LinkedHashMap<>(); answers.forEach((qid, value) -> stored.put(qid, answer(qid, value, Map.of(), now)));
+        boolean late = deadlines.effectiveDeadline(attempt, assignment) instanceof OffsetDateTime deadline && now.isAfter(deadline);
+        Score score = finish(attempt, stored, tenant, now, late); Attempt saved = attempts.saveAndFlush(attempt);
+        afterSubmit(saved, assignment, tenant, score, now, late); return saved;
     }
 
     /**

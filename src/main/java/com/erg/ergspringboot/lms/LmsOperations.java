@@ -1,6 +1,8 @@
 package com.erg.ergspringboot.lms;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptResponse;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ImportPortableResultRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ImportedAttemptResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSubmitResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AnswerResultResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AssignmentProgressResponse;
@@ -50,6 +52,11 @@ public class LmsOperations {
     public AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request,
             UserAccessContext access) {
         return legacy.submitAttempt(attemptId, request, access);
+    }
+
+    public ImportedAttemptResponse importPortableResult(ImportPortableResultRequest request, String assignmentId,
+            String idempotencyKey, UserAccessContext access) {
+        return legacy.importPortableResult(request, assignmentId, idempotencyKey, access);
     }
 
     public AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request,

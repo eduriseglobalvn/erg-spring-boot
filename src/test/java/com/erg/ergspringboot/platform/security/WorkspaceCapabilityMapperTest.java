@@ -37,6 +37,19 @@ class WorkspaceCapabilityMapperTest {
     }
 
     @Test
+    void studentPreviewPermissionProjectsStudentWorkspaceWithoutOtherWorkspaces() {
+        assertEquals(
+                java.util.List.of("STUDENT", "TEACHER"),
+                WorkspaceCapabilityMapper.canonicalWorkspaces(
+                        java.util.List.of(), java.util.List.of("lms_teacher_standard"),
+                        java.util.List.of("lms.class.read", "elearning.student.preview")));
+        assertEquals(
+                java.util.List.of("STUDENT"),
+                WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                        java.util.List.of(), java.util.List.of("elearning.student.preview"), java.util.List.of()));
+    }
+
+    @Test
     void wildcardProjectsEveryWorkspaceOnlyForAPlatformWidePrincipal() {
         assertEquals(
                 java.util.List.of("ADMIN", "CRM", "STUDENT", "TEACHER"),

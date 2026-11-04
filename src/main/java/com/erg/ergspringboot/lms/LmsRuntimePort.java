@@ -18,6 +18,7 @@ public interface LmsRuntimePort {
     AnswerResultResponse saveAnswer(String attemptId, String questionId, SaveAnswerRequest request, UserAccessContext access);
     AttemptSyncResponse syncAttempt(String attemptId, AttemptSyncRequest request, UserAccessContext access);
     AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access);
+    ImportedAttemptResponse importPortableResult(ImportPortableResultRequest request, String assignmentId, String idempotencyKey, UserAccessContext access);
     AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access);
     AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access);
     List<AttemptResponse> quizStudents(String quizId, UserAccessContext access);

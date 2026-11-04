@@ -307,6 +307,20 @@ public final class LmsRuntimeDtos {
     public record AttemptSubmitResponse(double score, double maxScore, double percent, boolean passed) {
     }
 
+    /** Contents of a {@code .ergresult} file: the exported {@code body} plus its SHA-256 {@code checksum}. */
+    public record ImportPortableResultRequest(
+            @jakarta.validation.constraints.NotNull Map<String, Object> body,
+            @NotBlank String checksum
+    ) {
+    }
+
+    /** Outcome of importing an offline result; {@code duplicate} is true when the same file was imported before. */
+    public record ImportedAttemptResponse(
+            String attemptId, String assignmentId, String quizId, String studentId, String status,
+            double score, double maxScore, double percent, boolean passed, boolean late, boolean duplicate
+    ) {
+    }
+
     /** Teacher grade for one answer awaiting manual review; {@code expectedVersion} guards concurrent graders. */
     public record ManualGradeRequest(
             @jakarta.validation.constraints.NotNull @jakarta.validation.constraints.PositiveOrZero Double points,

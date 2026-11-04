@@ -65,6 +65,11 @@ public class QuizRuntimePackageService {
                 .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId));
     }
 
+    /** A package by its own id (offline result import); empty when it is not in the tenant. */
+    public Optional<QuizPackage> packageEntityById(String tenantId, String packageId) {
+        return packageRepository.findByIdAndTenantId(packageId, tenantId);
+    }
+
     public Optional<QuizPackageResponse> packageForVersion(String tenantId, String quizId, String quizVersionId) {
         return quizVersionRepository.findByIdAndTenantId(quizVersionId, tenantId)
                 .filter(version -> quizId.equals(version.getQuizId()))

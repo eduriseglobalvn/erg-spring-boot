@@ -102,6 +102,30 @@ public class LmsAssignmentAccessPolicy {
                 : Optional.empty();
     }
 
+    /** Visible assignments distributing the quiz to this learner (offline result import). */
+    public List<Assignment> visibleAssignmentsFor(String tenantId, String quizId, Student learner) {
+        String tenant = tenant(tenantId);
+        java.util.Set<String> assignmentIds = new java.util.LinkedHashSet<>();
+        resources.findByTenantIdAndQuizId(tenant, quizId).forEach(row -> assignmentIds.add(row.getAssignmentId()));
+        assignments.findByTenantIdAndQuizId(tenant, quizId).forEach(row -> assignmentIds.add(row.getId()));
+        return assignments.findByTenantIdAndIdIn(tenant, assignmentIds).stream()
+                .filter(assignment -> LmsStatePolicy.assignmentIsVisible(assignment.getStatus())
+                        && isRecipient(assignment, learner, learner.getAuthUserId()))
+                .toList();
+    }
+
+    /** Resolves an exported (class code, student code) pair inside the caller's tenant; both must agree. */
+    public Student importedLearner(String tenantId, String classCode, String studentCode) {
+        Student student = students.findByTenantIdAndStudentCode(tenant(tenantId), studentCode)
+                .orElseThrow(() -> new ResourceNotFoundException("student not found"));
+        Classroom classroom = blank(student.getAcademicClassId()) == null ? null
+                : classrooms.findByTenantIdAndId(tenant(tenantId), student.getAcademicClassId()).orElse(null);
+        if (classroom == null || classroom.getName() == null || !classroom.getName().trim().equalsIgnoreCase(classCode.trim())) {
+            throw new com.erg.ergspringboot.exception.BadRequestException("class code does not match the student's class");
+        }
+        return student;
+    }
+
     /** Whether any assignment visible to the learner distributes the quiz (used by the learner package endpoint). */
     public boolean isAssignedQuiz(String tenantId, String quizId, Student learner, String authUserId) {
         String tenant = tenant(tenantId);

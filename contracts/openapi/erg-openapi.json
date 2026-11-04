@@ -1495,6 +1495,32 @@
         },
         "type": "object"
       },
+      "ApiResponseCurriculumClassSubjectsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CurriculumClassSubjectsResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseCurriculumHardDeleteResponse": {
         "properties": {
           "data": {
@@ -2175,6 +2201,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/HandoverResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseImportedAttemptResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ImportedAttemptResponse"
           },
           "errors": {},
           "message": {
@@ -7417,6 +7469,56 @@
         },
         "type": "object"
       },
+      "CurriculumClassSubjectAllocationItem": {
+        "properties": {
+          "classId": {
+            "type": "string"
+          },
+          "subjectIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CurriculumClassSubjectsRequest": {
+        "properties": {
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/CurriculumClassSubjectAllocationItem"
+            },
+            "type": "array"
+          },
+          "expectedVersion": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CurriculumClassSubjectsResponse": {
+        "properties": {
+          "academicYear": {
+            "type": "string"
+          },
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/CurriculumClassSubjectAllocationItem"
+            },
+            "type": "array"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CurriculumHardDeleteResponse": {
         "properties": {
           "deleted": {
@@ -8691,6 +8793,64 @@
             "type": "string"
           },
           "registrationToken": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ImportPortableResultRequest": {
+        "properties": {
+          "body": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "checksum": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "body",
+          "checksum"
+        ],
+        "type": "object"
+      },
+      "ImportedAttemptResponse": {
+        "properties": {
+          "assignmentId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "maxScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "percent": {
+            "format": "double",
+            "type": "number"
+          },
+          "quizId": {
+            "type": "string"
+          },
+          "score": {
+            "format": "double",
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          },
+          "studentId": {
             "type": "string"
           }
         },
@@ -15979,6 +16139,90 @@
         ]
       }
     },
+    "/api/v1/curriculum/class-subjects": {
+      "get": {
+        "operationId": "classSubjects",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "academicYear",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCurriculumClassSubjectsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "curriculum-controller"
+        ]
+      },
+      "put": {
+        "operationId": "replaceClassSubjects",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "academicYear",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CurriculumClassSubjectsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCurriculumClassSubjectsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "curriculum-controller"
+        ]
+      }
+    },
     "/api/v1/curriculum/levels/{id}": {
       "delete": {
         "operationId": "hardDeleteLevel",
@@ -20186,6 +20430,54 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseAttemptResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/attempts/import": {
+      "post": {
+        "operationId": "importPortableResult",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "assignmentId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportPortableResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImportedAttemptResponse"
                 }
               }
             },

@@ -12,6 +12,9 @@ import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTreeResponse;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTeachingPlanRequest;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTeachingPlanResponse;
 import com.erg.ergspringboot.curriculum.CurriculumTeachingPlanService;
+import com.erg.ergspringboot.curriculum.CurriculumClassSubjectService;
+import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumClassSubjectsRequest;
+import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumClassSubjectsResponse;
 import com.erg.ergspringboot.curriculum.CurriculumProgramService;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumProgramRequest;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumProgramResponse;
@@ -39,13 +42,16 @@ public class CurriculumController {
     private final CurriculumTeachingPlanService teachingPlanService;
     private final AuthorizationOperations authorization;
     private final CurriculumProgramService programService;
+    private final CurriculumClassSubjectService classSubjectService;
 
     public CurriculumController(CurriculumOperations curriculumService, CurriculumTeachingPlanService teachingPlanService,
-                                AuthorizationOperations authorization, CurriculumProgramService programService) {
+                                AuthorizationOperations authorization, CurriculumProgramService programService,
+                                CurriculumClassSubjectService classSubjectService) {
         this.curriculumService = curriculumService;
         this.teachingPlanService = teachingPlanService;
         this.authorization = authorization;
         this.programService = programService;
+        this.classSubjectService = classSubjectService;
     }
 
     @GetMapping("/program")
@@ -76,6 +82,21 @@ public class CurriculumController {
             @RequestBody CurriculumTeachingPlanRequest body, HttpServletRequest request) {
         return ok("Curriculum teaching plan saved",
                 teachingPlanService.upsert(schoolId, subjectId, academicYear, body, access(request), hasGlobalCurriculumPermission()), request);
+    }
+
+    @GetMapping("/class-subjects")
+    public ApiResponse<CurriculumClassSubjectsResponse> classSubjects(
+            @RequestParam String schoolId, @RequestParam String academicYear, HttpServletRequest request) {
+        return ok("Curriculum class subjects loaded",
+                classSubjectService.get(schoolId, academicYear, access(request), hasGlobalCurriculumPermission()), request);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/class-subjects")
+    public ApiResponse<CurriculumClassSubjectsResponse> replaceClassSubjects(
+            @RequestParam String schoolId, @RequestParam String academicYear,
+            @RequestBody CurriculumClassSubjectsRequest body, HttpServletRequest request) {
+        return ok("Curriculum class subjects saved",
+                classSubjectService.replace(schoolId, academicYear, body, access(request), hasGlobalCurriculumPermission()), request);
     }
 
     private boolean hasGlobalCurriculumPermission() {

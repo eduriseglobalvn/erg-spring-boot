@@ -8,7 +8,7 @@ statement, row, payload, state-owner, cache and pagination metadata. The existin
 `RequestMappingHandlerMapping`; a new production mapping therefore fails CI until it is
 explicitly inventoried.
 
-REST route count: `555`
+REST route count: `558`
 
 GraphQL mapped field count: `44`
 

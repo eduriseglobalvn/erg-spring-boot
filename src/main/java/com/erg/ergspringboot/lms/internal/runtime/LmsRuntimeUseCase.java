@@ -3,6 +3,7 @@ package com.erg.ergspringboot.lms.internal.runtime;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.lms.LmsRuntimePort;
 import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
+import com.erg.ergspringboot.lms.internal.attempt.LmsPortableResultImportUseCase;
 import com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase;
 import com.erg.ergspringboot.lms.internal.readmodel.LmsStudentReadModelUseCase;
 import com.erg.ergspringboot.lms.internal.resource.LmsResourceQueryUseCase;
@@ -16,13 +17,15 @@ import org.springframework.context.annotation.Primary;
 @Primary
 public class LmsRuntimeUseCase implements LmsRuntimePort {
     private final LmsAttemptUseCase attempts;
+    private final LmsPortableResultImportUseCase imports;
     private final LmsClassroomQueryUseCase classrooms;
     private final LmsResourceQueryUseCase resources;
     private final LmsStudentReadModelUseCase students;
 
-    public LmsRuntimeUseCase(LmsAttemptUseCase attempts, LmsClassroomQueryUseCase classrooms,
+    public LmsRuntimeUseCase(LmsAttemptUseCase attempts, LmsPortableResultImportUseCase imports, LmsClassroomQueryUseCase classrooms,
             LmsResourceQueryUseCase resources, LmsStudentReadModelUseCase students) {
         this.attempts = attempts;
+        this.imports = imports;
         this.classrooms = classrooms;
         this.resources = resources;
         this.students = students;
@@ -38,6 +41,7 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
     @Override public AnswerResultResponse saveAnswer(String attemptId, String questionId, SaveAnswerRequest request, UserAccessContext access) { return attempts.saveAnswer(attemptId, questionId, request, access); }
     @Override public AttemptSyncResponse syncAttempt(String attemptId, AttemptSyncRequest request, UserAccessContext access) { return attempts.sync(attemptId, request, access); }
     @Override public AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access) { return attempts.submit(attemptId, request, access); }
+    @Override public ImportedAttemptResponse importPortableResult(ImportPortableResultRequest request, String assignmentId, String idempotencyKey, UserAccessContext access) { return imports.importPortableResult(request, assignmentId, idempotencyKey, access); }
     @Override public AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access) { return attempts.gradeManualAnswer(attemptId, questionId, request, access); }
     @Override public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) { return students.assignmentProgress(assignmentId, access); }
     @Override public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) { return students.quizStudents(quizId, access); }
