@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.learningoutcomes.internal;
 
 import com.erg.ergspringboot.exception.ConflictException;
-import com.erg.ergspringboot.model.learningoutcomes.LearningOutcomeCommandReceipt;
-import com.erg.ergspringboot.repository.learningoutcomes.LearningOutcomeCommandReceiptRepository;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningOutcomeCommandReceipt;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningOutcomeCommandReceiptRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;

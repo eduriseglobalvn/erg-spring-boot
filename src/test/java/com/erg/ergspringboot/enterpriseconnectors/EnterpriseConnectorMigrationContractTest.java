@@ -36,6 +36,7 @@ class EnterpriseConnectorMigrationContractTest {
                 .filter(value -> value.name().equals("enterpriseconnectors"))
                 .findFirst().orElseThrow();
         assertThat(module.enabled()).isTrue();
+        assertThat(module.modelPackage()).isEqualTo("com.erg.ergspringboot.enterpriseconnectors.persistence");
         assertThat(module.entityCount()).isEqualTo(3);
         assertThat(module.repositoryCount()).isEqualTo(3);
     }

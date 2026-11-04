@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AdminStatsResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.OutboxRunResponse;
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import com.erg.ergspringboot.notifications.internal.NotificationCommand;
 import com.erg.ergspringboot.notifications.internal.NotificationCommandResult;
 import com.erg.ergspringboot.notifications.internal.NotificationCommandService;

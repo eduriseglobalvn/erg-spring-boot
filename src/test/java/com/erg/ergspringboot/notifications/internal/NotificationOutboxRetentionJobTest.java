@@ -9,7 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
 

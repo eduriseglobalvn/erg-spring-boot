@@ -9,13 +9,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
-import com.erg.ergspringboot.model.notifications.NotificationOutboxEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxEntity;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.notifications.delivery.NotificationDeliveryAdapterRegistry;
-import com.erg.ergspringboot.repository.notifications.NotificationDeliveryAttemptRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationMessageRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeliveryAttemptRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationMessageRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;

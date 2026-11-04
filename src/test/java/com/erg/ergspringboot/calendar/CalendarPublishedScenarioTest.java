@@ -8,7 +8,7 @@ import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
 import com.erg.ergspringboot.notifications.internal.NotificationDeviceService;
 import com.erg.ergspringboot.notifications.internal.NotificationOutboxWorker;
 import com.erg.ergspringboot.notifications.internal.NotificationService;
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.modulith.test.ApplicationModuleTest;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -25,6 +26,9 @@ import org.springframework.test.context.jdbc.Sql;
         mode = ApplicationModuleTest.BootstrapMode.STANDALONE,
         verifyAutomatically = false)
 @ActiveProfiles("test")
+// The module owns its entities (notifications.persistence), so the standalone slice scans them, but the
+// slice runs no Flyway (FlywayConfig is outside the module) and the consumer under test never touches them.
+@TestPropertySource(properties = "spring.jpa.properties.jakarta.persistence.schema-generation.database.action=none")
 @Sql(scripts = "classpath:db/fixtures/h2_spring_modulith_event_publication.sql")
 class CalendarPublishedScenarioTest {
 

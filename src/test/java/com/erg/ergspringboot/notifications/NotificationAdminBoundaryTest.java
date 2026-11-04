@@ -13,7 +13,7 @@ class NotificationAdminBoundaryTest {
         String source = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/controller/notifications/NotificationAdminController.java"));
         assertTrue(source.contains("NotificationAdminOperations"));
-        assertFalse(source.contains("repository.notifications"));
+        assertFalse(source.contains("notifications.persistence"));
         assertFalse(source.contains("NotificationCommandService"));
         assertFalse(source.contains("NotificationOutboxWorker"));
     }

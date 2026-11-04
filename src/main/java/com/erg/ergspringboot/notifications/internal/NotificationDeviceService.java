@@ -7,11 +7,11 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationEntity;
-import com.erg.ergspringboot.model.notifications.NotificationTopicMembershipEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationTopicMembershipEntity;
 import com.erg.ergspringboot.notifications.NotificationTokenCipher;
-import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationTopicMembershipRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationTopicMembershipRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

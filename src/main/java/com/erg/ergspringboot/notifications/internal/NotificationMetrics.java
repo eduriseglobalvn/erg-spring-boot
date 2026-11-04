@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.util.Locale;

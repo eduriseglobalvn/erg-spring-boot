@@ -10,12 +10,12 @@ import com.erg.ergspringboot.learningoutcomes.LearningOutcomesResponses.Completi
 import com.erg.ergspringboot.learningoutcomes.LearningOutcomesResponses.CompetencyResponse;
 import com.erg.ergspringboot.learningoutcomes.LearningOutcomesResponses.LearningPathResponse;
 import com.erg.ergspringboot.learningoutcomes.LearningOutcomesResponses.PathNodeResponse;
-import com.erg.ergspringboot.model.learningoutcomes.Competency;
-import com.erg.ergspringboot.model.learningoutcomes.CompetencyAttainment;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPath;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPathCompletion;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPathNode;
-import com.erg.ergspringboot.model.learningoutcomes.OutcomeCertificate;
+import com.erg.ergspringboot.learningoutcomes.persistence.Competency;
+import com.erg.ergspringboot.learningoutcomes.persistence.CompetencyAttainment;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPath;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathCompletion;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathNode;
+import com.erg.ergspringboot.learningoutcomes.persistence.OutcomeCertificate;
 
 /** Maps learning-outcome entities to the published response DTOs. */
 final class OutcomeResponseMapper {

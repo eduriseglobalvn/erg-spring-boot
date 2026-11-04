@@ -2,7 +2,7 @@ package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.beans.factory.ObjectProvider;

@@ -3,7 +3,7 @@ package com.erg.ergspringboot.notifications.internal;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import org.springframework.beans.factory.ObjectProvider;
