@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.users;
 
 public interface AccountMailSender {
 

@@ -17,8 +17,8 @@ import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
+import com.erg.ergspringboot.users.RoleAssignmentAudit;
+import com.erg.ergspringboot.users.RoleAssignmentAudit.UserRef;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
@@ -40,9 +40,9 @@ public class UserRoleAssignmentUseCase {
     private static final String DEFAULT_TENANT="erg";
     private final UserRepository users; private final RoleRepository roles; private final PermissionRepository permissions;
     private final UserPermissionOverrideRepository overrides; private final UserActivityRepository activities;
-    private final AuthorizationMutationAuditService authz; private final ProtectedRolePolicy rolePolicy=new ProtectedRolePolicy();
+    private final RoleAssignmentAudit authz; private final ProtectedRolePolicy rolePolicy=new ProtectedRolePolicy();
     public UserRoleAssignmentUseCase(UserRepository users,RoleRepository roles,PermissionRepository permissions,
-            UserPermissionOverrideRepository overrides,UserActivityRepository activities,AuthorizationMutationAuditService authz){
+            UserPermissionOverrideRepository overrides,UserActivityRepository activities,RoleAssignmentAudit authz){
         this.users=users;this.roles=roles;this.permissions=permissions;this.overrides=overrides;this.activities=activities;this.authz=authz;}
     @Transactional public UserResponse assignRoles(String userId,String tenantId,AdminAssignRolesRequest request,
             UserAuditContext audit,ErgPrincipal actor){

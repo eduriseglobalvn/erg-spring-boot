@@ -22,7 +22,7 @@ import com.erg.ergspringboot.repository.users.UserActivityRepository;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
-import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.users.ScopedRoleAssigner;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserOperations;
 import java.math.BigDecimal;
@@ -47,7 +47,7 @@ class EmployeeManagementServiceTest {
     @Mock private AuthSessionRepository sessionRepository;
     @Mock private SecurityEventRepository securityEventRepository;
     @Mock private UserRoleAssignmentRepository roleAssignmentRepository;
-    @Mock private ScopedRoleAssignmentService scopedRoleAssignmentService;
+    @Mock private ScopedRoleAssigner scopedRoleAssignmentService;
     private EmployeeManagementService service;
 
     @BeforeEach

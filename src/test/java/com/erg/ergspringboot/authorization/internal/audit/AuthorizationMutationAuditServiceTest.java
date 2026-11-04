@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.authorization;
+package com.erg.ergspringboot.authorization.internal.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

@@ -23,7 +23,7 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRo
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
-import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.authorization.internal.assignment.ScopedRoleAssignmentService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

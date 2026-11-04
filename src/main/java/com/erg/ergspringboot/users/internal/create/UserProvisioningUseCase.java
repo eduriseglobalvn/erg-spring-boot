@@ -20,8 +20,8 @@ import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.auth.AccountMailSender;
-import com.erg.ergspringboot.service.auth.PasswordService;
+import com.erg.ergspringboot.users.AccountMailSender;
+import com.erg.ergspringboot.users.CredentialHasher;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
@@ -41,12 +41,12 @@ public class UserProvisioningUseCase {
     private static final String DEFAULT_TENANT = "erg";
     private final UserRepository users; private final AuthSessionRepository sessions;
     private final RoleRepository roles; private final UserAccessScopeRepository scopes;
-    private final UserActivityRepository activities; private final PasswordService passwords;
+    private final UserActivityRepository activities; private final CredentialHasher passwords;
     private final AccountMailSender mail; private final ProtectedRolePolicy rolePolicy = new ProtectedRolePolicy();
 
     public UserProvisioningUseCase(UserRepository users, AuthSessionRepository sessions, RoleRepository roles,
             UserAccessScopeRepository scopes, UserActivityRepository activities,
-            PasswordService passwords, AccountMailSender mail) {
+            CredentialHasher passwords, AccountMailSender mail) {
         this.users = users; this.sessions = sessions; this.roles = roles; this.scopes = scopes;
         this.activities = activities; this.passwords = passwords; this.mail = mail;
     }

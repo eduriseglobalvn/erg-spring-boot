@@ -11,7 +11,7 @@ import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.auth.PasswordService;
+import com.erg.ergspringboot.users.CredentialHasher;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
@@ -29,10 +29,10 @@ public class UserPasswordUseCase {
     private final UserRepository userRepository;
     private final AuthSessionRepository sessionRepository;
     private final UserActivityRepository activityRepository;
-    private final PasswordService passwordService;
+    private final CredentialHasher passwordService;
 
     public UserPasswordUseCase(UserRepository users, AuthSessionRepository sessions,
-            UserActivityRepository activities, PasswordService passwordService) {
+            UserActivityRepository activities, CredentialHasher passwordService) {
         this.userRepository = users;
         this.sessionRepository = sessions;
         this.activityRepository = activities;

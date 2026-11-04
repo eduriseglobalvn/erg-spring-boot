@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.auth;
 
-import com.erg.ergspringboot.service.auth.AccountMailSender;
-import com.erg.ergspringboot.service.auth.PasswordService;
+import com.erg.ergspringboot.users.AccountMailSender;
+import com.erg.ergspringboot.auth.internal.credential.PasswordService;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
