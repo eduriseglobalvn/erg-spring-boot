@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.service.notifications;
 
+import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import org.junit.jupiter.api.Test;
 

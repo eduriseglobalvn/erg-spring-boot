@@ -12,9 +12,6 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface EducationUnitRepository extends JpaRepository<EducationUnit, String> {
 
-    @Deprecated(forRemoval = false)
-    List<EducationUnit> findAllByOrderByNameAsc();
-
     /** Session bootstrap must remain bounded even for global administrators. */
     List<EducationUnit> findTop500ByOrderByNameAsc();
 

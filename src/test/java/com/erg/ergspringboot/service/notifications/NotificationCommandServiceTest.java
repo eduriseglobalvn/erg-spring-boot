@@ -6,6 +6,7 @@ import com.erg.ergspringboot.model.notifications.NotificationMessageEntity;
 import com.erg.ergspringboot.model.notifications.NotificationOutboxEntity;
 import com.erg.ergspringboot.model.notifications.NotificationPreferenceEntity;
 import com.erg.ergspringboot.model.notifications.NotificationRecipientEntity;
+import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationMessageRepository;

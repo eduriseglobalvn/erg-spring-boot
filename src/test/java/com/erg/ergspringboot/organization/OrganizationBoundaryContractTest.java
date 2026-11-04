@@ -23,12 +23,11 @@ class OrganizationBoundaryContractTest {
     }
 
     @Test
-    void legacyEducationUnitServiceIsAnExplicitCompatibilityAdapter() throws Exception {
-        String service = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/organization/EducationUnitService.java"));
+    void legacyEducationUnitServiceIsRemoved() throws Exception {
         String controller = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/controller/organization/EducationUnitController.java"));
-        assertThat(service).contains("@Deprecated", "OrganizationEducationUnitQuery");
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/organization/EducationUnitService.java"))
+                .doesNotExist();
         assertThat(controller).contains("OrganizationOperations").doesNotContain("EducationUnitService");
     }
 }

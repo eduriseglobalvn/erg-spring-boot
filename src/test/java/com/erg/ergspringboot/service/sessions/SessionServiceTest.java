@@ -82,7 +82,7 @@ class SessionServiceTest {
         assertThat(response.workspaces()).containsExactly("TEACHER");
         assertThat(response.tenantId()).isEqualTo("erg");
         assertThat(response.lifecycle().status()).isEqualTo("FIRST_LOGIN_RESTRICTED");
-        verify(educationUnitRepository, never()).findAllByOrderByNameAsc();
+        verify(educationUnitRepository, never()).findTop500ByOrderByNameAsc();
         verify(educationUnitRepository, never()).findByParentIdInOrderByNameAsc(any());
     }
 
