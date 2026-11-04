@@ -531,10 +531,10 @@ File quan trong:
 
 - `service/lms/LmsRuntimeService.java`
 - `controller/lms/LmsController.java`
-- `repository/lms/AssignmentRepository.java`
-- `repository/lms/AttemptRepository.java`
-- `repository/lms/ClassroomRepository.java`
-- `repository/lms/StudentRepository.java`
+- `lms/persistence/AssignmentRepository.java`
+- `lms/persistence/AttemptRepository.java`
+- `lms/persistence/ClassroomRepository.java`
+- `lms/persistence/StudentRepository.java`
 
 Nhan xet:
 

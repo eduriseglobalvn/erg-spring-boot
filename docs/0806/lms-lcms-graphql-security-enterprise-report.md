@@ -172,12 +172,12 @@ Files chính:
 - `src/main/java/com/erg/ergspringboot/platform/graphql/LmsClassWorkspaceGraphQlController.java`
 - `src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java`
 - `src/main/java/com/erg/ergspringboot/common/response/lms/LmsClassWorkspaceResponses.java`
-- `src/main/java/com/erg/ergspringboot/repository/lms/ClassroomRepository.java`
-- `src/main/java/com/erg/ergspringboot/repository/lms/StudentRepository.java`
-- `src/main/java/com/erg/ergspringboot/repository/lms/AssignmentRepository.java`
-- `src/main/java/com/erg/ergspringboot/repository/lms/projection/ClassWorkspaceProjection.java`
-- `src/main/java/com/erg/ergspringboot/repository/lms/projection/StudentRosterProjection.java`
-- `src/main/java/com/erg/ergspringboot/repository/lms/projection/AssignmentCardProjection.java`
+- `src/main/java/com/erg/ergspringboot/lms/persistence/ClassroomRepository.java`
+- `src/main/java/com/erg/ergspringboot/lms/persistence/StudentRepository.java`
+- `src/main/java/com/erg/ergspringboot/lms/persistence/AssignmentRepository.java`
+- `src/main/java/com/erg/ergspringboot/lms/persistence/projection/ClassWorkspaceProjection.java`
+- `src/main/java/com/erg/ergspringboot/lms/persistence/projection/StudentRosterProjection.java`
+- `src/main/java/com/erg/ergspringboot/lms/persistence/projection/AssignmentCardProjection.java`
 
 Đã có:
 

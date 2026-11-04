@@ -22,10 +22,10 @@ Phạm vi: `erg-spring` backend cho màn hình lịch giảng dạy của LCMS v
 | WorkShift entity | `model/organization/WorkShift.java` — entity `work_shifts` với `userId`, `schoolId`, `room`, `teachingSubject`, `startTime`, `endTime`, `type`, `status`. **Không dùng cho lịch giảng dạy vì thiếu quan hệ class/subject/level/teacher role.** |
 | Notification system | `NotificationCommandService.enqueue(NotificationCommand)` — đã hoàn thiện, hỗ trợ userId list + topic + idempotency. Test đã dùng event type `"SCHEDULE_PUBLISHED"` và source type `"schedule"`. |
 | Notification outbox | `NotificationOutboxWorker` scheduled worker — đã có. |
-| Classroom entity | `model/lms/Classroom.java` → table `academic_classes`: `id`, `tenantId`, `schoolId`, `name`, `grade`, `academicYear`, `status`, `homeroomTeacherId`. |
-| Subject entity | `model/lms/Subject.java` → table `lms_subjects`: `id`, `tenantId`, `name`, `code`, `status`, `scope` (jsonb). |
-| Level entity | `model/lms/Level.java` → table `lms_levels`: `id`, `tenantId`, `subjectId`, `name`, `code`, `order`, `status`. |
-| User entity | `model/users/User.java` — có `workShifts` (Set<WorkShift>). Cần thêm `teachingScheduleEventTeachers` nếu muốn navigation 2 chiều. |
+| Classroom entity | `lms/persistence/Classroom.java` → table `academic_classes`: `id`, `tenantId`, `schoolId`, `name`, `grade`, `academicYear`, `status`, `homeroomTeacherId`. |
+| Subject entity | `lms/persistence/Subject.java` → table `lms_subjects`: `id`, `tenantId`, `name`, `code`, `status`, `scope` (jsonb). |
+| Level entity | `lms/persistence/Level.java` → table `lms_levels`: `id`, `tenantId`, `subjectId`, `name`, `code`, `order`, `status`. |
+| User entity | `users/persistence/User.java` — có `workShifts` (Set<WorkShift>). Cần thêm `teachingScheduleEventTeachers` nếu muốn navigation 2 chiều. |
 | Student entity | Tồn tại trong `model/lms/` — có `authUserId` map với `User.id`. |
 | Room entity | **KHÔNG CÓ.** `WorkShift.room` là String thường. Không có bảng `rooms`. |
 | Response pattern | Container class (`LmsClassWorkspaceResponses`) chứa các Java `record` bên trong. Không dùng Lombok cho DTO. |
