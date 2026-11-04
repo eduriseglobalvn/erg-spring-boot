@@ -1,10 +1,10 @@
-package com.erg.ergspringboot.repository.quiz.authoring;
+package com.erg.ergspringboot.lcms.persistence.quiz.authoring;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
 import com.erg.ergspringboot.model.lms.Quiz;
-import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
 import java.util.List;
 import java.util.Map;

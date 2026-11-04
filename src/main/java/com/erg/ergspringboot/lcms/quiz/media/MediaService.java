@@ -6,8 +6,8 @@ import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaCommitResp
 import com.erg.ergspringboot.common.response.quiz.MediaResponses.MediaPresignResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.quiz.media.MediaAsset;
-import com.erg.ergspringboot.repository.quiz.media.MediaAssetRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.media.MediaAsset;
+import com.erg.ergspringboot.lcms.persistence.quiz.media.MediaAssetRepository;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;

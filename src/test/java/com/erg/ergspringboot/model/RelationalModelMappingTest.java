@@ -16,7 +16,7 @@ import com.erg.ergspringboot.model.community.CommunityFollow;
 import com.erg.ergspringboot.model.community.CommunityMedia;
 import com.erg.ergspringboot.model.community.CommunityPost;
 import com.erg.ergspringboot.model.community.CommunityReaction;
-import com.erg.ergspringboot.model.content.Post;
+import com.erg.ergspringboot.content.persistence.Post;
 import com.erg.ergspringboot.model.recruitment.RecruitmentCandidate;
 import com.erg.ergspringboot.model.recruitment.RecruitmentJob;
 import com.erg.ergspringboot.model.users.Profile;
@@ -122,7 +122,7 @@ class RelationalModelMappingTest {
         assertOneToManyInverse(User.class, "loginAttempts", "user");
         assertOneToManyInverse(EducationUnit.class, "children", "parent");
         assertOneToManyInverse(RecruitmentJob.class, "candidates", "job");
-        assertOneToManyInverse(com.erg.ergspringboot.model.content.PostCategory.class, "posts", "category");
+        assertOneToManyInverse(com.erg.ergspringboot.content.persistence.PostCategory.class, "posts", "category");
         assertOneToManyInverse(com.erg.ergspringboot.model.community.CommunityTopic.class, "posts", "topic");
         assertOneToManyInverse(CommunityPost.class, "media", "post");
         assertOneToManyInverse(CommunityPost.class, "comments", "post");

@@ -4,10 +4,10 @@ import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupp
 import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.required;
 
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.learningcontent.ContentAsset;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
-import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentAsset;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemAsset;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItem;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.GoogleSlidesLectureResponse;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentAssetRequest;

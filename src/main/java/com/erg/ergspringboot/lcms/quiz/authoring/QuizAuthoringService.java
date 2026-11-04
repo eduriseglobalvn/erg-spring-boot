@@ -6,10 +6,10 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.DeleteQ
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.lms.Quiz;
-import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
-import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.lcms.internal.quiz.assessment.AssessmentCurriculumBridge;
 import java.time.OffsetDateTime;
 import java.util.List;

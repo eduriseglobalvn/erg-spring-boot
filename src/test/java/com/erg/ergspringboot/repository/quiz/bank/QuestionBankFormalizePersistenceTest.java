@@ -1,13 +1,13 @@
-package com.erg.ergspringboot.repository.quiz.bank;
+package com.erg.ergspringboot.lcms.persistence.quiz.bank;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
 import com.erg.ergspringboot.model.lms.Question;
-import com.erg.ergspringboot.model.quiz.bank.QuestionBankCategory;
-import com.erg.ergspringboot.model.quiz.bank.QuestionBankLevel;
-import com.erg.ergspringboot.model.quiz.bank.QuestionBankSubject;
-import com.erg.ergspringboot.model.quiz.bank.QuizBankItem;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionBankCategory;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionBankLevel;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionBankSubject;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizBankItem;
 import com.erg.ergspringboot.repository.lms.QuestionRepository;
 import java.util.List;
 import java.util.Map;

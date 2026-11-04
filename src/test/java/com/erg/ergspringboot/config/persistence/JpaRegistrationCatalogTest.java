@@ -61,6 +61,16 @@ class JpaRegistrationCatalogTest {
     }
 
     @Test
+    void ownedPartiallyManagedModuleAdmitsOnlyAllowListedEntities() {
+        String persistence = "com.erg.ergspringboot.content.persistence";
+        assertThat(JpaRegistrationCatalog.entityScanPackages()).contains(persistence);
+        assertThat(JpaRegistrationCatalog.enabledEntityPackages()).doesNotContain(persistence);
+        assertThat(JpaRegistrationCatalog.isManagedEntityClass(persistence + ".ContentLifecycleTransition")).isTrue();
+        assertThat(JpaRegistrationCatalog.isManagedEntityClass(persistence + ".Post")).isFalse();
+        assertThat(JpaRegistrationCatalog.isManagedEntityClass(persistence + ".Page")).isFalse();
+    }
+
+    @Test
     void repositoryRegistrationUsesCanonicalRootConvention() throws IOException {
         String config = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/config/persistence/PostgresJpaConfig.java"));

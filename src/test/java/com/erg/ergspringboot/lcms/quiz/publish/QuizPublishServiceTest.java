@@ -13,13 +13,13 @@ import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.PublishRe
 import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.repository.lms.QuestionRepository;
 import com.erg.ergspringboot.repository.lms.QuizQuestionRepository;
-import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.model.quiz.version.QuizVersion;
 import com.erg.ergspringboot.model.quiz.version.QuizVersionQuestion;
 import com.erg.ergspringboot.model.quiz.version.QuizVersionSection;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
-import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizPackageRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionQuestionRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;

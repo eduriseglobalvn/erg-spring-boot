@@ -8,11 +8,11 @@ import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupp
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.learningcontent.ContentItem;
-import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
-import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
-import com.erg.ergspringboot.repository.learningcontent.CurriculumTopicLookupRepository;
-import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItem;
+import com.erg.ergspringboot.learningcontent.persistence.ContentItemRepository;
+import com.erg.ergspringboot.learningcontent.persistence.CurriculumTopicLookupRepository;
+import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.PlaceContentItemRequest;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.ReorderTopicContentItemRequest;
 import java.util.HashMap;
