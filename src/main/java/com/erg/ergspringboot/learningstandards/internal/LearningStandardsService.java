@@ -1,8 +1,21 @@
 package com.erg.ergspringboot.learningstandards.internal;
 
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsAccessGuard.ensureLaunch;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsAccessGuard.ensureManage;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsAccessGuard.ensureRead;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsAccessGuard.tenant;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsInputs.key;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsInputs.now;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsInputs.parseTime;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsInputs.required;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsInputs.sha;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsInputs.trimToNull;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsResponseMapper.ltiResponse;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsResponseMapper.packageResponse;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsResponseMapper.version;
+import static com.erg.ergspringboot.learningstandards.internal.LearningStandardsResponseMapper.xapiResponse;
+
 import com.erg.ergspringboot.audit.AuditOperations;
-import com.erg.ergspringboot.audit.AuditOutcome;
-import com.erg.ergspringboot.audit.AuditRecord;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ForbiddenException;
@@ -30,8 +43,6 @@ import com.erg.ergspringboot.learningstandards.persistence.LearningPackage;
 import com.erg.ergspringboot.learningstandards.persistence.LearningStandardsCommandReceipt;
 import com.erg.ergspringboot.learningstandards.persistence.LtiRegistration;
 import com.erg.ergspringboot.learningstandards.persistence.XapiStatement;
-import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.learningstandards.persistence.LearningPackageRepository;
 import com.erg.ergspringboot.learningstandards.persistence.LearningStandardsCommandReceiptRepository;
@@ -39,18 +50,13 @@ import com.erg.ergspringboot.learningstandards.persistence.LtiRegistrationReposi
 import com.erg.ergspringboot.learningstandards.persistence.XapiStatementRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,16 +75,14 @@ public class LearningStandardsService implements LearningStandardsPort {
     private static final String ACCEPTED = "ACCEPTED";
     private static final int MAX_PACKAGE_TITLE = 255;
     private static final long MAX_PACKAGE_BYTES = 512L * 1024L * 1024L;
-    private static final Pattern SHA256 = Pattern.compile("[0-9a-fA-F]{64}");
 
     private final LearningPackageRepository packages;
     private final LtiRegistrationRepository registrations;
     private final XapiStatementRepository statements;
-    private final LearningStandardsCommandReceiptRepository receipts;
     private final LearningStandardsArtifactStorage storage;
     private final LtiLaunchTokenVerifier ltiVerifier;
     private final ApplicationEventPublisher events;
-    private final AuditOperations audit;
+    private final LearningStandardsCommandJournal journal;
 
     @Autowired
     public LearningStandardsService(
@@ -93,11 +97,10 @@ public class LearningStandardsService implements LearningStandardsPort {
         this.packages = packages;
         this.registrations = registrations;
         this.statements = statements;
-        this.receipts = receipts;
         this.storage = storage;
         this.ltiVerifier = ltiVerifier;
         this.events = events;
-        this.audit = audit;
+        this.journal = new LearningStandardsCommandJournal(receipts, audit);
     }
 
     @Override
@@ -124,7 +127,7 @@ public class LearningStandardsService implements LearningStandardsPort {
         String key = key(idempotencyKey);
         String hash = Hashing.sha256(String.join("\u001f", title, standard, packageVersion, artifactKey,
                 artifactSha, Long.toString(byteSize), manifestSha, launchPath));
-        LearningStandardsCommandReceipt replay = begin(tenant, "CREATE_PACKAGE", key, hash);
+        LearningStandardsCommandReceipt replay = journal.begin(tenant, "CREATE_PACKAGE", key, hash);
         if (replay != null) return packageResponse(findPackage(tenant, replay.getAggregateId()));
         if (packages.findByTenantIdAndArtifactKey(tenant, artifactKey).isPresent()) {
             throw new ConflictException("artifactKey is already registered");
@@ -143,8 +146,8 @@ public class LearningStandardsService implements LearningStandardsPort {
         value.setCreatedBy(access.userId());
         value.setUpdatedBy(access.userId());
         LearningPackage saved = packages.saveAndFlush(value);
-        saveReceipt(tenant, "CREATE_PACKAGE", key, hash, "LEARNING_PACKAGE", saved.getId());
-        audit(access, "LEARNING_PACKAGE_CREATED", "LEARNING_PACKAGE", saved.getId(), key,
+        journal.saveReceipt(tenant, "CREATE_PACKAGE", key, hash, "LEARNING_PACKAGE", saved.getId());
+        journal.audit(access, "LEARNING_PACKAGE_CREATED", "LEARNING_PACKAGE", saved.getId(), key,
                 Map.of("standard", standard, "byteSize", byteSize));
         return packageResponse(saved);
     }
@@ -158,7 +161,7 @@ public class LearningStandardsService implements LearningStandardsPort {
         List<LearningPackage> values = requested == null
                 ? packages.findTop100ByTenantIdOrderByUpdatedAtDesc(tenant)
                 : packages.findTop100ByTenantIdAndStatusOrderByUpdatedAtDesc(tenant, requested.toUpperCase(Locale.ROOT));
-        return values.stream().map(this::packageResponse).toList();
+        return values.stream().map(LearningStandardsResponseMapper::packageResponse).toList();
     }
 
     @Override
@@ -176,7 +179,7 @@ public class LearningStandardsService implements LearningStandardsPort {
         String key = key(idempotencyKey);
         String hash = Hashing.sha256("validate-package\u001f" + value.getId() + "\u001f"
                 + safe.expectedVersion() + "\u001f" + Hashing.sha256(manifest));
-        LearningStandardsCommandReceipt replay = begin(tenant, "VALIDATE_PACKAGE", key, hash);
+        LearningStandardsCommandReceipt replay = journal.begin(tenant, "VALIDATE_PACKAGE", key, hash);
         if (replay != null) return packageResponse(findPackage(tenant, replay.getAggregateId()));
         value.setStatus(VALIDATING);
         value.setQuarantineReason(null);
@@ -198,18 +201,18 @@ public class LearningStandardsService implements LearningStandardsPort {
         value.setManifestIdentifier(failure == null ? manifestResult.identifier() : null);
         value.setUpdatedBy(access.userId());
         LearningPackage saved = packages.saveAndFlush(value);
-        saveReceipt(tenant, "VALIDATE_PACKAGE", key, hash, "LEARNING_PACKAGE", saved.getId());
+        journal.saveReceipt(tenant, "VALIDATE_PACKAGE", key, hash, "LEARNING_PACKAGE", saved.getId());
         String eventId = IdGenerator.newId();
         String eventCorrelation = correlation(correlationId, eventId);
         if (failure == null) {
             events.publishEvent(new LearningPackageReady(eventId, tenant, saved.getId(), access.userId(),
                     version(saved), now(), 1, eventCorrelation, eventCorrelation));
-            audit(access, "LEARNING_PACKAGE_READY", "LEARNING_PACKAGE", saved.getId(), key,
+            journal.audit(access, "LEARNING_PACKAGE_READY", "LEARNING_PACKAGE", saved.getId(), key,
                     Map.of("standard", saved.getStandard()));
         } else {
             events.publishEvent(new LearningPackageQuarantined(eventId, tenant, saved.getId(), failure,
                     access.userId(), version(saved), now(), 1, eventCorrelation, eventCorrelation));
-            audit(access, "LEARNING_PACKAGE_QUARANTINED", "LEARNING_PACKAGE", saved.getId(), key,
+            journal.audit(access, "LEARNING_PACKAGE_QUARANTINED", "LEARNING_PACKAGE", saved.getId(), key,
                     Map.of("reason", failure));
         }
         return packageResponse(saved);
@@ -255,7 +258,7 @@ public class LearningStandardsService implements LearningStandardsPort {
         }
         String key = key(idempotencyKey);
         String hash = Hashing.sha256(String.join("\u001f", issuer, clientId, deploymentId, pem, host));
-        LearningStandardsCommandReceipt replay = begin(tenant, "CREATE_LTI_REGISTRATION", key, hash);
+        LearningStandardsCommandReceipt replay = journal.begin(tenant, "CREATE_LTI_REGISTRATION", key, hash);
         if (replay != null) return ltiResponse(findRegistration(tenant, replay.getAggregateId()));
         if (registrations.findByTenantIdAndIssuerAndClientId(tenant, issuer, clientId).isPresent()) {
             throw new ConflictException("LTI registration already exists");
@@ -271,8 +274,8 @@ public class LearningStandardsService implements LearningStandardsPort {
         value.setCreatedBy(access.userId());
         value.setUpdatedBy(access.userId());
         LtiRegistration saved = registrations.saveAndFlush(value);
-        saveReceipt(tenant, "CREATE_LTI_REGISTRATION", key, hash, "LTI_REGISTRATION", saved.getId());
-        audit(access, "LTI_REGISTRATION_CREATED", "LTI_REGISTRATION", saved.getId(), key,
+        journal.saveReceipt(tenant, "CREATE_LTI_REGISTRATION", key, hash, "LTI_REGISTRATION", saved.getId());
+        journal.audit(access, "LTI_REGISTRATION_CREATED", "LTI_REGISTRATION", saved.getId(), key,
                 Map.of("issuer", issuer, "clientId", clientId));
         return ltiResponse(saved);
     }
@@ -292,7 +295,7 @@ public class LearningStandardsService implements LearningStandardsPort {
         String key = key(idempotencyKey == null ? Hashing.sha256(signedToken) : idempotencyKey);
         String hash = Hashing.sha256("lti-launch\u001f" + registration.getId() + "\u001f" + nonce
                 + "\u001f" + Hashing.sha256(signedToken));
-        LearningStandardsCommandReceipt replay = begin(tenant, "LTI_LAUNCH", key, hash);
+        LearningStandardsCommandReceipt replay = journal.begin(tenant, "LTI_LAUNCH", key, hash);
         if (replay != null) return new LtiLaunchResponse(registration.getId(), "replayed", "", ACCEPTED, now());
         LtiLaunchTokenVerifier.VerifiedLaunch verified;
         try {
@@ -302,12 +305,12 @@ public class LearningStandardsService implements LearningStandardsPort {
         } catch (IllegalArgumentException exception) {
             throw new ForbiddenException("LTI launch proof is invalid");
         }
-        saveReceipt(tenant, "LTI_LAUNCH", key, hash, "LTI_REGISTRATION", registration.getId());
+        journal.saveReceipt(tenant, "LTI_LAUNCH", key, hash, "LTI_REGISTRATION", registration.getId());
         String eventId = IdGenerator.newId();
         String eventCorrelation = correlation(correlationId, eventId);
         events.publishEvent(new LtiLaunchAccepted(eventId, tenant, registration.getId(), verified.subject(),
                 access.userId(), version(registration), now(), 1, eventCorrelation, eventCorrelation));
-        audit(access, "LTI_LAUNCH_ACCEPTED", "LTI_REGISTRATION", registration.getId(), key,
+        journal.audit(access, "LTI_LAUNCH_ACCEPTED", "LTI_REGISTRATION", registration.getId(), key,
                 Map.of("subjectHash", Hashing.sha256(verified.subject())));
         return new LtiLaunchResponse(registration.getId(), verified.subject(), verified.targetLinkUri(), ACCEPTED, now());
     }
@@ -327,14 +330,14 @@ public class LearningStandardsService implements LearningStandardsPort {
         String key = key(idempotencyKey == null ? statementId : idempotencyKey);
         String hash = Hashing.sha256(String.join("\u001f", statementId, safe.actorId(), safe.verb(), safe.objectId(), payloadHash,
                 safe.occurredAt() == null ? "" : safe.occurredAt()));
-        LearningStandardsCommandReceipt replay = begin(tenant, "XAPI_STATEMENT", key, hash);
+        LearningStandardsCommandReceipt replay = journal.begin(tenant, "XAPI_STATEMENT", key, hash);
         if (replay != null) return xapiResponse(findStatement(tenant, replay.getAggregateId()));
         Optional<XapiStatement> existing = statements.findByTenantIdAndStatementId(tenant, statementId);
         if (existing.isPresent()) {
             if (!payloadHash.equalsIgnoreCase(existing.get().getPayloadSha256())) {
                 throw new ConflictException("xAPI statementId was already used with another payload");
             }
-            saveReceipt(tenant, "XAPI_STATEMENT", key, hash, "XAPI_STATEMENT", existing.get().getId());
+            journal.saveReceipt(tenant, "XAPI_STATEMENT", key, hash, "XAPI_STATEMENT", existing.get().getId());
             return xapiResponse(existing.get());
         }
         XapiStatement value = new XapiStatement();
@@ -349,79 +352,14 @@ public class LearningStandardsService implements LearningStandardsPort {
         value.setReceivedAt(now());
         value.setAcceptedBy(access.userId());
         XapiStatement saved = statements.saveAndFlush(value);
-        saveReceipt(tenant, "XAPI_STATEMENT", key, hash, "XAPI_STATEMENT", saved.getId());
+        journal.saveReceipt(tenant, "XAPI_STATEMENT", key, hash, "XAPI_STATEMENT", saved.getId());
         String eventId = IdGenerator.newId();
         String eventCorrelation = correlation(correlationId, eventId);
         events.publishEvent(new XapiStatementAccepted(eventId, tenant, saved.getStatementId(), saved.getActorHash(),
                 version(saved), now(), 1, eventCorrelation, eventCorrelation));
-        audit(access, "XAPI_STATEMENT_ACCEPTED", "XAPI_STATEMENT", saved.getId(), key,
+        journal.audit(access, "XAPI_STATEMENT_ACCEPTED", "XAPI_STATEMENT", saved.getId(), key,
                 Map.of("statementId", statementId, "actorHash", saved.getActorHash()));
         return xapiResponse(saved);
-    }
-
-    private LearningStandardsCommandReceipt begin(String tenant, String operation, String key, String hash) {
-        Optional<LearningStandardsCommandReceipt> existing = receipts
-                .findByTenantIdAndIdempotencyKeyAndOperation(tenant, key, operation);
-        if (existing.isEmpty()) return null;
-        if (!hash.equals(existing.get().getPayloadHash())) throw new ConflictException("IDEMPOTENCY_CONFLICT");
-        return existing.get();
-    }
-
-    private void saveReceipt(String tenant, String operation, String key, String hash,
-                             String aggregateType, String aggregateId) {
-        LearningStandardsCommandReceipt receipt = new LearningStandardsCommandReceipt();
-        receipt.setTenantId(tenant);
-        receipt.setOperation(operation);
-        receipt.setIdempotencyKey(key);
-        receipt.setPayloadHash(hash);
-        receipt.setAggregateType(aggregateType);
-        receipt.setAggregateId(aggregateId);
-        receipts.saveAndFlush(receipt);
-    }
-
-    private void audit(UserAccessContext access, String action, String resourceType, String resourceId,
-                       String key, Map<String, Object> details) {
-        Map<String, Object> bounded = new LinkedHashMap<>();
-        details.forEach((name, value) -> {
-            if (bounded.size() < 12 && name != null && value != null) bounded.put(name, String.valueOf(value));
-        });
-        audit.record(new AuditRecord(access.tenantId(), access.userId(), "TENANT", access.tenantId(), action,
-                resourceType, resourceId, AuditOutcome.SUCCESS, null, null, null, bounded,
-                "learning-standards:" + key, now(), null));
-    }
-
-    private String tenant(UserAccessContext access) {
-        if (access == null || access.userId() == null || access.userId().isBlank()) {
-            throw new ForbiddenException("authenticated access context is required");
-        }
-        return AuthenticatedTenant.require(access.tenantId());
-    }
-
-    private void ensureManage() {
-        if (!permission("learning.standards.manage")) throw new ForbiddenException("learning standards management is required");
-    }
-
-    private void ensureRead() {
-        if (!permission("learning.standards.read") && !permission("learning.standards.manage")) {
-            throw new ForbiddenException("learning standards read permission is required");
-        }
-    }
-
-    private void ensureLaunch() {
-        if (!permission("learning.standards.launch") && !permission("learning.standards.manage")) {
-            throw new ForbiddenException("learning standards launch permission is required");
-        }
-    }
-
-    private boolean permission(String expected) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication != null && authentication.isAuthenticated()
-                && authentication.getPrincipal() instanceof ErgPrincipal principal)) return false;
-        if (principal.deniedPermissions().stream()
-                .map(value -> value == null ? "" : value.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(value -> value.equals("*") || value.equals(expected))) return false;
-        return principal.permissions().stream().map(value -> value == null ? "" : value.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(value -> value.equals("*") || value.equals(expected));
     }
 
     private LearningPackage findPackage(String tenant, String id) {
@@ -437,69 +375,6 @@ public class LearningStandardsService implements LearningStandardsPort {
     private XapiStatement findStatement(String tenant, String id) {
         return statements.findByTenantIdAndId(tenant, id)
                 .orElseThrow(() -> new ResourceNotFoundException("xAPI statement not found"));
-    }
-
-    private PackageResponse packageResponse(LearningPackage value) {
-        return new PackageResponse(value.getId(), value.getTenantId(), value.getTitle(), value.getStandard(),
-                value.getPackageVersion(), value.getArtifactKey(), value.getArtifactSha256(), value.getByteSize(),
-                value.getManifestSha256(), value.getManifestIdentifier(), value.getLaunchPath(), value.getStatus(),
-                value.getQuarantineReason(), version(value), value.getCreatedAt(), value.getUpdatedAt());
-    }
-
-    private LtiRegistrationResponse ltiResponse(LtiRegistration value) {
-        return new LtiRegistrationResponse(value.getId(), value.getTenantId(), value.getIssuer(), value.getClientId(),
-                value.getDeploymentId(), value.getAllowedTargetHost(), value.getStatus(), version(value),
-                value.getCreatedAt(), value.getUpdatedAt());
-    }
-
-    private XapiStatementResponse xapiResponse(XapiStatement value) {
-        return new XapiStatementResponse(value.getId(), value.getTenantId(), value.getStatementId(), value.getActorHash(),
-                value.getVerb(), value.getObjectId(), value.getPayloadSha256(), value.getStatus(), value.getOccurredAt(),
-                value.getReceivedAt(), version(value));
-    }
-
-    private long version(Object value) {
-        return switch (value) {
-            case LearningPackage packageValue -> packageValue.getRecordVersion() == null ? 0 : packageValue.getRecordVersion();
-            case LtiRegistration registration -> registration.getRecordVersion() == null ? 0 : registration.getRecordVersion();
-            case XapiStatement statement -> statement.getRecordVersion() == null ? 0 : statement.getRecordVersion();
-            default -> 0;
-        };
-    }
-
-    private String required(String value, String name, int max) {
-        String normalized = trimToNull(value);
-        if (normalized == null) throw new BadRequestException(name + " is required");
-        if (normalized.length() > max) throw new BadRequestException(name + " is too long");
-        return normalized;
-    }
-
-    private String key(String value) {
-        return required(value, "idempotencyKey", 255);
-    }
-
-    private String sha(String value, String field) {
-        if (!SHA256.matcher(value).matches()) throw new BadRequestException(field + " must be a SHA-256 hex digest");
-        return value.toLowerCase(Locale.ROOT);
-    }
-
-    private String trimToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private OffsetDateTime parseTime(String value) {
-        if (trimToNull(value) == null) return now();
-        try {
-            OffsetDateTime parsed = OffsetDateTime.parse(value.trim());
-            if (parsed.isAfter(now().plusMinutes(5))) throw new BadRequestException("occurredAt is in the future");
-            return parsed;
-        } catch (java.time.format.DateTimeParseException exception) {
-            throw new BadRequestException("occurredAt must be ISO-8601");
-        }
-    }
-
-    private OffsetDateTime now() {
-        return OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     private String correlation(String value, String fallback) {

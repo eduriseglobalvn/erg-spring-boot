@@ -1,11 +1,25 @@
 package com.erg.ergspringboot.enterpriseconnectors.internal;
 
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorAccessGuard.ensureRead;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorAccessGuard.ensureSync;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorAccessGuard.ensureWrite;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorAccessGuard.tenant;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.ids;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.joinSample;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.key;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.mapping;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.optional;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.required;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorInputs.secret;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorResponseMapper.connectorResponse;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorResponseMapper.deprovisionResponse;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorResponseMapper.previewResponse;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorResponseMapper.syncResponse;
+import static com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorResponseMapper.version;
+
 import com.erg.ergspringboot.audit.AuditOperations;
-import com.erg.ergspringboot.audit.AuditOutcome;
-import com.erg.ergspringboot.audit.AuditRecord;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorDeprovisioned;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorEvent;
-import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorOperations;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorPolicy;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorPort;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorProviderPort;
@@ -20,15 +34,13 @@ import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorResponses.D
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorResponses.SyncPreviewResponse;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorResponses.SyncRunResponse;
 import com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorSyncCompleted;
+import com.erg.ergspringboot.enterpriseconnectors.internal.EnterpriseConnectorCommandJournal.Claim;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
-import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.enterpriseconnectors.persistence.EnterpriseConnector;
 import com.erg.ergspringboot.enterpriseconnectors.persistence.EnterpriseConnectorCommandReceipt;
 import com.erg.ergspringboot.enterpriseconnectors.persistence.EnterpriseConnectorRun;
-import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.enterpriseconnectors.persistence.EnterpriseConnectorCommandReceiptRepository;
 import com.erg.ergspringboot.enterpriseconnectors.persistence.EnterpriseConnectorRepository;
@@ -36,23 +48,15 @@ import com.erg.ergspringboot.enterpriseconnectors.persistence.EnterpriseConnecto
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,21 +72,18 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
     private static final String RETRY = "RETRY";
     private static final String DEPROVISION = "DEPROVISION";
     private static final String PREVIEW = "PREVIEW";
-    private static final String SUCCEEDED = "SUCCEEDED";
     /** Claimed run whose provider call is in flight (V122); replays of the same key return it. */
     private static final String RUNNING = "RUNNING";
     private static final String FAILED = "FAILED";
-    private static final String RETRYABLE_FAILED = "RETRYABLE_FAILED";
+    private static final String RETRYABLE_FAILED = EnterpriseConnectorCommandJournal.RETRYABLE_FAILED;
     private static final int MAX_RETRIES = 3;
-    private static final int MAX_SAMPLE_IDS = 20;
 
     private final EnterpriseConnectorRepository connectors;
     private final EnterpriseConnectorRunRepository runs;
-    private final EnterpriseConnectorCommandReceiptRepository receipts;
     private final EnterpriseConnectorProviderRegistry registry;
     private final ApplicationEventPublisher events;
-    private final AuditOperations audit;
     private final TransactionTemplate transaction;
+    private final EnterpriseConnectorCommandJournal journal;
 
     @Autowired
     public EnterpriseConnectorService(
@@ -95,11 +96,10 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
             @Qualifier("postgresTransactionManager") PlatformTransactionManager transactionManager) {
         this.connectors = connectors;
         this.runs = runs;
-        this.receipts = receipts;
         this.registry = registry;
         this.events = events;
-        this.audit = audit;
         this.transaction = new TransactionTemplate(transactionManager);
+        this.journal = new EnterpriseConnectorCommandJournal(receipts, runs, audit, transaction);
     }
 
     @Override
@@ -121,7 +121,7 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         String key = key(idempotencyKey);
         String hash = EnterpriseConnectorPolicy.sha256(String.join("\u001f", providerKind.name(), adapterKey,
                 providerKey, displayName, endpoint == null ? "" : endpoint, mapping.version(), mapping.hash()));
-        EnterpriseConnectorCommandReceipt replay = begin(tenant, "REGISTER_CONNECTOR", key, hash);
+        EnterpriseConnectorCommandReceipt replay = journal.begin(tenant, "REGISTER_CONNECTOR", key, hash);
         if (replay != null) return connectorResponse(findConnector(tenant, replay.getAggregateId()));
         if (connectors.findByTenantIdAndProviderKey(tenant, providerKey).isPresent()) {
             throw new ConflictException("providerKey is already registered");
@@ -140,11 +140,11 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         value.setCreatedBy(access.userId());
         value.setUpdatedBy(access.userId());
         EnterpriseConnector saved = connectors.saveAndFlush(value);
-        saveReceipt(tenant, "REGISTER_CONNECTOR", key, hash, "ENTERPRISE_CONNECTOR", saved.getId());
+        journal.saveReceipt(tenant, "REGISTER_CONNECTOR", key, hash, "ENTERPRISE_CONNECTOR", saved.getId());
         String eventId = IdGenerator.newId();
         publish(new EnterpriseConnectorRegistered(eventId, tenant, saved.getId(), access.userId(), version(saved),
                 now(), 1, correlation(correlationId, eventId), correlation(correlationId, eventId)));
-        audit(access, "ENTERPRISE_CONNECTOR_REGISTERED", "ENTERPRISE_CONNECTOR", saved.getId(), key,
+        journal.audit(access, "ENTERPRISE_CONNECTOR_REGISTERED", "ENTERPRISE_CONNECTOR", saved.getId(), key,
                 Map.of("providerKind", providerKind.name(), "adapterKey", adapterKey, "mappingHash", mapping.hash()));
         return connectorResponse(saved);
     }
@@ -154,7 +154,8 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
     public List<ConnectorResponse> connectors(UserAccessContext access) {
         String tenant = tenant(access);
         ensureRead();
-        return connectors.findTop100ByTenantIdOrderByUpdatedAtDesc(tenant).stream().map(this::connectorResponse).toList();
+        return connectors.findTop100ByTenantIdOrderByUpdatedAtDesc(tenant).stream()
+                .map(EnterpriseConnectorResponseMapper::connectorResponse).toList();
     }
 
     @Override
@@ -182,17 +183,17 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         String key = key(idempotencyKey);
         String hash = EnterpriseConnectorPolicy.sha256("DRY_RUN\u001f" + connectorRef + "\u001f"
                 + safe.expectedVersion() + "\u001f" + optional(safe.cursor(), 96));
-        Claim claim = claim(tenant, DRY_RUN, key, hash, () -> {
+        Claim claim = journal.claim(tenant, DRY_RUN, key, hash, () -> {
             EnterpriseConnector connector = findConnector(tenant, connectorRef);
             assertVersion(connector, safe.expectedVersion());
-            return new Claim(connector, runs.saveAndFlush(newRun(connector, DRY_RUN, RUNNING, access.userId())), false);
+            return new Claim(connector, runs.saveAndFlush(journal.newRun(connector, DRY_RUN, RUNNING, access.userId())), false);
         });
         if (claim.replay()) return previewResponse(claim.run());
         EnterpriseConnectorProviderPort.PreviewResult result;
         try {
             result = provider(claim.connector()).preview(descriptor(claim.connector()), safe.cursor());
         } catch (RuntimeException failure) {
-            return previewResponse(recordProviderFailure(tenant, claim.run().getId()));
+            return previewResponse(journal.recordProviderFailure(tenant, claim.run().getId()));
         }
         return transaction.execute(status -> {
             EnterpriseConnectorRun run = findRun(tenant, claim.run().getId());
@@ -203,7 +204,7 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
             run.setFailedCount(0);
             run.setSampleExternalIds(joinSample(result.sampleExternalIds()));
             EnterpriseConnectorRun saved = runs.saveAndFlush(run);
-            audit(access, "ENTERPRISE_CONNECTOR_DRY_RUN", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
+            journal.audit(access, "ENTERPRISE_CONNECTOR_DRY_RUN", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
                     Map.of("connectorId", claim.connector().getId(), "total", saved.getProcessed()));
             return previewResponse(saved);
         });
@@ -219,10 +220,10 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         String key = key(idempotencyKey);
         String hash = EnterpriseConnectorPolicy.sha256("SYNC\u001f" + connectorRef + "\u001f"
                 + safe.expectedVersion() + "\u001f" + optional(safe.cursor(), 96));
-        Claim claim = claim(tenant, SYNC, key, hash, () -> {
+        Claim claim = journal.claim(tenant, SYNC, key, hash, () -> {
             EnterpriseConnector connector = findConnector(tenant, connectorRef);
             assertVersion(connector, safe.expectedVersion());
-            return new Claim(connector, runs.saveAndFlush(newRun(connector, SYNC, RUNNING, access.userId())), false);
+            return new Claim(connector, runs.saveAndFlush(journal.newRun(connector, SYNC, RUNNING, access.userId())), false);
         });
         if (claim.replay()) return syncResponse(claim.run());
         return syncResponse(callAndRecordSync(access, tenant, claim, safe.cursor(), correlationId, key,
@@ -246,7 +247,7 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         String key = key(idempotencyKey);
         String hash = EnterpriseConnectorPolicy.sha256("RETRY\u001f" + connectorRef + "\u001f" + runRef
                 + "\u001f" + safe.expectedVersion());
-        Claim claim = claim(tenant, RETRY, key, hash, () -> {
+        Claim claim = journal.claim(tenant, RETRY, key, hash, () -> {
             EnterpriseConnector connector = findConnector(tenant, connectorRef);
             EnterpriseConnectorRun parent = findRun(tenant, runRef);
             if (!connector.getId().equals(parent.getConnectorId())) {
@@ -262,7 +263,7 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
             if (safe.expectedVersion() == null || safe.expectedVersion() != version(parent)) {
                 throw new ConflictException("connector run changed; reload before retry");
             }
-            EnterpriseConnectorRun retry = newRun(connector, RETRY, RUNNING, access.userId());
+            EnterpriseConnectorRun retry = journal.newRun(connector, RETRY, RUNNING, access.userId());
             retry.setParentRunId(parent.getId());
             retry.setRetryCount(previous + 1);
             return new Claim(connector, runs.saveAndFlush(retry), false);
@@ -284,17 +285,17 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         String key = key(idempotencyKey);
         String hash = EnterpriseConnectorPolicy.sha256("DEPROVISION\u001f" + connectorRef + "\u001f"
                 + safe.expectedVersion() + "\u001f" + String.join("\u001e", externalIds) + "\u001f" + reason);
-        Claim claim = claim(tenant, DEPROVISION, key, hash, () -> {
+        Claim claim = journal.claim(tenant, DEPROVISION, key, hash, () -> {
             EnterpriseConnector connector = findConnector(tenant, connectorRef);
             assertVersion(connector, safe.expectedVersion());
-            return new Claim(connector, runs.saveAndFlush(newRun(connector, DEPROVISION, RUNNING, access.userId())), false);
+            return new Claim(connector, runs.saveAndFlush(journal.newRun(connector, DEPROVISION, RUNNING, access.userId())), false);
         });
         if (claim.replay()) return deprovisionResponse(claim.run());
         EnterpriseConnectorProviderPort.DeprovisionResult result;
         try {
             result = provider(claim.connector()).deprovision(descriptor(claim.connector()), externalIds);
         } catch (RuntimeException failure) {
-            return deprovisionResponse(recordProviderFailure(tenant, claim.run().getId()));
+            return deprovisionResponse(journal.recordProviderFailure(tenant, claim.run().getId()));
         }
         return transaction.execute(status -> {
             EnterpriseConnectorRun run = findRun(tenant, claim.run().getId());
@@ -306,37 +307,14 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
             run.setSampleExternalIds(joinSample(externalIds));
             EnterpriseConnectorRun saved = runs.saveAndFlush(run);
             String eventId = IdGenerator.newId();
-            publish(new com.erg.ergspringboot.enterpriseconnectors.EnterpriseConnectorDeprovisioned(eventId, tenant,
+            publish(new EnterpriseConnectorDeprovisioned(eventId, tenant,
                     claim.connector().getId(), saved.getId(), access.userId(), version(saved), externalIds.size(),
                     result.deprovisioned(), result.skipped(), now(), 1, correlation(correlationId, eventId),
                     correlation(correlationId, eventId)));
-            audit(access, "ENTERPRISE_CONNECTOR_DEPROVISION", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
+            journal.audit(access, "ENTERPRISE_CONNECTOR_DEPROVISION", "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
                     Map.of("connectorId", claim.connector().getId(), "requested", externalIds.size(), "reason", reason));
             return deprovisionResponse(saved);
         });
-    }
-
-    private record Claim(EnterpriseConnector connector, EnterpriseConnectorRun run, boolean replay) {
-    }
-
-    /** Short transaction: replay an existing receipt, or create the RUNNING run and its receipt. */
-    private Claim claim(String tenant, String operation, String key, String hash, Supplier<Claim> create) {
-        try {
-            return transaction.execute(status -> {
-                EnterpriseConnectorCommandReceipt replay = begin(tenant, operation, key, hash);
-                if (replay != null) return new Claim(null, findRun(tenant, replay.getAggregateId()), true);
-                Claim created = create.get();
-                saveReceipt(tenant, operation, key, hash, "ENTERPRISE_CONNECTOR_RUN", created.run().getId());
-                return created;
-            });
-        } catch (DataIntegrityViolationException duplicate) {
-            // A concurrent request claimed the same key (receipt) or the same parent run (retry).
-            return transaction.execute(status -> {
-                EnterpriseConnectorCommandReceipt replay = begin(tenant, operation, key, hash);
-                if (replay == null) throw new ConflictException("connector run is already being processed");
-                return new Claim(null, findRun(tenant, replay.getAggregateId()), true);
-            });
-        }
     }
 
     private EnterpriseConnectorRun callAndRecordSync(UserAccessContext access, String tenant, Claim claim,
@@ -345,27 +323,17 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         try {
             result = provider(claim.connector()).sync(descriptor(claim.connector()), cursor);
         } catch (RuntimeException failure) {
-            return recordProviderFailure(tenant, claim.run().getId());
+            return journal.recordProviderFailure(tenant, claim.run().getId());
         }
         return transaction.execute(status -> {
             EnterpriseConnectorRun run = findRun(tenant, claim.run().getId());
             apply(run, result);
             EnterpriseConnectorRun saved = runs.saveAndFlush(run);
             publishSync(access, claim.connector(), saved, correlationId);
-            audit(access, action, "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
+            journal.audit(access, action, "ENTERPRISE_CONNECTOR_RUN", saved.getId(), key,
                     Map.of("connectorId", claim.connector().getId(), "processed", saved.getProcessed(),
                             "failed", saved.getFailedCount(), "retryCount", saved.getRetryCount()));
             return saved;
-        });
-    }
-
-    /** A provider exception leaves a retryable failed run instead of a stuck RUNNING row. */
-    private EnterpriseConnectorRun recordProviderFailure(String tenant, String runId) {
-        return transaction.execute(status -> {
-            EnterpriseConnectorRun run = findRun(tenant, runId);
-            run.setStatus(RETRYABLE_FAILED);
-            run.setErrorCode("PROVIDER_ERROR");
-            return runs.saveAndFlush(run);
         });
     }
 
@@ -379,21 +347,6 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         run.setErrorCode(optional(result.errorCode(), 96));
     }
 
-    private EnterpriseConnectorRun newRun(EnterpriseConnector connector, String mode, String status, String userId) {
-        EnterpriseConnectorRun run = new EnterpriseConnectorRun();
-        run.setTenantId(connector.getTenantId());
-        run.setConnectorId(connector.getId());
-        run.setMode(mode);
-        run.setStatus(status);
-        run.setProcessed(0);
-        run.setCreatedCount(0);
-        run.setUpdatedCount(0);
-        run.setFailedCount(0);
-        run.setRetryCount(0);
-        run.setRequestedBy(userId);
-        return run;
-    }
-
     private EnterpriseConnectorProviderPort provider(EnterpriseConnector connector) {
         return registry.require(connector.getAdapterKey());
     }
@@ -401,26 +354,6 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
     private EnterpriseConnectorProviderPort.ConnectorDescriptor descriptor(EnterpriseConnector connector) {
         return new EnterpriseConnectorProviderPort.ConnectorDescriptor(connector.getProviderKey(),
                 ProviderKind.valueOf(connector.getProviderKind()), connector.getMappingVersion(), connector.getMappingHash());
-    }
-
-    private EnterpriseConnectorCommandReceipt begin(String tenant, String operation, String key, String hash) {
-        Optional<EnterpriseConnectorCommandReceipt> existing = receipts
-                .findByTenantIdAndOperationAndIdempotencyKey(tenant, operation, key);
-        if (existing.isEmpty()) return null;
-        if (!hash.equals(existing.get().getPayloadHash())) throw new ConflictException("idempotency key was reused with another payload");
-        return existing.get();
-    }
-
-    private void saveReceipt(String tenant, String operation, String key, String hash, String aggregateType,
-                             String aggregateId) {
-        EnterpriseConnectorCommandReceipt receipt = new EnterpriseConnectorCommandReceipt();
-        receipt.setTenantId(tenant);
-        receipt.setOperation(operation);
-        receipt.setIdempotencyKey(key);
-        receipt.setPayloadHash(hash);
-        receipt.setAggregateType(aggregateType);
-        receipt.setAggregateId(aggregateId);
-        receipts.saveAndFlush(receipt);
     }
 
     private void publish(EnterpriseConnectorEvent event) {
@@ -434,54 +367,6 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
                 access.userId(), version(run), run.getMode(), run.getProcessed(), run.getCreatedCount(),
                 run.getUpdatedCount(), run.getFailedCount(), now(), 1, correlation(correlationId, eventId),
                 correlation(correlationId, eventId)));
-    }
-
-    private void audit(UserAccessContext access, String action, String resourceType, String resourceId,
-                       String key, Map<String, Object> details) {
-        Map<String, Object> bounded = new LinkedHashMap<>();
-        details.forEach((name, value) -> {
-            if (bounded.size() < 12 && name != null && value != null) bounded.put(name, String.valueOf(value));
-        });
-        audit.record(new AuditRecord(access.tenantId(), access.userId(), "TENANT", access.tenantId(), action,
-                resourceType, resourceId, AuditOutcome.SUCCESS, null, null, null, bounded,
-                "enterprise-connectors:" + key, now(), null));
-    }
-
-    private void ensureWrite() {
-        if (!permission("enterprise.connectors.manage")) throw new ForbiddenException("connector management is required");
-    }
-
-    private void ensureRead() {
-        if (!permission("enterprise.connectors.read") && !permission("enterprise.connectors.manage")) {
-            throw new ForbiddenException("connector read permission is required");
-        }
-    }
-
-    private void ensureSync() {
-        if (!permission("enterprise.connectors.sync") && !permission("enterprise.connectors.manage")) {
-            throw new ForbiddenException("connector sync permission is required");
-        }
-    }
-
-    private boolean permission(String expected) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication != null && authentication.isAuthenticated()
-                && authentication.getPrincipal() instanceof ErgPrincipal principal)) return false;
-        if (principal.deniedPermissions().stream().map(this::lower)
-                .anyMatch(value -> value.equals("*") || value.equals(expected))) return false;
-        return principal.permissions().stream().map(this::lower)
-                .anyMatch(value -> value.equals("*") || value.equals(expected));
-    }
-
-    private String lower(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String tenant(UserAccessContext access) {
-        if (access == null || access.userId() == null || access.userId().isBlank()) {
-            throw new ForbiddenException("authenticated access context is required");
-        }
-        return AuthenticatedTenant.require(access.tenantId());
     }
 
     private EnterpriseConnector findConnector(String tenant, String id) {
@@ -500,94 +385,11 @@ public class EnterpriseConnectorService implements EnterpriseConnectorPort {
         }
     }
 
-    private EnterpriseConnectorPolicy.Mapping mapping(String version, Map<String, String> fieldMapping) {
-        try {
-            return EnterpriseConnectorPolicy.mapping(version, fieldMapping);
-        } catch (IllegalArgumentException exception) {
-            throw new BadRequestException(exception.getMessage());
-        }
-    }
-
-    private String secret(String value) {
-        try {
-            return EnterpriseConnectorPolicy.secretReference(value);
-        } catch (IllegalArgumentException exception) {
-            throw new BadRequestException(exception.getMessage());
-        }
-    }
-
-    private List<String> ids(List<String> values) {
-        if (values == null || values.isEmpty() || values.size() > 100) throw new BadRequestException("externalIds must contain 1-100 values");
-        LinkedHashSet<String> unique = new LinkedHashSet<>();
-        values.forEach(value -> unique.add(required(value, "externalId", 96)));
-        return List.copyOf(unique);
-    }
-
-    private String joinSample(List<String> values) {
-        if (values == null) return null;
-        return String.join(",", values.stream().filter(Objects::nonNull).map(value -> required(value, "sampleExternalId", 96))
-                .limit(MAX_SAMPLE_IDS).toList());
-    }
-
-    private String key(String value) {
-        return required(value, "idempotencyKey", 255);
-    }
-
-    private String required(String value, String name, int max) {
-        String normalized = value == null ? "" : value.trim();
-        if (normalized.isBlank()) throw new BadRequestException(name + " is required");
-        if (normalized.length() > max) throw new BadRequestException(name + " is too long");
-        return normalized;
-    }
-
-    private String optional(String value, int max) {
-        if (value == null || value.isBlank()) return null;
-        return required(value, "value", max);
-    }
-
-    private long version(EnterpriseConnector value) {
-        return value.getRecordVersion() == null ? 0 : value.getRecordVersion();
-    }
-
-    private long version(EnterpriseConnectorRun value) {
-        return value.getRecordVersion() == null ? 0 : value.getRecordVersion();
-    }
-
     private OffsetDateTime now() {
         return OffsetDateTime.now(ZoneOffset.UTC);
     }
 
     private String correlation(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
-    }
-
-    private ConnectorResponse connectorResponse(EnterpriseConnector value) {
-        return new ConnectorResponse(value.getId(), value.getTenantId(), value.getProviderKind(), value.getAdapterKey(),
-                value.getProviderKey(), value.getDisplayName(), value.getEndpoint(), "secret://***",
-                value.getMappingVersion(), value.getMappingHash(), value.getStatus(), version(value),
-                value.getCreatedAt(), value.getUpdatedAt());
-    }
-
-    private SyncPreviewResponse previewResponse(EnterpriseConnectorRun run) {
-        List<String> samples = splitSample(run.getSampleExternalIds());
-        return new SyncPreviewResponse(run.getConnectorId(), run.getId(), run.getMode(), run.getCreatedCount(),
-                run.getUpdatedCount(), Math.max(0, run.getProcessed() - run.getCreatedCount() - run.getUpdatedCount()),
-                run.getProcessed(), samples, run.getStatus(), version(run), run.getCreatedAt());
-    }
-
-    private SyncRunResponse syncResponse(EnterpriseConnectorRun run) {
-        return new SyncRunResponse(run.getConnectorId(), run.getId(), run.getMode(), run.getProcessed(),
-                run.getCreatedCount(), run.getUpdatedCount(), run.getFailedCount(), run.getRetryCount(),
-                run.getStatus(), run.getErrorCode(), version(run), run.getCreatedAt(), run.getUpdatedAt());
-    }
-
-    private DeprovisionResponse deprovisionResponse(EnterpriseConnectorRun run) {
-        return new DeprovisionResponse(run.getConnectorId(), run.getId(), run.getProcessed(), run.getCreatedCount(),
-                run.getFailedCount(), run.getStatus(), version(run), run.getCreatedAt());
-    }
-
-    private List<String> splitSample(String value) {
-        if (value == null || value.isBlank()) return List.of();
-        return List.of(value.split(",", MAX_SAMPLE_IDS));
     }
 }

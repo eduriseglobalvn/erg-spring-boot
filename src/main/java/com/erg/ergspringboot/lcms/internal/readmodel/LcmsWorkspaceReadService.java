@@ -1,16 +1,10 @@
 package com.erg.ergspringboot.lcms.internal.readmodel;
 
-import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.EffectivePermissionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.AccessManagementWorkspaceResponse;
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankQuestionRowResponse;
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankChoiceResponse;
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse;
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankQuizOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.RoleOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.ScopeOptionResponse;
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.UserAccessRowResponse;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
 import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
@@ -128,15 +122,15 @@ public class LcmsWorkspaceReadService {
                 : Map.of();
         return new QuestionBankWorkspaceResponse(
                 normalizedTenantId,
-                toQuestionPage(questions, usageCounts),
+                LcmsWorkspaceResponseMapper.toQuestionPage(questions, usageCounts),
                 subjectOptions.stream()
-                        .map(option -> toQuestionBankOption(option, List.of()))
+                        .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
                         .toList(),
                 levelOptions.stream()
-                        .map(option -> toQuestionBankOption(option, topicIdsByLevelId.getOrDefault(option.id(), List.of())))
+                        .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, topicIdsByLevelId.getOrDefault(option.id(), List.of())))
                         .toList(),
                 topicOptions.stream()
-                        .map(option -> toQuestionBankOption(option, List.of()))
+                        .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
                         .toList(),
                 quizOptions(
                         normalizedTenantId,
@@ -148,7 +142,7 @@ public class LcmsWorkspaceReadService {
                         normalizedQuizKind
                 )
                         .stream()
-                        .map(this::toQuizOption)
+                        .map(LcmsWorkspaceResponseMapper::toQuizOption)
                         .toList()
         );
     }
@@ -255,7 +249,7 @@ public class LcmsWorkspaceReadService {
                 : Map.of();
         return new AccessManagementWorkspaceResponse(
                 normalizedTenantId,
-                toUserAccessPage(users, effectivePermissions),
+                LcmsWorkspaceResponseMapper.toUserAccessPage(users, effectivePermissions),
                 boundedRoleOptions().stream()
                         .map(role -> new RoleOptionResponse(role.id(), role.name()))
                         .toList(),
@@ -298,57 +292,6 @@ public class LcmsWorkspaceReadService {
         return bounded == null ? userAccessScopeRepository.findAccessManagementScopeOptions(tenantId) : bounded;
     }
 
-    private PageResponse<QuestionBankQuestionRowResponse> toQuestionPage(
-            Page<QuestionBankQuestionProjection> questions,
-            Map<String, Long> usageCounts
-    ) {
-        List<QuestionBankQuestionRowResponse> items = questions.getContent().stream()
-                .map(question -> new QuestionBankQuestionRowResponse(
-                        question.id(),
-                        scopeType(question),
-                        scopeId(question),
-                        scopeLabel(question),
-                        question.subjectId(),
-                        blankToDefault(question.subjectLabel(), question.subjectId()),
-                        question.levelId(),
-                        blankToDefault(question.levelLabel(), question.levelId()),
-                        question.topicId(),
-                        blankToDefault(question.topicLabel(), question.topicId()),
-                        blankToDefault(question.levelLabel(), question.subjectLabel()),
-                        question.title(),
-                        question.objective(),
-                        question.type(),
-                        question.difficulty(),
-                        question.status(),
-                        question.tags() == null ? List.of() : question.tags(),
-                        question.choices() == null ? List.of() : question.choices().stream()
-                                .map(choice -> new QuestionBankChoiceResponse(
-                                        choice.getId(),
-                                        choice.getLabel(),
-                                        Boolean.TRUE.equals(choice.getCorrect())
-                                ))
-                                .toList(),
-                        question.answer() == null ? null : String.valueOf(question.answer()),
-                        question.masteryRate(),
-                        usageCounts.getOrDefault(question.id(), question.usageCount() == null ? 0L : question.usageCount().longValue()),
-                        question.schoolsUsing(),
-                        question.updatedAt() == null ? null : question.updatedAt().toString(),
-                        recommendedCluster(question),
-                        null,
-                        question.updatedAt() == null ? null : question.updatedAt().toString()
-                ))
-                .toList();
-        return new PageResponse<>(
-                items,
-                questions.getNumber(),
-                questions.getSize(),
-                questions.getTotalElements(),
-                questions.getTotalPages(),
-                questions.hasNext(),
-                questions.hasPrevious()
-        );
-    }
-
     private Map<String, Long> questionUsageCounts(String tenantId, List<QuestionBankQuestionProjection> questions) {
         List<String> questionIds = questions.stream()
                 .map(QuestionBankQuestionProjection::id)
@@ -361,32 +304,6 @@ public class LcmsWorkspaceReadService {
                         QuestionUsageCountProjection::getQuestionId,
                         usage -> usage.getUsageCount() == null ? 0L : usage.getUsageCount()
                 ));
-    }
-
-    private PageResponse<UserAccessRowResponse> toUserAccessPage(
-            Page<UserAccessRowProjection> users,
-            Map<String, List<EffectivePermissionResponse>> effectivePermissions
-    ) {
-        List<UserAccessRowResponse> items = users.getContent().stream()
-                .map(user -> new UserAccessRowResponse(
-                        user.userId(),
-                        user.fullName(),
-                        user.email(),
-                        user.status(),
-                        user.roleCount() == null ? 0L : user.roleCount(),
-                        user.scopeCount() == null ? 0L : user.scopeCount(),
-                        effectivePermissions.getOrDefault(user.userId(), List.of())
-                ))
-                .toList();
-        return new PageResponse<>(
-                items,
-                users.getNumber(),
-                users.getSize(),
-                users.getTotalElements(),
-                users.getTotalPages(),
-                users.hasNext(),
-                users.hasPrevious()
-        );
     }
 
     private Map<String, List<EffectivePermissionResponse>> effectivePermissions(List<UserAccessRowProjection> users) {
@@ -407,84 +324,6 @@ public class LcmsWorkspaceReadService {
                                 Collectors.toList()
                         )
                 ));
-    }
-
-    private QuestionBankOptionResponse toQuestionBankOption(QuestionBankOptionProjection option, List<String> categoryIds) {
-        return new QuestionBankOptionResponse(
-                option.id(),
-                option.label(),
-                option.subjectId(),
-                option.levelId(),
-                blankToDefault(option.description(), option.label()),
-                "Toan cong ty",
-                categoryIds
-        );
-    }
-
-    private String scopeType(QuestionBankQuestionProjection question) {
-        return question.scope() == null || blankToNull(question.scope().getType()) == null ? "global" : question.scope().getType().trim();
-    }
-
-    private String scopeId(QuestionBankQuestionProjection question) {
-        return question.scope() == null ? null : blankToNull(question.scope().getSchoolId());
-    }
-
-    private String scopeLabel(QuestionBankQuestionProjection question) {
-        String type = scopeType(question);
-        String schoolId = scopeId(question);
-        if (schoolId != null) {
-            return schoolId;
-        }
-        return "global".equalsIgnoreCase(type) ? "Toan cong ty" : type;
-    }
-
-    private String recommendedCluster(QuestionBankQuestionProjection question) {
-        String scopeId = scopeId(question);
-        return scopeId == null ? "ERG" : scopeId;
-    }
-
-    private QuestionBankQuizOptionResponse toQuizOption(QuestionBankQuizOptionProjection option) {
-        List<String> questionIds = cleanStrings(option.questionIds());
-        return new QuestionBankQuizOptionResponse(
-                option.id(),
-                blankToDefault(option.title(), option.id()),
-                option.status(),
-                option.kind(),
-                option.subjectId(),
-                option.levelId(),
-                option.categoryId(),
-                questionIds,
-                questionIds.size(),
-                durationLabel(questionIds.size(), option.kind()),
-                "Toan cong ty",
-                sourceMode(option.kind()),
-                blankToDefault(option.ownerUserId(), "Academic team"),
-                option.updatedAt() == null ? null : option.updatedAt().toString()
-        );
-    }
-
-    private String durationLabel(int questionCount, String kind) {
-        int minutesPerQuestion = "test".equalsIgnoreCase(blankToNull(kind)) ? 2 : 3;
-        return Math.max(5, questionCount * minutesPerQuestion) + " phut";
-    }
-
-    private String sourceMode(String kind) {
-        return "test".equalsIgnoreCase(blankToNull(kind)) ? "manual" : "auto-random";
-    }
-
-    private List<String> cleanStrings(List<String> values) {
-        if (values == null) {
-            return List.of();
-        }
-        return values.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(String::trim)
-                .toList();
-    }
-
-    private String blankToDefault(String value, String fallback) {
-        String normalized = blankToNull(value);
-        return normalized == null ? fallback : normalized;
     }
 
     private PageBounds pageBounds(Integer page, Integer size, int hardMax) {

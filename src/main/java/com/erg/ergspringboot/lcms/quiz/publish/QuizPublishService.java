@@ -30,21 +30,15 @@ import com.erg.ergspringboot.lcms.quiz.publish.CompiledQuiz.CompiledSection;
 import com.erg.ergspringboot.lcms.quiz.publish.QuizValidationService.ValidationError;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.math.BigDecimal;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -56,25 +50,23 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class QuizPublishService {
 
-    private static final int SCHEMA_VERSION = 1;
-    private static final String MODE_CLIENT_FIRST = "client-first";
+    private static final int SCHEMA_VERSION = QuizPackageAssembler.SCHEMA_VERSION;
+    private static final String MODE_CLIENT_FIRST = QuizPackageAssembler.MODE_CLIENT_FIRST;
     private static final String MODE_SERVER_AUTH = "server-authoritative";
 
     private final QuizRepository quizRepository;
-    private final QuestionRepository bankQuestionRepository;
-    private final QuizQuestionRepository quizQuestionRepository;
     private final QuizDraftRepository quizDraftRepository;
     private final QuizVersionRepository quizVersionRepository;
     private final QuizVersionSectionRepository sectionRepository;
     private final QuizVersionQuestionRepository versionQuestionRepository;
     private final QuizPackageRepository packageRepository;
-    private final QuizCompileService compileService;
     private final QuizValidationService validationService;
     private final QuizPackageSigner packageSigner;
     private final AssessmentCurriculumBridge assessmentCurriculumBridge;
-    private final ObjectMapper objectMapper;
-    private final CacheManager cacheManager;
     private final ContentLifecyclePort lifecycle;
+    private final QuizDraftCompiler draftCompiler;
+    private final QuizPackageAssembler packageAssembler;
+    private final QuizPublishCacheEvictor cacheEvictor;
 
     @Autowired
     public QuizPublishService(
@@ -95,26 +87,24 @@ public class QuizPublishService {
             ContentLifecyclePort lifecycle
     ) {
         this.quizRepository = quizRepository;
-        this.bankQuestionRepository = bankQuestionRepository;
-        this.quizQuestionRepository = quizQuestionRepository;
         this.quizDraftRepository = quizDraftRepository;
         this.quizVersionRepository = quizVersionRepository;
         this.sectionRepository = sectionRepository;
         this.versionQuestionRepository = versionQuestionRepository;
         this.packageRepository = packageRepository;
-        this.compileService = compileService;
         this.validationService = validationService;
         this.packageSigner = packageSigner;
         this.assessmentCurriculumBridge = assessmentCurriculumBridge;
-        this.objectMapper = objectMapper;
-        this.cacheManager = cacheManager;
         this.lifecycle = lifecycle;
+        this.draftCompiler = new QuizDraftCompiler(bankQuestionRepository, quizQuestionRepository, compileService);
+        this.packageAssembler = new QuizPackageAssembler(packageSigner, objectMapper);
+        this.cacheEvictor = new QuizPublishCacheEvictor(cacheManager);
     }
 
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public ValidationResultResponse validate(String tenantId, String quizId) {
         QuizDraft draft = latestDraft(tenantId, quizId);
-        CompiledQuiz compiled = compileWithSettings(tenantId, quizId, draft);
+        CompiledQuiz compiled = draftCompiler.compileWithSettings(tenantId, quizId, draft);
         List<ValidationErrorResponse> errors = validationService.validate(compiled).stream()
                 .map(this::toErrorResponse)
                 .toList();
@@ -146,7 +136,7 @@ public class QuizPublishService {
         QuizDraft draft = latestDraft(tenantId, quizId);
         assertDocVersion(draft, request == null ? null : request.docVersion());
 
-        CompiledQuiz compiled = compileWithSettings(tenantId, quizId, draft);
+        CompiledQuiz compiled = draftCompiler.compileWithSettings(tenantId, quizId, draft);
         List<ValidationError> errors = validationService.validate(compiled);
         if (!errors.isEmpty()) {
             throw new ValidationFailedException(errors);
@@ -159,9 +149,9 @@ public class QuizPublishService {
                 .orElse(0) + 1;
         String versionLabel = resolveLabel(request == null ? null : request.versionLabel(), versionNumber);
 
-        Map<String, Object> packagePayload = packagePayload(
+        Map<String, Object> packagePayload = packageAssembler.packagePayload(
                 quiz.getId(), versionLabel, compiled, gradingMode);
-        String canonicalPackagePayload = canonicalJson(packagePayload);
+        String canonicalPackagePayload = packageAssembler.canonicalJson(packagePayload);
         String contentHash = packageSigner.contentHash(canonicalPackagePayload);
 
         // Deactivate the previous active version, then insert this one active.
@@ -190,7 +180,7 @@ public class QuizPublishService {
 
         persistSections(tenantId, savedVersion.getId(), compiled);
 
-        QuizPackage pkg = buildPackage(
+        QuizPackage pkg = packageAssembler.buildPackage(
                 tenantId,
                 quiz,
                 savedVersion,
@@ -208,7 +198,7 @@ public class QuizPublishService {
         quizRepository.save(quiz);
         lifecycle.recordPublishedSnapshot(tenantId, quizId, userId, key);
 
-        evictQuizCachesAfterCommit(tenantId, quizId);
+        cacheEvictor.evictQuizCachesAfterCommit(tenantId, quizId);
 
         return new PublishResponse(
                 savedVersion.getId(), versionLabel, versionNumber, savedPackage.getId(), contentHash);
@@ -226,8 +216,8 @@ public class QuizPublishService {
         QuizDraft draft = new QuizDraft();
         draft.setQuizId(quizId);
         draft.setTenantId(tenantId);
-        draft.setSettings(asMap(snapshot.get("settings")));
-        draft.setPlayerTemplate(asMap(snapshot.get("playerTemplate")));
+        draft.setSettings(QuizPackageAssembler.asMap(snapshot.get("settings")));
+        draft.setPlayerTemplate(QuizPackageAssembler.asMap(snapshot.get("playerTemplate")));
         draft.setTree(snapshot.get("tree"));
         draft.setSchemaVersion(SCHEMA_VERSION);
         draft.setDocVersion(0L);
@@ -239,7 +229,7 @@ public class QuizPublishService {
             quiz.setLatestDraftId(savedDraft.getId());
             quizRepository.save(quiz);
         });
-        evictQuizCachesAfterCommit(tenantId, quizId);
+        cacheEvictor.evictQuizCachesAfterCommit(tenantId, quizId);
         return new ForkResponse(savedDraft.getId(), 0L, version.getVersionLabel());
     }
 
@@ -272,107 +262,6 @@ public class QuizPublishService {
             entity.setAnswerKey(question.answerKey().isEmpty() ? null : question.answerKey());
             versionQuestionRepository.save(entity);
         }
-    }
-
-    private CompiledQuiz compileWithSettings(String tenantId, String quizId, QuizDraft draft) {
-        List<String> bankQuestionIds = extractBankQuestionIds(draft.getTree());
-        Map<String, Map<String, Object>> questionSettings = new LinkedHashMap<>();
-        if (!bankQuestionIds.isEmpty()) {
-            bankQuestionRepository.findByTenantIdAndIdIn(tenantId, bankQuestionIds).forEach(question -> {
-                if (question.getSettings() != null && !question.getSettings().isEmpty()) {
-                    questionSettings.put(question.getId(), question.getSettings());
-                }
-            });
-        }
-
-        Map<String, Map<String, Object>> questionSetSettings = new LinkedHashMap<>();
-        quizQuestionRepository.findByTenantIdAndQuizIdOrderByOrderIndexAsc(tenantId, quizId).forEach(link -> {
-            if (link.getSettings() != null && !link.getSettings().isEmpty()) {
-                questionSetSettings.put(link.getQuestionId(), link.getSettings());
-            }
-        });
-        return compileService.compile(draft.getSettings(), draft.getTree(), questionSettings, questionSetSettings);
-    }
-
-    private List<String> extractBankQuestionIds(Object tree) {
-        java.util.LinkedHashSet<String> ids = new java.util.LinkedHashSet<>();
-        for (Map<String, Object> group : asMapList(tree)) {
-            Object slides = group.get("slides");
-            for (Map<String, Object> slide : asMapList(slides)) {
-                Object bankQuestionId = firstNonNull(slide.get("bankQuestionId"), slide.get("questionId"));
-                if (bankQuestionId instanceof String value && !value.isBlank()) {
-                    ids.add(value.trim());
-                }
-            }
-        }
-        return List.copyOf(ids);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> asMapList(Object value) {
-        if (value instanceof List<?> list) {
-            List<Map<String, Object>> result = new java.util.ArrayList<>();
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> map) {
-                    result.add((Map<String, Object>) map);
-                }
-            }
-            return result;
-        }
-        return List.of();
-    }
-
-    private QuizPackage buildPackage(
-            String tenantId,
-            Quiz quiz,
-            QuizVersion version,
-            String gradingMode,
-            String contentHash,
-            Map<String, Object> packageJson,
-            String canonicalPackagePayload
-    ) {
-        // server-authoritative packages must never embed the answer key (spec §6 anti-leak).
-        String hashPrefix = contentHash.length() >= 8 ? contentHash.substring(0, 8) : contentHash;
-        String packageId = "pkg_" + quiz.getId() + "_" + version.getVersionLabel() + "_" + hashPrefix;
-        String signature = packageSigner.sign(canonicalPackagePayload);
-
-        QuizPackage pkg = new QuizPackage();
-        pkg.setId(packageId);
-        pkg.setQuizId(quiz.getId());
-        pkg.setQuizVersionId(version.getId());
-        pkg.setQuizVersion(version.getVersionLabel());
-        pkg.setTenantId(tenantId);
-        pkg.setContentHash(contentHash);
-        pkg.setSignature(signature);
-        pkg.setPublicKeyId(packageSigner.publicKeyId());
-        pkg.setSignatureAlgorithm(packageSigner.signatureAlgorithm());
-        pkg.setGradingMode(gradingMode);
-        pkg.setSchemaVersion(SCHEMA_VERSION);
-        pkg.setPackageFormat("single");
-        pkg.setAssetsManifest(asMap(packageJson.get("assetsManifest")));
-        pkg.setPackageJson(packageJson);
-        pkg.setGeneratedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        return pkg;
-    }
-
-    private Map<String, Object> packagePayload(
-            String quizId,
-            String versionLabel,
-            CompiledQuiz compiled,
-            String gradingMode
-    ) {
-        PortableQuizAssetBundler.Bundle bundledAssets = PortableQuizAssetBundler.bundle(compiled.runtimeQuiz());
-        Map<String, Object> packageJson = new LinkedHashMap<>();
-        packageJson.put("schemaVersion", SCHEMA_VERSION);
-        packageJson.put("quizId", quizId);
-        packageJson.put("version", versionLabel);
-        packageJson.put("gradingMode", gradingMode);
-        packageJson.put("quiz", bundledAssets.runtimeQuiz());
-        packageJson.put("assetsManifest", bundledAssets.assetsManifest());
-        if (MODE_CLIENT_FIRST.equals(gradingMode)) {
-            packageJson.put("answerKey", compiled.answerKey());
-        }
-        return packageJson;
     }
 
     private Map<String, Object> snapshot(QuizDraft draft, Map<String, Object> curriculumSnapshot) {
@@ -427,90 +316,12 @@ public class QuizPublishService {
         return value != null ? value : "v" + versionNumber;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> asMap(Object value) {
-        if (value instanceof Map<?, ?> map) {
-            return new LinkedHashMap<>((Map<String, Object>) map);
-        }
-        return new LinkedHashMap<>();
-    }
-
     private ValidationErrorResponse toErrorResponse(ValidationError error) {
         return new ValidationErrorResponse(error.path(), error.code(), error.message());
     }
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private Object firstNonNull(Object... values) {
-        for (Object value : values) {
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private void evictQuizCachesAfterCommit(String tenantId, String quizId) {
-        Runnable evict = () -> {
-            Cache cache = cacheManager.getCache("quizRuntimePackage");
-            if (cache != null) {
-                cache.evict(tenantId + ":" + quizId);
-            }
-            evictAll("lcmsQuestionBankWorkspace");
-            evictAll("lcmsQuizWorkspace");
-        };
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            evict.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                evict.run();
-            }
-        });
-    }
-
-    private void evictAll(String cacheName) {
-        Cache cache = cacheManager.getCache(cacheName);
-        if (cache != null) {
-            cache.clear();
-        }
-    }
-
-    // Stable serialization for hashing/signing: keys are ordered so the same content always hashes equal.
-    private String canonicalJson(Map<String, Object> payload) {
-        return objectMapper.writeValueAsString(canonicalValue(payload));
-    }
-
-    private Object canonicalValue(Object value) {
-        if (value instanceof Map<?, ?> map) {
-            Map<String, Object> sorted = new TreeMap<>();
-            map.forEach((key, item) -> sorted.put(String.valueOf(key), canonicalValue(item)));
-            return sorted;
-        }
-        if (value instanceof Collection<?> collection) {
-            return collection.stream().map(this::canonicalValue).toList();
-        }
-        if (value instanceof BigDecimal decimal) {
-            BigDecimal normalized = decimal.stripTrailingZeros();
-            return normalized.scale() < 0 ? normalized.setScale(0) : normalized;
-        }
-        if (value instanceof Double number) {
-            if (!Double.isFinite(number)) {
-                throw new IllegalArgumentException("package payload contains a non-finite number");
-            }
-            return canonicalValue(BigDecimal.valueOf(number));
-        }
-        if (value instanceof Float number) {
-            if (!Float.isFinite(number)) {
-                throw new IllegalArgumentException("package payload contains a non-finite number");
-            }
-            return canonicalValue(BigDecimal.valueOf(number.doubleValue()));
-        }
-        return value;
     }
 
     /** 422 with the field-level error list (spec §4.2 publish returns VALIDATION_FAILED). */
