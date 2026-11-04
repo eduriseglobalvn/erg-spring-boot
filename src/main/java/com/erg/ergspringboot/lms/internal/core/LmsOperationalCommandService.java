@@ -3,16 +3,16 @@ package com.erg.ergspringboot.lms.internal.core;
 import static com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.*;
 import static com.erg.ergspringboot.common.response.lms.LmsOperationalResponses.*;
 
+import static com.erg.ergspringboot.lms.internal.core.LmsOperationalResponseMapper.*;
+
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
-import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
 import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
@@ -50,6 +50,8 @@ public class LmsOperationalCommandService {
     private final EducationUnitRepository schools;
     private final UserActivityRepository activities;
     private final UserRepository users;
+    private final LmsOperationalScopeGuard guard;
+
 
     public LmsOperationalCommandService(
             ClassroomRepository classrooms,
@@ -66,13 +68,14 @@ public class LmsOperationalCommandService {
         this.enrollments = enrollments;
         this.schools = schools;
         this.activities = activities;
+        this.guard = new LmsOperationalScopeGuard(classrooms, students, subjects, schools);
     }
 
     @Transactional
     @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public ClassResponse createClass(String schoolId, CreateClassRequest request, UserAccessContext access) {
-        assertSchool(access, schoolId);
-        school(access, schoolId);
+        guard.assertSchool(access, schoolId);
+        guard.school(access, schoolId);
         String name = required(request.name(), "Class name");
         String year = trim(request.academicYear());
         if (classrooms.existsByTenantIdAndSchoolIdAndNameIgnoreCaseAndAcademicYear(
@@ -97,8 +100,8 @@ public class LmsOperationalCommandService {
     @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public ClassResponse updateClass(String schoolId, String classId, UpdateClassRequest request,
                                      UserAccessContext access) {
-        assertSchool(access, schoolId);
-        Classroom classroom = classroom(access, classId);
+        guard.assertSchool(access, schoolId);
+        Classroom classroom = guard.classroom(access, classId);
         if (!schoolId.equals(classroom.getSchoolId())) throw new ResourceNotFoundException("Class not found.");
         assertVersion(request.version(), classroom.getRecordVersion(), "Class");
         String nextName = request.name() == null ? classroom.getName() : required(request.name(), "Class name");
@@ -122,8 +125,8 @@ public class LmsOperationalCommandService {
     @Transactional
     @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public ClassResponse archiveClass(String schoolId, String classId, Long version, UserAccessContext access) {
-        assertSchool(access, schoolId);
-        Classroom classroom = classroom(access, classId);
+        guard.assertSchool(access, schoolId);
+        Classroom classroom = guard.classroom(access, classId);
         if (!schoolId.equals(classroom.getSchoolId())) throw new ResourceNotFoundException("Class not found.");
         assertVersion(version, classroom.getRecordVersion(), "Class");
         classroom.setStatus("ARCHIVED");
@@ -135,14 +138,14 @@ public class LmsOperationalCommandService {
     @Transactional
     @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public StudentResponse createStudent(String schoolId, CreateStudentRequest request, UserAccessContext access) {
-        assertSchool(access, schoolId);
-        school(access, schoolId);
+        guard.assertSchool(access, schoolId);
+        guard.school(access, schoolId);
         String code = required(request.studentCode(), "Student code");
         if (students.findByTenantIdAndStudentCodeIgnoreCase(access.tenantId(), code).isPresent()) {
             throw new ConflictException("Student code already exists in this tenant.");
         }
         Classroom classroom = request.academicClassId() == null || request.academicClassId().isBlank()
-                ? null : scopedClass(access, request.academicClassId(), schoolId);
+                ? null : guard.scopedClass(access, request.academicClassId(), schoolId);
         Student student = new Student();
         student.setId(IdGenerator.newId());
         student.setTenantId(access.tenantId());
@@ -162,8 +165,8 @@ public class LmsOperationalCommandService {
     @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public StudentResponse updateStudent(String schoolId, String studentId, UpdateStudentRequest request,
                                          UserAccessContext access) {
-        assertSchool(access, schoolId);
-        Student student = student(access, studentId);
+        guard.assertSchool(access, schoolId);
+        Student student = guard.student(access, studentId);
         if (!schoolId.equals(student.getSchoolId())) throw new ResourceNotFoundException("Student not found.");
         assertVersion(request.version(), student.getRecordVersion(), "Student");
         if (request.studentCode() != null && !normalize(request.studentCode()).equals(normalize(student.getStudentCode()))) {
@@ -187,8 +190,8 @@ public class LmsOperationalCommandService {
     @Transactional
     @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public StudentResponse archiveStudent(String schoolId, String studentId, Long version, UserAccessContext access) {
-        assertSchool(access, schoolId);
-        Student student = student(access, studentId);
+        guard.assertSchool(access, schoolId);
+        Student student = guard.student(access, studentId);
         if (!schoolId.equals(student.getSchoolId())) throw new ResourceNotFoundException("Student not found.");
         assertVersion(version, student.getRecordVersion(), "Student");
         student.setStatus("ARCHIVED");
@@ -201,8 +204,8 @@ public class LmsOperationalCommandService {
     @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public BulkStudentImportResponse importStudents(String schoolId, BulkStudentImportRequest request,
                                                     String idempotencyKey, UserAccessContext access) {
-        assertSchool(access, schoolId);
-        school(access, schoolId);
+        guard.assertSchool(access, schoolId);
+        guard.school(access, schoolId);
         String key = normalizeKey(idempotencyKey);
         List<StudentResponse> result = new ArrayList<>();
         int replayed = 0;
@@ -227,8 +230,8 @@ public class LmsOperationalCommandService {
     public SubjectResponse createSubject(CreateSubjectRequest request, UserAccessContext access) {
         String schoolId = trim(request.schoolId());
         if (schoolId != null) {
-            assertSchool(access, schoolId);
-            school(access, schoolId);
+            guard.assertSchool(access, schoolId);
+            guard.school(access, schoolId);
         }
         String code = required(request.code(), "Subject code");
         if (subjects.findByTenantIdAndCodeIgnoreCase(access.tenantId(), code).isPresent()) {
@@ -249,8 +252,8 @@ public class LmsOperationalCommandService {
     @Transactional
     @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public SubjectResponse updateSubject(String subjectId, UpdateSubjectRequest request, UserAccessContext access) {
-        Subject subject = subject(access, subjectId);
-        assertSubjectScope(access, subject);
+        Subject subject = guard.subject(access, subjectId);
+        guard.assertSubjectScope(access, subject);
         assertVersion(request.version(), subject.getRecordVersion(), "Subject");
         if (request.code() != null && !normalize(request.code()).equals(normalize(subject.getCode()))) {
             subjects.findByTenantIdAndCodeIgnoreCase(access.tenantId(), request.code().trim())
@@ -268,8 +271,8 @@ public class LmsOperationalCommandService {
     @Transactional
     @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public SubjectResponse archiveSubject(String subjectId, Long version, UserAccessContext access) {
-        Subject subject = subject(access, subjectId);
-        assertSubjectScope(access, subject);
+        Subject subject = guard.subject(access, subjectId);
+        guard.assertSubjectScope(access, subject);
         assertVersion(version, subject.getRecordVersion(), "Subject");
         subject.setStatus("ARCHIVED");
         Subject saved = subjects.save(subject);
@@ -285,8 +288,8 @@ public class LmsOperationalCommandService {
             var replay = enrollments.findByTenantIdAndIdempotencyKey(access.tenantId(), key);
             if (replay.isPresent()) return enrollmentResponse(replay.get(), true);
         }
-        Student student = student(access, request.studentId());
-        Classroom classroom = scopedClass(access, request.classId(), student.getSchoolId());
+        Student student = guard.student(access, request.studentId());
+        Classroom classroom = guard.scopedClass(access, request.classId(), student.getSchoolId());
         String year = trim(request.academicYear());
         var existing = enrollments.findByTenantIdAndStudentIdAndClassIdAndAcademicYear(
                 access.tenantId(), student.getId(), classroom.getId(), year);
@@ -327,45 +330,6 @@ public class LmsOperationalCommandService {
         return new BulkEnrollmentResponse(root, request.items().size(), request.items().size() - replayed, replayed, results);
     }
 
-    private Classroom scopedClass(UserAccessContext access, String classId, String schoolId) {
-        Classroom classroom = classroom(access, classId);
-        if (!Objects.equals(classroom.getSchoolId(), schoolId)) throw new BadRequestException("Class does not belong to the requested school.");
-        assertSchool(access, schoolId);
-        return classroom;
-    }
-
-    private Classroom classroom(UserAccessContext access, String id) {
-        return classrooms.findByTenantIdAndId(access.tenantId(), id)
-                .orElseThrow(() -> new ResourceNotFoundException("Class not found."));
-    }
-
-    private Student student(UserAccessContext access, String id) {
-        return students.findByTenantIdAndId(access.tenantId(), id)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found."));
-    }
-
-    private Subject subject(UserAccessContext access, String id) {
-        return subjects.findById(id).filter(value -> access.tenantId().equals(value.getTenantId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found."));
-    }
-
-    private EducationUnit school(UserAccessContext access, String id) {
-        return schools.findByIdAndTenantId(id, access.tenantId())
-                .orElseThrow(() -> new ResourceNotFoundException("School not found."));
-    }
-
-    private void assertSchool(UserAccessContext access, String schoolId) {
-        if (schoolId == null || schoolId.isBlank() || !access.canAccessEducationUnit(schoolId)) {
-            throw new ForbiddenException("School scope is not allowed for the authenticated principal.");
-        }
-    }
-
-    private void assertSubjectScope(UserAccessContext access, Subject subject) {
-        ContentScope scope = subject.getScope();
-        if (scope != null && "school".equalsIgnoreCase(scope.getType()) && scope.getSchoolId() != null) {
-            assertSchool(access, scope.getSchoolId());
-        }
-    }
 
     private void assertVersion(Long requested, Long actual, String resource) {
         if (requested == null) {
@@ -408,22 +372,6 @@ public class LmsOperationalCommandService {
         if (request.enrollmentDate() != null) student.setEnrollmentDate(request.enrollmentDate()); if (request.note() != null) student.setNote(trim(request.note()));
     }
 
-    private ClassResponse classResponse(Classroom value) {
-        return new ClassResponse(value.getId(), value.getTenantId(), value.getSchoolId(), value.getName(), value.getGrade(), value.getAcademicYear(), value.getHomeroomTeacherId(), value.getStatus(), version(value.getRecordVersion()), value.getUpdatedAt());
-    }
-
-    private StudentResponse studentResponse(Student value) {
-        return new StudentResponse(value.getId(), value.getTenantId(), value.getSchoolId(), value.getAcademicClassId(), value.getStudentCode(), value.getFullName(), value.getUsername(), value.getAuthUserId(), value.getEmail(), value.getGender(), value.getBirthday(), value.getPhone(), value.getAddress(), value.getParentName(), value.getParentPhone(), value.getParentEmail(), value.getParentRelationship(), value.getEnrollmentDate(), value.getNote(), value.getStatus(), version(value.getRecordVersion()), value.getUpdatedAt());
-    }
-
-    private SubjectResponse subjectResponse(Subject value) {
-        String schoolId = value.getScope() == null ? null : value.getScope().getSchoolId();
-        return new SubjectResponse(value.getId(), value.getTenantId(), schoolId, value.getName(), value.getCode(), value.getStatus(), version(value.getRecordVersion()), value.getUpdatedAt());
-    }
-
-    private EnrollmentResponse enrollmentResponse(StudentEnrollment value, boolean replayed) {
-        return new EnrollmentResponse(value.getId(), value.getTenantId(), value.getSchoolId(), value.getStudentId(), value.getClassId(), value.getAcademicYear(), value.getStatus(), version(value.getRecordVersion()), replayed, value.getUpdatedAt());
-    }
 
     private void audit(UserAccessContext access, String action, String resourceId, Map<String, Object> metadata) {
         UserActivity activity = new UserActivity();
@@ -432,7 +380,6 @@ public class LmsOperationalCommandService {
         activity.setCreatedAt(OffsetDateTime.now()); activities.save(activity);
     }
 
-    private long version(Long value) { return value == null ? 0L : value; }
     private String status(String value, String fallback) {
         String normalized = value == null || value.isBlank() ? fallback : value.trim().toUpperCase(Locale.ROOT);
         if (!ACTIVE_STATUSES.contains(normalized)) throw new BadRequestException("Unsupported status.");

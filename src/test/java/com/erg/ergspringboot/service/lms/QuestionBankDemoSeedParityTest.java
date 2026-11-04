@@ -28,13 +28,13 @@ class QuestionBankDemoSeedParityTest {
         assumeTrue(Files.exists(feMock), "erg-system workspace is required for FE/BE seed parity check");
 
         String frontend = Files.readString(feMock);
-        String backend = readBackendSource("QuestionBankDemoBootstrapSeedService.java");
+        String backend = readBackendSource("QuestionBankDemoSeedContent.java");
 
         List<String> frontendQuestionIds = frontendQuestionIds(frontend);
-        List<String> backendQuestionIds = matches(backend, "upsertQuestion\\(\"(qb-[^\"]+)\"");
+        List<String> backendQuestionIds = matches(backend, "question\\(\"(qb-[^\"]+)\"");
         List<String> frontendQuizIds = matches(frontend, "id:\\s*\"(quiz-[^\"]+)\"");
-        List<String> backendQuizIds = matches(backend, "upsertQuizBankItem\\(\"(quiz-[^\"]+)\"");
-        List<String> backendSubjectIds = matches(backend, "upsertSubject\\(\"([^\"]+)\"");
+        List<String> backendQuizIds = matches(backend, "quizBankItem\\(\"(quiz-[^\"]+)\"");
+        List<String> backendSubjectIds = matches(backend, "subject\\(\"([^\"]+)\"");
 
         assertThat(backendSubjectIds).contains("ic3-gs6", "python", "mos");
         assertThat(backendQuestionIds)
@@ -53,7 +53,7 @@ class QuestionBankDemoSeedParityTest {
         assumeTrue(Files.exists(feMock), "erg-system workspace is required for FE/BE seed parity check");
 
         String frontend = Files.readString(feMock);
-        String backend = readBackendSource("QuestionBankDemoBootstrapSeedService.java");
+        String backend = readBackendSource("QuestionBankDemoSeedContent.java");
 
         assertThat(backendQuestionSeeds(backend))
                 .containsAll(frontendQuestionSeeds(frontend))
@@ -72,7 +72,7 @@ class QuestionBankDemoSeedParityTest {
         assumeTrue(Files.exists(feQuestionTypes), "erg-system workspace is required for FE/BE seed parity check");
 
         String frontend = Files.readString(feQuestionTypes);
-        String backend = readBackendSource("QuizDemoBootstrapSeedService.java");
+        String backend = readBackendSource("QuizDemoSeedContent.java");
 
         List<String> frontendTypes = matches(frontend, "kind:\\s*\"([^\"]+)\"");
         List<String> backendTypes = matches(backend, "question\\(\"q\\d+-[^\"]+\",\\s*\"([^\"]+)\"");
@@ -83,10 +83,10 @@ class QuestionBankDemoSeedParityTest {
 
     @Test
     void runtimeDemoReferencesOnlyQuestionsCreatedByQuestionBankSeed() throws IOException {
-        String questionBankSeed = readBackendSource("QuestionBankDemoBootstrapSeedService.java");
-        String runtimeSeed = readBackendSource("QuizDemoBootstrapSeedService.java");
+        String questionBankSeed = readBackendSource("QuestionBankDemoSeedContent.java");
+        String runtimeSeed = readBackendSource("QuizDemoSeedContent.java");
 
-        List<String> seededQuestionIds = matches(questionBankSeed, "upsertQuestion\\(\"(qb-[^\"]+)\"");
+        List<String> seededQuestionIds = matches(questionBankSeed, "question\\(\"(qb-[^\"]+)\"");
         List<String> runtimeQuestionIds = matches(runtimeSeed, "case \"q\\d+-[^\"]+\" -> \"(qb-[^\"]+)\"");
 
         assertThat(runtimeQuestionIds).hasSize(14);
@@ -134,7 +134,7 @@ class QuestionBankDemoSeedParityTest {
 
     private static List<QuestionSeed> backendQuestionSeeds(String backend) {
         var matcher = Pattern.compile(
-                "upsertQuestion\\(\"(qb-[^\"]+)\",\\s*\"[^\"]+\",\\s*\"[^\"]+\",\\s*(?:\"[^\"]+\"|topicId),\\s*\"([^\"]+)\",\\s*\"([^\"]+)\",\\s*\"([^\"]+)\""
+                "question\\(\"(qb-[^\"]+)\",\\s*\"[^\"]+\",\\s*\"[^\"]+\",\\s*(?:\"[^\"]+\"|topicId),\\s*\"([^\"]+)\",\\s*\"([^\"]+)\",\\s*\"([^\"]+)\""
         ).matcher(backend);
         List<QuestionSeed> seeds = new ArrayList<>();
         while (matcher.find()) {
@@ -161,7 +161,7 @@ class QuestionBankDemoSeedParityTest {
 
     private static List<QuizSeed> backendQuizSeeds(String backend) {
         var matcher = Pattern.compile(
-                "upsertQuizBankItem\\(\"(quiz-[^\"]+)\",\\s*\"[^\"]+\",\\s*\"([^\"]+)\",\\s*\"[^\"]+\",\\s*\"[^\"]+\",\\s*\"([^\"]+)\",\\s*List\\.of\\(([^)]*)\\)"
+                "quizBankItem\\(\"(quiz-[^\"]+)\",\\s*\"[^\"]+\",\\s*\"([^\"]+)\",\\s*\"[^\"]+\",\\s*\"[^\"]+\",\\s*\"([^\"]+)\",\\s*List\\.of\\(([^)]*)\\)"
         ).matcher(backend);
         List<QuizSeed> seeds = new ArrayList<>();
         while (matcher.find()) {
