@@ -111,30 +111,6 @@ public class QuizPublishService {
         this.lifecycle = lifecycle;
     }
 
-    /** Compatibility constructor for focused publish tests during lifecycle migration. */
-    @Deprecated
-    public QuizPublishService(
-            QuizRepository quizRepository,
-            QuestionRepository bankQuestionRepository,
-            QuizQuestionRepository quizQuestionRepository,
-            QuizDraftRepository quizDraftRepository,
-            QuizVersionRepository quizVersionRepository,
-            QuizVersionSectionRepository sectionRepository,
-            QuizVersionQuestionRepository versionQuestionRepository,
-            QuizPackageRepository packageRepository,
-            QuizCompileService compileService,
-            QuizValidationService validationService,
-            QuizPackageSigner packageSigner,
-            AssessmentCurriculumBridge assessmentCurriculumBridge,
-            ObjectMapper objectMapper,
-            CacheManager cacheManager
-    ) {
-        this(quizRepository, bankQuestionRepository, quizQuestionRepository, quizDraftRepository,
-                quizVersionRepository, sectionRepository, versionQuestionRepository, packageRepository,
-                compileService, validationService, packageSigner, assessmentCurriculumBridge,
-                objectMapper, cacheManager, null);
-    }
-
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public ValidationResultResponse validate(String tenantId, String quizId) {
         QuizDraft draft = latestDraft(tenantId, quizId);
@@ -230,9 +206,7 @@ public class QuizPublishService {
         quiz.setPackageHash(contentHash);
         quiz.setPublishedAt(savedVersion.getPublishedAt());
         quizRepository.save(quiz);
-        if (lifecycle != null) {
-            lifecycle.recordPublishedSnapshot(tenantId, quizId, userId, key);
-        }
+        lifecycle.recordPublishedSnapshot(tenantId, quizId, userId, key);
 
         evictQuizCachesAfterCommit(tenantId, quizId);
 

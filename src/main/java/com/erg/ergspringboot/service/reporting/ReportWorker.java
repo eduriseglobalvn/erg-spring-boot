@@ -6,6 +6,7 @@ import com.erg.ergspringboot.platform.security.TenantContext;
 import com.erg.ergspringboot.repository.reporting.ReportJobRepository;
 import com.erg.ergspringboot.service.quiz.report.QuizReportService;
 import com.erg.ergspringboot.reporting.AssignmentProgressFilter;
+import com.erg.ergspringboot.reporting.ReportJobPort;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -75,7 +76,7 @@ public class ReportWorker {
         TenantContext previous = TenantContext.current();
         try {
             TenantContext.set(TenantContext.of(job.getTenantId(), job.getRequestedBy(), "report-worker"));
-            if (!ReportJobService.ASSIGNMENT_PROGRESS.equals(job.getReportType())) {
+            if (!ReportJobPort.ASSIGNMENT_PROGRESS.equals(job.getReportType())) {
                 throw new IllegalArgumentException("unsupported report type: " + job.getReportType());
             }
             List<Map<String, Object>> students = new ArrayList<>();

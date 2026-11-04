@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Legacy persistence adapter retained during the strangler migration. New
@@ -46,18 +45,6 @@ public class LearningContentService {
     private final TopicPlacementService topicPlacements;
     private final GoogleSlidesLectureFactory googleSlidesLectures;
 
-    public LearningContentService(
-            ContentItemRepository contentItemRepository,
-            ContentAssetRepository contentAssetRepository,
-            ContentItemAssetRepository contentItemAssetRepository,
-            TopicContentItemRepository topicContentItemRepository,
-            CurriculumTopicLookupRepository curriculumTopicLookupRepository
-    ) {
-        this(contentItemRepository, contentAssetRepository, contentItemAssetRepository, topicContentItemRepository,
-                curriculumTopicLookupRepository, null);
-    }
-
-    @Autowired
     public LearningContentService(
             ContentItemRepository contentItemRepository,
             ContentAssetRepository contentAssetRepository,

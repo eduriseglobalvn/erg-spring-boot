@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -20,24 +19,19 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Spring Modulith correctly protects explicit module-to-module edges, but
  * horizontal legacy packages sit outside that graph. This test prevents the
- * LCMS public contract from becoming a new dumping ground while its two
- * explicitly deprecated construction adapters are retired.</p>
+ * LCMS public contract from becoming a new dumping ground.</p>
  */
 class ModulePublicPackageDirectionTest {
 
     private static final Path SOURCE_ROOT = Path.of("src/main/java/com/erg/ergspringboot");
     private static final Pattern IMPORT = Pattern.compile("(?m)^import\\s+([a-zA-Z0-9_.*]+);");
-    private static final Set<String> APPROVED_LCMS_ADAPTERS = Set.of(
-            "LcmsCommandCompatibility.java",
-            "LcmsReadCompatibility.java");
 
     @Test
-    void lcmsPublicPackageCannotGrowLegacyOrPersistenceImportsOutsideAdapters() throws IOException {
+    void lcmsPublicPackageCannotGrowLegacyOrPersistenceImports() throws IOException {
         Path lcmsRoot = SOURCE_ROOT.resolve("lcms");
         List<String> violations = new java.util.ArrayList<>();
         try (Stream<Path> files = Files.list(lcmsRoot)) {
             files.filter(path -> path.getFileName().toString().endsWith(".java"))
-                    .filter(path -> !APPROVED_LCMS_ADAPTERS.contains(path.getFileName().toString()))
                     .forEach(path -> {
                         try {
                             Matcher matcher = IMPORT.matcher(Files.readString(path));
@@ -55,14 +49,6 @@ class ModulePublicPackageDirectionTest {
 
         assertThat(violations).as("LCMS public package must depend on module-owned contracts")
                 .isEmpty();
-    }
-
-    @Test
-    void approvedLcmsAdaptersRemainDeprecatedAndExplicit() throws IOException {
-        for (String file : APPROVED_LCMS_ADAPTERS) {
-            String source = Files.readString(SOURCE_ROOT.resolve("lcms").resolve(file));
-            assertThat(source).as(file).contains("@Deprecated", "Compatibility");
-        }
     }
 
     @Test

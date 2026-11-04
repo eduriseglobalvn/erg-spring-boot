@@ -62,7 +62,8 @@ class LearningContentServiceTest {
                 contentAssetRepository,
                 contentItemAssetRepository,
                 topicContentItemRepository,
-                curriculumTopicLookupRepository
+                curriculumTopicLookupRepository,
+                null
         );
     }
 

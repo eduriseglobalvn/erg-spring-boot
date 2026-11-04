@@ -22,6 +22,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.Publish
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDraftResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
+import com.erg.ergspringboot.lcms.internal.command.LcmsCommandUseCase;
 import com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService;
 import com.erg.ergspringboot.service.quiz.authoring.QuizAuthoringService;
 import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
@@ -38,7 +39,7 @@ class LcmsOperationsTest {
         SaveQuestionResponse expected = mock(SaveQuestionResponse.class);
         when(legacy.create("tenant-1", "user-1", request)).thenReturn(expected);
 
-        assertThat(new LcmsOperations(LcmsCommandCompatibility.fromServices(
+        assertThat(new LcmsOperations(new LcmsCommandUseCase(
                 legacy,
                 mock(QuizAuthoringService.class),
                 mock(QuizDraftService.class),
@@ -75,7 +76,7 @@ class LcmsOperationsTest {
         when(publishing.fork("tenant-1", "quiz-1", "version-1", "user-1")).thenReturn(forked);
         when(authoring.delete("tenant-1", "quiz-1")).thenReturn(deleted);
 
-        LcmsOperations operations = new LcmsOperations(LcmsCommandCompatibility.fromServices(
+        LcmsOperations operations = new LcmsOperations(new LcmsCommandUseCase(
                 mock(QuestionBankAuthoringService.class), authoring, drafts, publishing,
                 mock(MediaService.class), mock(PortableQuizBundleService.class)));
 
@@ -98,7 +99,7 @@ class LcmsOperationsTest {
         MediaCommitResponse committed = mock(MediaCommitResponse.class);
         when(media.presign("tenant-1", "user-1", presignRequest)).thenReturn(presigned);
         when(media.commit("tenant-1", commitRequest)).thenReturn(committed);
-        LcmsOperations operations = new LcmsOperations(LcmsCommandCompatibility.fromServices(
+        LcmsOperations operations = new LcmsOperations(new LcmsCommandUseCase(
                 mock(QuestionBankAuthoringService.class), mock(QuizAuthoringService.class),
                 mock(QuizDraftService.class), mock(QuizPublishService.class), media,
                 mock(PortableQuizBundleService.class)));

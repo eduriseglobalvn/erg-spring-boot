@@ -2,8 +2,10 @@ package com.erg.ergspringboot.reporting;
 
 import com.erg.ergspringboot.common.response.reporting.ReportJobResponses.ReportJobResponse;
 
-/** Narrow report-job application port shared by web and compatibility adapters. */
+/** Narrow report-job application port shared by the web facade and the report worker. */
 public interface ReportJobPort {
+    String ASSIGNMENT_PROGRESS = "ASSIGNMENT_PROGRESS";
+
     ReportJobResponse enqueueAssignmentProgress(
             String tenantId, String requestedBy, String assignmentId, String idempotencyKey);
 

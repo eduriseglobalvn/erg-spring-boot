@@ -102,10 +102,6 @@ class ModulePublicApiContractTest {
 
         assertThat(Files.exists(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/auth/AuthService.java"))).isFalse();
-        String curriculumAdapter = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java"));
-        assertThat(curriculumAdapter).contains("@Deprecated", "CurriculumOperations operations")
-                .doesNotContain(".internal.");
         assertThat(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java")).doesNotExist();
         String usersAdapter = Files.readString(Path.of(
@@ -131,10 +127,9 @@ class ModulePublicApiContractTest {
         // The deprecated LmsRuntimeService pass-through bean was removed; LmsOperations uses the port directly.
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/lms/LmsRuntimeService.java")).doesNotExist();
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/lms/readmodel/LmsReadModelService.java")).doesNotExist();
-        assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/reporting/ReportJobService.java")))
-                .contains("@Deprecated", "ReportJobPort operations")
-                .doesNotContain(".internal.");
+        // Deprecated CurriculumService and ReportJobService pass-through beans were removed (P3-2).
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java")).doesNotExist();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/reporting/ReportJobService.java")).doesNotExist();
         String learningContentAdapter = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/learningcontent/internal/LegacyLearningContentAdapter.java"));
         assertThat(learningContentAdapter).contains("implements LearningContentPort", "LearningContentService legacy")

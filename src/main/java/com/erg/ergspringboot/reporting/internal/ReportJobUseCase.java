@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 /** Owns report-job persistence and idempotent enqueue semantics inside reporting. */
 @Service
 public class ReportJobUseCase implements ReportJobPort {
-    public static final String ASSIGNMENT_PROGRESS = "ASSIGNMENT_PROGRESS";
     private final ReportJobRepository repository;
 
     public ReportJobUseCase(ReportJobRepository repository) {
