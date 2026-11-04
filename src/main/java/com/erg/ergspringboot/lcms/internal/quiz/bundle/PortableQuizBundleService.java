@@ -14,7 +14,6 @@ import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -40,8 +39,6 @@ public class PortableQuizBundleService {
     private static final String MODE_CLIENT_FIRST = "client-first";
     private static final String MODE_SERVER_AUTH = "server-authoritative";
     private static final int BUNDLE_FORMAT_VERSION = 1;
-    private static final int MAX_ASSET_NODES = 10_000;
-    private static final long MAX_ASSET_BYTES = 1_073_741_824L;
     private static final int MAX_UPDATE_ITEMS = 100;
     private static final Pattern SHA256 = Pattern.compile("(?i)^(?:sha256:)?[0-9a-f]{64}$");
     private static final Set<String> PACKAGE_FORMATS = Set.of("single", "bundle");
@@ -194,12 +191,11 @@ public class PortableQuizBundleService {
         Map<String, Object> sourcePackage = pkg.getPackageJson() == null
                 ? Map.of()
                 : pkg.getPackageJson();
-        AssetBounds assetBounds = inspectAssets(pkg.getAssetsManifest());
-        if (!assetBounds.valid()) {
+        if (!PortableQuizPackageContentPolicy.assetsWithinBounds(pkg.getAssetsManifest())) {
             throw new ResourceNotFoundException("portable package assets exceed the supported bounds");
         }
 
-        Map<String, Object> runtime = copyAndSanitize(sourcePackage, serverAuthoritative);
+        Map<String, Object> runtime = PortableQuizPackageContentPolicy.sanitizedRuntime(sourcePackage, serverAuthoritative);
         String contentHash = text(pkg.getContentHash());
         String signature = text(pkg.getSignature());
         String publicKeyId = text(pkg.getPublicKeyId());
@@ -229,7 +225,7 @@ public class PortableQuizBundleService {
         bundle.put("signatureBlock", signatureBlock);
         bundle.put("signatureAlgorithm", signatureAlgorithm);
         bundle.put("minRuntimeVersion", text(pkg.getMinRuntimeVersion()));
-        bundle.put("downloadUrl", safeDownloadUrl(pkg.getDownloadUrl()));
+        bundle.put("downloadUrl", PortableQuizPackageContentPolicy.safeDownloadUrl(pkg.getDownloadUrl()));
         bundle.put("sizeBytes", pkg.getSizeBytes());
         bundle.put("releaseChannel", defaultValue(pkg.getReleaseChannel(), "stable"));
         bundle.put("expiresAt", pkg.getExpiresAt());
@@ -345,103 +341,11 @@ public class PortableQuizBundleService {
                 && "Ed25519".equalsIgnoreCase(signatureAlgorithm)
                 && pkg.getRevokedAt() == null
                 && !isExpired(pkg)
-                && !containsExternalAssetReference(pkg.getPackageJson(), "");
-    }
-
-    private boolean containsExternalAssetReference(Object value, String field) {
-        if (value instanceof String text) {
-            String normalized = text.trim().toLowerCase(Locale.ROOT);
-            return ("url".equalsIgnoreCase(field) || "src".equalsIgnoreCase(field))
-                    && (normalized.startsWith("https://") || normalized.startsWith("http://"));
-        }
-        if (value instanceof Map<?, ?> map) {
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (containsExternalAssetReference(entry.getValue(), String.valueOf(entry.getKey()))) return true;
-            }
-        } else if (value instanceof Collection<?> collection) {
-            for (Object item : collection) {
-                if (containsExternalAssetReference(item, field)) return true;
-            }
-        }
-        return false;
+                && !PortableQuizPackageContentPolicy.containsExternalAssetReference(pkg.getPackageJson(), "");
     }
 
     private boolean isExpired(QuizPackage pkg) {
         return pkg.getExpiresAt() != null && !pkg.getExpiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC));
-    }
-
-    private AssetBounds inspectAssets(Object value) {
-        AssetBounds bounds = new AssetBounds();
-        inspectAssets(value, bounds, 0);
-        return bounds;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void inspectAssets(Object value, AssetBounds bounds, int depth) {
-        if (!bounds.valid() || value == null || depth > 32) return;
-        if (value instanceof Map<?, ?> map) {
-            bounds.nodes += map.size();
-            if (map.size() > MAX_ASSET_NODES || bounds.nodes > MAX_ASSET_NODES) {
-                bounds.valid = false;
-                return;
-            }
-            Object bytes = map.get("byteSize") != null ? map.get("byteSize") : map.get("sizeBytes");
-            if (bytes instanceof Number number) {
-                bounds.bytes += Math.max(0, number.longValue());
-                if (bounds.bytes > MAX_ASSET_BYTES) bounds.valid = false;
-            }
-            for (Object child : map.values()) inspectAssets(child, bounds, depth + 1);
-        } else if (value instanceof Collection<?> collection) {
-            bounds.nodes += collection.size();
-            if (bounds.nodes > MAX_ASSET_NODES) {
-                bounds.valid = false;
-                return;
-            }
-            for (Object child : collection) inspectAssets(child, bounds, depth + 1);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> copyAndSanitize(Object value, boolean stripAnswerKey) {
-        if (!(value instanceof Map<?, ?> map)) return Map.of();
-        Map<String, Object> copy = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            String key = String.valueOf(entry.getKey());
-            if (isSensitiveKey(key) || (stripAnswerKey && isAnswerKey(key))) continue;
-            copy.put(key, sanitizeValue(entry.getValue(), stripAnswerKey));
-        }
-        return copy;
-    }
-
-    private Object sanitizeValue(Object value, boolean stripAnswerKey) {
-        if (value instanceof Map<?, ?>) return copyAndSanitize(value, stripAnswerKey);
-        if (value instanceof Collection<?> collection) {
-            return collection.stream().map(item -> sanitizeValue(item, stripAnswerKey)).toList();
-        }
-        return value;
-    }
-
-    private boolean isSensitiveKey(String key) {
-        String normalized = key.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
-        return normalized.equals("accesstoken")
-                || normalized.equals("refreshtoken")
-                || normalized.equals("password")
-                || normalized.equals("clientsecret")
-                || normalized.equals("apikey")
-                || normalized.equals("privatekey")
-                || normalized.equals("credential")
-                || normalized.equals("credentials");
-    }
-
-    private boolean isAnswerKey(String key) {
-        String normalized = key.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
-        return normalized.equals("answerkey") || normalized.equals("answerkeys");
-    }
-
-    private String safeDownloadUrl(String value) {
-        if (!nonBlank(value)) return null;
-        String normalized = value.trim();
-        return normalized.startsWith("https://") ? normalized : null;
     }
 
     private String etag(String contentHash, String packageId) {
@@ -468,13 +372,4 @@ public class PortableQuizBundleService {
         return nonBlank(value) ? value : fallback;
     }
 
-    private static final class AssetBounds {
-        private int nodes;
-        private long bytes;
-        private boolean valid = true;
-
-        private boolean valid() {
-            return valid && nodes <= MAX_ASSET_NODES && bytes <= MAX_ASSET_BYTES;
-        }
-    }
 }

@@ -9,8 +9,6 @@ import com.erg.ergspringboot.common.response.learningcontent.LearningResourceLib
 import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumTopic;
-import com.erg.ergspringboot.learningcontent.persistence.ContentItem;
-import com.erg.ergspringboot.learningcontent.persistence.TopicContentItem;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
@@ -344,33 +342,6 @@ public class LearningResourceLibraryReadService {
                 card.getUpdatedAt() == null ? null : card.getUpdatedAt().atOffset(java.time.ZoneOffset.UTC));
     }
 
-    private LearningResourceCardResponse card(
-            ContentItem item,
-            TopicContentItem placement,
-            Map<String, CurriculumLevel> levelsById,
-            Map<String, CurriculumTopic> topicsById
-    ) {
-        String topicId = placement == null ? null : placement.getTopicId();
-        CurriculumTopic topic = topicId == null ? null : topicsById.get(topicId);
-        CurriculumLevel level = topic == null ? null : levelsById.get(topic.getLevelId());
-        return new LearningResourceCardResponse(
-                item.getId(),
-                level == null ? null : level.getSubjectId(),
-                null,
-                level == null ? null : level.getId(),
-                topicId,
-                topicId,
-                item.getTitle(),
-                item.getId(),
-                item.getDescription(),
-                null,
-                item.getVisibility(),
-                item.getStatus(),
-                null,
-                item.getUpdatedAt()
-        );
-    }
-
     private String requiredTenant(String tenantId) {
         String normalized = blankToNull(tenantId);
         return normalized == null ? "erg" : normalized;
@@ -379,17 +350,6 @@ public class LearningResourceLibraryReadService {
     private String normalized(String value) {
         String normalized = blankToNull(value);
         return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
-    }
-
-    private boolean contentStatusMatches(String requestedStatus, String itemStatus) {
-        if (requestedStatus == null) {
-            return true;
-        }
-        String normalizedItemStatus = normalized(itemStatus);
-        if (ACTIVE.equals(requestedStatus)) {
-            return ACTIVE.equals(normalizedItemStatus) || "published".equals(normalizedItemStatus);
-        }
-        return requestedStatus.equals(normalizedItemStatus);
     }
 
     private String firstNonBlank(String first, String second) {

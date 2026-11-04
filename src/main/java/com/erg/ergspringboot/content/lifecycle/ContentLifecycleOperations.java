@@ -4,7 +4,6 @@ import com.erg.ergspringboot.authorization.AuthorizationOperations;
 import com.erg.ergspringboot.content.lifecycle.ContentLifecycleRequests.TransitionRequest;
 import com.erg.ergspringboot.content.lifecycle.ContentLifecycleResponses.LifecycleResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.content.persistence.ContentLifecycleTransition;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
@@ -15,7 +14,6 @@ import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
-import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.content.persistence.ContentLifecycleTransitionRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
@@ -30,11 +28,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
 import java.util.Map;
-import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,8 +39,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ContentLifecycleOperations implements ContentLifecyclePort {
 
-    private static final Set<String> ELEVATED = Set.of("content.manage", "curriculum.manage", "content.lifecycle.manage");
-
     private final ContentLifecycleTransitionRepository transitions;
     private final CurriculumSubjectRepository subjects;
     private final CurriculumLevelRepository levels;
@@ -56,7 +48,7 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
     private final QuizRepository quizzes;
     private final QuizDraftRepository quizDrafts;
     private final QuizVersionRepository quizVersions;
-    private final AuthorizationOperations authorization;
+    private final ContentLifecycleAccessPolicy accessPolicy;
 
     public ContentLifecycleOperations(
             ContentLifecycleTransitionRepository transitions,
@@ -78,7 +70,7 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
         this.quizzes = quizzes;
         this.quizDrafts = quizDrafts;
         this.quizVersions = quizVersions;
-        this.authorization = authorization;
+        this.accessPolicy = new ContentLifecycleAccessPolicy(transitions, authorization);
     }
 
     @Override
@@ -88,11 +80,11 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
             LifecycleResourceKind kind,
             String resourceId,
             TransitionRequest request) {
-        requireAccess(access, resourceId);
+        accessPolicy.requireAccess(access, resourceId);
         if (request == null) throw new BadRequestException("lifecycle transition request is required");
         LifecycleState targetState = parseState(request.targetState());
         if (kind == null) throw new BadRequestException("resourceKind is required");
-        authorize(targetState, kind, access.tenantId());
+        accessPolicy.authorize(targetState, kind, access.tenantId());
         String key = required(request.idempotencyKey(), "idempotencyKey");
         ContentLifecycleTransition replay = transitions
                 .findByTenantIdAndResourceKindAndResourceIdAndIdempotencyKey(
@@ -115,7 +107,7 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
                 && targetState == LifecycleState.DRAFT;
         LifecycleTransition decision = LifecycleTransitionPolicy.validate(
                 loaded.state(), targetState, request.reason(), quizRollback);
-        enforceApprovalSeparation(access.tenantId(), access.userId(), kind, resourceId, decision.to());
+        accessPolicy.enforceApprovalSeparation(access.tenantId(), access.userId(), kind, resourceId, decision.to());
         if (request.expectedVersion() != null && request.expectedVersion() != loaded.version()) {
             throw new LifecycleTransitionException("STALE_WRITE", "content changed; reload before transitioning lifecycle");
         }
@@ -173,23 +165,6 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
         transitions.save(event);
     }
 
-    private void requireAccess(UserAccessContext access, String resourceId) {
-        if (access == null || blankToNull(access.tenantId()) == null || blankToNull(access.userId()) == null) {
-            throw new ForbiddenException("authenticated tenant context is required");
-        }
-        if (blankToNull(resourceId) == null) throw new BadRequestException("resourceId is required");
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || !(authentication.getPrincipal() instanceof ErgPrincipal)) {
-            throw new ForbiddenException("authenticated principal is required");
-        }
-        ErgPrincipal principal = (ErgPrincipal) authentication.getPrincipal();
-        if (!access.tenantId().equals(principal.tenantId())
-                || !access.userId().equals(principal.userId())) {
-            throw new ForbiddenException("access context does not match the authenticated principal");
-        }
-    }
-
     private Loaded load(LifecycleResourceKind kind, String id, String tenantId) {
         Object entity = switch (kind) {
             case CURRICULUM_SUBJECT -> subjects.findByTenantIdAndId(tenantId, id)
@@ -210,58 +185,6 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
 
     private RuntimeException notFound(LifecycleResourceKind kind, String id) {
         return new ResourceNotFoundException(kind.name().toLowerCase(Locale.ROOT) + " not found: " + id);
-    }
-
-    private void authorize(LifecycleState target, LifecycleResourceKind kind, String tenantId) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || !(authentication.getPrincipal() instanceof ErgPrincipal principal)
-                || principal.tenantId() == null || principal.tenantId().isBlank()) {
-            throw new ForbiddenException("authenticated principal is required");
-        }
-        String required = switch (target) {
-            case IN_REVIEW -> "content.lifecycle.submit";
-            case APPROVED -> "content.lifecycle.approve";
-            case PUBLISHED -> kind == LifecycleResourceKind.QUIZ ? "lms.quiz.publish" : "content.lifecycle.publish";
-            case ARCHIVED -> "content.lifecycle.archive";
-            case DRAFT -> "content.lifecycle.rollback";
-        };
-        if (!hasPermission(principal, required, kind, tenantId)) {
-            throw new ForbiddenException("missing permission " + required);
-        }
-    }
-
-    private boolean hasPermission(ErgPrincipal principal, String required, LifecycleResourceKind kind, String tenantId) {
-        if (authorization == null) {
-            Set<String> permissions = principal.permissions() == null ? Set.of() : Set.copyOf(principal.permissions());
-            return permissions.stream().map(this::normalize).anyMatch(required::equals);
-        }
-        if (required.equals("lms.quiz.publish") && kind == LifecycleResourceKind.QUIZ) {
-            return authorization.isAllowed(principal, required, "teacher", tenantId)
-                    || authorization.isAllowed(principal, "content.lifecycle.publish", "admin", tenantId)
-                    || authorization.isAllowed(principal, "content.manage", "admin", tenantId);
-        }
-        return authorization.isAllowed(principal, required, "admin", tenantId)
-                || authorization.isAllowed(principal, "content.manage", "admin", tenantId)
-                || authorization.isAllowed(principal, "curriculum.manage", "admin", tenantId);
-    }
-
-    private void enforceApprovalSeparation(String tenantId, String actorId, LifecycleResourceKind kind, String resourceId, LifecycleState target) {
-        if (target != LifecycleState.APPROVED || hasElevatedPermission()) return;
-        transitions.findTopByTenantIdAndResourceKindAndResourceIdAndToStateOrderByCreatedAtDesc(
-                        tenantId, kind.name(), resourceId, LifecycleState.IN_REVIEW.name())
-                .filter(last -> actorId.equals(last.getActorId()))
-                .ifPresent(last -> { throw new ForbiddenException("review submitter cannot approve without elevated permission"); });
-    }
-
-    private boolean hasElevatedPermission() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof ErgPrincipal principal)) return false;
-        if (authorization == null) {
-            return principal.permissions().stream().map(this::normalize).anyMatch(ELEVATED::contains);
-        }
-        return authorization.isAllowedAny(principal, "admin", principal.tenantId(),
-                List.of("content.manage", "curriculum.manage", "content.lifecycle.manage"));
     }
 
     private void applyState(Object entity, LifecycleResourceKind kind, LifecycleState target, String actorId) {
@@ -432,6 +355,5 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
     }
 
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private String normalize(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
     private record Loaded(Object entity, LifecycleState state, long version) { }
 }
