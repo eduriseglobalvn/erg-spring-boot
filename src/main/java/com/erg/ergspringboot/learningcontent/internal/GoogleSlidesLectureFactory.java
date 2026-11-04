@@ -1,19 +1,19 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.normalizedOrDefault;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.required;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.normalizedOrDefault;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.required;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.learningcontent.ContentAsset;
 import com.erg.ergspringboot.model.learningcontent.ContentItem;
 import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
 import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.GoogleSlidesLectureResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.AttachContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateGoogleSlidesLectureRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.PlaceContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.GoogleSlidesLectureResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateGoogleSlidesLectureRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.PlaceContentItemRequest;
 import java.net.URI;
 import java.util.Map;
 

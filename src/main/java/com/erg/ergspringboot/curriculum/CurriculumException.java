@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.curriculum;
+package com.erg.ergspringboot.curriculum;
 
 import com.erg.ergspringboot.exception.ApiException;
 import org.springframework.http.HttpStatus;

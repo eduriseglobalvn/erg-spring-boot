@@ -8,7 +8,7 @@ import com.erg.ergspringboot.platform.cache.CacheInvalidationMessage;
 import com.erg.ergspringboot.platform.cache.CacheRuntimeHintsContributor;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.curriculum.CurriculumDtos;
+import com.erg.ergspringboot.curriculum.CurriculumDtos;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.aot.hint.MemberCategory;

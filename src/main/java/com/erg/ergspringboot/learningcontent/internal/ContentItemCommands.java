@@ -1,11 +1,11 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.blankToNull;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.copyMetadata;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.normalizeLimit;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.normalizedOrDefault;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.required;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.requiredUpper;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.blankToNull;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.copyMetadata;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.normalizeLimit;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.normalizedOrDefault;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.required;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.requiredUpper;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -18,12 +18,12 @@ import com.erg.ergspringboot.repository.learningcontent.ContentAssetRepository;
 import com.erg.ergspringboot.repository.learningcontent.ContentItemAssetRepository;
 import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
 import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.ContentAssetResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.ContentItemListResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.ContentItemResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.TopicContentPlacementResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.ContentAssetResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.ContentItemListResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.ContentItemResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.TopicContentPlacementResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.UpdateContentItemRequest;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;

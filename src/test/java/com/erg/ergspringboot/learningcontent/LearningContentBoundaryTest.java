@@ -40,7 +40,7 @@ class LearningContentBoundaryTest {
                     .filter(source -> source.contains("package com.erg.ergspringboot.learningcontent;"))
                     .noneMatch(source -> source.contains("com.erg.ergspringboot.model.")
                             || source.contains("com.erg.ergspringboot.repository.")
-                            || source.contains("com.erg.ergspringboot.service.learningcontent.LearningContentRequests")
+                            || source.contains("com.erg.ergspringboot.learningcontent.internal.LearningContentRequests")
                             || source.contains("jakarta.persistence.")))
                     .isTrue();
         }

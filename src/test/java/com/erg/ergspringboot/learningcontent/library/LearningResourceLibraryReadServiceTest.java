@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.library;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;

@@ -1,10 +1,10 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.blankToNull;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.normalizedOrDefault;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.positive;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.required;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.requiredUpper;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.blankToNull;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.normalizedOrDefault;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.positive;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.required;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.requiredUpper;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -13,8 +13,8 @@ import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
 import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
 import com.erg.ergspringboot.repository.learningcontent.CurriculumTopicLookupRepository;
 import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.PlaceContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.ReorderTopicContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.PlaceContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.ReorderTopicContentItemRequest;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

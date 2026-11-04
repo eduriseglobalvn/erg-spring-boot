@@ -14,7 +14,7 @@ class GraphQlEnterpriseSecurityAuditTest {
         String securityGuardTest = read("src/test/java/com/erg/ergspringboot/platform/security/GraphQlSecurityGuardContractTest.java");
         String securityConfig = read("src/main/java/com/erg/ergspringboot/platform/security/SecurityConfig.java");
         String contextFactoryTest = read("src/test/java/com/erg/ergspringboot/platform/graphql/GraphQlRequestContextFactoryTest.java");
-        String resourceReadServiceTest = read("src/test/java/com/erg/ergspringboot/service/learningcontent/LearningResourceLibraryReadServiceTest.java");
+        String resourceReadServiceTest = read("src/test/java/com/erg/ergspringboot/learningcontent/library/LearningResourceLibraryReadServiceTest.java");
 
         assertThat(securityGuardTest)
                 .contains("securityConfigRequiresAuthenticatedPostToGraphQlEndpoint")

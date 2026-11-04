@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,13 +17,13 @@ import com.erg.ergspringboot.repository.learningcontent.ContentItemAssetReposito
 import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
 import com.erg.ergspringboot.repository.learningcontent.CurriculumTopicLookupRepository;
 import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.ContentItemListResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.AttachContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateGoogleSlidesLectureRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.PlaceContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.ReorderTopicContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.ContentItemListResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateGoogleSlidesLectureRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.PlaceContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.ReorderTopicContentItemRequest;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;

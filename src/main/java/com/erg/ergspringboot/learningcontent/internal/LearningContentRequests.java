@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
 import java.util.List;
 import java.util.Map;

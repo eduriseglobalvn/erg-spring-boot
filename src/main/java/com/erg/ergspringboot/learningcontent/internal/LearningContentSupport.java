@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
 import com.erg.ergspringboot.common.response.sync.SyncMutationResponses.ConflictPayload;
 import com.erg.ergspringboot.exception.BadRequestException;

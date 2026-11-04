@@ -1,12 +1,12 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.blankToNull;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.copyMetadata;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.nonNegative;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.normalizedOrDefault;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.positive;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.required;
-import static com.erg.ergspringboot.service.learningcontent.LearningContentSupport.requiredUpper;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.blankToNull;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.copyMetadata;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.nonNegative;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.normalizedOrDefault;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.positive;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.required;
+import static com.erg.ergspringboot.learningcontent.internal.LearningContentSupport.requiredUpper;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -17,9 +17,9 @@ import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.repository.learningcontent.ContentAssetRepository;
 import com.erg.ergspringboot.repository.learningcontent.ContentItemAssetRepository;
 import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.AttachContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.UpdateContentAssetRequest;
 import java.util.Map;
 
 /**

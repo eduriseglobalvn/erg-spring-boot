@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
 import com.erg.ergspringboot.model.learningcontent.ContentAsset;
 import com.erg.ergspringboot.model.learningcontent.ContentItem;
