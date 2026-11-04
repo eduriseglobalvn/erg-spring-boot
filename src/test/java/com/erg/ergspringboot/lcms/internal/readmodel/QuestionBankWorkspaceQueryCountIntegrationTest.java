@@ -180,6 +180,11 @@ class QuestionBankWorkspaceQueryCountIntegrationTest {
         return entityManager.unwrap(Session.class).doReturningWork(connection -> {
             List<String> plan = new ArrayList<>();
             Array questionIdArray = connection.createArrayOf("text", questionIds.toArray(String[]::new));
+            // A few dozen seeded rows make a seq scan cheapest, so the planner's pick flips between runs;
+            // the test proves the index is usable, not that tiny tables prefer it.
+            try (PreparedStatement off = connection.prepareStatement("set local enable_seqscan = off")) {
+                off.execute();
+            }
             try (PreparedStatement statement = connection.prepareStatement("""
                     explain (analyze, buffers, format text)
                     select link.question_id as questionId, count(distinct link.quiz_id) as usageCount
