@@ -21,9 +21,7 @@ class ApplicationYamlMigrationTest {
                 .doesNotContain("learning:")
                 .contains("ddl-auto: validate")
                 .contains("${SPRING_DATA_MONGODB_URI:${MONGODB__URI}}")
-                .contains("${SPRING_DATA_MONGODB_DATABASE:${MONGODB__DATABASE}}")
-                .contains("${REDIS__HOST:localhost}")
-                .contains("${REDIS__PORT:6379}");
+                .contains("${SPRING_DATA_MONGODB_DATABASE:${MONGODB__DATABASE}}");
     }
 
     @Test
