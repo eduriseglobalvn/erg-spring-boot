@@ -12,7 +12,7 @@ import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;
-import com.erg.ergspringboot.service.auth.PasswordService;
+import com.erg.ergspringboot.auth.internal.credential.PasswordService;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Locale;
 import java.util.Optional;

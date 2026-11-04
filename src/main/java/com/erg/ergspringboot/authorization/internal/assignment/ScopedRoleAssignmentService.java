@@ -1,5 +1,6 @@
-package com.erg.ergspringboot.service.authorization;
+package com.erg.ergspringboot.authorization.internal.assignment;
 
+import com.erg.ergspringboot.authorization.internal.audit.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRoleAssignmentResponse;
@@ -13,7 +14,8 @@ import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
+import com.erg.ergspringboot.users.RoleAssignmentAudit.UserRef;
+import com.erg.ergspringboot.users.ScopedRoleAssigner;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
@@ -23,7 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ScopedRoleAssignmentService {
+public class ScopedRoleAssignmentService implements ScopedRoleAssigner {
     private static final List<String> SCOPE_TYPES = List.of("SYSTEM", "TENANT", "CENTER", "SCHOOL", "CLASS");
     private final UserRoleAssignmentRepository assignmentRepository;
     private final RoleRepository roleRepository;
@@ -53,6 +55,7 @@ public class ScopedRoleAssignmentService {
         return assign(userId, tenantId, request, actor, actorContext(actor));
     }
 
+    @Override
     @Transactional
     public ScopedRoleAssignmentResponse assign(
             String userId,

@@ -46,10 +46,10 @@ import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepo
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
 import com.erg.ergspringboot.repository.organization.UserAccessScopeRepository;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.auth.AccountMailSender;
-import com.erg.ergspringboot.service.auth.PasswordService;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
+import com.erg.ergspringboot.users.AccountMailSender;
+import com.erg.ergspringboot.auth.internal.credential.PasswordService;
+import com.erg.ergspringboot.users.RoleAssignmentAudit;
+import com.erg.ergspringboot.users.RoleAssignmentAudit.UserRef;
 import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
 import com.erg.ergspringboot.users.internal.lifecycle.UserLifecycleUseCase;
 import com.erg.ergspringboot.users.internal.password.UserPasswordUseCase;
@@ -100,7 +100,7 @@ class UserOperationsUseCaseTest {
     private AccountMailSender accountMailSender;
 
     @Mock
-    private AuthorizationMutationAuditService authorizationMutationAuditService;
+    private RoleAssignmentAudit authorizationMutationAuditService;
 
     private PasswordService passwordService;
     private UserOperations operations;

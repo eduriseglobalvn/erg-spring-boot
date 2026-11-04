@@ -10,7 +10,7 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeSc
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRoleAssignmentResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
-import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.authorization.internal.assignment.ScopedRoleAssignmentService;
 import com.erg.ergspringboot.users.UserAuditContext;
 import java.util.List;
 import java.util.Map;

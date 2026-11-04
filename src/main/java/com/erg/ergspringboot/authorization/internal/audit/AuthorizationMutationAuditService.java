@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.authorization;
+package com.erg.ergspringboot.authorization.internal.audit;
 
 import com.erg.ergspringboot.audit.AuditOperations;
 import com.erg.ergspringboot.audit.AuditOutcome;
@@ -10,6 +10,7 @@ import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.users.RoleAssignmentAudit;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
@@ -24,7 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AuthorizationMutationAuditService {
+public class AuthorizationMutationAuditService implements RoleAssignmentAudit {
     private static final int BATCH_SIZE = 500;
     private final UserRepository userRepository;
     private final UserActivityRepository activityRepository;
@@ -53,6 +54,7 @@ public class AuthorizationMutationAuditService {
         this(userRepository, activityRepository, securityEventRepository, null);
     }
 
+    @Override
     @Transactional
     public void authorizationChanged(
             Collection<UserRef> users,
@@ -255,8 +257,5 @@ public class AuthorizationMutationAuditService {
         if (requestId != null && !requestId.isBlank()) seed = requestId.trim() + ":" + seed;
         int hash = seed.hashCode();
         return "authz:" + Integer.toUnsignedString(hash, 36) + ":" + Math.abs((long) hash);
-    }
-
-    public record UserRef(String userId, String tenantId) {
     }
 }

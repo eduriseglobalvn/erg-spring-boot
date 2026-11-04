@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.authorization;
+package com.erg.ergspringboot.authorization.internal.assignment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.erg.ergspringboot.authorization.internal.audit.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.model.authorization.Role;

@@ -2,7 +2,7 @@ package com.erg.ergspringboot.auth;
 
 import com.erg.ergspringboot.auth.internal.login.AuthLoginRateLimiter;
 import com.erg.ergspringboot.auth.internal.login.LoginFailureEnforcementService;
-import com.erg.ergspringboot.service.auth.PasswordService;
+import com.erg.ergspringboot.auth.internal.credential.PasswordService;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;

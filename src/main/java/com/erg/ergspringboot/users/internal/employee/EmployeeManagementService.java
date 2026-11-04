@@ -22,7 +22,7 @@ import com.erg.ergspringboot.common.request.users.UserRequests.AccessPolicyReque
 import com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRequest;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
-import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
+import com.erg.ergspringboot.users.ScopedRoleAssigner;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
@@ -53,7 +53,7 @@ public class EmployeeManagementService {
     private final AuthSessionRepository sessionRepository;
     private final SecurityEventRepository securityEventRepository;
     private final UserRoleAssignmentRepository roleAssignmentRepository;
-    private final ScopedRoleAssignmentService scopedRoleAssignmentService;
+    private final ScopedRoleAssigner scopedRoleAssignmentService;
 
     public EmployeeManagementService(
             UserOperations userOperations,
@@ -63,7 +63,7 @@ public class EmployeeManagementService {
             AuthSessionRepository sessionRepository,
             SecurityEventRepository securityEventRepository,
             UserRoleAssignmentRepository roleAssignmentRepository,
-            ScopedRoleAssignmentService scopedRoleAssignmentService
+            ScopedRoleAssigner scopedRoleAssignmentService
     ) {
         this.userOperations = userOperations;
         this.profileRepository = profileRepository;
