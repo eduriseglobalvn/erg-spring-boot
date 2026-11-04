@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.erg.ergspringboot.content.lifecycle.ContentLifecyclePort;
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.PublishRequest;
 import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.repository.lms.QuestionRepository;
@@ -151,6 +152,7 @@ class QuizPublishServiceTest {
         when(quizRepository.save(any(Quiz.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(cacheManager.getCache("quizRuntimePackage")).thenReturn(runtimeCache);
 
+        ContentLifecyclePort lifecycle = mock(ContentLifecyclePort.class);
         QuizPublishService service = new QuizPublishService(
                 quizRepository,
                 bankQuestionRepository,
@@ -165,7 +167,8 @@ class QuizPublishServiceTest {
                 packageSigner,
                 assessmentCurriculumBridge,
                 objectMapper,
-                cacheManager
+                cacheManager,
+                lifecycle
         );
 
         var response = service.publish(
@@ -185,6 +188,7 @@ class QuizPublishServiceTest {
         verify(packageSigner).sign("canonical-package-json");
         verify(runtimeCache).evict("tenant-a:quiz-1");
         verify(quizRepository).save(quiz);
+        verify(lifecycle).recordPublishedSnapshot("tenant-a", "quiz-1", "author-1", "publish-key-1");
         assertThat(quiz.getCurrentVersionId()).isEqualTo("version-1");
         assertThat(quiz.getPackageHash()).isEqualTo("sha256:abcdef1234567890");
         assertThat(versionCaptor.getValue().getAuthoringSnapshot())

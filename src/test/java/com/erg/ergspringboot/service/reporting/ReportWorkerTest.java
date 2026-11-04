@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.AssignmentReportResponse;
 import com.erg.ergspringboot.model.reporting.ReportJob;
+import com.erg.ergspringboot.reporting.ReportJobPort;
 import com.erg.ergspringboot.repository.reporting.ReportJobRepository;
 import com.erg.ergspringboot.service.quiz.report.QuizReportService;
 import java.time.OffsetDateTime;
@@ -64,7 +65,7 @@ class ReportWorkerTest {
         job.setId("job-1");
         job.setTenantId("tenant-a");
         job.setRequestedBy("teacher-1");
-        job.setReportType(ReportJobService.ASSIGNMENT_PROGRESS);
+        job.setReportType(ReportJobPort.ASSIGNMENT_PROGRESS);
         job.setAggregateId("assignment-1");
         job.setStatus("queued");
         job.setAvailableAt(OffsetDateTime.now());

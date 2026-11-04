@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.erg.ergspringboot.controller.lcms.LcmsMediaController;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lcms.LcmsOperations;
-import com.erg.ergspringboot.lcms.LcmsCommandCompatibility;
+import com.erg.ergspringboot.lcms.internal.command.LcmsCommandUseCase;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -52,7 +52,7 @@ class LcmsMediaControllerUploadTest {
                 org.mockito.Mockito.mock(
                         com.erg.ergspringboot.repository.quiz.media.MediaAssetRepository.class),
                 storage);
-        return new LcmsOperations(LcmsCommandCompatibility.fromServices(
+        return new LcmsOperations(new LcmsCommandUseCase(
                 org.mockito.Mockito.mock(
                         com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService.class),
                 org.mockito.Mockito.mock(

@@ -3,7 +3,6 @@ package com.erg.ergspringboot.reporting;
 import com.erg.ergspringboot.common.response.reporting.ReportJobResponses.ReportJobResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.reporting.ReportJobService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +17,6 @@ public class ReportingOperations {
     public ReportingOperations(ReportJobPort jobs, AssignmentScopeLookup assignments,
                                ReportingAnalyticsPort analytics) {
         this.jobs = jobs;
-        this.statusReader = jobs::get;
         this.assignments = assignments;
         this.analytics = analytics;
     }
@@ -26,32 +24,6 @@ public class ReportingOperations {
     public ReportingOperations(ReportJobPort jobs, AssignmentScopeLookup assignments) {
         this(jobs, assignments, null);
     }
-
-    /** Compatibility constructor for the legacy report-job adapter. */
-    public ReportingOperations(ReportJobPort jobs) {
-        this(jobs, (tenantId, assignmentId) -> java.util.Optional.empty());
-    }
-
-    /** Compatibility constructor retained for legacy tests and adapters. */
-    public ReportingOperations(ReportJobService jobs, AssignmentScopeLookup assignments) {
-        this.jobs = new ReportJobPort() {
-            @Override
-            public ReportJobResponse enqueueAssignmentProgress(String tenantId, String requestedBy,
-                    String assignmentId, String idempotencyKey) {
-                return jobs.enqueueAssignmentProgress(tenantId, requestedBy, assignmentId, idempotencyKey);
-            }
-
-            @Override
-            public ReportJobResponse get(String tenantId, String id) {
-                return jobs.get(tenantId, id);
-            }
-        };
-        this.statusReader = jobs::get;
-        this.assignments = assignments;
-        this.analytics = null;
-    }
-
-    private final JobStatusReader statusReader;
 
     public ReportJobResponse enqueueAssignmentProgress(
             UserAccessContext access, String assignmentId, String idempotencyKey
@@ -81,7 +53,7 @@ public class ReportingOperations {
      * reported assignment; a job id alone (logs, shared URLs) is not a capability.
      */
     public ReportJobResponse status(UserAccessContext access, String jobId) {
-        ReportJobResponse job = statusReader.get(access.tenantId(), jobId);
+        ReportJobResponse job = jobs.get(access.tenantId(), jobId);
         boolean requester = access.userId() != null
                 && jobs.requestedBy(access.tenantId(), jobId).filter(access.userId()::equals).isPresent();
         if (requester) return job;
@@ -100,10 +72,5 @@ public class ReportingOperations {
             UserAccessContext access, String assignmentId, AssignmentProgressFilter filter) {
         if (analytics == null) throw new IllegalStateException("reporting analytics is not configured");
         return analytics.assignmentProgress(access, assignmentId, filter);
-    }
-
-    @FunctionalInterface
-    private interface JobStatusReader {
-        ReportJobResponse get(String tenantId, String id);
     }
 }
