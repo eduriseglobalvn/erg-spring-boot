@@ -438,7 +438,9 @@ INSERT INTO lms_attempts
      score, max_score, percent, passed, started_at, updated_at, class_id, mode,
      submitted_count, total_questions, last_active_at)
 SELECT format('load-attempt-%s-0', n), student.tenant_id,
-       format('seed-assignment-%s-01', right(student.academic_class_id, 4)),
+       -- 5,000 attempts over 4,500 students: attempts past 4,500 use the next assignment so each student
+       -- keeps at most one in-progress attempt per assignment (V115 uq_lms_attempts_single_in_progress).
+       format('seed-assignment-%s-%s', right(student.academic_class_id, 4), lpad((((n - 1) / 4500) + 1)::text, 2, '0')),
        format('seed-quiz-%s', right(student.tenant_id, 2)), student.id,
        'load-fixture', 'in_progress', '{}'::jsonb, 0, 50, 0, false,
        now() - interval '5 minutes', now(), student.academic_class_id, 'ONLINE', 0, 50, now()

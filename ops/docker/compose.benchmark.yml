@@ -30,6 +30,11 @@ x-backend-environment: &backend-environment
   SECRET_AUTH__JWT_SECRET: benchmark-only-jwt-secret-0123456789-abcdef
   SECRET_AUTH__JWT_REFRESH_SECRET: benchmark-only-refresh-secret-9876543210-fedcba
   SECRET_MEDIA_URL_SIGNING_KEY: benchmark-only-media-signing-key-abcdef-0123456789
+  # prod fails closed without these.
+  ERG_OUTBOX_ENCRYPTION_KEY: benchmark-only-outbox-key-0123456789-abcdef
+  AUDIT_REDACTION_HMAC_SECRET: benchmark-only-audit-hmac-9876543210-fedcba
+  NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_KEY: benchmark-only-push-token-key-0123456789
+  HTTP__CORS__ALLOWED_ORIGINS: https://benchmark.invalid
   AUTH__GEO_BLOCK_ENABLED: "false"
   TENANT__ENABLED: "true"
   ERG_PROCESS_LOCAL_ENABLED: "false"

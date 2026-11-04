@@ -62,7 +62,7 @@ function graphQl(query, variables, operationName) {
 }
 
 const workflows = [
-  () => request('GET', __ENV.SESSION_PATH || '/api/v1/auth/session', null, 'session_bootstrap'),
+  () => request('GET', __ENV.SESSION_PATH || '/api/v1/sessions/current', null, 'session_bootstrap'),
   () => request('GET', __ENV.ASSIGNMENTS_PATH || '/api/v1/lms/students/me/assignments', null, 'assignment_list'),
   () => request('GET', __ENV.CALENDAR_PATH || '/api/v1/calendar/workspace?from=2026-07-01&to=2026-07-07', null, 'calendar'),
   () => graphQl(
@@ -75,8 +75,9 @@ const workflows = [
     'query TeacherHomework($input: TeacherHomeworkWorkspaceInput) { lms { teacherHomeworkWorkspace(input: $input) { tenantId } } }',
     { input: { tenantId: tenant, page: 0, size: 20 } }, 'TeacherHomework'),
   () => graphQl(
-    'query CacheCombined { lms { __typename } lcms { __typename } elearning { __typename } }',
-    {}, 'CacheCombined'),
+    // Real fields: a __typename-only query counts as introspection, which prod rejects with 403.
+    'query CacheCombined($input: TeacherHomeworkWorkspaceInput) { lms { teacherHomeworkWorkspace(input: $input) { tenantId } } elearning { studentDashboard { tenantId } } }',
+    { input: { tenantId: tenant, page: 0, size: 20 } }, 'CacheCombined'),
 ];
 
 export default function () {
