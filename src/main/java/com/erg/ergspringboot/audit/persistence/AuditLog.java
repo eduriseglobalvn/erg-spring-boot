@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.audit;
+package com.erg.ergspringboot.audit.persistence;
 
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;

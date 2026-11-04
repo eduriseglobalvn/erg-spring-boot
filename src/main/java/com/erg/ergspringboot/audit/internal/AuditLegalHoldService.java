@@ -7,7 +7,7 @@ import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.audit.AuditEventRepository;
+import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;

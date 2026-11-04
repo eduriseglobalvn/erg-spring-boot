@@ -1,6 +1,6 @@
 package com.erg.ergspringboot.audit.internal;
 
-import com.erg.ergspringboot.model.audit.AuditEvent;
+import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

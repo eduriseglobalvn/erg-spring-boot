@@ -1,7 +1,7 @@
-package com.erg.ergspringboot.repository.audit;
+package com.erg.ergspringboot.audit.persistence;
 
 import com.erg.ergspringboot.audit.AuditOutcome;
-import com.erg.ergspringboot.model.audit.AuditEvent;
+import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;

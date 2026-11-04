@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.audit;
+package com.erg.ergspringboot.audit.persistence;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import com.erg.ergspringboot.audit.AuditOutcome;

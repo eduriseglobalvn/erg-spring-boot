@@ -9,9 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.audit.internal.AuditQueryService;
 import com.erg.ergspringboot.audit.internal.AuditRedactionPolicy;
-import com.erg.ergspringboot.model.audit.AuditEvent;
+import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.audit.AuditEventRepository;
+import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

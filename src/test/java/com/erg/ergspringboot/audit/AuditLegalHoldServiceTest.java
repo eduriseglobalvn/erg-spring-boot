@@ -15,7 +15,7 @@ import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.audit.AuditEventRepository;
+import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;

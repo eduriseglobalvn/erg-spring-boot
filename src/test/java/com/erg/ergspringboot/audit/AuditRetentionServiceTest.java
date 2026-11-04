@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.audit.internal.AuditRetentionService;
-import com.erg.ergspringboot.repository.audit.AuditEventRepository;
+import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.time.OffsetDateTime;

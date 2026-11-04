@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.audit.internal;
 
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
-import com.erg.ergspringboot.repository.audit.AuditEventRepository;
+import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicBoolean;

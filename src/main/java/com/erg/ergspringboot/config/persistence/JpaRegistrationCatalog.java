@@ -18,7 +18,7 @@ public final class JpaRegistrationCatalog {
 
     private static final List<Module> MODULES = List.of(
             enabled("auth", 5, 6),
-            enabled("audit", 1, 1),
+            owned("audit", 1, 1),
             enabled("authorization", 6, 6),
             enabled("calendar", 5, 5),
             dormant("community", 6),

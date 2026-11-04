@@ -3,7 +3,7 @@ package com.erg.ergspringboot.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.audit.internal.AuditHashChain;
-import com.erg.ergspringboot.model.audit.AuditEvent;
+import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;

@@ -61,7 +61,7 @@ public class AuditOperations {
         return page;
     }
 
-    private AuditEntry toEntry(com.erg.ergspringboot.model.audit.AuditEvent event) {
+    private AuditEntry toEntry(com.erg.ergspringboot.audit.persistence.AuditEvent event) {
         return new AuditEntry(
                 event.getId(), event.getTenantId(), event.getActorId(), event.getScopeType(), event.getScopeId(),
                 event.getAction(), event.getResourceType(), event.getResourceId(), event.getOutcome(),
