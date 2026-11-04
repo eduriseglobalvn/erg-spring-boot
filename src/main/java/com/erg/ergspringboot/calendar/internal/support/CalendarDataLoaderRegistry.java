@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.calendar.internal.support;
 
-import com.erg.ergspringboot.model.calendar.CalendarEvent;
-import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
-import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

@@ -15,7 +15,7 @@ class CalendarModuleArchitectureTest {
 
         assertThat(controller)
                 .contains("CalendarOperations")
-                .doesNotContain("repository.calendar", "CalendarCommandService", "CalendarReadService", "CalendarRoomRepository");
+                .doesNotContain("repository.calendar", "calendar.persistence", "CalendarCommandService", "CalendarReadService", "CalendarRoomRepository");
     }
 
     @Test
@@ -24,6 +24,6 @@ class CalendarModuleArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/calendar/CalendarOperations.java"));
 
         assertThat(facade)
-                .doesNotContain("Repository", "model.calendar", "model.lms");
+                .doesNotContain("Repository", "model.calendar", "calendar.persistence", "model.lms");
     }
 }

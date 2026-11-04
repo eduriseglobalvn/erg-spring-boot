@@ -5,9 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.AssignmentReportResponse;
-import com.erg.ergspringboot.model.reporting.ReportJob;
+import com.erg.ergspringboot.reporting.persistence.ReportJob;
 import com.erg.ergspringboot.reporting.ReportJobPort;
-import com.erg.ergspringboot.repository.reporting.ReportJobRepository;
+import com.erg.ergspringboot.reporting.persistence.ReportJobRepository;
 import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import java.time.OffsetDateTime;
 import java.util.List;

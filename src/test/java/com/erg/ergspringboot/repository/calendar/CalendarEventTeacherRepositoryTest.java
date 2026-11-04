@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.repository.calendar;
+package com.erg.ergspringboot.calendar.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +24,7 @@ class CalendarEventTeacherRepositoryTest {
 
         assertThat(query).isNotNull();
         assertThat(query.value())
-                .contains("SELECT new com.erg.ergspringboot.repository.calendar.projection.CalendarTeacherColorProjection")
+                .contains("SELECT new com.erg.ergspringboot.calendar.persistence.projection.CalendarTeacherColorProjection")
                 .contains("FROM CalendarEventTeacher et JOIN CalendarEvent e ON e.id = et.eventId")
                 .contains("e.tenantId = :tenantId")
                 .contains("et.tenantId = :tenantId")

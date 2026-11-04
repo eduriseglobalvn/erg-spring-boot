@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.reporting.internal;
 
 import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.AssignmentReportResponse;
-import com.erg.ergspringboot.model.reporting.ReportJob;
+import com.erg.ergspringboot.reporting.persistence.ReportJob;
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.repository.reporting.ReportJobRepository;
+import com.erg.ergspringboot.reporting.persistence.ReportJobRepository;
 import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import com.erg.ergspringboot.reporting.AssignmentProgressFilter;
 import com.erg.ergspringboot.reporting.ReportJobPort;

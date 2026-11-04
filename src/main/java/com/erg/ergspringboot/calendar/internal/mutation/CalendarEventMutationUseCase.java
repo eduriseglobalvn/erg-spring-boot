@@ -10,9 +10,9 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.calendar.CalendarEvent;
-import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;

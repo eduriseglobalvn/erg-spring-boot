@@ -13,11 +13,11 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarBatchSummaryResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarWorkspaceResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.model.calendar.CalendarBatch;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatchRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.calendar.CalendarScopeService;
 import java.util.Collections;

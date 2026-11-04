@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.repository.calendar;
+package com.erg.ergspringboot.calendar.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

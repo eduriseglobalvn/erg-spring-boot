@@ -54,7 +54,8 @@ class ModulePublicPackageDirectionTest {
         assertThat(Stream.of(CalendarReadPort.class.getDeclaredMethods())
                 .flatMap(method -> Stream.of(method.getParameterTypes()))
                 .map(Class::getName)
-                .noneMatch(name -> name.startsWith("com.erg.ergspringboot.model.")))
+                .noneMatch(name -> name.startsWith("com.erg.ergspringboot.model.")
+                        || name.startsWith("com.erg.ergspringboot.calendar.persistence.")))
                 .as("CalendarReadPort must expose only module-owned contracts")
                 .isTrue();
         assertThat(SOURCE_ROOT.resolve("calendar/CalendarReadCompatibilityPort.java"))

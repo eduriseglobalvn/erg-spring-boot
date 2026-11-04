@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.calendar.internal.room;
 
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOption;
-import com.erg.ergspringboot.model.calendar.CalendarRoom;
-import com.erg.ergspringboot.repository.calendar.CalendarRoomRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarRoom;
+import com.erg.ergspringboot.calendar.persistence.CalendarRoomRepository;
 import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
