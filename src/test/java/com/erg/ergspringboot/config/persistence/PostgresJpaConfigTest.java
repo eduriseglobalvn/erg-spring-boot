@@ -57,10 +57,6 @@ class PostgresJpaConfigTest {
                 .contains(
                         "com.erg.ergspringboot.model.auth.AuthSession",
                         "com.erg.ergspringboot.model.reporting.ReportJob"
-                )
-                .doesNotContain(
-                        "com.erg.ergspringboot.model.recruitment.RecruitmentCandidate",
-                        "com.erg.ergspringboot.model.recruitment.RecruitmentJob"
                 );
     }
 }

@@ -11,14 +11,7 @@ import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.model.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.Certificate;
-import com.erg.ergspringboot.model.community.CommunityComment;
-import com.erg.ergspringboot.model.community.CommunityFollow;
-import com.erg.ergspringboot.model.community.CommunityMedia;
-import com.erg.ergspringboot.model.community.CommunityPost;
-import com.erg.ergspringboot.model.community.CommunityReaction;
 import com.erg.ergspringboot.model.content.Post;
-import com.erg.ergspringboot.model.recruitment.RecruitmentCandidate;
-import com.erg.ergspringboot.model.recruitment.RecruitmentJob;
 import com.erg.ergspringboot.model.users.Profile;
 import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.model.organization.UserAccessScope;
@@ -96,19 +89,10 @@ class RelationalModelMappingTest {
         assertManyToOne(Post.class, "publishedById", "publishedBy", "published_by_id", true);
         assertOneToOne(Profile.class, "userId", "user", "user_id", false);
         assertManyToOne(Certificate.class, "userId", "user", "user_id", false);
-        assertManyToOne(RecruitmentCandidate.class, "jobId", "job", "job_id", false);
-        assertManyToOne(RecruitmentJob.class, "createdBy", "createdByUser", "created_by", true);
         assertManyToOne(WorkShift.class, "userId", "user", "user_id", false);
         assertManyToOne(EducationUnit.class, "parentId", "parent", "parent_id", true);
         assertManyToOne(UserAccessScope.class, "userId", "user", "user_id", false);
         assertManyToOne(UserAccessScope.class, "educationUnitId", "educationUnit", "education_unit_id", false);
-        assertManyToOne(CommunityPost.class, "topicId", "topic", "topic_id", false);
-        assertManyToOne(CommunityPost.class, "authorId", "author", "author_id", false);
-        assertManyToOne(CommunityMedia.class, "postId", "post", "post_id", false);
-        assertManyToOne(CommunityComment.class, "postId", "post", "post_id", false);
-        assertManyToOne(CommunityComment.class, "authorId", "author", "author_id", false);
-        assertManyToOne(CommunityReaction.class, "userId", "user", "user_id", false);
-        assertManyToOne(CommunityFollow.class, "userId", "user", "user_id", false);
     }
 
     @Test
@@ -121,11 +105,7 @@ class RelationalModelMappingTest {
         assertOneToManyInverse(User.class, "accessScopes", "user");
         assertOneToManyInverse(User.class, "loginAttempts", "user");
         assertOneToManyInverse(EducationUnit.class, "children", "parent");
-        assertOneToManyInverse(RecruitmentJob.class, "candidates", "job");
         assertOneToManyInverse(com.erg.ergspringboot.model.content.PostCategory.class, "posts", "category");
-        assertOneToManyInverse(com.erg.ergspringboot.model.community.CommunityTopic.class, "posts", "topic");
-        assertOneToManyInverse(CommunityPost.class, "media", "post");
-        assertOneToManyInverse(CommunityPost.class, "comments", "post");
 
         assertThat(classExists("com.erg.ergspringboot.model.core.UserRole")).isFalse();
         assertThat(classExists("com.erg.ergspringboot.model.core.RolePermission")).isFalse();

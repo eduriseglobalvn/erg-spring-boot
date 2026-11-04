@@ -21,10 +21,7 @@ public final class JpaRegistrationCatalog {
             owned("audit", 1, 1),
             enabled("authorization", 6, 6),
             enabled("calendar", 5, 5),
-            dormant("community", 6),
-            dormant("configuration", 1),
             partiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
-            dormant("courses", 1),
             enabled("crm", 6, 6),
             enabled("curriculum", 6, 6),
             enabled("enterpriseconnectors", 3, 3),
@@ -36,10 +33,8 @@ public final class JpaRegistrationCatalog {
             enabled("organization", 3, 2),
             enabled("outbox", 1, 1),
             enabled("quiz", 14, 14),
-            dormant("recruitment", 2),
             enabled("reporting", 1, 1),
             enabled("school", 3, 4),
-            dormant("security", 1),
             enabled("users", 5, 3)
     );
 
