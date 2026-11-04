@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
  * are dropped from the runtime body. Groups become sections.
  *
  * <p>This class orchestrates: body building lives in {@link QuestionBodyCompiler}, per-kind answer
- * stripping and answer-key extraction in {@link QuestionKindCompiler}; it owns traversal, point
+ * stripping and answer-key extraction in {@link QuestionKindStrategy}; it owns traversal, point
  * allocation and runtime-quiz assembly.
  *
  * <p>The compiler is deterministic and side-effect free so it can be unit tested per question kind and so
@@ -75,7 +75,7 @@ public class QuizCompileService {
                 Map<String, Object> runtimeSlide = bodyCompiler.mergeRuntimeQuestion(slide);
                 Map<String, Object> body = bodyCompiler.compileBody(
                         runtimeSlide, mapping.runtimeKind(), bankQuestionId, questionSettings, questionSetSettings);
-                Map<String, Object> key = QuestionKindCompiler.answerKeyFor(runtimeSlide, mapping.runtimeKind());
+                Map<String, Object> key = QuestionKindStrategy.answerKeyFor(runtimeSlide, mapping.runtimeKind());
                 if (!key.isEmpty()) {
                     answerKey.put(runtimeQuestionId, key);
                 }

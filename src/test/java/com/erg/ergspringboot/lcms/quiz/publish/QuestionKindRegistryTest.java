@@ -20,8 +20,7 @@ class QuestionKindRegistryTest {
             assertThat(descriptor.runtimeKind()).isNotBlank();
             assertThat(descriptor.authoringAliases()).isNotEmpty();
             assertThat(descriptor.gradingPolicy()).isIn("auto", "manual", "survey");
-            assertThat(descriptor.answerKeyRule()).isNotNull();
-            assertThat(descriptor.gradingRule()).isNotNull();
+            assertThat(descriptor.strategy()).isNotNull();
         });
         assertThat(new HashSet<>(QuestionKindRegistry.all().stream()
                 .map(QuestionKindDescriptor::runtimeKind).toList())).hasSize(14);
@@ -35,8 +34,8 @@ class QuestionKindRegistryTest {
         assertThat(QuestionKindMapping.forAuthoringType(" MULTIPLE-CHOICE ").runtimeKind())
                 .isEqualTo("single_choice");
         assertThat(QuestionKindMapping.isQuestionType("instruction-slide")).isFalse();
-        assertThat(QuestionKindRegistry.requireRuntimeKind("drag_drop").gradingRule())
-                .isEqualTo(QuestionKindDescriptor.GradingRule.PAIR_RATIO);
+        assertThat(QuestionKindRegistry.requireRuntimeKind("drag_drop").strategy())
+                .isEqualTo(QuestionKindStrategy.DRAG_DROP);
         assertThatThrownBy(() -> QuestionKindRegistry.requireRuntimeKind("future_kind"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsupported question kind");
@@ -53,17 +52,19 @@ class QuestionKindRegistryTest {
         assertThat(grading).doesNotContain("case \"single_choice\"");
         assertThat(validation).doesNotContain("switch (question.kind())");
         assertThat(compile).doesNotContain("switch (runtimeKind)");
-        String compilers = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/lcms/quiz/publish/QuestionKindCompiler.java"));
-        assertThat(compilers).doesNotContain("case \"single_choice\"");
+        assertThat(grading).doesNotContain("switch");
+        assertThat(validation).doesNotContain("switch");
+        String strategies = Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/lcms/quiz/publish/QuestionKindStrategy.java"));
+        assertThat(strategies).doesNotContain("case \"single_choice\"");
     }
 
     @Test
-    void everyRegisteredKindResolvesOneCompileStrategy() {
+    void everyRegisteredKindResolvesOneStrategy() {
         assertThat(QuestionKindRegistry.all()).allSatisfy(descriptor ->
-                assertThat(QuestionKindCompiler.forRuntimeKind(descriptor.runtimeKind()).name())
-                        .isEqualTo(descriptor.answerKeyRule().name()));
-        assertThatThrownBy(() -> QuestionKindCompiler.forRuntimeKind("future_kind"))
+                assertThat(QuestionKindStrategy.forRuntimeKind(descriptor.runtimeKind()))
+                        .isSameAs(descriptor.strategy()));
+        assertThatThrownBy(() -> QuestionKindStrategy.forRuntimeKind("future_kind"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsupported question kind");
     }
@@ -77,7 +78,7 @@ class QuestionKindRegistryTest {
         body.put("numericAnswer", Map.of("correctValue", 4, "unit", "cm"));
         body.put("correctAnswer", "a");
 
-        QuestionKindCompiler.stripAllAnswers(body);
+        QuestionKindStrategy.stripAllAnswers(body);
 
         assertThat(body).containsOnlyKeys("options", "hotspotAreas", "wordSlots", "numericAnswer");
         assertThat(body.get("options")).isEqualTo(List.of(Map.of("id", "a")));
@@ -95,7 +96,7 @@ class QuestionKindRegistryTest {
         }
         body.put("sequenceItems", List.of(Map.of("id", "s1")));
 
-        QuestionKindCompiler.stripAllAnswers(body);
+        QuestionKindStrategy.stripAllAnswers(body);
 
         assertThat(body).containsOnlyKeys("sequenceItems");
     }
