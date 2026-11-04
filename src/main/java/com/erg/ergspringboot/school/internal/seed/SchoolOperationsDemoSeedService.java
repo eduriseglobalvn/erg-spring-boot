@@ -10,7 +10,7 @@ import com.erg.ergspringboot.model.lms.StudentMetrics;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.lms.ClassroomRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;

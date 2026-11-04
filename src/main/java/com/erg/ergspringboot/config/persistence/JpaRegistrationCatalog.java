@@ -17,7 +17,7 @@ public final class JpaRegistrationCatalog {
     public static final String REPOSITORY_SCAN_ROOT = "com.erg.ergspringboot";
 
     private static final List<Module> MODULES = List.of(
-            enabled("auth", 5, 6),
+            enabled("auth", 5, 5),
             owned("audit", 1, 1),
             enabled("authorization", 6, 6),
             owned("calendar", 5, 5),
@@ -32,11 +32,11 @@ public final class JpaRegistrationCatalog {
             enabled("lms", 16, 16),
             enabled("notifications", 7, 7),
             enabled("organization", 3, 2),
-            enabled("outbox", 1, 1),
+            owned("outbox", "auth", 1, 1),
             enabled("quiz", 7, 7),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
-            enabled("users", 5, 3)
+            owned("users", 5, 4)
     );
 
     private JpaRegistrationCatalog() {
@@ -102,6 +102,12 @@ public final class JpaRegistrationCatalog {
 
     private static Module enabled(String name, int entities, int repositories) {
         return new Module(name, model(name), repository(name), true, entities, repositories, Set.of());
+    }
+
+    /** Persistence folded into another module, e.g. outbox lives in {@code auth.persistence}. */
+    private static Module owned(String name, String owner, int entities, int repositories) {
+        String persistence = "com.erg.ergspringboot." + owner + ".persistence";
+        return new Module(name, persistence, persistence, true, entities, repositories, Set.of());
     }
 
     /** P3-4: entities and repositories live in the owning module at {@code <module>.persistence}. */

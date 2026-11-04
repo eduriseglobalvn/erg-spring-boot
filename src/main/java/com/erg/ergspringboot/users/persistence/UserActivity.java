@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.users;
+package com.erg.ergspringboot.users.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

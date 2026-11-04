@@ -8,7 +8,7 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.authorization.internal.audit.AuthorizationMutationAuditService;
@@ -76,7 +76,7 @@ public class AuthorizationPermissionOverrideUseCase {
                 "PERMISSION_OVERRIDE_DELETED", requiredContext(context));
     }
 
-    private com.erg.ergspringboot.model.users.User scopedUser(String userId, String tenantId) {
+    private com.erg.ergspringboot.users.persistence.User scopedUser(String userId, String tenantId) {
         return users.findByIdAndTenantId(userId, normalize(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("user not found"));
     }

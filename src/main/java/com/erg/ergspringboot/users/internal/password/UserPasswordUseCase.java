@@ -6,11 +6,11 @@ import com.erg.ergspringboot.common.response.users.UserResponses.PasswordChangeR
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.model.auth.AuthSession;
-import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.model.users.UserActivity;
+import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.CredentialHasher;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;

@@ -11,10 +11,10 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignSc
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import java.time.OffsetDateTime;

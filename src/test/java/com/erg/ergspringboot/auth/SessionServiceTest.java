@@ -15,7 +15,7 @@ import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.auth.AuthSessionRepository;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;

@@ -12,7 +12,7 @@ import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.model.lms.Classroom;
 import com.erg.ergspringboot.model.lms.Student;
 import com.erg.ergspringboot.model.lms.StudentEnrollment;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.repository.lms.projection.AnnouncementCardProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardAssignmentProjection;
 import com.erg.ergspringboot.repository.lms.projection.StudentDashboardScoreSummaryProjection;

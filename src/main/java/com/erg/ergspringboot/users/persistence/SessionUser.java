@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.users;
+package com.erg.ergspringboot.users.persistence;
 
 import java.util.List;
 import lombok.AllArgsConstructor;

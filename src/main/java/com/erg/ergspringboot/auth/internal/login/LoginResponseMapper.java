@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.response.auth.AuthResponses.SessionDeviceRes
 import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycleResponse;
 import com.erg.ergspringboot.model.auth.AuthSession;
 import com.erg.ergspringboot.model.authorization.Role;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;

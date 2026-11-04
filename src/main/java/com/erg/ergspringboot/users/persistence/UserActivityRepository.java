@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.users;
+package com.erg.ergspringboot.users.persistence;
 
-import com.erg.ergspringboot.model.users.UserActivity;
+import com.erg.ergspringboot.users.persistence.UserActivity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

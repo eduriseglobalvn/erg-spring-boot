@@ -9,9 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.model.outbox.OutboxEvent;
+import com.erg.ergspringboot.auth.persistence.OutboxEvent;
 import com.erg.ergspringboot.platform.security.TenantContext;
-import com.erg.ergspringboot.repository.outbox.OutboxEventRepository;
+import com.erg.ergspringboot.auth.persistence.OutboxEventRepository;
 import com.erg.ergspringboot.auth.SmtpAccountMailSender;
 import java.time.OffsetDateTime;
 import java.util.List;

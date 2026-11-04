@@ -7,9 +7,9 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.AccessManagementWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.auth.user.projection.UserAccessRowProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserEffectivePermissionProjection;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
+import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.projection.RoleOptionProjection;
 import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;

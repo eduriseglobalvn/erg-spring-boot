@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.model.lms;
 
 import com.erg.ergspringboot.model.BaseEntity;
-import com.erg.ergspringboot.model.users.User;
+import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.model.curriculum.CurriculumLevel;
 import com.erg.ergspringboot.model.curriculum.CurriculumSubject;
 import com.erg.ergspringboot.model.curriculum.CurriculumTopic;

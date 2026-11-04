@@ -25,7 +25,7 @@ class CalendarFullCatalogArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/calendar/internal/readmodel/CalendarFullCatalogQueryUseCase.java"));
         assertThat(source)
                 .contains("UserDirectoryPort")
-                .doesNotContain("model.users.User")
+                .doesNotContain("users.persistence.User")
                 .doesNotContain("UserRepository");
     }
 }

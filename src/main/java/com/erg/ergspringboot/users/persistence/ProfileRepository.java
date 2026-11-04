@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.users;
+package com.erg.ergspringboot.users.persistence;
 
-import com.erg.ergspringboot.model.users.Profile;
+import com.erg.ergspringboot.users.persistence.Profile;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

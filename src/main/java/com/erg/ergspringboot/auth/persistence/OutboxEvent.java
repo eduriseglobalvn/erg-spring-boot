@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.outbox;
+package com.erg.ergspringboot.auth.persistence;
 
 import java.time.OffsetDateTime;
 import java.util.Map;

@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.users;
+package com.erg.ergspringboot.users.persistence;
 
-import com.erg.ergspringboot.model.users.EmployeeProfile;
+import com.erg.ergspringboot.users.persistence.EmployeeProfile;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

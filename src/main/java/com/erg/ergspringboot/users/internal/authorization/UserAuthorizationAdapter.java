@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.users.internal.authorization;
 
 import com.erg.ergspringboot.model.authorization.UserPermissionOverride;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.auth.user.projection.UserEffectivePermissionProjection;
-import com.erg.ergspringboot.repository.auth.user.projection.UserRoleNameProjection;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
+import com.erg.ergspringboot.users.persistence.UserRoleNameProjection;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
 import com.erg.ergspringboot.users.UserAuthorizationProjection;

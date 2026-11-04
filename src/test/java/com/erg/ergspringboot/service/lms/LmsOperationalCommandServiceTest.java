@@ -24,7 +24,7 @@ import com.erg.ergspringboot.repository.lms.StudentEnrollmentRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
 import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
-import com.erg.ergspringboot.repository.users.UserActivityRepository;
+import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +42,7 @@ class LmsOperationalCommandServiceTest {
     @Mock private StudentEnrollmentRepository enrollments;
     @Mock private EducationUnitRepository schools;
     @Mock private UserActivityRepository activities;
-    @Mock private com.erg.ergspringboot.repository.auth.user.UserRepository users;
+    @Mock private com.erg.ergspringboot.users.persistence.UserRepository users;
 
     private LmsOperationalCommandService service;
     private final UserAccessContext access =
@@ -139,7 +139,7 @@ class LmsOperationalCommandServiceTest {
         student.setRecordVersion(2L);
         when(students.findByTenantIdAndId("tenant-1", "student-1")).thenReturn(Optional.of(student));
         when(users.findByIdAndTenantId("usr-1", "tenant-1"))
-                .thenReturn(Optional.of(new com.erg.ergspringboot.model.users.User()));
+                .thenReturn(Optional.of(new com.erg.ergspringboot.users.persistence.User()));
         when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "usr-1")).thenReturn(Optional.empty());
         when(students.save(any(Student.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -162,7 +162,7 @@ class LmsOperationalCommandServiceTest {
                 "usr-other-tenant"), access)).isInstanceOf(BadRequestException.class);
 
         when(users.findByIdAndTenantId("usr-2", "tenant-1"))
-                .thenReturn(Optional.of(new com.erg.ergspringboot.model.users.User()));
+                .thenReturn(Optional.of(new com.erg.ergspringboot.users.persistence.User()));
         when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "usr-2"))
                 .thenReturn(Optional.of(student("student-2", "S-002", "Bob")));
         assertThatThrownBy(() -> service.updateStudent("school-1", "student-1", new UpdateStudentRequest(

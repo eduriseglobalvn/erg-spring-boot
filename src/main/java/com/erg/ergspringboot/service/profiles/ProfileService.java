@@ -6,9 +6,9 @@ import com.erg.ergspringboot.common.response.profiles.ProfileResponses.ProfileRe
 import com.erg.ergspringboot.common.response.profiles.ProfileResponses.SocialLinksResponse;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.users.Profile;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
-import com.erg.ergspringboot.repository.users.ProfileRepository;
+import com.erg.ergspringboot.users.persistence.Profile;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.ProfileRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.util.Map;

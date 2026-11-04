@@ -40,6 +40,6 @@ class UserAuthorizationBoundaryTest {
         assertThat(source)
                 .contains("UserAuthorizationPort")
                 .doesNotContain("UserRepository")
-                .doesNotContain("model.users.User");
+                .doesNotContain("users.persistence.User");
     }
 }

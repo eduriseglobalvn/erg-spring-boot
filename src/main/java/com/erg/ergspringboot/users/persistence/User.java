@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.users;
+package com.erg.ergspringboot.users.persistence;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import com.erg.ergspringboot.model.authorization.Role;
