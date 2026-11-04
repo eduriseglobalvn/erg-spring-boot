@@ -23,12 +23,12 @@ import com.erg.ergspringboot.learningoutcomes.LearningOutcomesResponses.PathDeta
 import com.erg.ergspringboot.learningoutcomes.LearningOutcomesResponses.PathNodeResponse;
 import com.erg.ergspringboot.learningoutcomes.LearningPathCreated;
 import com.erg.ergspringboot.learningoutcomes.LearningPathPublished;
-import com.erg.ergspringboot.model.learningoutcomes.LearningOutcomeCommandReceipt;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPath;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPathNode;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningOutcomeCommandReceipt;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPath;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathNode;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.repository.learningoutcomes.LearningPathNodeRepository;
-import com.erg.ergspringboot.repository.learningoutcomes.LearningPathRepository;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathNodeRepository;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.util.LinkedHashMap;
 import java.util.List;

@@ -38,6 +38,7 @@ class LearningStandardsMigrationContractTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(module.enabled()).isTrue();
+        assertThat(module.modelPackage()).isEqualTo("com.erg.ergspringboot.learningstandards.persistence");
         assertThat(module.entityCount()).isEqualTo(4);
         assertThat(module.repositoryCount()).isEqualTo(4);
     }

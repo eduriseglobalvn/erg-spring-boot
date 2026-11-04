@@ -3,8 +3,8 @@ package com.erg.ergspringboot.notifications.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;

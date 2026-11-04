@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
-import com.erg.ergspringboot.repository.notifications.NotificationDeviceRegistrationRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

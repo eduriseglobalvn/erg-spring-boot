@@ -4,9 +4,9 @@ import static com.erg.ergspringboot.learningoutcomes.internal.OutcomeValues.requ
 import static com.erg.ergspringboot.learningoutcomes.internal.OutcomeValues.trimToNull;
 
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.model.learningoutcomes.CompetencyAttainment;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPath;
-import com.erg.ergspringboot.model.learningoutcomes.OutcomeCertificate;
+import com.erg.ergspringboot.learningoutcomes.persistence.CompetencyAttainment;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPath;
+import com.erg.ergspringboot.learningoutcomes.persistence.OutcomeCertificate;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;

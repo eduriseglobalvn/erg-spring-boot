@@ -8,11 +8,11 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.NotificationPreferenceResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.UnreadCountResponse;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.notifications.NotificationPreferenceEntity;
-import com.erg.ergspringboot.model.notifications.NotificationRecipientEntity;
-import com.erg.ergspringboot.repository.notifications.NotificationPreferenceRepository;
-import com.erg.ergspringboot.repository.notifications.NotificationRecipientRepository;
-import com.erg.ergspringboot.repository.notifications.projection.NotificationInboxProjection;
+import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationRecipientEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationRecipientRepository;
+import com.erg.ergspringboot.notifications.persistence.projection.NotificationInboxProjection;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;

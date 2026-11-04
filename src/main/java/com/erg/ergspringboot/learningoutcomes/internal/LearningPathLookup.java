@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.learningoutcomes.internal;
 
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.learningoutcomes.LearningPath;
-import com.erg.ergspringboot.repository.learningoutcomes.LearningPathRepository;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPath;
+import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
