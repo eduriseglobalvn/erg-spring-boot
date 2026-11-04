@@ -17,6 +17,7 @@ import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.AttemptExpiryRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackageRepository;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
@@ -61,6 +62,7 @@ class LmsAttemptFlowIntegrationTest {
     @Autowired private EntityManager entityManager;
     @Autowired private LmsAttemptUseCase attempts;
     @Autowired private AttemptRepository attemptRepository;
+    @Autowired private AttemptExpiryRepository expiryRepository;
     @Autowired private QuizPackageRepository packageRepository;
 
     @Test
@@ -95,6 +97,24 @@ class LmsAttemptFlowIntegrationTest {
 
         assertThatThrownBy(() -> attemptRepository.saveAndFlush(inProgress("att-flow-2")))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void expirySweepFindsAndClosesAnAttemptPastItsDuration() {
+        seed();
+        Assignment assignment = entityManager.find(Assignment.class, "asg-flow");
+        assignment.setMaxDurationMinutes(30);
+        Attempt stale = inProgress("att-flow-stale");
+        stale.setStartedAt(OffsetDateTime.now().minusHours(2));
+        attemptRepository.saveAndFlush(stale);
+        OffsetDateTime now = OffsetDateTime.now();
+
+        assertThat(expiryRepository.findExpiredCandidates(now, 10)).extracting("id").containsExactly("att-flow-stale");
+        assertThat(attempts.closeIfExpired(TENANT, "att-flow-stale", now)).isTrue();
+        entityManager.flush();
+        assertThat(attemptRepository.findByTenantIdAndId(TENANT, "att-flow-stale").orElseThrow().getStatus())
+                .isNotEqualTo("in_progress");
+        assertThat(expiryRepository.findExpiredCandidates(now, 10)).isEmpty();
     }
 
     @Test

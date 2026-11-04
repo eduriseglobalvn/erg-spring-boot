@@ -301,6 +301,20 @@ public class LmsAttemptUseCase {
         return score;
     }
 
+    /** Sweep entry (P2-5): closes the attempt when its deadline plus grace passed; true when it was closed. */
+    @Transactional("postgresTransactionManager")
+    public boolean closeIfExpired(String tenant, String attemptId, OffsetDateTime now) {
+        Attempt attempt = attempts.findByTenantIdAndId(tenant, attemptId).orElse(null);
+        if (attempt == null || !LmsStatePolicy.initialAttemptState().equals(LmsStatePolicy.normalizeState(attempt.getStatus()))) {
+            return false;
+        }
+        Assignment assignment = policy.assignment(tenant, attempt.getAssignmentId());
+        if (!deadlines.isExpired(attempt, assignment, now)) return false;
+        autoClose(attempt, assignment, tenant, now);
+        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        return true;
+    }
+
     /** Closes an in-progress attempt whose deadline plus grace passed, grading whatever the server holds. */
     private void autoClose(Attempt attempt, Assignment assignment, String tenant, OffsetDateTime now) {
         Score score = finish(attempt, new LinkedHashMap<>(map(attempt.getAnswers())), tenant, now, true);
