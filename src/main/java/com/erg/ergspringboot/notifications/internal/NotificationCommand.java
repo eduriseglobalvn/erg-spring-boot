@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.notifications;
+package com.erg.ergspringboot.notifications.internal;
 
 import java.util.List;
 import java.util.Map;

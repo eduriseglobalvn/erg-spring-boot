@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.notifications;
+package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.OutboxRunResponse;

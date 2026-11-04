@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.notifications;
+package com.erg.ergspringboot.notifications.internal;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

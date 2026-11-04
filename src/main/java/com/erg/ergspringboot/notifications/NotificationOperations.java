@@ -6,8 +6,8 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.U
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.PreferenceUpdateItemRequest;
 import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.*;
-import com.erg.ergspringboot.service.notifications.NotificationDeviceService;
-import com.erg.ergspringboot.service.notifications.NotificationService;
+import com.erg.ergspringboot.notifications.internal.NotificationDeviceService;
+import com.erg.ergspringboot.notifications.internal.NotificationService;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;

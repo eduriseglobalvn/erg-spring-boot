@@ -9,7 +9,7 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import org.springframework.web.bind.annotation.RequestParam;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.notifications.NotificationAdminOperations;
-import com.erg.ergspringboot.service.notifications.NotificationSecuritySupport;
+import com.erg.ergspringboot.notifications.NotificationSecuritySupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;

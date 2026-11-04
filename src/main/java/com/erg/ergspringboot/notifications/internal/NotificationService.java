@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.notifications;
+package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.PreferenceUpdateItemRequest;
 import com.erg.ergspringboot.common.response.PageResponse;

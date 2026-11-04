@@ -7,8 +7,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeviceRegistrationResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.notifications.NotificationOperations;
-import com.erg.ergspringboot.service.notifications.NotificationDeviceService;
-import com.erg.ergspringboot.service.notifications.NotificationSecuritySupport;
+import com.erg.ergspringboot.notifications.NotificationSecuritySupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -31,11 +30,6 @@ public class NotificationDeviceController {
     public NotificationDeviceController(NotificationOperations notifications, NotificationSecuritySupport security) {
         this.notifications = notifications;
         this.security = security;
-    }
-
-    @Deprecated
-    NotificationDeviceController(NotificationDeviceService legacy, NotificationSecuritySupport security) {
-        this(new NotificationOperations(null, legacy), security);
     }
 
     @PostMapping

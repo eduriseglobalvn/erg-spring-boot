@@ -2,8 +2,8 @@ package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.calendar.CalendarBatchPublished;
 import com.erg.ergspringboot.calendar.CalendarPublishedBatchProjection;
-import com.erg.ergspringboot.service.notifications.NotificationCommand;
-import com.erg.ergspringboot.service.notifications.NotificationCommandService;
+import com.erg.ergspringboot.notifications.internal.NotificationCommand;
+import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
 import java.util.Map;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;

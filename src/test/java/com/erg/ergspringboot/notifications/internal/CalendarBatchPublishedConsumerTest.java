@@ -14,9 +14,9 @@ import com.erg.ergspringboot.repository.notifications.NotificationMessageReposit
 import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationPreferenceRepository;
 import com.erg.ergspringboot.repository.notifications.NotificationRecipientRepository;
-import com.erg.ergspringboot.service.notifications.NotificationCommand;
-import com.erg.ergspringboot.service.notifications.NotificationCommandService;
-import com.erg.ergspringboot.service.notifications.NotificationMetrics;
+import com.erg.ergspringboot.notifications.internal.NotificationCommand;
+import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
+import com.erg.ergspringboot.notifications.internal.NotificationMetrics;
 import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import java.time.OffsetDateTime;
 import java.util.List;

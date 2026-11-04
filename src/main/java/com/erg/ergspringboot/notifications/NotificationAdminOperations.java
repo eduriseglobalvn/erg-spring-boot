@@ -6,10 +6,10 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeadLetterReplayResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.OutboxRunResponse;
 import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
-import com.erg.ergspringboot.service.notifications.NotificationCommand;
-import com.erg.ergspringboot.service.notifications.NotificationCommandResult;
-import com.erg.ergspringboot.service.notifications.NotificationCommandService;
-import com.erg.ergspringboot.service.notifications.NotificationOutboxWorker;
+import com.erg.ergspringboot.notifications.internal.NotificationCommand;
+import com.erg.ergspringboot.notifications.internal.NotificationCommandResult;
+import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
+import com.erg.ergspringboot.notifications.internal.NotificationOutboxWorker;
 import org.springframework.stereotype.Service;
 
 /** Public application boundary for notification administration. */

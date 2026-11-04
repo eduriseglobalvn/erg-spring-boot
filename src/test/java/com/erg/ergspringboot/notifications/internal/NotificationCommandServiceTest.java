@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.notifications;
+package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.notifications.NotificationDeviceRegistrationEntity;

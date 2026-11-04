@@ -13,7 +13,7 @@ import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentAudience;
-import com.erg.ergspringboot.service.notifications.LmsNotificationEventPublisher;
+import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
