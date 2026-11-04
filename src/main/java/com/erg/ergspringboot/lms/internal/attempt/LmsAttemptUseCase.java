@@ -15,7 +15,7 @@ import com.erg.ergspringboot.model.lms.AttemptAnswer;
 import com.erg.ergspringboot.model.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.service.quiz.runtime.*;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.*;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

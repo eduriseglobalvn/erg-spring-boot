@@ -5,7 +5,7 @@ import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.model.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
 import com.erg.ergspringboot.repository.quiz.authoring.QuizDraftRepository;
-import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
+import com.erg.ergspringboot.lcms.quiz.publish.QuizPublishService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

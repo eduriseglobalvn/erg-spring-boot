@@ -11,7 +11,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.Assignment
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.reporting.AssignmentScopeLookup;
 import com.erg.ergspringboot.reporting.AssignmentProgressFilter;
-import com.erg.ergspringboot.service.quiz.report.QuizReportService;
+import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;

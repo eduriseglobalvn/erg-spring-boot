@@ -9,7 +9,7 @@ import com.erg.ergspringboot.reporting.ReportingResponses;
 import com.erg.ergspringboot.reporting.ReportingResponses.AssignmentProgressReportResponse;
 import com.erg.ergspringboot.reporting.ReportingResponses.KpiDefinition;
 import com.erg.ergspringboot.reporting.ReportingResponses.ReportFilter;
-import com.erg.ergspringboot.service.quiz.report.QuizReportService;
+import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;

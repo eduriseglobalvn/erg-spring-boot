@@ -110,9 +110,9 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
-    @ExceptionHandler(com.erg.ergspringboot.service.quiz.publish.QuizPublishService.ValidationFailedException.class)
+    @ExceptionHandler(com.erg.ergspringboot.lcms.quiz.publish.QuizPublishService.ValidationFailedException.class)
     public ResponseEntity<ApiResponse<Void>> handleQuizValidationFailed(
-            com.erg.ergspringboot.service.quiz.publish.QuizPublishService.ValidationFailedException exception,
+            com.erg.ergspringboot.lcms.quiz.publish.QuizPublishService.ValidationFailedException exception,
             WebRequest request
     ) {
         List<FieldErrorDetail> details = exception.errors().stream()

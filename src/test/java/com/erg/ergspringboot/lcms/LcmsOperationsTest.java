@@ -23,12 +23,12 @@ import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDra
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
 import com.erg.ergspringboot.common.response.quiz.QuestionBankAuthoringResponses.SaveQuestionResponse;
 import com.erg.ergspringboot.lcms.internal.command.LcmsCommandUseCase;
-import com.erg.ergspringboot.service.quiz.authoring.QuestionBankAuthoringService;
-import com.erg.ergspringboot.service.quiz.authoring.QuizAuthoringService;
-import com.erg.ergspringboot.service.quiz.authoring.QuizDraftService;
-import com.erg.ergspringboot.service.quiz.publish.QuizPublishService;
-import com.erg.ergspringboot.service.quiz.media.MediaService;
-import com.erg.ergspringboot.service.quiz.bundle.PortableQuizBundleService;
+import com.erg.ergspringboot.lcms.quiz.authoring.QuestionBankAuthoringService;
+import com.erg.ergspringboot.lcms.quiz.authoring.QuizAuthoringService;
+import com.erg.ergspringboot.lcms.quiz.authoring.QuizDraftService;
+import com.erg.ergspringboot.lcms.quiz.publish.QuizPublishService;
+import com.erg.ergspringboot.lcms.quiz.media.MediaService;
+import com.erg.ergspringboot.lcms.internal.quiz.bundle.PortableQuizBundleService;
 import org.junit.jupiter.api.Test;
 
 class LcmsOperationsTest {

@@ -6,7 +6,7 @@ import com.erg.ergspringboot.model.lms.Assignment;
 import com.erg.ergspringboot.model.lms.Attempt;
 import com.erg.ergspringboot.model.lms.Quiz;
 import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.service.quiz.runtime.QuizAttemptGradingService;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService;
 import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
