@@ -1,14 +1,14 @@
 package com.erg.ergspringboot.calendar;
 
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.model.calendar.CalendarBatch;
-import com.erg.ergspringboot.model.calendar.CalendarEvent;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
+import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
 import com.erg.ergspringboot.platform.security.AccessScopeSet;
-import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatchRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;

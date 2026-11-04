@@ -5,8 +5,8 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBu
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarPreviewPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRowResultResponse;
-import com.erg.ergspringboot.model.calendar.CalendarEvent;
-import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
+import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.internal.support.CalendarBulkInputNormalizer;
 import com.erg.ergspringboot.calendar.internal.support.CalendarConflictService;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService;

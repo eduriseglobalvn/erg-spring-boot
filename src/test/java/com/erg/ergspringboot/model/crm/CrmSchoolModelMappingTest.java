@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.crm;
+package com.erg.ergspringboot.crm.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -7,8 +7,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.ConflictException;
-import com.erg.ergspringboot.model.reporting.ReportJob;
-import com.erg.ergspringboot.repository.reporting.ReportJobRepository;
+import com.erg.ergspringboot.reporting.persistence.ReportJob;
+import com.erg.ergspringboot.reporting.persistence.ReportJobRepository;
 import com.erg.ergspringboot.reporting.ReportExportOptions;
 import com.erg.ergspringboot.reporting.AssignmentProgressFilter;
 import java.time.ZoneId;

@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.calendar.internal.readmodel;
 
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
-import com.erg.ergspringboot.model.calendar.CalendarBatch;
-import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatchRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;

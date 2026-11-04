@@ -1,12 +1,12 @@
 package com.erg.ergspringboot.calendar.internal.support;
 
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
-import com.erg.ergspringboot.model.calendar.CalendarConflict;
-import com.erg.ergspringboot.model.calendar.CalendarEvent;
-import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
-import com.erg.ergspringboot.repository.calendar.CalendarConflictRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
-import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarConflict;
+import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
+import com.erg.ergspringboot.calendar.persistence.CalendarConflictRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
