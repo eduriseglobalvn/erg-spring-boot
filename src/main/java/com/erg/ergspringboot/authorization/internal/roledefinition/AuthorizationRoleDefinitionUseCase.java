@@ -14,6 +14,7 @@ import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.cache.annotation.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,7 @@ public class AuthorizationRoleDefinitionUseCase {
     private UserRoleAssignmentRepository assignments; private AuthorizationMutationAuditService audit;
     private final ProtectedRolePolicy policy=new ProtectedRolePolicy();
     public AuthorizationRoleDefinitionUseCase(RoleRepository roles,PermissionRepository permissions){this.roles=roles;this.permissions=permissions;}
-    public void setUserRoleAssignmentRepository(UserRoleAssignmentRepository value){this.assignments=value;} public void setMutationAuditService(AuthorizationMutationAuditService value){this.audit=value;}
+    @Autowired(required=false) public void setUserRoleAssignmentRepository(UserRoleAssignmentRepository value){this.assignments=value;} @Autowired(required=false) public void setMutationAuditService(AuthorizationMutationAuditService value){this.audit=value;}
     @Transactional(readOnly=true) @Cacheable(cacheNames="authorizationRoles",key="'all'") public List<RoleResponse> list(){List<Role> all=roles.findAllWithPermissionsAndUsers();Map<String,List<UserRoleAssignment>> by=active(all);return all.stream().filter(r->!"system.god_mode".equalsIgnoreCase(r.getName())).map(r->response(r,by.getOrDefault(r.getId(),List.of()))).toList();}
     @Transactional(readOnly=true) public RoleResponse get(String id){Role role=find(id);if("system.god_mode".equalsIgnoreCase(role.getName()))throw new ResourceNotFoundException("role not found");return response(role);}
     @Transactional @CacheEvict(cacheNames={"authorizationRoles","authorizationPermissions"},allEntries=true) public RoleResponse create(CreateRoleRequest request,ErgPrincipal actor,AuditContext context){policy.assertCanManageRoleDefinitions(actor);policy.assertRoleDefinitionAllowed(request.name());AuditContext c=required(actor,context);Role role=new Role();role.setId(IdGenerator.newId());role.setName(request.name().trim());role.setDescription(request.description());role.setIsDefault(false);role.setUpdatedBy(c.actorUserId());role.setPermissions(resolve(request.permissions()));role=roles.save(role);audit().recordRoleMutation(tenant(actor),role.getId(),"ROLE_CREATED",c,Map.of("roleName",role.getName()));return response(role);}

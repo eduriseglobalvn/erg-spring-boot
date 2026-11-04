@@ -106,10 +106,8 @@ class ModulePublicApiContractTest {
                 "src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java"));
         assertThat(curriculumAdapter).contains("@Deprecated", "CurriculumOperations operations")
                 .doesNotContain(".internal.");
-        String authorizationAdapter = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java"));
-        assertThat(authorizationAdapter).contains("@Deprecated", "AuthorizationCommandOperations operations")
-                .doesNotContain(".internal.");
+        assertThat(Path.of(
+                "src/main/java/com/erg/ergspringboot/service/authorization/AuthorizationService.java")).doesNotExist();
         String usersAdapter = Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/users/UserService.java"));
         assertThat(usersAdapter).contains("@Deprecated", "UserOperations operations")

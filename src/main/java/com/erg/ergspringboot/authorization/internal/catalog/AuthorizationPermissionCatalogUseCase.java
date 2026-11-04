@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -20,7 +21,7 @@ public class AuthorizationPermissionCatalogUseCase {
     private PermissionGroupRepository groups; private PermissionBindingRepository bindings;
     private final UserPermissionOverrideRepository overrides;
     public AuthorizationPermissionCatalogUseCase(PermissionRepository permissions,RoleRepository roles,UserPermissionOverrideRepository overrides){this.permissions=permissions;this.roles=roles;this.overrides=overrides;}
-    public void setPermissionGroupRepository(PermissionGroupRepository value){this.groups=value;} public void setPermissionBindingRepository(PermissionBindingRepository value){this.bindings=value;}
+    @Autowired(required=false) public void setPermissionGroupRepository(PermissionGroupRepository value){this.groups=value;} @Autowired(required=false) public void setPermissionBindingRepository(PermissionBindingRepository value){this.bindings=value;}
     @Transactional(readOnly=true) @Cacheable(cacheNames="authorizationPermissions",key="'all'") public List<PermissionResponse> list(){return map(permissions.findTop500ByOrderByNameAsc());}
     @Transactional(readOnly=true) public PermissionPageResponse search(Integer page,Integer limit,String search,String group,String portal,String status,Boolean used){int p=page==null?0:Math.max(0,page);int l=limit==null?25:Math.max(1,Math.min(100,limit));Page<Permission> result=permissions.searchCatalog(trim(search),trim(group),trim(portal),trim(status),used,PageRequest.of(p,l,Sort.by(Sort.Direction.ASC,"name")));return new PermissionPageResponse(map(result.getContent()),result.getNumber(),result.getSize(),result.getTotalElements(),result.getTotalPages());}
     @Transactional(readOnly=true) public PermissionResponse get(String id){Permission p=permissions.findById(id).orElseGet(()->permissions.findByNameInIgnoreCase(List.of(id)).stream().findFirst().orElseThrow(()->new ResourceNotFoundException("permission not found")));return map(List.of(p)).getFirst();}

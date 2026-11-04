@@ -6,6 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase;
+import com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase;
+import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.CreateRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AddPermissionOverrideRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
@@ -41,15 +44,20 @@ class AuthorizationRoleMutationServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private UserRoleAssignmentRepository assignmentRepository;
     @Mock private AuthorizationMutationAuditService mutationAuditService;
-    private AuthorizationService service;
+    private AuthorizationRoleDefinitionUseCase roles;
+    private AuthorizationDirectRoleUseCase directRoles;
+    private AuthorizationPermissionOverrideUseCase overrides;
     private ErgPrincipal actor;
     private AuditContext context;
 
     @BeforeEach
     void setUp() {
-        service = new AuthorizationService(roleRepository, permissionRepository, overrideRepository, userRepository);
-        service.setUserRoleAssignmentRepository(assignmentRepository);
-        service.setMutationAuditService(mutationAuditService);
+        roles = new AuthorizationRoleDefinitionUseCase(roleRepository, permissionRepository);
+        directRoles = new AuthorizationDirectRoleUseCase(userRepository, roleRepository, mutationAuditService);
+        overrides = new AuthorizationPermissionOverrideUseCase(
+                userRepository, permissionRepository, overrideRepository, mutationAuditService);
+        roles.setUserRoleAssignmentRepository(assignmentRepository);
+        roles.setMutationAuditService(mutationAuditService);
         actor = new ErgPrincipal("admin-1", "session-1", "tenant-a", List.of("system.super_admin"), List.of("*"),
                 List.of(), List.of("*"), "erg", "admin", Map.of());
         context = new AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit");
@@ -59,7 +67,7 @@ class AuthorizationRoleMutationServiceTest {
     void roleCreationWritesRequestAwareAuditWithoutInventingAffectedUsers() {
         when(roleRepository.save(any(Role.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.createRole(new CreateRoleRequest("teacher", "Teacher", List.of()), actor, context);
+        var response = roles.create(new CreateRoleRequest("teacher", "Teacher", List.of()), actor, context);
 
         assertThat(response.updatedBy()).isEqualTo("admin-1");
         verify(mutationAuditService).recordRoleMutation(
@@ -83,7 +91,7 @@ class AuthorizationRoleMutationServiceTest {
                 .thenReturn(List.of(scoped));
         when(roleRepository.save(role)).thenReturn(role);
 
-        var response = service.updateRole(
+        var response = roles.update(
                 "role-teacher",
                 new UpdateRoleRequest(null, "Updated", List.of("lms.assignment.create")),
                 actor,
@@ -106,7 +114,7 @@ class AuthorizationRoleMutationServiceTest {
         when(assignmentRepository.findActiveForRole(eq("role-teacher"), any(OffsetDateTime.class)))
                 .thenReturn(List.of());
 
-        service.deleteRole("role-teacher", actor, context);
+        roles.delete("role-teacher", actor, context);
 
         verify(roleRepository).delete(role);
         verify(mutationAuditService).authorizationChanged(
@@ -123,7 +131,7 @@ class AuthorizationRoleMutationServiceTest {
         when(userRepository.findByIdAndTenantId("user-1", "tenant-a")).thenReturn(Optional.of(target));
         when(roleRepository.findById("role-teacher")).thenReturn(Optional.of(role));
 
-        service.removeRole("user-1", "role-teacher", "tenant-a", actor, context);
+        directRoles.remove("user-1", "role-teacher", "tenant-a", actor, context);
 
         verify(mutationAuditService).authorizationChanged(
                 List.of(new UserRef("user-1", "tenant-a")),
@@ -143,7 +151,7 @@ class AuthorizationRoleMutationServiceTest {
                 new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(actor, null, List.of()));
 
         try {
-            service.addPermissionOverride(
+            overrides.add(
                     "user-1",
                     new AddPermissionOverrideRequest("GRANT", "lms.assignment.create", "temporary", null),
                     "admin-1", "tenant-a", context);
@@ -161,7 +169,7 @@ class AuthorizationRoleMutationServiceTest {
         ErgPrincipal tenantAdmin = new ErgPrincipal("admin-2", "session-2", "tenant-b", List.of("admin"),
                 List.of("*", "rbac.role.update"), List.of(), List.of(), "erg", "admin", Map.of());
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.updateRole(
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> roles.update(
                         "role-teacher", new UpdateRoleRequest(null, null, List.of("*")), tenantAdmin, context))
                 .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
         org.mockito.Mockito.verify(roleRepository, org.mockito.Mockito.never()).save(any());
