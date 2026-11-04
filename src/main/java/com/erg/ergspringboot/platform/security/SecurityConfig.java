@@ -14,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -21,6 +23,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    static final String API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'";
 
     private final ErgAuthenticationFilter authenticationFilter;
     private final PermissionAuthorizationManager permissions;
@@ -76,6 +80,11 @@ public class SecurityConfig {
             http.csrf(AbstractHttpConfigurer::disable)
                     .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         }
+
+        // JSON API: no document may load anything or be framed. The Scalar docs UI is HTML and is exempt.
+        http.headers(headers -> headers.addHeaderWriter(new DelegatingRequestMatcherHeaderWriter(
+                request -> !request.getRequestURI().startsWith("/scalar"),
+                new StaticHeadersWriter("Content-Security-Policy", API_CONTENT_SECURITY_POLICY))));
 
         http.exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, ex) -> {

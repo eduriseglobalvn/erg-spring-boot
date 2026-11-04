@@ -42,6 +42,7 @@ class PortalErrorEnvelopeIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string("X-Request-ID", "req-portal-error"))
                 .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
                 .andExpect(jsonPath("$.statusCode").value(401))
                 .andExpect(jsonPath("$.message").value("Authentication is required"))
                 .andExpect(jsonPath("$.errors").value("AUTHENTICATION_REQUIRED"))

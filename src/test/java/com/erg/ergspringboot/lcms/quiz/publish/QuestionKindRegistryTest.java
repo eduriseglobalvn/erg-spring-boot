@@ -94,10 +94,9 @@ class QuestionKindRegistryTest {
                 "correctRegions", "regions", "correctTargets", "targets")) {
             body.put(field, List.of("answer"));
         }
-        body.put("sequenceItems", List.of(Map.of("id", "s1")));
 
         QuestionKindStrategy.stripAllAnswers(body);
 
-        assertThat(body).containsOnlyKeys("sequenceItems");
+        assertThat(body).isEmpty();
     }
 }

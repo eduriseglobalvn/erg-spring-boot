@@ -3,6 +3,9 @@ package com.erg.ergspringboot.lcms.quiz.publish;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.lcms.quiz.publish.CompiledQuiz.CompiledQuestion;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.GradingEngine;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -236,5 +239,78 @@ class QuizCompileServiceTest {
         Map<String, Object> contentImage = (Map<String, Object>) body.get("contentImage");
         assertThat(contentImage).containsEntry("url", "data:image/png;base64,cXVlc3Rpb24=")
                 .containsEntry("alt", "Question illustration");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> ids(Object items) {
+        List<String> ids = new ArrayList<>();
+        for (Object item : (List<Object>) items) {
+            ids.add(((Map<String, Object>) item).get("id").toString());
+        }
+        return ids;
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void sequencePlayerBodyIsShuffledAndTheKeyKeepsTheAuthoringOrder() {
+        List<Object> items = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            items.add(Map.of("id", "s" + i, "label", "Step " + i));
+        }
+        for (int run = 0; run < 20; run++) {
+            CompiledQuestion q = compileSlides(Map.of("slideId", "q-seq", "type", "sequence",
+                    "sequenceItems", items)).questions().getFirst();
+            assertThat(q.answerKey().get("order")).isEqualTo(List.of("s1", "s2", "s3", "s4", "s5", "s6"));
+            assertThat(ids(q.body().get("sequenceItems"))).isNotEqualTo(q.answerKey().get("order"))
+                    .containsExactlyInAnyOrder("s1", "s2", "s3", "s4", "s5", "s6");
+            GradingEngine engine = new GradingEngine();
+            assertThat(engine.grade("sequence", Map.of("sequenceOrder", q.answerKey().get("order")), q.answerKey(),
+                    BigDecimal.TEN).correct()).isTrue();
+            assertThat(engine.grade("sequence", Map.of("order", ids(q.body().get("sequenceItems"))), q.answerKey(),
+                    BigDecimal.TEN).correct()).isFalse();
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void matchingPlayerBodySplitsPromptsFromOpaqueShuffledResponsesAndGradesWithThoseIds() {
+        CompiledQuestion q = compileSlides(Map.of("slideId", "q-match", "type", "matching", "matching", List.of(
+                Map.of("id", "m1", "prompt", "Cat", "response", "Meow"),
+                Map.of("id", "m2", "prompt", "Dog", "response", "Woof"),
+                Map.of("id", "m3", "prompt", "Cow", "response", "Moo", "responseImage", Map.of("url", "u"))
+        ))).questions().getFirst();
+
+        List<Map<String, Object>> prompts = (List<Map<String, Object>>) q.body().get("matching");
+        List<Map<String, Object>> responses = (List<Map<String, Object>>) q.body().get("matchingResponses");
+        assertThat(prompts).allSatisfy(p -> assertThat(p).doesNotContainKeys("response", "responseImage"));
+        assertThat(prompts).extracting(p -> p.get("prompt")).containsExactly("Cat", "Dog", "Cow");
+        assertThat(responses).hasSize(3).allSatisfy(r -> assertThat(r.get("id").toString()).doesNotMatch("m[123]"));
+        assertThat(q.body().toString()).doesNotContain("correctPairs");
+
+        String meow = idOfResponse(responses, "Meow");
+        String woof = idOfResponse(responses, "Woof");
+        String moo = idOfResponse(responses, "Moo");
+        GradingEngine engine = new GradingEngine();
+        Map<String, Object> key = q.answerKey();
+        assertThat(engine.grade("matching", Map.of("matchingAssignments", Map.of("m1", meow, "m2", woof, "m3", moo)),
+                key, BigDecimal.TEN).correct()).isTrue();
+        assertThat(engine.grade("matching", Map.of("pairs", Map.of("m1", meow, "m2", woof, "m3", moo)),
+                key, BigDecimal.TEN).correct()).isTrue();
+        // FE row-order answer: response ids listed in prompt order
+        assertThat(engine.grade("matching", Map.of("matchingOrder", List.of(meow, woof, moo)),
+                key, BigDecimal.TEN).correct()).isTrue();
+        // partial credit: 1 of 3 right
+        var partial = engine.grade("matching", Map.of("matchingAssignments", Map.of("m1", meow, "m2", moo, "m3", woof)),
+                key, BigDecimal.TEN);
+        assertThat(partial.correct()).isFalse();
+        assertThat(partial.partiallyRight()).isTrue();
+        assertThat(partial.awardedPoints()).isEqualByComparingTo("3.33");
+        // old-style ids no longer grade as correct
+        assertThat(engine.grade("matching", Map.of("matchingAssignments", Map.of("m1", "m1", "m2", "m2", "m3", "m3")),
+                key, BigDecimal.TEN).awardedPoints()).isEqualByComparingTo("0");
+    }
+
+    private static String idOfResponse(List<Map<String, Object>> responses, String text) {
+        return responses.stream().filter(r -> text.equals(r.get("response"))).findFirst().orElseThrow().get("id").toString();
     }
 }

@@ -58,6 +58,9 @@ final class AnswerGrading {
         if (expected.isEmpty()) {
             return zero();
         }
+        if (actual.isEmpty()) {
+            actual = positionalAssignments(rawAnswer, expected);
+        }
         long right = 0;
         for (Map<String, Object> pair : expected) {
             String promptId = string(firstNonNull(pair.get("promptId"), pair.get("itemId"), pair.get("id")));
@@ -67,6 +70,20 @@ final class AnswerGrading {
             }
         }
         return ratioResult(right, expected.size(), max);
+    }
+
+    /** Legacy FE answer {@code matchingOrder}: response ids listed in prompt (row) order. */
+    private static Map<String, Object> positionalAssignments(Object rawAnswer, List<Map<String, Object>> expected) {
+        List<String> order = stringList(answerValue(rawAnswer, "matchingOrder"));
+        Map<String, Object> assignments = new LinkedHashMap<>();
+        for (int i = 0; i < expected.size() && i < order.size(); i++) {
+            Map<String, Object> pair = expected.get(i);
+            String promptId = string(firstNonNull(pair.get("promptId"), pair.get("itemId"), pair.get("id")));
+            if (promptId != null) {
+                assignments.put(promptId, order.get(i));
+            }
+        }
+        return assignments;
     }
 
     static boolean pointInRegion(Map<String, Object> region, double x, double y) {
@@ -108,23 +125,7 @@ final class AnswerGrading {
             case "text" -> firstText(answer.get("textResponses"));
             case "value" -> answer.get("numericValue");
             case "order" -> answer.get("sequenceOrder");
-            case "pairs" -> {
-                Object assignments = answer.get("matchingAssignments");
-                if (assignments != null) {
-                    yield assignments;
-                }
-                Object order = answer.get("matchingOrder");
-                if (order instanceof List<?> list) {
-                    Map<String, Object> orderMap = new LinkedHashMap<>();
-                    for (Object item : list) {
-                        if (item != null) {
-                            orderMap.put(item.toString(), item.toString());
-                        }
-                    }
-                    yield orderMap;
-                }
-                yield null;
-            }
+            case "pairs" -> answer.get("matchingAssignments");
             case "targets" -> answer.get("dragDropPlacements");
             case "blanks" -> firstNonNull(
                     answer.get("textResponses"),
