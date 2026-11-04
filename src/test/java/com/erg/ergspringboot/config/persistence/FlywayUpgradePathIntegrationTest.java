@@ -77,7 +77,7 @@ class FlywayUpgradePathIntegrationTest {
                     + "where table_name = 'user_activities' and column_name = 'user_id'")).isEqualTo("YES");
             assertThat(text(statement, "select confdeltype::text from pg_constraint "
                     + "where conname = 'fk_user_activities_user'")).isEqualTo("n");
-            // V108: role_id matches roles.id.
+            // V124: role_id matches roles.id.
             assertThat(text(statement, "select character_maximum_length::text from information_schema.columns "
                     + "where table_name = 'user_role_assignments' and column_name = 'role_id'")).isEqualTo("36");
         }
