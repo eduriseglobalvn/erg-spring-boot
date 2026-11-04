@@ -34,7 +34,7 @@ import com.erg.ergspringboot.model.lms.Level;
 import com.erg.ergspringboot.model.lms.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.users.internal.directory.LegacyUserDirectoryAdapter;
+import com.erg.ergspringboot.users.internal.directory.UserDirectoryAdapter;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
@@ -101,7 +101,7 @@ class CalendarReadUseCaseTest {
     @BeforeEach
     void setUp() {
         // Same wiring Spring uses: the user directory port over the user repository.
-        LegacyUserDirectoryAdapter userDirectory = new LegacyUserDirectoryAdapter(userRepository);
+        UserDirectoryAdapter userDirectory = new UserDirectoryAdapter(userRepository);
         service = new CalendarReadUseCase(
                 eventRepository,
                 eventTeacherRepository,
