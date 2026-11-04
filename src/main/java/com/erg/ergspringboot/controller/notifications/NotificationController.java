@@ -10,8 +10,7 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.UnreadCountResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.notifications.NotificationOperations;
-import com.erg.ergspringboot.service.notifications.NotificationSecuritySupport;
-import com.erg.ergspringboot.service.notifications.NotificationService;
+import com.erg.ergspringboot.notifications.NotificationSecuritySupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -36,11 +35,6 @@ public class NotificationController {
     public NotificationController(NotificationOperations notifications, NotificationSecuritySupport security) {
         this.notifications = notifications;
         this.security = security;
-    }
-
-    @Deprecated
-    NotificationController(NotificationService legacy, NotificationSecuritySupport security) {
-        this(new NotificationOperations(legacy, null), security);
     }
 
     @GetMapping

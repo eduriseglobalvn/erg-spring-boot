@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.notifications;
+package com.erg.ergspringboot.notifications;
 
 import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;

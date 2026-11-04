@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.service.notifications.NotificationCommandService;
-import com.erg.ergspringboot.service.notifications.NotificationDeviceService;
-import com.erg.ergspringboot.service.notifications.NotificationOutboxWorker;
-import com.erg.ergspringboot.service.notifications.NotificationService;
+import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
+import com.erg.ergspringboot.notifications.internal.NotificationDeviceService;
+import com.erg.ergspringboot.notifications.internal.NotificationOutboxWorker;
+import com.erg.ergspringboot.notifications.internal.NotificationService;
 import com.erg.ergspringboot.repository.notifications.NotificationOutboxRepository;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -36,7 +36,7 @@ class CalendarPublishedScenarioTest {
     @MockitoBean NotificationCommandService notifications;
     // Collaborators of the LMS learning-event consumer, which lives in the same module.
     @MockitoBean com.erg.ergspringboot.lms.LmsNotificationProjection lmsAudience;
-    @MockitoBean com.erg.ergspringboot.service.notifications.LmsNotificationEventPublisher lmsNotifications;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher lmsNotifications;
     // The scenario isolates the notifications event consumer. Public REST
     // facades are still compatibility adapters over the legacy services, so
     // their collaborators are mocked instead of widening the standalone
@@ -45,6 +45,10 @@ class CalendarPublishedScenarioTest {
     @MockitoBean NotificationService notificationService;
     @MockitoBean NotificationOutboxWorker notificationWorker;
     @MockitoBean NotificationOutboxRepository notificationOutbox;
+    // Scheduled jobs and metrics now live inside the module and are picked up by its scan.
+    @MockitoBean com.erg.ergspringboot.notifications.internal.NotificationDeviceMaintenanceService notificationDeviceMaintenance;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.NotificationOutboxRetentionJob notificationOutboxRetention;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.NotificationMetrics notificationMetrics;
 
     @Test
     void publishedEventEventuallyEnqueuesOneIdempotentNotification(Scenario scenario) {

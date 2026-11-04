@@ -5,7 +5,7 @@ import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentAudience;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.service.notifications.LmsNotificationEventPublisher;
+import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher;
 import java.util.List;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
