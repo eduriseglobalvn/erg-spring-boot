@@ -43,7 +43,21 @@ public class FlywayConfig {
                 .baselineVersion("0")
                 .table("flyway_schema_history")
                 .configuration(SESSION_LEVEL_LOCK)
+                .initSql(demoPurgeInitSql(environment))
                 .load();
+    }
+
+    /** Fresh-install demo purge switch (env {@code ERG_FLYWAY_DEMO_PURGE=true}), read by V125. */
+    static final String DEMO_PURGE = "erg.flyway.demo-purge";
+
+    /**
+     * V125 removes the V4/V11/V21/V33/V68/V102 demo rows only when this session setting is on. It is a
+     * runtime setting, not a Flyway placeholder, so the script checksum never depends on it and other
+     * Flyway runners (tests, reset script) need no extra configuration. Parsed as a boolean so no
+     * free text reaches SQL.
+     */
+    static String demoPurgeInitSql(Environment environment) {
+        return environment.getProperty(DEMO_PURGE, Boolean.class, false) ? "SET erg.demo_purge = 'true'" : null;
     }
 
     /**

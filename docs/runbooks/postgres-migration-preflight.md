@@ -112,3 +112,26 @@ Then run `flyway repair` (only if the history row is marked failed) and migrate 
 `scripts/reset-and-seed-postgres.ps1` and `scripts/reset-postgres-db.ps1` drop the whole `public`
 schema. They refuse any host other than `localhost`, `127.0.0.1`, `::1`, `*.localhost` or `*.test`
 unless `-AllowRemoteHost <exact host>` names the target. Never pass it for a production database.
+
+## 6. Fresh production install without demo data (V125)
+
+V4, V11, V21, V33, V68 and V102 are applied, append-only migrations that insert demo rows (demo
+schools, classes, subjects, quizzes, a teaching calendar and seed accounts) in every environment.
+`V125__purge_demo_seed_on_fresh_install.sql` removes exactly those rows, but only when it is asked to:
+
+1. For a **brand-new** production database only, set `ERG_FLYWAY_DEMO_PURGE=true` for the first
+   deploy. `FlywayConfig` then runs `SET erg.demo_purge = 'true'` on the Flyway connection.
+2. Deploy. The log shows `V125: <n> rows removed from <table>` per table (about 630 in total). The
+   removed rows are kept in `_quarantine_v125_<table>`; drop them deliberately once the install is
+   accepted.
+3. Remove the flag (or set it back to `false`). V125 runs once; the flag has no effect afterwards.
+
+Leave the flag unset everywhere else. Unset, V125 is a no-op, so local dev and every existing server
+keep their data. If the flag is set on a database that is not fresh, V125 fails without deleting
+anything: it refuses when any user other than the seed accounts exists, when a seed account has a
+password or a login, or when any non-demo row references a demo row. The failed migration rolls back;
+unset the flag and redeploy, and V125 records as a no-op.
+
+Always kept: `usr_super_admin`, `usr_relationship_placeholder` (the V11 owner for orphaned CRM deals),
+roles and permissions, the `ctr_*` organisation units and the IC3/Tin hoc/Python/MOS curriculum.
+The flag is a session setting, not a Flyway placeholder, so the V125 checksum is the same either way.

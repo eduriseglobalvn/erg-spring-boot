@@ -84,6 +84,15 @@ class FlywayConfigTest {
     }
 
     @Test
+    void demoPurgeIsOffUnlessExplicitlyEnabled() {
+        assertThat(FlywayConfig.demoPurgeInitSql(new MockEnvironment())).isNull();
+        assertThat(FlywayConfig.demoPurgeInitSql(new MockEnvironment().withProperty(FlywayConfig.DEMO_PURGE, "false")))
+                .isNull();
+        assertThat(FlywayConfig.demoPurgeInitSql(new MockEnvironment().withProperty(FlywayConfig.DEMO_PURGE, "true")))
+                .isEqualTo("SET erg.demo_purge = 'true'");
+    }
+
+    @Test
     void flywayCanUseMigrationOwnerCredentialsSeparateFromRuntimeDatasource() throws Exception {
         Method method = FlywayConfig.class.getDeclaredMethod(
                 "migrationDataSource",
