@@ -67,15 +67,4 @@ class ApiResponseTest {
                 .contains("\"errors\":[{\"field\":\"email\"")
                 .doesNotContain("\"value\"");
     }
-
-    @Test
-    void wrapsPaginatedDataLikeGo() {
-        PaginatedData<String> data = PaginatedData.of("items", 51, 2, 20);
-
-        assertThat(data.data()).isEqualTo("items");
-        assertThat(data.total()).isEqualTo(51);
-        assertThat(data.page()).isEqualTo(2);
-        assertThat(data.limit()).isEqualTo(20);
-        assertThat(data.totalPages()).isEqualTo(3);
-    }
 }

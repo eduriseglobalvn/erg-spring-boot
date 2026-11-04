@@ -15,8 +15,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Encrypts persisted Firebase registration tokens at the notifications
- * module boundary. The service-layer compatibility facade delegates here so
- * notification delivery does not depend on legacy horizontal packages.
+ * module boundary.
  */
 @Component
 public class NotificationTokenCipher {

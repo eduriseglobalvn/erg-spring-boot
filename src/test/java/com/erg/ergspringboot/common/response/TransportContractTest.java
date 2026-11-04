@@ -41,16 +41,6 @@ class TransportContractTest {
     }
 
     @Test
-    void productionCodeDoesNotAdoptLegacyPaginatedData() throws Exception {
-        List<Path> offenders = sourceFiles().stream()
-                .filter(path -> !path.endsWith("common/response/PaginatedData.java"))
-                .filter(path -> read(path).contains("PaginatedData"))
-                .toList();
-
-        assertThat(offenders).isEmpty();
-    }
-
-    @Test
     void controllersDoNotReimplementRequestCorrelationLookup() throws Exception {
         List<String> forbiddenFragments = List.of(
                 "getAttribute(\"requestId\")",

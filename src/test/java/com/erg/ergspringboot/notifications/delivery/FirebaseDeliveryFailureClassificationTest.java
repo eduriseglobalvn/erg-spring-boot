@@ -7,7 +7,7 @@ import com.erg.ergspringboot.notifications.push.FirebaseHttpV1PushSender;
 import com.erg.ergspringboot.notifications.push.FirebasePushPayload;
 import com.erg.ergspringboot.notifications.push.FirebasePushSender;
 import com.erg.ergspringboot.notifications.push.SendResult;
-import com.erg.ergspringboot.service.notifications.NotificationTokenCipher;
+import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

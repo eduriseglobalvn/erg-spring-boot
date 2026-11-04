@@ -65,7 +65,7 @@ class NotificationDeliveryAdapterRegistryTest {
                         return SendResult.success(200, "id", 1);
                     }
                 },
-                new com.erg.ergspringboot.service.notifications.NotificationTokenCipher(
+                new com.erg.ergspringboot.notifications.NotificationTokenCipher(
                         new com.erg.ergspringboot.notifications.config.NotificationPushProperties()));
 
         NotificationDeliveryAdapterRegistry registry = new NotificationDeliveryAdapterRegistry(List.of(adapter));
