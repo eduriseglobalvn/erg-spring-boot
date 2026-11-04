@@ -37,11 +37,22 @@ class WorkspaceCapabilityMapperTest {
     }
 
     @Test
-    void wildcardIsExplicitlyProjectedToEveryCanonicalWorkspace() {
+    void wildcardProjectsEveryWorkspaceOnlyForAPlatformWidePrincipal() {
         assertEquals(
                 java.util.List.of("ADMIN", "CRM", "STUDENT", "TEACHER"),
                 WorkspaceCapabilityMapper.canonicalWorkspaces(
-                        java.util.List.of("*"), java.util.List.of(), java.util.List.of()));
+                        java.util.List.of(), java.util.List.of("system.super_admin"), java.util.List.of("*")));
+        assertEquals(java.util.List.of("*"), WorkspaceCapabilityMapper.legacyPortalsFor(
+                java.util.List.of(), java.util.List.of("system.super_admin"), java.util.List.of("*")));
+    }
+
+    @Test
+    void bareWildcardWithoutTheSystemRoleGrantsNoWorkspace() {
+        // P3-1: a client-sent "*" portal or a tenant-level "*" grant is not platform-wide.
+        assertEquals(java.util.List.of(), WorkspaceCapabilityMapper.canonicalWorkspaces(
+                java.util.List.of("*"), java.util.List.of(), java.util.List.of("*")));
+        assertEquals(java.util.List.of(), WorkspaceCapabilityMapper.legacyPortalsFor(
+                java.util.List.of("*"), java.util.List.of("tenant_admin"), java.util.List.of("*")));
     }
 
     @Test

@@ -41,6 +41,8 @@ jobs:
           SPRING_DATASOURCE_USERNAME: erg
           SPRING_DATASOURCE_PASSWORD: erg
         run: ./mvnw -B -ntp verify
+      - name: Destructive-script host guard (P1-4)
+        run: pwsh -NoProfile -File scripts/postgres-target-guard.test.ps1
 
   database-safety-gates:
     name: Tenant RLS and migration gates (mandatory, Docker)

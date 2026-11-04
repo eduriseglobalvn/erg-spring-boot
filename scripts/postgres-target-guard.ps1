@@ -31,6 +31,10 @@ function Assert-LocalPostgresTarget {
         [string]$AllowRemoteHost
     )
 
+    if ($DatabaseUrl -match "^(?:jdbc:)?postgres(?:ql)?://(?:[^@/]*@)?[^/?]*,") {
+        # Multi-host URLs (host1,host2) would only have their first host checked.
+        throw "Refusing to run: multi-host PostgreSQL URLs are not supported by destructive scripts."
+    }
     $hostName = Get-PostgresUrlHost $DatabaseUrl
     if ($null -eq $hostName) {
         throw "Refusing to run: cannot parse the PostgreSQL host from the database URL."

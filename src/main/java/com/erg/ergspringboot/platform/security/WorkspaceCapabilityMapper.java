@@ -27,8 +27,8 @@ public final class WorkspaceCapabilityMapper {
 
     /**
      * Projects authenticated, server-derived claims into the public workspace
-     * vocabulary. Unknown values are ignored. A wildcard is deliberately
-     * explicit and means every workspace; no other client-controlled token
+     * vocabulary. Unknown values are ignored. Every workspace is projected only for a
+     * platform-wide principal ({@link #isPlatformWide}); no client-controlled token
      * grants access.
      */
     public static List<String> canonicalWorkspaces(
@@ -37,7 +37,7 @@ public final class WorkspaceCapabilityMapper {
             List<String> permissions
     ) {
         Set<WorkspaceCapability> capabilities = EnumSet.noneOf(WorkspaceCapability.class);
-        if (hasWildcard(portals) || hasWildcard(roles) || hasWildcard(permissions)) {
+        if (isPlatformWide(roles, permissions, List.of())) {
             capabilities.addAll(EnumSet.allOf(WorkspaceCapability.class));
         } else {
             addTokens(capabilities, portals);
@@ -57,10 +57,7 @@ public final class WorkspaceCapabilityMapper {
             List<String> permissions,
             List<String> deniedPermissions) {
         Set<WorkspaceCapability> capabilities = EnumSet.noneOf(WorkspaceCapability.class);
-        boolean systemRole = containsNormalized(roles, "system.super_admin", "erg_super_admin", "global_admin");
-        boolean wildcardGrant = containsNormalized(permissions, "*");
-        boolean wildcardDeny = containsNormalized(deniedPermissions, "*");
-        if (systemRole && wildcardGrant && !wildcardDeny) {
+        if (isPlatformWide(roles, permissions, deniedPermissions)) {
             capabilities.addAll(EnumSet.allOf(WorkspaceCapability.class));
         } else {
             addVerifiedTokens(capabilities, roles);
@@ -80,7 +77,7 @@ public final class WorkspaceCapabilityMapper {
             List<String> roles,
             List<String> permissions
     ) {
-        if (hasWildcard(portals) || hasWildcard(roles) || hasWildcard(permissions)) {
+        if (isPlatformWide(roles, permissions, List.of())) {
             return List.of("*");
         }
         Set<String> legacy = new LinkedHashSet<>();
@@ -123,6 +120,16 @@ public final class WorkspaceCapabilityMapper {
         }
     }
 
+    /**
+     * The single meaning of a privileged {@code *} (P3-1): a verified system role holds it and nothing
+     * denies it. Any other {@code *}, including a client-sent portal value, grants no workspace.
+     */
+    public static boolean isPlatformWide(List<String> roles, List<String> permissions, List<String> deniedPermissions) {
+        return containsNormalized(roles, "system.super_admin", "erg_super_admin", "global_admin")
+                && containsNormalized(permissions, "*")
+                && !containsNormalized(deniedPermissions, "*");
+    }
+
     private static boolean containsNormalized(List<String> values, String... expected) {
         if (values == null) return false;
         Set<String> wanted = Set.of(expected);
@@ -131,9 +138,6 @@ public final class WorkspaceCapabilityMapper {
                 .anyMatch(wanted::contains);
     }
 
-    private static boolean hasWildcard(List<String> values) {
-        return values != null && values.stream().anyMatch(value -> value != null && "*".equals(value.trim()));
-    }
 
     private static Optional<WorkspaceCapability> fromCapabilityToken(String value) {
         if (value == null || value.isBlank()) return Optional.empty();

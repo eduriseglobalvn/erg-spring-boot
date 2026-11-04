@@ -50,13 +50,8 @@ public final class AuthorizationCapabilityPolicy {
         if (principal == null || principal.roles() == null || principal.permissions() == null) {
             return false;
         }
-        boolean systemRole = principal.roles().stream().map(this::normalize)
-                .anyMatch(role -> role.equals("system.super_admin")
-                        || role.equals("erg_super_admin")
-                        || role.equals("global_admin"));
-        boolean wildcardGrant = principal.permissions().stream().anyMatch(value -> "*".equals(normalize(value)));
-        boolean wildcardDeny = principal.deniedPermissions().stream().anyMatch(value -> "*".equals(normalize(value)));
-        return systemRole && wildcardGrant && !wildcardDeny;
+        return WorkspaceCapabilityMapper.isPlatformWide(
+                principal.roles(), principal.permissions(), principal.deniedPermissions());
     }
 
     public boolean isPermissionWildcardAllowed(ErgPrincipal principal, String grant) {

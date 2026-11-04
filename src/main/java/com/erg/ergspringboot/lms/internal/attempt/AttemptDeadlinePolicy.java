@@ -6,12 +6,15 @@ import com.erg.ergspringboot.lms.persistence.Attempt;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Attempt time rules: the assignment open window, the deadline frozen in the start policy snapshot (falling back
  * to the live assignment {@code dueAt}/duration for legacy attempts) and the server-side submit grace.
  */
 final class AttemptDeadlinePolicy {
+    private static final Logger log = LoggerFactory.getLogger(AttemptDeadlinePolicy.class);
     private final Duration submitGrace;
 
     AttemptDeadlinePolicy(Duration submitGrace) {
@@ -64,7 +67,9 @@ final class AttemptDeadlinePolicy {
         if (value == null || value.toString().isBlank()) return null;
         try {
             return OffsetDateTime.parse(value.toString());
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException invalid) {
+            // P3-6: a corrupt snapshot is a server bug; make it visible and keep the bounded live deadline.
+            log.warn("Attempt {} has an unparseable policy snapshot deadlineAt; using the assignment deadline", attempt.getId());
             return null;
         }
     }
@@ -73,7 +78,12 @@ final class AttemptDeadlinePolicy {
         Object value = map(attempt.getPolicySnapshot()).get(key);
         if (value instanceof Number number) return number.intValue();
         if (value == null || value.toString().isBlank()) return null;
-        try { return Integer.valueOf(value.toString()); } catch (NumberFormatException ignored) { return null; }
+        try {
+            return Integer.valueOf(value.toString());
+        } catch (NumberFormatException invalid) {
+            log.warn("Attempt {} has an unparseable policy snapshot {}; ignoring it", attempt.getId(), key);
+            return null;
+        }
     }
 
     private <K,V> Map<K,V> map(Map<K,V> value) { return value == null ? Map.of() : value; }
