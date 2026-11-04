@@ -102,9 +102,12 @@ public final class ErgTieredCacheManager implements CacheManager {
     }
 
     public void clearLocal(String cacheName, String tenantId) {
-        Cache cache = caches.get(cacheName);
+        int scopeAt = cacheName == null ? -1 : cacheName.indexOf('#');
+        String name = scopeAt < 0 ? cacheName : cacheName.substring(0, scopeAt);
+        Cache cache = caches.get(name);
         if (cache instanceof ErgTieredCache tiered) {
-            tiered.clearLocal(tenantId);
+            if (scopeAt < 0) tiered.clearLocal(tenantId);
+            else tiered.clearLocal(tenantId, cacheName.substring(scopeAt + 1));
         }
     }
 }

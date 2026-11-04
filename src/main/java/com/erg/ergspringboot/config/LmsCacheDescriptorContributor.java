@@ -16,6 +16,7 @@ import com.erg.ergspringboot.platform.cache.CacheDescriptorContributor;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
@@ -29,22 +30,35 @@ public class LmsCacheDescriptorContributor implements CacheDescriptorContributor
         JavaType quizPackage = mapper.getTypeFactory().constructParametricType(Optional.class, QuizPackageResponse.class);
         return List.of(
                 descriptor("lmsClassWorkspace", mapper.constructType(ClassWorkspaceResponse.class), Duration.ofSeconds(30), 64),
-                descriptor("lmsHomeworkWorkspace", mapper.constructType(TeacherHomeworkWorkspaceResponse.class), Duration.ofSeconds(30), 64),
-                descriptor("lmsAssignmentProgress", mapper.constructType(AssignmentProgressWorkspaceResponse.class), Duration.ofSeconds(30), 64),
+                descriptor("lmsHomeworkWorkspace", mapper.constructType(TeacherHomeworkWorkspaceResponse.class), Duration.ofSeconds(30), 64, keyPart(1)),
+                descriptor("lmsAssignmentProgress", mapper.constructType(AssignmentProgressWorkspaceResponse.class), Duration.ofSeconds(30), 64, keyPart(1)),
                 descriptor("lmsStudentAssignments", mapper.constructType(StudentAssignmentListResponse.class), Duration.ofSeconds(30), 64),
                 descriptor("lmsStudentGroups", mapper.constructType(StudentGroupWorkspaceResponse.class), Duration.ofSeconds(30), 32),
                 descriptor("quizRuntimePackage", quizPackage, Duration.ofMinutes(10), 256),
-                descriptor("quizQuestionAnalytics", mapper.constructType(QuestionAnalyticsResponse.class), Duration.ofSeconds(30), 64),
-                descriptor("quizAssignmentReport", mapper.constructType(AssignmentReportResponse.class), Duration.ofSeconds(30), 64),
+                descriptor("quizQuestionAnalytics", mapper.constructType(QuestionAnalyticsResponse.class), Duration.ofSeconds(30), 64, keyPart(1)),
+                descriptor("quizAssignmentReport", mapper.constructType(AssignmentReportResponse.class), Duration.ofSeconds(30), 64, keyPart(1)),
                 descriptor("lcmsQuestionBankWorkspace", mapper.constructType(QuestionBankWorkspaceResponse.class), Duration.ofSeconds(30), 128),
                 descriptor("lcmsQuizWorkspace", mapper.constructType(QuizWorkspaceResponse.class), Duration.ofSeconds(30), 128),
-                descriptor("studentDashboard", mapper.constructType(StudentDashboardResponse.class), Duration.ofSeconds(30), 64),
+                descriptor("studentDashboard", mapper.constructType(StudentDashboardResponse.class), Duration.ofSeconds(30), 64,
+                        // The dashboard shows one student: the requested one, else the viewer.
+                        key -> Optional.ofNullable(keyPart(3).apply(key)).orElseGet(() -> keyPart(0).apply(key))),
                 descriptor("lmsSchoolClasses", untyped, Duration.ofSeconds(60), 64)
         );
     }
 
     private CacheDescriptor<Object> descriptor(String name, JavaType type, Duration ttl, long l1MiB) {
+        return descriptor(name, type, ttl, l1MiB, null);
+    }
+
+    /** Scoped caches let one write (an attempt) invalidate its teacher/assignment/quiz/student instead of the tenant. */
+    private CacheDescriptor<Object> descriptor(String name, JavaType type, Duration ttl, long l1MiB, Function<Object, String> scope) {
         return new CacheDescriptor<>(name, type, ttl, ttl.multipliedBy(4), l1MiB * 1024 * 1024,
-                1024 * 1024, true, false);
+                1024 * 1024, true, false, scope);
+    }
+
+    /** Element {@code index} of an {@code @Cacheable} list key such as {@code {#tenantId, #assignmentId, ...}}. */
+    static Function<Object, String> keyPart(int index) {
+        return key -> key instanceof List<?> parts && parts.size() > index && parts.get(index) != null
+                ? parts.get(index).toString() : null;
     }
 }

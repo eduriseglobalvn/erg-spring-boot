@@ -4,13 +4,15 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.concurrent.ConcurrentHashMap;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.concurrent.ConcurrentMap;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 public final class RedisCacheGenerationService implements CacheGenerationService {
 
     private final StringRedisTemplate redis;
-    private final ConcurrentHashMap<String, Long> local = new ConcurrentHashMap<>();
+    // Bounded memo of Redis: an evicted entry is re-read from Redis, and scoped generations add one key per scope.
+    private final ConcurrentMap<String, Long> local = Caffeine.newBuilder().maximumSize(100_000).<String, Long>build().asMap();
 
     public RedisCacheGenerationService(StringRedisTemplate redis) {
         this.redis = redis;

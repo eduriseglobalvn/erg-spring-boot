@@ -40,6 +40,11 @@ public final class CacheInvalidationService {
         requests().add(request);
     }
 
+    /** Invalidates one scope (e.g. one assignment) of a scoped cache instead of the whole tenant. */
+    public void clearTenantCacheScope(String tenantId, String cacheName, String scope) {
+        clearTenantCache(tenantId, ErgTieredCache.scopeGenerationName(require(cacheName, "cacheName"), require(scope, "scope")));
+    }
+
     @SuppressWarnings("unchecked")
     private Set<Request> requests() {
         Set<Request> existing = (Set<Request>) TransactionSynchronizationManager.getResource(RESOURCE_KEY);

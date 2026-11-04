@@ -188,6 +188,17 @@ public final class ErgTieredCache implements Cache {
         l1.asMap().keySet().removeIf(key -> Objects.equals(key.tenantId(), tenantId));
     }
 
+    /** Drops this tenant's L1 entries of one scope; L2 entries become unreachable through the scope generation. */
+    public void clearLocal(String tenantId, String scope) {
+        l1.asMap().keySet().removeIf(key -> Objects.equals(key.tenantId(), tenantId)
+                && Objects.equals(scope, descriptor.scopeFor(key.sourceKey())));
+    }
+
+    /** Generation name of one scope; '#' cannot occur in a cache name, so it never collides with one. */
+    public static String scopeGenerationName(String cacheName, String scope) {
+        return cacheName + "#" + scope;
+    }
+
     private Object lookup(Object key) {
         ScopedCacheKey scoped = scoped(key);
         Object local = l1.getIfPresent(scoped);
@@ -225,6 +236,13 @@ public final class ErgTieredCache implements Cache {
         String effectiveTenant = tenant == null ? "global" : tenant;
         long generation = generations.current(effectiveTenant, descriptor.name());
         if (generation < 0) return null;
+        String scope = descriptor.scopeFor(sourceKey);
+        if (scope != null) {
+            long scopeGeneration = generations.current(effectiveTenant, scopeGenerationName(descriptor.name(), scope));
+            if (scopeGeneration < 0) return null;
+            // Either a tenant-wide clear or a clear of this scope moves the key; both counters stay far below 2^31.
+            generation = (generation << 32) | (scopeGeneration & 0xFFFFFFFFL);
+        }
         return keys.businessKey(effectiveTenant, descriptor, sourceKey, generation);
     }
 

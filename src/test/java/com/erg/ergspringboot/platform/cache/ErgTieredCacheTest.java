@@ -3,6 +3,7 @@ package com.erg.ergspringboot.platform.cache;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,14 +63,52 @@ class ErgTieredCacheTest {
         }
     }
 
+    @Test
+    void clearingOneScopeKeepsOtherScopesInL1AndL2() {
+        Fixture fixture = new Fixture(key -> ((List<?>) key).get(1).toString());
+        List<String> assignmentA = List.of("tenant-a", "asg-A");
+        List<String> assignmentB = List.of("tenant-a", "asg-B");
+        fixture.cache.put(assignmentA, "progress-A");
+        fixture.cache.put(assignmentB, "progress-B");
+
+        // What CacheInvalidationService.clearTenantCacheScope + the after-commit local clear do for asg-A.
+        fixture.generations.increment("tenant-a", ErgTieredCache.scopeGenerationName("studentDashboard", "asg-A"));
+        fixture.cache.clearLocal("tenant-a", "asg-A");
+
+        assertThat(fixture.cache.get(assignmentA, String.class)).isNull();
+        assertThat(fixture.cache.get(assignmentB, String.class)).isEqualTo("progress-B");
+        fixture.cache.clearLocal();
+        assertThat(fixture.cache.get(assignmentB, String.class)).as("asg-B still served from L2").isEqualTo("progress-B");
+        assertThat(fixture.cache.get(assignmentA, String.class)).as("asg-A L2 key moved with its scope generation").isNull();
+    }
+
+    @Test
+    void tenantWideClearStillInvalidatesScopedKeys() {
+        Fixture fixture = new Fixture(key -> ((List<?>) key).get(1).toString());
+        List<String> assignmentA = List.of("tenant-a", "asg-A");
+        fixture.cache.put(assignmentA, "progress-A");
+
+        fixture.generations.increment("tenant-a", "studentDashboard");
+        fixture.cache.clearLocal("tenant-a");
+
+        assertThat(fixture.cache.get(assignmentA, String.class)).isNull();
+    }
+
     private static final class Fixture {
         private final JsonMapper mapper = JsonMapper.builder().build();
-        private final CacheDescriptor<String> descriptor = new CacheDescriptor<>(
-                "studentDashboard", mapper.constructType(String.class), Duration.ofMinutes(1),
-                Duration.ofMinutes(2), 1024 * 1024, 1024, true, false);
+        private final CacheDescriptor<String> descriptor;
         private final FakeStore store = new FakeStore();
         private final LocalCacheGenerationService generations = new LocalCacheGenerationService();
-        private final ErgTieredCache cache = new ErgTieredCache(
+        private final ErgTieredCache cache;
+
+        Fixture() {
+            this(null);
+        }
+
+        Fixture(java.util.function.Function<Object, String> scope) {
+            descriptor = new CacheDescriptor<>("studentDashboard", mapper.constructType(String.class), Duration.ofMinutes(1),
+                    Duration.ofMinutes(2), 1024 * 1024, 1024, true, false, scope);
+            cache = new ErgTieredCache(
                 descriptor,
                 new CacheKeyFactory(mapper),
                 new JacksonCacheValueCodec(mapper),
@@ -78,7 +117,8 @@ class ErgTieredCacheTest {
                 generations,
                 new CacheFailurePolicy(2, Duration.ofSeconds(1)),
                 new CacheLoadCoordinator()
-        );
+            );
+        }
     }
 
     private static final class FakeStore implements RedisCacheStore {

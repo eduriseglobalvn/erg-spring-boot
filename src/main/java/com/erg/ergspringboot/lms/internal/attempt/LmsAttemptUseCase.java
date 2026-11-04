@@ -111,7 +111,7 @@ public class LmsAttemptUseCase {
             attempt.setLastActiveAt(now);
             Attempt saved = attempts.save(attempt);
             log.info("EXAM_ATTEMPT_RESUME studentId={} attemptId={} quizId={} assignmentId={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId());
-            caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+            evictReads(tenant, saved, assignment);
             AttemptResponse result = response(saved);
             complete(receipt, result, version(saved));
             return result;
@@ -136,7 +136,7 @@ public class LmsAttemptUseCase {
             throw new ConflictException("an attempt is already in progress for this quiz");
         }
         log.info("EXAM_ATTEMPT_START studentId={} attemptId={} quizId={} assignmentId={} mode={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId(), saved.getMode());
-        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        evictReads(tenant, saved, assignment);
         AttemptResponse result = response(saved);
         complete(receipt, result, version(saved));
         return result;
@@ -208,7 +208,7 @@ public class LmsAttemptUseCase {
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_submitted", null, null, Map.of("score", score.score(), "percent", score.percent(), "passed", score.passed(), "late", late), submitted);
         if (request != null) events.recordClientBatch(saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.clientEvents());
         progress.projectAfterCommit(saved, owned.assignment(), tenant);
-        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        evictReads(tenant, saved, owned.assignment());
         publisher.publishEvent(new LmsAttemptSubmitted("attempt-submitted:" + saved.getId(), tenant, saved.getId(),
                 saved.getAssignmentId(), saved.getStudentId(), saved.getStatus(), score.score(), score.max(), score.passed(),
                 submitted));
@@ -250,11 +250,16 @@ public class LmsAttemptUseCase {
         log.info("EXAM_ATTEMPT_GRADED attemptId={} questionId={} graderId={} status={}", saved.getId(), questionId, access.userId(), saved.getStatus());
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_answer_graded", questionId, null, Map.of("score", result.score().doubleValue(), "status", saved.getStatus()), now());
         progress.projectAfterCommit(saved, assignment, tenant);
-        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        evictReads(tenant, saved, assignment);
         return response(saved);
     }
 
     private record Owned(Attempt attempt, Assignment assignment) { }
+
+    private void evictReads(String tenant, Attempt attempt, Assignment assignment) {
+        caches.evictAttemptAfterCommit(tenant, attempt, assignment,
+                policy.learner(tenant, attempt.getStudentId()).map(Student::getAuthUserId).orElse(null));
+    }
     private record Score(double score, double max, double percent, boolean passed) { }
 
     private Owned mutable(String id, UserAccessContext access) {
@@ -311,7 +316,7 @@ public class LmsAttemptUseCase {
         Assignment assignment = policy.assignment(tenant, attempt.getAssignmentId());
         if (!deadlines.isExpired(attempt, assignment, now)) return false;
         autoClose(attempt, assignment, tenant, now);
-        caches.evictAfterCommit(tenant, LmsReadCacheInvalidator.ATTEMPT_READ_CACHES);
+        evictReads(tenant, attempt, assignment);
         return true;
     }
 
