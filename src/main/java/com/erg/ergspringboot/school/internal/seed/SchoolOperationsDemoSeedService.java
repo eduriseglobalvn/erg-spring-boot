@@ -1,4 +1,6 @@
-package com.erg.ergspringboot.service.school;
+package com.erg.ergspringboot.school.internal.seed;
+
+import com.erg.ergspringboot.school.internal.command.SchoolCommandService;
 
 import com.erg.ergspringboot.common.request.school.SchoolRequests.CreateSchoolRequest;
 import com.erg.ergspringboot.model.lms.Classroom;

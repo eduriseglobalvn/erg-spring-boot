@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.school;
+package com.erg.ergspringboot.school.internal.command;
 
 import static com.erg.ergspringboot.common.request.school.SchoolRequests.*;
 import static com.erg.ergspringboot.common.response.school.SchoolResponses.*;

@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.school;
+package com.erg.ergspringboot.school.internal.seed;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.lms.internal.seed.LmsBootstrapSeedInitializer;
 import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoSeedInitializer;
-import com.erg.ergspringboot.service.school.SchoolOperationsDemoSeedInitializer;
+import com.erg.ergspringboot.school.internal.seed.SchoolOperationsDemoSeedInitializer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Profile;

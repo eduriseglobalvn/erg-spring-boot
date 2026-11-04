@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.school;
+package com.erg.ergspringboot.school.internal.command;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

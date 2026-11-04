@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.school;
+package com.erg.ergspringboot.school.internal.seed;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;

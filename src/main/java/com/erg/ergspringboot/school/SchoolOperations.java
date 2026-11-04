@@ -4,7 +4,7 @@ import static com.erg.ergspringboot.common.request.school.SchoolRequests.*;
 import static com.erg.ergspringboot.common.response.school.SchoolResponses.*;
 
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.school.SchoolCommandService;
+import com.erg.ergspringboot.school.internal.command.SchoolCommandService;
 import org.springframework.stereotype.Service;
 
 /** Public command boundary for the school bounded context. */
