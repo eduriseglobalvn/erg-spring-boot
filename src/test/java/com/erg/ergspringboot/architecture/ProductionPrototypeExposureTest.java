@@ -21,7 +21,6 @@ class ProductionPrototypeExposureTest {
             "documents/DocumentController.java",
             "engagement/EngagementController.java",
             "operations/AnalyticsOperationsController.java",
-            "platform/MigrationPlatformController.java",
             "seo/SeoController.java",
             "trending/TrendingBotController.java");
 

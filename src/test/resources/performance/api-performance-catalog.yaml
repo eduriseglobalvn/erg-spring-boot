@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 563
+  route-count: 555
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -1706,42 +1706,6 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: GET /api/v1/migration/cache-key-registry => com.erg.ergspringboot.controller.platform.MigrationPlatformController.cacheKeys
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
-    - route: GET /api/v1/migration/cutover-runbook => com.erg.ergspringboot.controller.platform.MigrationPlatformController.cutover
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
-    - route: GET /api/v1/migration/data-parity-matrix => com.erg.ergspringboot.controller.platform.MigrationPlatformController.dataParity
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
-    - route: GET /api/v1/migration/native-image-assessment => com.erg.ergspringboot.controller.platform.MigrationPlatformController.nativeAssessment
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
     - route: GET /api/v1/notifications => com.erg.ergspringboot.controller.notifications.NotificationController.list
       classification: persistent-read
       statement-budget: 12
@@ -1860,33 +1824,6 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
-    - route: GET /api/v1/platform/runtime-wiring => com.erg.ergspringboot.controller.platform.MigrationPlatformController.runtimeWiring
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
-    - route: GET /api/v1/platform/shared-libraries => com.erg.ergspringboot.controller.platform.MigrationPlatformController.sharedLibraries
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
-    - route: GET /api/v1/platform/tenancy => com.erg.ergspringboot.controller.platform.MigrationPlatformController.tenancy
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
     - route: GET /api/v1/posts => com.erg.ergspringboot.controller.cms.PostController.list
       classification: process-local-stub
       disposition: disable-in-prod
@@ -3772,15 +3709,6 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/v1/migration/load-test/report => com.erg.ergspringboot.controller.platform.MigrationPlatformController.loadReport
-      classification: process-local-stub
-      disposition: disable-in-prod
-      statement-budget: 0
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: process-local-disabled-prod
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
     - route: POST /api/v1/notification-devices => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.register
       classification: persistent-write
       statement-budget: 25
