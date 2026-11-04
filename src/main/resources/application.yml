@@ -275,12 +275,6 @@ erg:
       shutdown-timeout: ${ERG_PERFORMANCE_READ_EXECUTOR_SHUTDOWN_TIMEOUT:5s}
   openapi:
     server-url: ${ERG_OPENAPI_SERVER_URL:/}
-  app:
-    env: ${APP__ENV:development}
-    read-timeout: ${APP__READ_TIMEOUT:15s}
-    write-timeout: ${APP__WRITE_TIMEOUT:15s}
-    idle-timeout: ${APP__IDLE_TIMEOUT:60s}
-    shutdown-time: ${APP__SHUTDOWN_TIME:30s}
   notifications:
     push:
       enabled: ${NOTIFICATIONS__PUSH__ENABLED:false}
@@ -308,9 +302,6 @@ erg:
         initial-backoff: ${NOTIFICATIONS__WORKER__INITIAL_BACKOFF:10s}
         max-backoff: ${NOTIFICATIONS__WORKER__MAX_BACKOFF:60m}
   auth:
-    bearer-prefix: ${AUTH__BEARER_PREFIX:Bearer}
-    refresh-token-ttl: ${AUTH__REFRESH_TOKEN_TTL:7d}
-    admin-email: ${AUTH__ADMIN_EMAIL:admin@erg.edu.vn}
     # Per-account lockout (LoginFailureEnforcementService): after max-failed-login wrong
     # passwords within failed-login-window the account is refused for block-duration.
     max-failed-login: ${AUTH__MAX_FAILED_LOGIN:5}
@@ -327,12 +318,6 @@ erg:
     refresh-token-history:
       retention-cron: ${ERG_AUTH_REFRESH_TOKEN_HISTORY_RETENTION_CRON:0 20 3 * * *}
   http:
-    host: ${HTTP__HOST:${APP__HOST:0.0.0.0}}
-    port: ${HTTP__PORT:${APP__PORT:8080}}
-    read-timeout: ${HTTP__READ_TIMEOUT:${APP__READ_TIMEOUT:15s}}
-    write-timeout: ${HTTP__WRITE_TIMEOUT:${APP__WRITE_TIMEOUT:15s}}
-    idle-timeout: ${HTTP__IDLE_TIMEOUT:${APP__IDLE_TIMEOUT:60s}}
-    shutdown-timeout: ${HTTP__SHUTDOWN_TIMEOUT:${APP__SHUTDOWN_TIME:30s}}
     trusted-proxy-cidrs: ${HTTP__TRUSTED_PROXY_CIDRS:}
     cors:
       allowed-origins: ${HTTP__CORS__ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3003,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3003,http://crm.erg.edu.vn:3001,http://lcms.erg.edu.vn:3001,http://lms.erg.edu.vn:3001,http://elearning.erg.edu.vn:3001,https://crm.erg.edu.vn:3001,https://lcms.erg.edu.vn:3001,https://lms.erg.edu.vn:3001,https://elearning.erg.edu.vn:3001}
@@ -341,21 +326,6 @@ erg:
       exposed-headers: ${HTTP__CORS__EXPOSED_HEADERS:X-Request-ID,X-Trace-ID,Deprecation,Sunset,Link,X-ERG-API-Owner}
       allow-credentials: ${HTTP__CORS__ALLOW_CREDENTIALS:true}
       max-age: ${HTTP__CORS__MAX_AGE:86400}
-  queue:
-    redis:
-      host: ${QUEUE__REDIS_HOST:${REDIS__HOST:localhost}}
-      port: ${QUEUE__REDIS_PORT:${REDIS__PORT:6379}}
-      username: ${QUEUE__REDIS_USERNAME:${REDIS__USERNAME:}}
-      password: ${SECRET_QUEUE__REDIS_PASSWORD:${QUEUE__REDIS_PASSWORD:${SECRET_REDIS__PASSWORD:${REDIS__PASSWORD:}}}}
-      database: ${QUEUE__REDIS_DB:0}
-      tls: ${QUEUE__REDIS_TLS:${REDIS__TLS:false}}
-    concurrency: ${QUEUE__CONCURRENCY:10}
-    retry-delay: ${QUEUE__RETRY_DELAY:10s}
-    max-retry: ${QUEUE__MAX_RETRY:3}
-    queue-name: ${QUEUE__QUEUE_NAME:default}
-    dlq-queue-name: ${QUEUE__DLQ_QUEUE_NAME:erg-dlq}
-    retry-backoff: ${QUEUE__RETRY_BACKOFF:true}
-    is-server: ${QUEUE__IS_SERVER:true}
   r2:
     enabled: ${R2__ENABLED:false}
     endpoint: ${R2__ENDPOINT:}
@@ -364,40 +334,7 @@ erg:
     bucket-name: ${R2__BUCKET_NAME:}
     public-domain: ${R2__PUBLIC_DOMAIN:}
     region: ${R2__REGION:auto}
-  ai:
-    provider: ${AI__PROVIDER:groq}
-    api-key-encryption-secret: ${SECRET_AI__API_KEY_ENCRYPTION_SECRET:${AI__API_KEY_ENCRYPTION_SECRET:}}
-    gemini-api-key: ${SECRET_AI__GEMINI_API_KEY:${AI__GEMINI_API_KEY:}}
-    gemini-model: ${AI__GEMINI_MODEL:gemini-3-flash-preview}
-    gemini-timeout: ${AI__GEMINI_TIMEOUT:10s}
-    groq-base-url: ${AI__GROQ_BASE_URL:https://api.groq.com/openai/v1}
-    groq-model: ${AI__GROQ_MODEL:openai/gpt-oss-120b}
-    groq-api-key: ${SECRET_AI__GROQ_API_KEY:${AI__GROQ_API_KEY:}}
-    groq-timeout: ${AI__GROQ_TIMEOUT:30s}
-    groq-max-completion-tokens: ${AI__GROQ_MAX_COMPLETION_TOKENS:4096}
-    groq-temperature: ${AI__GROQ_TEMPERATURE:1}
-    groq-reasoning-effort: ${AI__GROQ_REASONING_EFFORT:medium}
-    huggingface-image-base-url: ${AI__HUGGINGFACE_IMAGE_BASE_URL:https://router.huggingface.co}
-    huggingface-image-api-key: ${SECRET_AI__HUGGINGFACE_IMAGE_API_KEY:${AI__HUGGINGFACE_IMAGE_API_KEY:}}
-    huggingface-image-provider: ${AI__HUGGINGFACE_IMAGE_PROVIDER:fal-ai}
-    huggingface-image-model: ${AI__HUGGINGFACE_IMAGE_MODEL:black-forest-labs/FLUX.1-Krea-dev}
-    huggingface-image-timeout: ${AI__HUGGINGFACE_IMAGE_TIMEOUT:90s}
-    huggingface-image-width: ${AI__HUGGINGFACE_IMAGE_WIDTH:1024}
-    huggingface-image-height: ${AI__HUGGINGFACE_IMAGE_HEIGHT:576}
-    huggingface-image-steps: ${AI__HUGGINGFACE_IMAGE_STEPS:28}
-    huggingface-image-guidance: ${AI__HUGGINGFACE_IMAGE_GUIDANCE:7}
-    huggingface-image-negative-prompt: ${AI__HUGGINGFACE_IMAGE_NEGATIVE_PROMPT:text, watermark, logo, blurry, distorted, low quality, extra fingers}
-    cache-ttl: ${AI__CACHE_TTL:24h}
-    batch-size: ${AI__BATCH_SIZE:10}
-  telemetry:
-    enabled: ${TELEMETRY__ENABLED:false}
-    service-name: ${TELEMETRY__SERVICE_NAME:erg-server}
-    service-version: ${TELEMETRY__SERVICE_VERSION:0.1.0}
-    environment: ${TELEMETRY__ENVIRONMENT:${APP__ENV:development}}
-    jaeger-endpoint: ${TELEMETRY__JAEGER_ENDPOINT:}
   logging:
-    format: ${LOGGING__FORMAT:console}
-    time-format: ${LOGGING__TIME_FORMAT:rfc3339}
     mask-sensitive: ${ERG_LOGGING_MASK_SENSITIVE:true}
   graphql:
     require-operation-name: ${ERG_GRAPHQL_REQUIRE_OPERATION_NAME:true}
@@ -416,28 +353,7 @@ erg:
       fail-closed-on-redis-error: ${ERG_GRAPHQL_RATE_LIMIT_FAIL_CLOSED_ON_REDIS_ERROR:true}
       requests-per-minute: ${ERG_GRAPHQL_RATE_LIMIT_REQUESTS_PER_MINUTE:120}
       burst: ${ERG_GRAPHQL_RATE_LIMIT_BURST:30}
-  scraper:
-    min-delay: ${SCRAPER__MIN_DELAY:3s}
-    max-delay: ${SCRAPER__MAX_DELAY:10s}
-    timeout: ${SCRAPER__TIMEOUT:30s}
-    max-response-size: ${SCRAPER__MAX_RESPONSE_SIZE:10485760}
-    respect-robots-txt: ${SCRAPER__RESPECT_ROBOTS_TXT:true}
-    max-retries: ${SCRAPER__MAX_RETRIES:3}
-  trending:
-    refresh-cron: ${TRENDING__REFRESH_CRON:*/30 * * * *}
-    cache-ttl: ${TRENDING__CACHE_TTL:25m}
-    feed-limit: ${TRENDING__FEED_LIMIT:100}
-    topics-limit: ${TRENDING__TOPICS_LIMIT:20}
-    news-limit: ${TRENDING__NEWS_LIMIT:20}
-    min-hot-score: ${TRENDING__MIN_HOT_SCORE:75}
-  compose:
-    enabled: ${COMPOSE__ENABLED:false}
-    deploy-manifest-path: ${COMPOSE__DEPLOY_MANIFEST_PATH:deploy.yaml}
   lifecycle:
-    auth-bootstrap-admin-on-startup: ${LIFECYCLE__AUTH_BOOTSTRAP_ADMIN_ON_STARTUP:false}
-    profile-backfill-on-startup: ${LIFECYCLE__PROFILE_BACKFILL_ON_STARTUP:false}
-    operation-seed-on-startup: ${LIFECYCLE__OPERATION_SEED_ON_STARTUP:false}
-    trending-refresh-on-startup: ${LIFECYCLE__TRENDING_REFRESH_ON_STARTUP:false}
     lms-seed-on-startup: ${LIFECYCLE__LMS_SEED_ON_STARTUP:false}
     question-bank-seed-on-startup: ${LIFECYCLE__QUESTION_BANK_SEED_ON_STARTUP:false}
     school-operations-seed-on-startup: ${LIFECYCLE__SCHOOL_OPERATIONS_SEED_ON_STARTUP:false}
@@ -532,10 +448,6 @@ erg:
     # contract/security tests can authenticate via X-User-ID/X-Permissions headers.
     trusted-header-auth-enabled: true
   lifecycle:
-    auth-bootstrap-admin-on-startup: false
-    profile-backfill-on-startup: false
-    operation-seed-on-startup: false
-    trending-refresh-on-startup: false
     lms-seed-on-startup: false
     question-bank-seed-on-startup: false
   notifications:

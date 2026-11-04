@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Configuration
@@ -20,6 +21,13 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 public class FlywayConfig {
 
     private static final String CLASSPATH_MIGRATION_LOCATION = "classpath:db/migration/postgres";
+    /**
+     * Demo data for developer databases. It sits outside {@code db/migration} so the default recursive
+     * {@code classpath:db/migration} scan never sees it, and it is added only for the {@code dev}
+     * profile (never together with {@code prod}). Use repeatable {@code R__} scripts only there, so
+     * dev-only files can never take a version number the shared migrations need later.
+     */
+    static final String DEV_SEED_LOCATION = "classpath:db/seed/dev";
     private static final Path SOURCE_MIGRATION_LOCATION = Path.of("src/main/resources/db/migration/postgres");
 
     @Bean(initMethod = "migrate")
@@ -30,7 +38,7 @@ public class FlywayConfig {
     ) {
         return Flyway.configure()
                 .dataSource(migrationDataSource(properties, environment))
-                .locations(resolveMigrationLocation(environment))
+                .locations(resolveMigrationLocations(environment))
                 .baselineOnMigrate(baselineOnMigrate(environment))
                 .baselineVersion("0")
                 .table("flyway_schema_history")
@@ -85,7 +93,13 @@ public class FlywayConfig {
         return Flyway.configure().dataSource(dataSource).locations("classpath:db/migration/postgres").load();
     }
 
-    private String resolveMigrationLocation(Environment environment) {
+    static String[] resolveMigrationLocations(Environment environment) {
+        String migrations = resolveMigrationLocation(environment);
+        boolean devSeed = environment.acceptsProfiles(Profiles.of("dev")) && !isProduction(environment);
+        return devSeed ? new String[] {migrations, DEV_SEED_LOCATION} : new String[] {migrations};
+    }
+
+    private static String resolveMigrationLocation(Environment environment) {
         boolean productionProfile = isProduction(environment);
         if (!productionProfile && Files.isDirectory(SOURCE_MIGRATION_LOCATION)) {
             return "filesystem:" + SOURCE_MIGRATION_LOCATION

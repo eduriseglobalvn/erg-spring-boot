@@ -3,9 +3,11 @@ package com.erg.ergspringboot.service.school;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.env.Environment;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("!prod")
 public class SchoolOperationsDemoSeedInitializer implements ApplicationRunner {
     private static final String SEED_PROPERTY = "erg.lifecycle.school-operations-seed-on-startup";
 

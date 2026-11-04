@@ -51,6 +51,26 @@ class FlywayConfigTest {
     }
 
     @Test
+    void onlyTheDevProfileGetsTheDemoSeedLocation() {
+        MockEnvironment production = new MockEnvironment()
+                .withProperty("spring.flyway.locations", "classpath:db/migration");
+        production.setActiveProfiles("prod");
+        assertThat(FlywayConfig.resolveMigrationLocations(production))
+                .containsExactly("classpath:db/migration");
+
+        production.setActiveProfiles("prod", "dev");
+        assertThat(FlywayConfig.resolveMigrationLocations(production))
+                .doesNotContain(FlywayConfig.DEV_SEED_LOCATION);
+
+        MockEnvironment dev = new MockEnvironment();
+        dev.setActiveProfiles("dev");
+        assertThat(FlywayConfig.resolveMigrationLocations(dev)).contains(FlywayConfig.DEV_SEED_LOCATION);
+
+        // The default location is scanned recursively, so the seed folder must not live under it.
+        assertThat(FlywayConfig.DEV_SEED_LOCATION).doesNotStartWith("classpath:db/migration");
+    }
+
+    @Test
     void productionNeverBaselinesUnlessExplicitlyAllowed() {
         MockEnvironment production = new MockEnvironment()
                 .withProperty("spring.flyway.baseline-on-migrate", "true");
