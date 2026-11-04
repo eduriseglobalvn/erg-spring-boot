@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.quiz.runtime;
+package com.erg.ergspringboot.lcms.persistence.quiz.runtime;
 
 import java.io.Serializable;
 import java.util.Objects;

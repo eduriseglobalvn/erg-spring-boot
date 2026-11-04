@@ -1,8 +1,8 @@
-package com.erg.ergspringboot.repository.quiz.runtime;
+package com.erg.ergspringboot.lcms.persistence.quiz.runtime;
 
-import com.erg.ergspringboot.model.quiz.runtime.AttemptAnswerId;
-import com.erg.ergspringboot.model.quiz.runtime.AttemptAnswerRow;
-import com.erg.ergspringboot.repository.quiz.runtime.projection.QuestionAnalyticsProjection;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerId;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRow;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.projection.QuestionAnalyticsProjection;
 import java.util.List;
 import java.util.Collection;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -47,9 +47,11 @@ public interface AttemptAnswerRowRepository extends JpaRepository<AttemptAnswerR
     List<QuestionAnalyticsProjection> findQuestionAnalytics(@Param("tenantId") String tenantId,
             @Param("quizVersionId") String quizVersionId, java.util.Collection<String> completedStates);
 
-    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    /** Mirrors {@code LmsStatePolicy.completedAttemptStates()} (lms depends on lcms, so it cannot be called here); AttemptStateParityTest keeps them equal. */
+    java.util.List<String> COMPLETED_ATTEMPT_STATES = java.util.List.of("submitted", "needs_review", "review_required", "graded", "completed");
+
     default List<QuestionAnalyticsProjection> findQuestionAnalytics(@Param("tenantId") String tenantId,
             @Param("quizVersionId") String quizVersionId) {
-        return findQuestionAnalytics(tenantId, quizVersionId, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
+        return findQuestionAnalytics(tenantId, quizVersionId, COMPLETED_ATTEMPT_STATES);
     }
 }

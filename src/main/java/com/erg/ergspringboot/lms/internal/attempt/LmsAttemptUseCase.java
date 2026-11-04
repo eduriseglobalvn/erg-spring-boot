@@ -13,7 +13,7 @@ import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.*;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.*;
 import com.erg.ergspringboot.lms.persistence.AttemptAnswer;
-import com.erg.ergspringboot.model.quiz.version.QuizPackage;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.*;

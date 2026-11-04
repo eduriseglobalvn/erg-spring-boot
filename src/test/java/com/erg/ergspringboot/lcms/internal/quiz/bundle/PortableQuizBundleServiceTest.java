@@ -7,10 +7,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.quiz.version.QuizPackage;
-import com.erg.ergspringboot.model.quiz.version.QuizVersion;
-import com.erg.ergspringboot.repository.quiz.version.QuizPackageRepository;
-import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackageRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

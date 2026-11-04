@@ -62,7 +62,7 @@ class PostgresOnlineIndexContractTest {
         assertThat(sql).doesNotContain("begin;", "commit;");
 
         String repository = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/repository/quiz/runtime/AttemptAnswerRowRepository.java"))
+                "src/main/java/com/erg/ergspringboot/lcms/persistence/quiz/runtime/AttemptAnswerRowRepository.java"))
                 .toLowerCase();
         assertThat(repository).contains("and attempt.tenant_id = :tenantid");
     }

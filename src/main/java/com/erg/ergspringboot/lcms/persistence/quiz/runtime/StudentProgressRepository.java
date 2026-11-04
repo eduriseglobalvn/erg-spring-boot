@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.quiz.runtime;
+package com.erg.ergspringboot.lcms.persistence.quiz.runtime;
 
-import com.erg.ergspringboot.model.quiz.runtime.StudentProgress;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgress;
 import java.util.List;
 import java.util.Optional;
 import java.time.OffsetDateTime;

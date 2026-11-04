@@ -25,7 +25,7 @@ import com.erg.ergspringboot.learningcontent.persistence.ContentItemRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
-import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

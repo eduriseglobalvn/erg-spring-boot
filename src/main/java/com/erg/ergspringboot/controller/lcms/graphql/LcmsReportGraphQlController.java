@@ -4,7 +4,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.Assignment
 import com.erg.ergspringboot.common.response.quiz.QuizReportResponses.QuestionAnalyticsResponse;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.lcms.LcmsQueryOperations;
+import com.erg.ergspringboot.reporting.quiz.QuizReportService;
 import com.erg.ergspringboot.lcms.authorization.LcmsReportRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -18,10 +18,10 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class LcmsReportGraphQlController {
 
-    private final LcmsQueryOperations queries;
+    private final QuizReportService queries;
     private final GraphQlAccessSupport accessSupport;
 
-    public LcmsReportGraphQlController(LcmsQueryOperations queries, GraphQlAccessSupport accessSupport) {
+    public LcmsReportGraphQlController(QuizReportService queries, GraphQlAccessSupport accessSupport) {
         this.queries = queries;
         this.accessSupport = accessSupport;
     }

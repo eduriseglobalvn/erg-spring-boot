@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.quiz.runtime;
+package com.erg.ergspringboot.lcms.persistence.quiz.runtime;
 
-import com.erg.ergspringboot.model.quiz.runtime.AttemptEvent;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptEvent;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 

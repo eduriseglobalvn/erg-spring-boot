@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.lms.internal.quiz.runtime;
 
-import com.erg.ergspringboot.model.quiz.runtime.AttemptEvent;
-import com.erg.ergspringboot.repository.quiz.runtime.AttemptEventRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptEvent;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptEventRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

@@ -5,7 +5,7 @@ import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.Assignment;
 import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
-import com.erg.ergspringboot.model.quiz.version.QuizPackage;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;

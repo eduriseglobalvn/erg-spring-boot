@@ -1,13 +1,13 @@
 package com.erg.ergspringboot.lms.internal.quiz.runtime;
 
-import com.erg.ergspringboot.model.quiz.runtime.AttemptAnswerRow;
-import com.erg.ergspringboot.model.quiz.runtime.StudentProgress;
-import com.erg.ergspringboot.model.quiz.version.QuizVersion;
-import com.erg.ergspringboot.model.quiz.version.QuizVersionQuestion;
-import com.erg.ergspringboot.repository.quiz.runtime.AttemptAnswerRowRepository;
-import com.erg.ergspringboot.repository.quiz.runtime.StudentProgressRepository;
-import com.erg.ergspringboot.repository.quiz.version.QuizVersionQuestionRepository;
-import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRow;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgress;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestion;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRowRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgressRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.GradingEngine.GradeResult;
 import java.math.BigDecimal;
 import java.math.RoundingMode;

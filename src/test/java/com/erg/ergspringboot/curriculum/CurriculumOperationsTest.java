@@ -23,7 +23,7 @@ import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
-import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import com.erg.ergspringboot.curriculum.CurriculumException;
 import java.util.List;
 import java.util.Optional;

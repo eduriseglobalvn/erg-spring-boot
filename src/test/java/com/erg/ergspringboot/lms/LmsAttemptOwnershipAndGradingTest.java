@@ -25,7 +25,7 @@ import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.model.quiz.version.QuizPackage;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService.GradedAttempt;
 import java.math.BigDecimal;

@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.repository.quiz.runtime.projection;
+package com.erg.ergspringboot.lcms.persistence.quiz.runtime.projection;
 
 import java.math.BigDecimal;
 

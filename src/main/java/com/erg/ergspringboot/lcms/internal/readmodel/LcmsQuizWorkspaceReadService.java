@@ -10,7 +10,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWor
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.model.quiz.version.QuizVersion;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
 import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
@@ -18,7 +18,7 @@ import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.projection.QuizSummaryProjection;
-import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;

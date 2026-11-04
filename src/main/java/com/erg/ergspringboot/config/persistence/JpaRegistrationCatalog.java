@@ -25,7 +25,7 @@ public final class JpaRegistrationCatalog {
             owned("crm", 6, 6),
             enabled("curriculum", 6, 6),
             owned("enterpriseconnectors", 3, 3),
-            owned("lcms", 11, 11),
+            owned("lcms", 18, 18),
             owned("learningcontent", 4, 5),
             owned("learningoutcomes", 7, 7),
             owned("learningstandards", 4, 4),
@@ -33,7 +33,6 @@ public final class JpaRegistrationCatalog {
             owned("notifications", 7, 7),
             enabled("organization", 3, 2),
             owned("outbox", "auth", 1, 1),
-            enabled("quiz", 7, 7),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
             owned("users", 5, 4)

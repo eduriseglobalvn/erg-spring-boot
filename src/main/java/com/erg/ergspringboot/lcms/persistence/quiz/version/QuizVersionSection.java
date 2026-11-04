@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.model.quiz.version;
+package com.erg.ergspringboot.lcms.persistence.quiz.version;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;

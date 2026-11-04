@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.repository.quiz.version;
+package com.erg.ergspringboot.lcms.persistence.quiz.version;
 
-import com.erg.ergspringboot.model.quiz.version.QuizVersionQuestion;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestion;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
