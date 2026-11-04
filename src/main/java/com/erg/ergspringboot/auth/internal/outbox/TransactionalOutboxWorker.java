@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.outbox;
+package com.erg.ergspringboot.auth.internal.outbox;
 
 import com.erg.ergspringboot.model.outbox.OutboxEvent;
 import com.erg.ergspringboot.platform.security.TenantContext;

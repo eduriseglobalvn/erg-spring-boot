@@ -6,7 +6,7 @@ import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionCo
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.sessions.SessionService;
+import com.erg.ergspringboot.auth.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

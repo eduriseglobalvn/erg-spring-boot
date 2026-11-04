@@ -28,7 +28,7 @@ class EventPublicationRegistryContractTest {
     @Test
     void calendarPublicationIsNotDuplicatedThroughTheLegacyOutbox() throws Exception {
         String worker = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/outbox/TransactionalOutboxWorker.java"));
+                "src/main/java/com/erg/ergspringboot/auth/internal/outbox/TransactionalOutboxWorker.java"));
 
         assertThat(worker).doesNotContain("SCHEDULE_PUBLISHED", "CalendarBatchPublished");
     }

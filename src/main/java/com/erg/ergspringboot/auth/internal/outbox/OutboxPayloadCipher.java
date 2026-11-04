@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.outbox;
+package com.erg.ergspringboot.auth.internal.outbox;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
