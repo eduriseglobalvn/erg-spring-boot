@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.support;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

@@ -11,7 +11,7 @@ import com.erg.ergspringboot.model.calendar.CalendarEventTeacher;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
-import com.erg.ergspringboot.service.calendar.CalendarConflictService;
+import com.erg.ergspringboot.calendar.internal.support.CalendarConflictService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;

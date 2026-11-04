@@ -14,7 +14,7 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.repository.lms.StudentRepository;
-import com.erg.ergspringboot.service.calendar.CalendarExpansionService;
+import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;

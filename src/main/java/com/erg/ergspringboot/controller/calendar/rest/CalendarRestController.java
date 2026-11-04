@@ -22,7 +22,7 @@ import com.erg.ergspringboot.exception.NotImplementedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
-import com.erg.ergspringboot.service.calendar.CalendarScopeService;
+import com.erg.ergspringboot.calendar.CalendarScopeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.IOException;

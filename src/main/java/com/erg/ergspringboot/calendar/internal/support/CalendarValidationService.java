@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.support;
 
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkCreateRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;

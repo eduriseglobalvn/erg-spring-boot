@@ -19,7 +19,7 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.repository.calendar.CalendarBatchRepository;
 import com.erg.ergspringboot.repository.calendar.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.CalendarReadPort;
-import com.erg.ergspringboot.service.calendar.CalendarScopeService;
+import com.erg.ergspringboot.calendar.CalendarScopeService;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

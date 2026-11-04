@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.calendar;
+package com.erg.ergspringboot.calendar.internal.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
