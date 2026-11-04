@@ -19,7 +19,6 @@ import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepo
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
-import com.erg.ergspringboot.service.users.UserService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
@@ -71,5 +70,5 @@ public class UserRoleAssignmentUseCase {
     private List<String> roleNames(Set<Role> r){if(r==null||r.isEmpty())return List.of("user");return r.stream().map(Role::getName).filter(v->v!=null&&!v.isBlank()).toList();}
     private String grant(String v){String g=v.trim().toUpperCase();if(!List.of("GRANT","DENY").contains(g))throw new BadRequestException("invalid permission grant type");return g;}
     private OffsetDateTime parse(String v){return blank(v)?null:OffsetDateTime.parse(v);}private String trim(String v){return blank(v)?null:v.trim();}private String tenant(String v){return blank(v)?DEFAULT_TENANT:v.trim();}private boolean blank(String v){return v==null||v.isBlank();}private String iso(OffsetDateTime v){return v==null?null:v.toString();}
-    private UserService.AuditContext legacy(UserAuditContext c){return c==null?new UserService.AuditContext(null,null,null,null):new UserService.AuditContext(c.actorUserId(),c.requestId(),c.ipAddress(),c.userAgent());}
+    private UserAuditContext legacy(UserAuditContext c){return c==null?new UserAuditContext(null,null,null,null):c;}
 }

@@ -20,7 +20,7 @@ import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +41,7 @@ class AuthorizationServiceSecurityTest {
     @Mock private UserAuthorizationPort userAuthorizationPort;
 
     /** Unauthenticated caller: no principal, no request metadata. */
-    private static final AuditContext NO_ACTOR = new AuditContext(null, null, null, null);
+    private static final UserAuditContext NO_ACTOR = new UserAuditContext(null, null, null, null);
 
     private AuthorizationRoleDefinitionUseCase roles;
     private AuthorizationDirectRoleUseCase directRoles;

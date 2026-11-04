@@ -11,7 +11,7 @@ import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.repository.auth.AccountVerificationCodeRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -64,7 +64,7 @@ public class AccountVerificationService {
 
     @Transactional
     public RecoveryEmailChallengeResponse requestRecoveryEmailChallenge(
-            String userId, String tenantId, String requestedEmail, AuditContext auditContext
+            String userId, String tenantId, String requestedEmail, UserAuditContext auditContext
     ) {
         User user = findUser(userId, tenantId);
         boolean isGoogleUser = isGoogleEmail(user.getEmail());
@@ -123,7 +123,7 @@ public class AccountVerificationService {
 
     @Transactional
     public RecoveryEmailVerificationResponse verifyRecoveryEmail(
-            String userId, String tenantId, String challengeId, String otp, AuditContext auditContext
+            String userId, String tenantId, String challengeId, String otp, UserAuditContext auditContext
     ) {
         User user = findUser(userId, tenantId);
         AccountVerificationCode challenge = codeRepository.findById(challengeId)
@@ -156,9 +156,9 @@ public class AccountVerificationService {
         return new RecoveryEmailVerificationResponse(true, lifecycle(user));
     }
 
-    private void recordActivity(User user, AuditContext auditContext, String action, Map<String, Object> after) {
-        AuditContext context = auditContext == null
-                ? new AuditContext(user.getId(), null, null, null)
+    private void recordActivity(User user, UserAuditContext auditContext, String action, Map<String, Object> after) {
+        UserAuditContext context = auditContext == null
+                ? new UserAuditContext(user.getId(), null, null, null)
                 : auditContext;
         UserActivity activity = new UserActivity();
         activity.setId(IdGenerator.newId());

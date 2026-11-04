@@ -12,7 +12,7 @@ import com.erg.ergspringboot.model.users.UserActivity;
 import com.erg.ergspringboot.repository.auth.SecurityEventRepository;
 import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.users.UserActivityRepository;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ class AuthorizationMutationAuditServiceTest {
                 List.of(new AuthorizationMutationAuditService.UserRef("user-1", "tenant-a")),
                 "role-teacher",
                 "SCOPED_ROLE_REVOKED",
-                new AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit")
+                new UserAuditContext("admin-1", "request-1", "127.0.0.1", "JUnit")
         );
 
         assertThat(target.getAuthzVersion()).isEqualTo(8L);

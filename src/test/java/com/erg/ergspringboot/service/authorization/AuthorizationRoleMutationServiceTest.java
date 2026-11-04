@@ -24,7 +24,7 @@ import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService.UserRef;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -48,7 +48,7 @@ class AuthorizationRoleMutationServiceTest {
     private AuthorizationDirectRoleUseCase directRoles;
     private AuthorizationPermissionOverrideUseCase overrides;
     private ErgPrincipal actor;
-    private AuditContext context;
+    private UserAuditContext context;
 
     @BeforeEach
     void setUp() {
@@ -60,7 +60,7 @@ class AuthorizationRoleMutationServiceTest {
         roles.setMutationAuditService(mutationAuditService);
         actor = new ErgPrincipal("admin-1", "session-1", "tenant-a", List.of("system.super_admin"), List.of("*"),
                 List.of(), List.of("*"), "erg", "admin", Map.of());
-        context = new AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit");
+        context = new UserAuditContext("admin-1", "request-1", "127.0.0.1", "JUnit");
     }
 
     @Test

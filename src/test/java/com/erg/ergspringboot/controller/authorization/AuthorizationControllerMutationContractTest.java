@@ -11,7 +11,7 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRo
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
 import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
-import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuditContext;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -53,14 +53,14 @@ class AuthorizationControllerMutationContractTest {
                 org.mockito.ArgumentMatchers.eq("tenant-a"),
                 any(RevokeScopedRoleRequest.class),
                 org.mockito.ArgumentMatchers.eq(principal),
-                any(AuditContext.class)
+                any(UserAuditContext.class)
         )).thenReturn(response);
 
         var apiResponse = controller.revokeScopedRole(
                 "user-1", "assignment-1", new RevokeScopedRoleRequest("left department"), request);
 
         assertThat(apiResponse.data()).isEqualTo(response);
-        ArgumentCaptor<AuditContext> context = ArgumentCaptor.forClass(AuditContext.class);
+        ArgumentCaptor<UserAuditContext> context = ArgumentCaptor.forClass(UserAuditContext.class);
         verify(scopedService).revoke(
                 org.mockito.ArgumentMatchers.eq("user-1"),
                 org.mockito.ArgumentMatchers.eq("assignment-1"),
@@ -69,6 +69,6 @@ class AuthorizationControllerMutationContractTest {
                 org.mockito.ArgumentMatchers.eq(principal),
                 context.capture()
         );
-        assertThat(context.getValue()).isEqualTo(new AuditContext("admin-1", "request-1", "127.0.0.1", "JUnit"));
+        assertThat(context.getValue()).isEqualTo(new UserAuditContext("admin-1", "request-1", "127.0.0.1", "JUnit"));
     }
 }
