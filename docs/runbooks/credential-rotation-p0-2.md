@@ -25,6 +25,12 @@ dumps and the reset manifest expose:
 
 ## Operator steps
 
+Steps 1 and the P0-10 V88 duplicate check run as one command (counts only, safe to re-run):
+
+```bash
+psql "$TARGET_URL" -v ON_ERROR_STOP=1 -f ops/postgres/predeploy-p0.sql
+```
+
 1. **Revoke every session that existed when the dump was taken** (the dump is dated 2026-07-16 14:37
    UTC+7). Run on each hosted database:
 
