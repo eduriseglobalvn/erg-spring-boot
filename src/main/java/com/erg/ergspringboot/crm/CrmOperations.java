@@ -15,15 +15,15 @@ import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.UpdateLeadStatusReq
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.UpdateOpportunityRequest;
 import com.erg.ergspringboot.common.dto.crm.CrmWorkspaceDtos.WorkspaceResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
-import com.erg.ergspringboot.service.crm.CrmSchoolService;
-import com.erg.ergspringboot.service.crm.CrmWorkspaceService;
+import com.erg.ergspringboot.crm.internal.CrmSchoolService;
+import com.erg.ergspringboot.crm.internal.CrmWorkspaceService;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
  * Public CRM application boundary. The facade keeps controllers independent of
- * repositories/entities while the existing services are migrated inward.
+ * repositories/entities, which stay in {@code crm.internal}.
  */
 @Service
 public class CrmOperations {
