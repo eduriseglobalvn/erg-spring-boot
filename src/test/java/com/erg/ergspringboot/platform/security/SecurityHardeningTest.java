@@ -378,7 +378,7 @@ class SecurityHardeningTest {
     @Test
     void recoveryEmailLifecycleWritesAuditableEventsWithoutRawOtp() throws Exception {
         String source = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/auth/AccountVerificationService.java"));
+                "src/main/java/com/erg/ergspringboot/auth/AccountVerificationService.java"));
 
         assertThat(source).contains("RECOVERY_EMAIL_CHALLENGE_SENT", "RECOVERY_EMAIL_VERIFIED");
         assertThat(source).doesNotContain("\"otp\"");

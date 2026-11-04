@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

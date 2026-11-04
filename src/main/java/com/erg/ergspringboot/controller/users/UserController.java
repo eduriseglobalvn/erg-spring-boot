@@ -71,7 +71,7 @@ public class UserController {
     /** Compatibility constructor retained for existing focused controller tests. */
     @Deprecated
     UserController(UserOperations users,
-            com.erg.ergspringboot.service.auth.AccountVerificationService verification) {
+            com.erg.ergspringboot.auth.AccountVerificationService verification) {
         this(users, new AuthOperations(null, null, null, null, verification));
     }
 

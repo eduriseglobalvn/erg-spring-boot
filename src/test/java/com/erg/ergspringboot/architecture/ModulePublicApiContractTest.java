@@ -57,7 +57,7 @@ class ModulePublicApiContractTest {
                 AuthRefreshUseCase.class,
                 AuthSessionLifecycleUseCase.class,
                 AuthSecurityQueryUseCase.class,
-                com.erg.ergspringboot.service.auth.AccountVerificationService.class))
+                com.erg.ergspringboot.auth.AccountVerificationService.class))
                 .isNotNull();
         assertThat(CurriculumOperations.class.getDeclaredConstructor(
                 CurriculumTreeQueryUseCase.class,

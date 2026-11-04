@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;

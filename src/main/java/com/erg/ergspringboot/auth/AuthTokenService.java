@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

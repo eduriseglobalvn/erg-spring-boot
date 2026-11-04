@@ -1,5 +1,6 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth;
 
+import com.erg.ergspringboot.service.auth.AccountMailSender;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;

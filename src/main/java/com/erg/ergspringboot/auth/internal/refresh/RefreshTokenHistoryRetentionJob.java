@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.auth;
+package com.erg.ergspringboot.auth.internal.refresh;
 
 import com.erg.ergspringboot.repository.auth.RefreshTokenHistoryRepository;
 import java.time.OffsetDateTime;
