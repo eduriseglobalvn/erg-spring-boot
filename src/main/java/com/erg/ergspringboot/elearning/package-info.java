@@ -1,4 +1,4 @@
 @org.springframework.modulith.ApplicationModule(
         displayName = "ELEARNING",
-        allowedDependencies = {"lms", "users", "users :: persistence"})
+        allowedDependencies = {"lms", "lms :: persistence", "users", "users :: persistence"})
 package com.erg.ergspringboot.elearning;

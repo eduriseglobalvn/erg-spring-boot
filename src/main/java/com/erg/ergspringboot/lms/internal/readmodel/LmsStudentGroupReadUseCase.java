@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.lms.internal.readmodel;
 
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.*;
-import com.erg.ergspringboot.model.lms.StudentGroup;
-import com.erg.ergspringboot.repository.lms.StudentGroupMemberRepository;
-import com.erg.ergspringboot.repository.lms.StudentGroupRepository;
+import com.erg.ergspringboot.lms.persistence.StudentGroup;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
+import com.erg.ergspringboot.lms.persistence.StudentGroupRepository;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.cache.annotation.Cacheable;

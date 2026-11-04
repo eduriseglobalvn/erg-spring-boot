@@ -1,10 +1,10 @@
 package com.erg.ergspringboot.lms;
 
-import com.erg.ergspringboot.repository.lms.projection.AssignmentCardProjection;
-import com.erg.ergspringboot.repository.lms.projection.AssignmentDetailProjection;
-import com.erg.ergspringboot.repository.lms.projection.MissingLateStudentProjection;
-import com.erg.ergspringboot.repository.lms.projection.RecipientProgressProjection;
-import com.erg.ergspringboot.repository.lms.projection.TeacherHomeworkSummaryProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AssignmentCardProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AssignmentDetailProjection;
+import com.erg.ergspringboot.lms.persistence.projection.MissingLateStudentProjection;
+import com.erg.ergspringboot.lms.persistence.projection.RecipientProgressProjection;
+import com.erg.ergspringboot.lms.persistence.projection.TeacherHomeworkSummaryProjection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;

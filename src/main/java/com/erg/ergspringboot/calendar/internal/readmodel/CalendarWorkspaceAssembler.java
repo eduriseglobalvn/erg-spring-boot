@@ -5,9 +5,9 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarLaneSummaryResponse;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
-import com.erg.ergspringboot.model.lms.Classroom;
-import com.erg.ergspringboot.model.lms.Level;
-import com.erg.ergspringboot.model.lms.Subject;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.Level;
+import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import java.util.LinkedHashMap;

@@ -8,13 +8,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
-import com.erg.ergspringboot.repository.lms.SubjectRepository;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfileRepository;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

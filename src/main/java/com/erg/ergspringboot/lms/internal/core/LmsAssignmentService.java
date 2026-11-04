@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.lms.internal.core;
 
-import com.erg.ergspringboot.model.lms.Assignment;
-import com.erg.ergspringboot.repository.lms.AssignmentRepository;
+import com.erg.ergspringboot.lms.persistence.Assignment;
+import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;

@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.lms.internal.core;
 
-import com.erg.ergspringboot.model.lms.Classroom;
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;

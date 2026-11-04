@@ -8,8 +8,8 @@ import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponse
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionReactionResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.sql.ResultSet;
 import java.sql.SQLException;

@@ -2,7 +2,7 @@ package com.erg.ergspringboot.lms.internal.classroom;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.lms.Classroom;
+import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;

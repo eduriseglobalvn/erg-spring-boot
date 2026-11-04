@@ -7,8 +7,8 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.CreateDiscussionCommand;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.MarkAnnouncementReadCommand;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.SetReactionCommand;

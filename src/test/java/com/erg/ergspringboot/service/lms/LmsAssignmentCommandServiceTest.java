@@ -18,17 +18,17 @@ import static org.mockito.Mockito.when;
 import com.erg.ergspringboot.common.request.quiz.AssignmentRequests.CreateAssignmentRequest;
 import com.erg.ergspringboot.common.response.quiz.AssignmentResponses.CreateAssignmentResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.lms.Assignment;
-import com.erg.ergspringboot.model.lms.AssignmentRecipient;
-import com.erg.ergspringboot.model.lms.AssignmentResource;
-import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.model.lms.StudentGroupMember;
+import com.erg.ergspringboot.lms.persistence.Assignment;
+import com.erg.ergspringboot.lms.persistence.AssignmentRecipient;
+import com.erg.ergspringboot.lms.persistence.AssignmentResource;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMember;
 import com.erg.ergspringboot.model.quiz.version.QuizVersion;
-import com.erg.ergspringboot.repository.lms.AssignmentRecipientRepository;
-import com.erg.ergspringboot.repository.lms.AssignmentRepository;
-import com.erg.ergspringboot.repository.lms.AssignmentResourceRepository;
-import com.erg.ergspringboot.repository.lms.StudentGroupMemberRepository;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
+import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
+import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
 import java.util.List;
 import java.util.Optional;
@@ -80,7 +80,7 @@ class LmsAssignmentCommandServiceTest {
                 new com.erg.ergspringboot.lms.LmsReadCacheInvalidator(cacheManager, (com.erg.ergspringboot.platform.cache.CacheInvalidationService) null),
                 policy, (com.erg.ergspringboot.platform.sync.LmsSyncOperationService) null, event -> { });
         when(classrooms.findByTenantIdAndId(eq("tenant-a"), anyString())).thenAnswer(invocation -> {
-            com.erg.ergspringboot.model.lms.Classroom classroom = new com.erg.ergspringboot.model.lms.Classroom();
+            com.erg.ergspringboot.lms.persistence.Classroom classroom = new com.erg.ergspringboot.lms.persistence.Classroom();
             classroom.setId(invocation.getArgument(1));
             classroom.setSchoolId("school-1");
             return Optional.of(classroom);

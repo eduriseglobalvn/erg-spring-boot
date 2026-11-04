@@ -6,6 +6,7 @@ import com.erg.ergspringboot.lms.internal.core.LmsClassroomService;
 import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
+import com.erg.ergspringboot.lms.persistence.*;
 import com.erg.ergspringboot.model.lms.*;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
@@ -77,7 +78,7 @@ public class LmsStudentReadModelUseCase {
         String tenant = tenant(access.tenantId());
         var source = attempts.findQuizAttemptSummaries(tenant, quizId);
         Map<String, Assignment> byId = assignments.findByTenantIdAndIdIn(tenant,
-                        source.stream().map(com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection::assignmentId)
+                        source.stream().map(com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection::assignmentId)
                                 .filter(Objects::nonNull).distinct().toList())
                 .stream().collect(java.util.stream.Collectors.toMap(Assignment::getId, item -> item, (a,b) -> a));
         Map<String, Classroom> classes = classrooms(tenant, new ArrayList<>(byId.values()));
@@ -105,7 +106,7 @@ public class LmsStudentReadModelUseCase {
     }
 
     // List view: no jsonb answers/packageId/packageHash (not selected by the projection).
-    private AttemptResponse attemptSummary(com.erg.ergspringboot.repository.lms.projection.AttemptSummaryProjection a) {
+    private AttemptResponse attemptSummary(com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection a) {
         return new AttemptResponse(a.id(), a.assignmentId(), a.quizId(), a.studentId(), null, null,
                 a.status(), Map.of(), value(a.score()), value(a.maxScore()), value(a.percent()),
                 Boolean.TRUE.equals(a.passed()), a.startedAt(), a.submittedAt(), a.updatedAt());

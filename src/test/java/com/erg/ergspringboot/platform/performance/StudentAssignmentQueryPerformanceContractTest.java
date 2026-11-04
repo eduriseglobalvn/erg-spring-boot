@@ -11,7 +11,7 @@ class StudentAssignmentQueryPerformanceContractTest {
     @Test
     void explicitAndLegacyRecipientsUseIndependentIndexableBranches() throws Exception {
         String repository = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/repository/lms/AssignmentRepository.java"));
+                "src/main/java/com/erg/ergspringboot/lms/persistence/AssignmentRepository.java"));
 
         assertThat(repository)
                 .contains("union all")

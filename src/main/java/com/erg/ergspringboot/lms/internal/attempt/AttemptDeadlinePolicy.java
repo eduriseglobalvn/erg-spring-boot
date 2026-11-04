@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.lms.internal.attempt;
 
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.model.lms.Assignment;
-import com.erg.ergspringboot.model.lms.Attempt;
+import com.erg.ergspringboot.lms.persistence.Assignment;
+import com.erg.ergspringboot.lms.persistence.Attempt;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Map;

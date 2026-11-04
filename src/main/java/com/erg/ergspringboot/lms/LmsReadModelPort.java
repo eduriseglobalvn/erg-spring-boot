@@ -2,8 +2,8 @@ package com.erg.ergspringboot.lms;
 
 import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.ClassWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lms.LmsHomeworkWorkspaceResponses.*;
-import com.erg.ergspringboot.repository.lms.projection.AssignmentProgressProjection;
-import com.erg.ergspringboot.repository.lms.projection.ClassWorkspaceProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AssignmentProgressProjection;
+import com.erg.ergspringboot.lms.persistence.projection.ClassWorkspaceProjection;
 import java.util.Collection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

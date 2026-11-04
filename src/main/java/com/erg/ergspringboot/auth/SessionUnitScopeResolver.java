@@ -5,14 +5,14 @@ import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBo
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapUnit;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.model.authorization.UserRoleAssignment;
-import com.erg.ergspringboot.model.lms.Classroom;
+import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.model.organization.EducationUnit;
 import com.erg.ergspringboot.model.organization.UserAccessScope;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository;
-import com.erg.ergspringboot.repository.lms.ClassroomRepository;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.repository.organization.EducationUnitRepository;
 import java.time.OffsetDateTime;
 import java.util.Comparator;

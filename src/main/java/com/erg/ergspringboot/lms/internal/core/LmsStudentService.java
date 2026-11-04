@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.lms.internal.core;
 
-import com.erg.ergspringboot.model.lms.Student;
-import com.erg.ergspringboot.repository.lms.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
