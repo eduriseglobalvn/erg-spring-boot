@@ -1,10 +1,10 @@
-package com.erg.ergspringboot.service.curriculum;
+package com.erg.ergspringboot.curriculum;
 
 import com.erg.ergspringboot.model.curriculum.CurriculumTeachingPlanSetting;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.curriculum.CurriculumTeachingPlanSettingRepository;
-import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTeachingPlanRequest;
-import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTeachingPlanResponse;
+import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTeachingPlanRequest;
+import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTeachingPlanResponse;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;

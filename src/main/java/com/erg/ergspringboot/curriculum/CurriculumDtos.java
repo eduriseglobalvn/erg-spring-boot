@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.curriculum;
+package com.erg.ergspringboot.curriculum;
 
 import java.time.OffsetDateTime;
 import java.time.LocalDate;

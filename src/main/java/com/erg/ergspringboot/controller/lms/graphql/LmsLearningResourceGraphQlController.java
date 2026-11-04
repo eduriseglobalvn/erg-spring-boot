@@ -3,7 +3,7 @@ package com.erg.ergspringboot.controller.lms.graphql;
 import com.erg.ergspringboot.common.response.learningcontent.LearningResourceLibraryResponses.LearningResourceLibraryResponse;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.learningcontent.LearningResourceLibraryReadService;
+import com.erg.ergspringboot.learningcontent.library.LearningResourceLibraryReadService;
 import com.erg.ergspringboot.lms.authorization.LmsResourceRead;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;

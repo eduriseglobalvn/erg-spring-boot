@@ -24,7 +24,7 @@ import com.erg.ergspringboot.repository.lms.AttemptRepository;
 import com.erg.ergspringboot.repository.lms.QuestionRepository;
 import com.erg.ergspringboot.repository.lms.QuizRepository;
 import com.erg.ergspringboot.repository.quiz.version.QuizVersionRepository;
-import com.erg.ergspringboot.service.curriculum.CurriculumException;
+import com.erg.ergspringboot.curriculum.CurriculumException;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;

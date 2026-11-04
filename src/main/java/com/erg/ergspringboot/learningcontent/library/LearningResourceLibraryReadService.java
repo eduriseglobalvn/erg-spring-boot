@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.library;
 
 import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.common.response.learningcontent.LearningResourceLibraryResponses.LearningRecentResourceResponse;

@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.learningcontent;
+package com.erg.ergspringboot.learningcontent.internal;
 
 import com.erg.ergspringboot.model.learningcontent.ContentAsset;
 import com.erg.ergspringboot.model.learningcontent.ContentItem;
@@ -9,16 +9,16 @@ import com.erg.ergspringboot.repository.learningcontent.ContentItemAssetReposito
 import com.erg.ergspringboot.repository.learningcontent.ContentItemRepository;
 import com.erg.ergspringboot.repository.learningcontent.CurriculumTopicLookupRepository;
 import com.erg.ergspringboot.repository.learningcontent.TopicContentItemRepository;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.ContentItemListResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos.GoogleSlidesLectureResponse;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.AttachContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.CreateGoogleSlidesLectureRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.PlaceContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.ReorderTopicContentItemRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentAssetRequest;
-import com.erg.ergspringboot.service.learningcontent.LearningContentRequests.UpdateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.ContentItemListResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos.GoogleSlidesLectureResponse;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.AttachContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.CreateGoogleSlidesLectureRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.PlaceContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.ReorderTopicContentItemRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.UpdateContentAssetRequest;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentRequests.UpdateContentItemRequest;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -27,15 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * Legacy persistence adapter retained during the strangler migration. New
- * callers must use {@code learningcontent.LearningContentOperations}; this
- * service is not a public module contract.
+ * Module-internal persistence service behind {@link LearningContentPortAdapter}. Callers outside the
+ * module use {@code learningcontent.LearningContentOperations}.
  *
  * <p>Thin transactional facade (SQ-20): it owns the transaction and cache-eviction boundary and delegates
  * to plain, non-proxied collaborators ({@link ContentItemCommands}, {@link ContentAssetCommands},
  * {@link TopicPlacementService}, {@link GoogleSlidesLectureFactory}).
  */
-@Deprecated(since = "2026-08-08", forRemoval = false)
 @Service
 @Transactional(value = "postgresTransactionManager")
 public class LearningContentService {

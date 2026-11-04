@@ -42,7 +42,7 @@ import com.erg.ergspringboot.users.internal.roleassignment.UserRoleAssignmentUse
 import com.erg.ergspringboot.users.internal.session.UserSessionUseCase;
 import com.erg.ergspringboot.learningcontent.LearningContentOperations;
 import com.erg.ergspringboot.learningcontent.LearningContentPort;
-import com.erg.ergspringboot.learningcontent.internal.LegacyLearningContentAdapter;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentPortAdapter;
 import com.erg.ergspringboot.crm.CrmOperations;
 import com.erg.ergspringboot.elearning.ElearningOperations;
 import java.nio.file.Files;
@@ -88,7 +88,7 @@ class ModulePublicApiContractTest {
         assertThat(LmsRuntimeUseCase.class).isAssignableTo(LmsRuntimePort.class);
         assertThat(LmsReadModelUseCase.class).isAssignableTo(LmsReadModelPort.class);
         assertThat(ReportJobUseCase.class).isAssignableTo(ReportJobPort.class);
-        assertThat(LegacyLearningContentAdapter.class).isAssignableTo(LearningContentPort.class);
+        assertThat(LearningContentPortAdapter.class).isAssignableTo(LearningContentPort.class);
         assertThat(LearningContentOperations.class.getDeclaredConstructor(LearningContentPort.class))
                 .isNotNull();
         assertThat(CrmOperations.class.getDeclaredConstructor(
@@ -128,12 +128,16 @@ class ModulePublicApiContractTest {
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/curriculum/CurriculumService.java")).doesNotExist();
         assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/reporting/ReportJobService.java")).doesNotExist();
         String learningContentAdapter = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/learningcontent/internal/LegacyLearningContentAdapter.java"));
-        assertThat(learningContentAdapter).contains("implements LearningContentPort", "LearningContentService legacy")
+                "src/main/java/com/erg/ergspringboot/learningcontent/internal/LearningContentPortAdapter.java"));
+        assertThat(learningContentAdapter).contains("implements LearningContentPort", "LearningContentService service")
                 .doesNotContain("public ContentItem ", "public ContentAsset ", "public TopicContentItem ");
+        // P3-4: the persistence service moved inside the module; no legacy horizontal adapter remains.
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/service/learningcontent")).doesNotExist();
+        assertThat(Path.of("src/main/java/com/erg/ergspringboot/learningcontent/internal/LegacyLearningContentAdapter.java"))
+                .doesNotExist();
         assertThat(Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/service/learningcontent/LearningContentService.java")))
-                .contains("@Deprecated", "Legacy persistence adapter");
+                "src/main/java/com/erg/ergspringboot/learningcontent/internal/LearningContentService.java")))
+                .doesNotContain("@Deprecated");
         assertThat(Files.readString(Path.of(
                 "src/main/java/com/erg/ergspringboot/service/elearning/engagement/StudentEngagementService.java")))
                 .contains("@Deprecated", "ElearningOperations");

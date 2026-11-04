@@ -15,7 +15,7 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.repository.curriculum.CurriculumLevelRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumSubjectRepository;
 import com.erg.ergspringboot.repository.curriculum.CurriculumTopicRepository;
-import com.erg.ergspringboot.service.curriculum.CurriculumException;
+import com.erg.ergspringboot.curriculum.CurriculumException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

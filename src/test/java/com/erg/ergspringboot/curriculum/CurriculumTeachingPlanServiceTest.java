@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.service.curriculum;
+package com.erg.ergspringboot.curriculum;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;

@@ -9,7 +9,7 @@ import com.erg.ergspringboot.model.learningcontent.ContentAsset;
 import com.erg.ergspringboot.model.learningcontent.ContentItem;
 import com.erg.ergspringboot.model.learningcontent.ContentItemAsset;
 import com.erg.ergspringboot.model.learningcontent.TopicContentItem;
-import com.erg.ergspringboot.service.learningcontent.LearningContentDtos;
+import com.erg.ergspringboot.learningcontent.internal.LearningContentDtos;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

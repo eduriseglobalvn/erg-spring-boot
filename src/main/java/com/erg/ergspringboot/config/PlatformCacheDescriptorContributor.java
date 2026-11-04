@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.response.learningcontent.LearningResourceLib
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitListResponse;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolDirectoryWorkspace;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
-import com.erg.ergspringboot.service.curriculum.CurriculumDtos.CurriculumTreeResponse;
+import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumTreeResponse;
 import com.erg.ergspringboot.platform.cache.CacheDescriptor;
 import com.erg.ergspringboot.platform.cache.CacheDescriptorContributor;
 import java.time.Duration;
