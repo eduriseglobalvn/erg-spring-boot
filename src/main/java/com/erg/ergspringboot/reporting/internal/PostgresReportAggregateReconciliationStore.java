@@ -46,7 +46,8 @@ public class PostgresReportAggregateReconciliationStore implements ReportAggrega
     public void reconcile(Task task) {
         jdbc.sql("select erg_reconcile_assignment_progress(:tenantId, :aggregateId)")
                 .param("tenantId", task.tenantId()).param("aggregateId", task.aggregateId())
-                .query(Integer.class).optional();
+                // The function RETURNS void: reading its result as a number throws and rolls the task back forever.
+                .query(row -> { });
         jdbc.sql("""
                 delete from report_reconciliation_queue
                 where tenant_id = :tenantId and aggregate_type = 'assignment_progress'
