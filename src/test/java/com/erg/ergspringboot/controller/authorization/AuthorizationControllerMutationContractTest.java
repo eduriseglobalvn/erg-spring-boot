@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRoleAssignmentResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.service.authorization.AuthorizationService;
+import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
 import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
 import com.erg.ergspringboot.service.users.UserService.AuditContext;
 import java.util.List;
@@ -30,10 +30,10 @@ class AuthorizationControllerMutationContractTest {
 
     @Test
     void revokeScopedRolePassesAuthenticatedTenantAndRequestAuditContext() {
-        AuthorizationService authorizationService = mock(AuthorizationService.class);
+        AuthorizationCommandOperations operations = new AuthorizationCommandOperations(null, null, null, null, null);
         ScopedRoleAssignmentService scopedService = mock(ScopedRoleAssignmentService.class);
-        AuthorizationController controller = new AuthorizationController(authorizationService);
-        controller.setScopedRoleAssignmentService(scopedService);
+        operations.setScopedRoleAssignmentService(scopedService);
+        AuthorizationController controller = new AuthorizationController(operations);
         ErgPrincipal principal = new ErgPrincipal(
                 "admin-1", "session-1", "tenant-a", List.of("admin"), List.of("rbac.role.assign"),
                 List.of(), List.of("admin"), "erg", "admin", Map.of());

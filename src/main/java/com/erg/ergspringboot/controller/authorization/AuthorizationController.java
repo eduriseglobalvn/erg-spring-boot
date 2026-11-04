@@ -57,18 +57,6 @@ public class AuthorizationController {
         this.authorizationService = authorizationService;
     }
 
-    /** Compatibility constructor retained for focused controller tests and old embedders. */
-    @Deprecated
-    public AuthorizationController(com.erg.ergspringboot.service.authorization.AuthorizationService legacy) {
-        this.authorizationService = new AuthorizationCommandOperations(legacy);
-    }
-
-    /** Compatibility injection seam; production wiring uses the facade bean. */
-    @Deprecated
-    public void setScopedRoleAssignmentService(com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService scoped) {
-        authorizationService.setScopedRoleAssignmentService(scoped);
-    }
-
     @GetMapping("/roles")
     @RbacRoleRead
     public ApiResponse<List<RoleResponse>> listRoles(HttpServletRequest request) {

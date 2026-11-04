@@ -23,8 +23,6 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRo
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
-import com.erg.ergspringboot.service.authorization.AuthorizationService;
-import com.erg.ergspringboot.service.authorization.AuthorizationMutationAuditService;
 import com.erg.ergspringboot.service.authorization.ScopedRoleAssignmentService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,10 +36,8 @@ public class AuthorizationCommandOperations {
     private final AuthorizationAccessQueryUseCase access;
     private final AuthorizationDirectRoleUseCase directRoles;
     private final AuthorizationPermissionOverrideUseCase overrides;
-    private final AuthorizationService legacy;
     private ScopedRoleAssignmentService scoped;
 
-    @Autowired
     public AuthorizationCommandOperations(
             AuthorizationPermissionCatalogUseCase catalog,
             AuthorizationRoleDefinitionUseCase roles,
@@ -53,18 +49,6 @@ public class AuthorizationCommandOperations {
         this.access = access;
         this.directRoles = directRoles;
         this.overrides = overrides;
-        this.legacy = null;
-    }
-
-    /** Compatibility constructor for controller tests and old embedders. */
-    @Deprecated
-    public AuthorizationCommandOperations(AuthorizationService legacy) {
-        this.catalog = null;
-        this.roles = null;
-        this.access = null;
-        this.directRoles = null;
-        this.overrides = null;
-        this.legacy = legacy;
     }
 
     @Autowired(required = false)
@@ -73,63 +57,56 @@ public class AuthorizationCommandOperations {
     }
 
     public List<RoleResponse> listRoles() {
-        return legacy != null ? legacy.listRoles() : roles.list();
+        return roles.list();
     }
 
     public RoleResponse getRole(String roleId) {
-        return legacy != null ? legacy.getRole(roleId) : roles.get(roleId);
+        return roles.get(roleId);
     }
 
     public RoleResponse createRole(CreateRoleRequest request, ErgPrincipal actor, AuthorizationAuditContext context) {
-        return legacy != null ? legacy.createRole(request, actor, context.toLegacy())
-                : roles.create(request, actor, context.toLegacy());
+        return roles.create(request, actor, context.toLegacy());
     }
 
     public RoleResponse updateRole(String roleId, UpdateRoleRequest request, ErgPrincipal actor,
             AuthorizationAuditContext context) {
-        return legacy != null ? legacy.updateRole(roleId, request, actor, context.toLegacy())
-                : roles.update(roleId, request, actor, context.toLegacy());
+        return roles.update(roleId, request, actor, context.toLegacy());
     }
 
     public void deleteRole(String roleId, ErgPrincipal actor, AuthorizationAuditContext context) {
-        if (legacy != null) legacy.deleteRole(roleId, actor, context.toLegacy());
-        else roles.delete(roleId, actor, context.toLegacy());
+        roles.delete(roleId, actor, context.toLegacy());
     }
 
     public List<PermissionResponse> listPermissions() {
-        return legacy != null ? legacy.listPermissions() : catalog.list();
+        return catalog.list();
     }
 
     public PermissionPageResponse searchPermissions(Integer page, Integer limit, String search, String group,
             String portal, String status, Boolean used) {
-        return legacy != null ? legacy.searchPermissions(page, limit, search, group, portal, status, used)
-                : catalog.search(page, limit, search, group, portal, status, used);
+        return catalog.search(page, limit, search, group, portal, status, used);
     }
 
     public PermissionResponse getPermission(String permissionId) {
-        return legacy != null ? legacy.getPermission(permissionId) : catalog.get(permissionId);
+        return catalog.get(permissionId);
     }
 
     public List<PermissionGroupResponse> listPermissionGroups() {
-        return legacy != null ? legacy.listPermissionGroups() : catalog.groups();
+        return catalog.groups();
     }
 
     public void removeRole(String userId, String roleId, String tenantId, ErgPrincipal actor,
             AuthorizationAuditContext context) {
-        if (legacy != null) legacy.removeRole(userId, roleId, tenantId, actor, context.toLegacy());
-        else directRoles.remove(userId, roleId, tenantId, actor, context.toLegacy());
+        directRoles.remove(userId, roleId, tenantId, actor, context.toLegacy());
     }
 
     public RoleResponse assignRoles(String userId, String tenantId, List<String> roleIds,
             ErgPrincipal actor, AuthorizationAuditContext context) {
-        if (legacy != null) return legacy.assignRoles(userId, tenantId, roleIds, actor, context.toLegacy());
         return directRoles.assign(userId, tenantId, roleIds, actor, context.toLegacy());
     }
 
     public long bulkAssignRole(BulkAssignRoleRequest request, String tenantId, ErgPrincipal actor,
             AuthorizationAuditContext context) {
-        return legacy != null ? legacy.bulkAssignRole(request, tenantId, actor, context.toLegacy())
-                : directRoles.bulk(request, tenantId, actor, context.toLegacy());
+        return directRoles.bulk(request, tenantId, actor, context.toLegacy());
     }
 
     public ScopedRoleAssignmentResponse assignScopedRole(String userId, String tenantId,
@@ -146,35 +123,12 @@ public class AuthorizationCommandOperations {
 
     public PermissionOverrideResponse addPermissionOverride(String userId, AddPermissionOverrideRequest request,
             String actorId, String tenantId, AuthorizationAuditContext context) {
-        return legacy != null ? legacy.addPermissionOverride(userId, request, actorId, tenantId, context.toLegacy())
-                : overrides.add(userId, request, actorId, tenantId, context.toLegacy());
-    }
-
-    public void setPermissionGroupRepository(
-            com.erg.ergspringboot.repository.authorization.PermissionGroupRepository value) {
-        if (catalog != null) catalog.setPermissionGroupRepository(value);
-    }
-
-    public void setPermissionBindingRepository(
-            com.erg.ergspringboot.repository.authorization.PermissionBindingRepository value) {
-        if (catalog != null) catalog.setPermissionBindingRepository(value);
-    }
-
-    public void setUserRoleAssignmentRepository(
-            com.erg.ergspringboot.repository.authorization.UserRoleAssignmentRepository value) {
-        if (roles != null) roles.setUserRoleAssignmentRepository(value);
-    }
-
-    public void setMutationAuditService(AuthorizationMutationAuditService value) {
-        if (roles != null) roles.setMutationAuditService(value);
-        if (directRoles != null) directRoles.setMutationAuditService(value);
-        if (overrides != null) overrides.setMutationAuditService(value);
+        return overrides.add(userId, request, actorId, tenantId, context.toLegacy());
     }
 
     public void deletePermissionOverride(String userId, String overrideId, String tenantId,
             AuthorizationAuditContext context) {
-        if (legacy != null) legacy.deletePermissionOverride(userId, overrideId, tenantId, context.toLegacy());
-        else overrides.delete(userId, overrideId, tenantId, context.toLegacy());
+        overrides.delete(userId, overrideId, tenantId, context.toLegacy());
     }
 
     public EffectivePermissionsResponse effectivePermissions(String userId) {
@@ -182,8 +136,7 @@ public class AuthorizationCommandOperations {
     }
 
     public EffectivePermissionsResponse effectivePermissions(String userId, String tenantId) {
-        return legacy != null ? legacy.effectivePermissions(userId, tenantId)
-                : access.effective(userId, normalizeTenant(tenantId));
+        return access.effective(userId, normalizeTenant(tenantId));
     }
 
     public List<PermissionOverrideResponse> listPermissionOverrides(String userId) {
@@ -191,8 +144,7 @@ public class AuthorizationCommandOperations {
     }
 
     public List<PermissionOverrideResponse> listPermissionOverrides(String userId, String tenantId) {
-        return legacy != null ? legacy.listPermissionOverrides(userId, tenantId)
-                : access.listOverrides(userId, normalizeTenant(tenantId));
+        return access.listOverrides(userId, normalizeTenant(tenantId));
     }
 
     public FeatureConfigResponse featureConfig(String userId) {
@@ -200,8 +152,7 @@ public class AuthorizationCommandOperations {
     }
 
     public FeatureConfigResponse featureConfig(String userId, String tenantId) {
-        return legacy != null ? legacy.featureConfig(userId, tenantId)
-                : access.feature(userId, normalizeTenant(tenantId));
+        return access.feature(userId, normalizeTenant(tenantId));
     }
 
     public PreviewChangesResponse previewChanges(String userId, PreviewChangesRequest request) {
@@ -209,8 +160,7 @@ public class AuthorizationCommandOperations {
     }
 
     public PreviewChangesResponse previewChanges(String userId, PreviewChangesRequest request, String tenantId) {
-        return legacy != null ? legacy.previewChanges(userId, request, tenantId)
-                : access.preview(userId, request, normalizeTenant(tenantId));
+        return access.preview(userId, request, normalizeTenant(tenantId));
     }
 
     private void requireScoped() {

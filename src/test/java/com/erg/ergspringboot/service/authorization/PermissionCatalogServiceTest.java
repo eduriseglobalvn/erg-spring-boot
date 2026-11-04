@@ -6,12 +6,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 
+import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
+import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
+import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import com.erg.ergspringboot.model.authorization.Permission;
 import com.erg.ergspringboot.model.authorization.PermissionBinding;
 import com.erg.ergspringboot.model.authorization.PermissionGroup;
 import com.erg.ergspringboot.model.authorization.Role;
 import com.erg.ergspringboot.model.users.User;
-import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionGroupRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionBindingRepository;
@@ -37,15 +39,17 @@ class PermissionCatalogServiceTest {
     private final PermissionBindingRepository permissionBindingRepository = mock(PermissionBindingRepository.class);
     private final UserRoleAssignmentRepository userRoleAssignmentRepository = mock(UserRoleAssignmentRepository.class);
     private final UserPermissionOverrideRepository overrideRepository = mock(UserPermissionOverrideRepository.class);
-    private final UserRepository userRepository = mock(UserRepository.class);
-    private final AuthorizationService service = new AuthorizationService(
-            roleRepository, permissionRepository, overrideRepository, userRepository
+    private final AuthorizationPermissionCatalogUseCase catalog = new AuthorizationPermissionCatalogUseCase(
+            permissionRepository, roleRepository, overrideRepository
+    );
+    private final AuthorizationRoleDefinitionUseCase roles = new AuthorizationRoleDefinitionUseCase(
+            roleRepository, permissionRepository
     );
 
     {
-        service.setPermissionGroupRepository(permissionGroupRepository);
-        service.setPermissionBindingRepository(permissionBindingRepository);
-        service.setUserRoleAssignmentRepository(userRoleAssignmentRepository);
+        catalog.setPermissionGroupRepository(permissionGroupRepository);
+        catalog.setPermissionBindingRepository(permissionBindingRepository);
+        roles.setUserRoleAssignmentRepository(userRoleAssignmentRepository);
     }
 
     @Test
@@ -60,7 +64,7 @@ class PermissionCatalogServiceTest {
         when(permissionRepository.findByGroupNameInOrderByGroupNameAscNameAsc(List.of("lms")))
                 .thenReturn(List.of(permission));
 
-        assertThat(service.listPermissionGroups())
+        assertThat(catalog.groups())
                 .singleElement()
                 .satisfies(group -> {
                     assertThat(group.id()).isEqualTo("pg_lms");
@@ -95,7 +99,7 @@ class PermissionCatalogServiceTest {
         when(permissionRepository.findTop500ByOrderByNameAsc()).thenReturn(List.of(permission));
 
         Map<String, Object> response = new ObjectMapper().findAndRegisterModules().convertValue(
-                service.listPermissions().getFirst(),
+                catalog.list().getFirst(),
                 new TypeReference<>() { }
         );
 
@@ -113,7 +117,7 @@ class PermissionCatalogServiceTest {
 
     @Test
     void permissionCatalogHasPagedServerSearchContract() {
-        assertThat(Arrays.stream(AuthorizationService.class.getDeclaredMethods())
+        assertThat(Arrays.stream(AuthorizationCommandOperations.class.getDeclaredMethods())
                 .map(java.lang.reflect.Method::getName))
                 .contains("searchPermissions");
     }
@@ -129,7 +133,7 @@ class PermissionCatalogServiceTest {
         when(userRoleAssignmentRepository.findActiveForRoleIds(
                 org.mockito.ArgumentMatchers.eq(List.of("role-teacher")), org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
-        assertThat(service.listRoles()).singleElement().extracting(response -> response.id())
+        assertThat(roles.list()).singleElement().extracting(response -> response.id())
                 .isEqualTo("role-teacher");
 
         verify(roleRepository).findAllWithPermissionsAndUsers();
@@ -151,7 +155,7 @@ class PermissionCatalogServiceTest {
                 org.mockito.ArgumentMatchers.any(Pageable.class)
         )).thenReturn(Page.empty());
 
-        service.searchPermissions(0, 25, " assignment ", " lms ", " teacher ", " ACTIVE ", true);
+        catalog.search(0, 25, " assignment ", " lms ", " teacher ", " ACTIVE ", true);
 
         verify(permissionRepository).searchCatalog(
                 org.mockito.ArgumentMatchers.eq("assignment"),

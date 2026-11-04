@@ -7,6 +7,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase;
+import com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase;
+import com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase;
+import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.BulkAssignRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
 import com.erg.ergspringboot.exception.ForbiddenException;
@@ -16,6 +20,8 @@ import com.erg.ergspringboot.repository.auth.user.UserRepository;
 import com.erg.ergspringboot.repository.authorization.PermissionRepository;
 import com.erg.ergspringboot.repository.authorization.RoleRepository;
 import com.erg.ergspringboot.repository.authorization.UserPermissionOverrideRepository;
+import com.erg.ergspringboot.service.users.UserService.AuditContext;
+import com.erg.ergspringboot.users.UserAuthorizationPort;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,12 +38,22 @@ class AuthorizationServiceSecurityTest {
     @Mock private PermissionRepository permissionRepository;
     @Mock private UserPermissionOverrideRepository overrideRepository;
     @Mock private UserRepository userRepository;
+    @Mock private UserAuthorizationPort userAuthorizationPort;
 
-    private AuthorizationService service;
+    /** Unauthenticated caller: no principal, no request metadata. */
+    private static final AuditContext NO_ACTOR = new AuditContext(null, null, null, null);
+
+    private AuthorizationRoleDefinitionUseCase roles;
+    private AuthorizationDirectRoleUseCase directRoles;
+    private AuthorizationPermissionOverrideUseCase overrides;
+    private AuthorizationAccessQueryUseCase access;
 
     @BeforeEach
     void setUp() {
-        service = new AuthorizationService(roleRepository, permissionRepository, overrideRepository, userRepository);
+        roles = new AuthorizationRoleDefinitionUseCase(roleRepository, permissionRepository);
+        directRoles = new AuthorizationDirectRoleUseCase(userRepository, roleRepository, null);
+        overrides = new AuthorizationPermissionOverrideUseCase(userRepository, permissionRepository, overrideRepository, null);
+        access = new AuthorizationAccessQueryUseCase(userAuthorizationPort);
     }
 
     @Test
@@ -47,10 +63,11 @@ class AuthorizationServiceSecurityTest {
         when(userRepository.findByTenantIdAndIdInAnyStatus("tenant-a", List.of("foreign-user")))
                 .thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.bulkAssignRole(
+        assertThatThrownBy(() -> directRoles.bulk(
                         new BulkAssignRoleRequest(List.of("foreign-user"), "role-teacher"),
                         "tenant-a",
-                        null
+                        null,
+                        NO_ACTOR
                 ))
                 .isInstanceOf(ResourceNotFoundException.class);
 
@@ -62,8 +79,8 @@ class AuthorizationServiceSecurityTest {
         when(userRepository.findByIdAndTenantId("foreign-user", "tenant-a"))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.removeRole(
-                        "foreign-user", "role-teacher", "tenant-a", null
+        assertThatThrownBy(() -> directRoles.remove(
+                        "foreign-user", "role-teacher", "tenant-a", null, NO_ACTOR
                 ))
                 .isInstanceOf(ResourceNotFoundException.class);
 
@@ -72,13 +89,13 @@ class AuthorizationServiceSecurityTest {
 
     @Test
     void effectivePermissionsRejectsForeignUserMetadataLookup() {
-        when(userRepository.findByIdAndTenantId("foreign-user", "tenant-a"))
+        when(userAuthorizationPort.find("foreign-user", "tenant-a"))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.effectivePermissions("foreign-user", "tenant-a"))
+        assertThatThrownBy(() -> access.effective("foreign-user", "tenant-a"))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(overrideRepository, never()).findByUserId("foreign-user");
+        verify(userAuthorizationPort, never()).findOverrides(any(), any());
     }
 
     @Test
@@ -86,8 +103,8 @@ class AuthorizationServiceSecurityTest {
         when(userRepository.findByIdAndTenantId("foreign-user", "tenant-a"))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.deletePermissionOverride(
-                        "foreign-user", "override-1", "tenant-a"
+        assertThatThrownBy(() -> overrides.delete(
+                        "foreign-user", "override-1", "tenant-a", NO_ACTOR
                 ))
                 .isInstanceOf(ResourceNotFoundException.class);
 
@@ -96,9 +113,11 @@ class AuthorizationServiceSecurityTest {
 
     @Test
     void protectedRoleDefinitionCannotBeUpdatedWithoutPlatformWildcard() {
-        assertThatThrownBy(() -> service.updateRole(
+        assertThatThrownBy(() -> roles.update(
                         "role-system.rbac_admin",
-                        new UpdateRoleRequest(null, "escalated definition", null)
+                        new UpdateRoleRequest(null, "escalated definition", null),
+                        null,
+                        NO_ACTOR
                 ))
                 .isInstanceOf(ForbiddenException.class);
 
@@ -107,7 +126,7 @@ class AuthorizationServiceSecurityTest {
 
     @Test
     void protectedRoleDefinitionCannotBeDeletedWithoutPlatformWildcard() {
-        assertThatThrownBy(() -> service.deleteRole("role-system.rbac_admin"))
+        assertThatThrownBy(() -> roles.delete("role-system.rbac_admin", null, NO_ACTOR))
                 .isInstanceOf(ForbiddenException.class);
 
         verify(roleRepository, never()).delete(any());
@@ -118,7 +137,7 @@ class AuthorizationServiceSecurityTest {
         when(roleRepository.findAllWithPermissionsAndUsers())
                 .thenReturn(List.of(role("lms_teacher"), role("system.god_mode")));
 
-        assertThat(service.listRoles()).extracting(response -> response.name())
+        assertThat(roles.list()).extracting(response -> response.name())
                 .containsExactly("lms_teacher");
     }
 
