@@ -235,6 +235,8 @@ erg:
       # require Ed25519 plus a key managed outside source control.
       signing-key: ${SECRET_QUIZ_PACKAGE_SIGNING_KEY:}
       public-key-id: ${QUIZ_PACKAGE_PUBLIC_KEY_ID:unset}
+      # Key rotation: list kid-to-secret under erg.quiz.package.signing-keys.<kid>; this picks the signing kid (default public-key-id).
+      active-key-id: ${QUIZ_PACKAGE_ACTIVE_KEY_ID:}
       signing-algorithm: ${QUIZ_PACKAGE_SIGNING_ALGORITHM:HMAC-SHA256}
       ed25519-private-key: ${SECRET_QUIZ_PACKAGE_ED25519_PRIVATE_KEY:}
     media:

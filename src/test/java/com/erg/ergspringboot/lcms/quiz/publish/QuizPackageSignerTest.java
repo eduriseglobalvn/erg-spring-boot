@@ -6,6 +6,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.util.Base64;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class QuizPackageSignerTest {
@@ -54,5 +55,28 @@ class QuizPackageSignerTest {
 
         assertThat(ed25519.signatureAlgorithm()).isEqualTo("Ed25519");
         assertThat(verifier.verify(signatureBytes)).isTrue();
+    }
+
+    @Test
+    void rotationSignsWithActiveKidAndStillVerifiesPackagesSignedWithTheOldKid() {
+        QuizPackageSigner before = new QuizPackageSigner("old-secret", "k1");
+        String oldSignature = before.sign("payload");
+
+        QuizPackageSigner after = new QuizPackageSigner("old-secret", "k1", "HMAC-SHA256", "", "k2",
+                Map.of("k2", "new-secret"));
+
+        assertThat(after.publicKeyId()).isEqualTo("k2");
+        assertThat(after.sign("payload")).isNotEqualTo(oldSignature);
+        assertThat(after.verify("payload", after.sign("payload"), "k2")).isTrue();
+        assertThat(after.verify("payload", oldSignature, "k1")).isTrue();
+        assertThat(after.verify("tampered", oldSignature, "k1")).isFalse();
+        assertThat(after.verify("payload", oldSignature, "k2")).isFalse();
+    }
+
+    @Test
+    void verifyRejectsUnknownKid() {
+        QuizPackageSigner signer = new QuizPackageSigner("secret", "k1");
+        assertThat(signer.verify("payload", signer.sign("payload"), "k-unknown")).isFalse();
+        assertThat(signer.verify("payload", signer.sign("payload"), null)).isFalse();
     }
 }

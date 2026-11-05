@@ -7,7 +7,12 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,11 +25,16 @@ import org.springframework.stereotype.Component;
  * secret configuration. HMAC-SHA256 remains an explicit compatibility mode
  * for existing web/runtime rows; it is never marked portable-ready because a
  * client must not receive an HMAC secret.
+ *
+ * <p>HMAC keys form a key ring for rotation: {@code erg.quiz.package.signing-keys.<kid>=secret} lists every
+ * key still accepted for verification and {@code erg.quiz.package.active-key-id} picks the one that signs.
+ * The legacy single {@code signing-key} stays valid: it is registered under {@code public-key-id}, which is
+ * also the default active kid, so existing configuration keeps working unchanged.
  */
 @Component
 public class QuizPackageSigner {
 
-    private final String signingKey;
+    private final Map<String, String> hmacKeys;
     private final String publicKeyId;
     private final String algorithm;
     private final PrivateKey ed25519PrivateKey;
@@ -34,17 +44,35 @@ public class QuizPackageSigner {
             @Value("${erg.quiz.package.signing-key:}") String signingKey,
             @Value("${erg.quiz.package.public-key-id:unset}") String publicKeyId,
             @Value("${erg.quiz.package.signing-algorithm:HMAC-SHA256}") String algorithm,
-            @Value("${erg.quiz.package.ed25519-private-key:}") String ed25519PrivateKey
+            @Value("${erg.quiz.package.ed25519-private-key:}") String ed25519PrivateKey,
+            @Value("${erg.quiz.package.active-key-id:}") String activeKeyId,
+            Environment environment
     ) {
-        this.signingKey = signingKey;
-        this.publicKeyId = publicKeyId;
+        this(signingKey, publicKeyId, algorithm, ed25519PrivateKey, activeKeyId,
+                Binder.get(environment).bind("erg.quiz.package.signing-keys", Bindable.mapOf(String.class, String.class))
+                        .orElseGet(Map::of));
+    }
+
+    QuizPackageSigner(String signingKey, String publicKeyId, String algorithm, String ed25519PrivateKey,
+                      String activeKeyId, Map<String, String> ringKeys) {
+        Map<String, String> ring = new LinkedHashMap<>();
+        if (signingKey != null && !signingKey.isEmpty()) {
+            ring.put(publicKeyId, signingKey);
+        }
+        ring.putAll(ringKeys);
+        this.hmacKeys = Map.copyOf(ring);
+        this.publicKeyId = activeKeyId == null || activeKeyId.isBlank() ? publicKeyId : activeKeyId;
         this.algorithm = normalizeAlgorithm(algorithm);
         this.ed25519PrivateKey = loadEd25519Key(this.algorithm, ed25519PrivateKey);
     }
 
     /** Compatibility constructor used by tests and legacy web publishing. */
     public QuizPackageSigner(String signingKey, String publicKeyId) {
-        this(signingKey, publicKeyId, "HMAC-SHA256", "");
+        this(signingKey, publicKeyId, "HMAC-SHA256", "", "", Map.of());
+    }
+
+    public QuizPackageSigner(String signingKey, String publicKeyId, String algorithm, String ed25519PrivateKey) {
+        this(signingKey, publicKeyId, algorithm, ed25519PrivateKey, "", Map.of());
     }
 
     public String publicKeyId() {
@@ -65,7 +93,22 @@ public class QuizPackageSigner {
         }
     }
 
+    /** True when {@code signature} is the signature of the payload under {@code keyId}; unknown kids are rejected. */
+    public boolean verify(String canonicalPayload, String signature, String keyId) {
+        boolean known = "Ed25519".equals(algorithm) ? publicKeyId.equals(keyId) : keyId != null && hmacKeys.containsKey(keyId);
+        if (!known || signature == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                signWith(canonicalPayload, keyId).getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8));
+    }
+
     public String sign(String canonicalPayload) {
+        return signWith(canonicalPayload, publicKeyId);
+    }
+
+    private String signWith(String canonicalPayload, String keyId) {
         if ("Ed25519".equals(algorithm)) {
             if (ed25519PrivateKey == null) {
                 throw new IllegalStateException("Ed25519 package signing key is not configured");
@@ -79,9 +122,13 @@ public class QuizPackageSigner {
                 throw new IllegalStateException("failed to sign package payload with Ed25519", ex);
             }
         }
+        String secret = hmacKeys.get(keyId);
+        if (secret == null) {
+            throw new IllegalStateException("quiz package signing key is not configured for key id: " + keyId);
+        }
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(signingKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] signature = mac.doFinal(canonicalPayload.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(signature);
         } catch (Exception ex) {

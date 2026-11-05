@@ -76,6 +76,7 @@ public class QuizCompileService {
                 Map<String, Object> body = bodyCompiler.compileBody(
                         runtimeSlide, mapping.runtimeKind(), bankQuestionId, questionSettings, questionSetSettings);
                 Map<String, Object> key = QuestionKindStrategy.answerKeyFor(runtimeSlide, mapping.runtimeKind());
+                PlayerBodyShuffler.apply(mapping.runtimeKind(), body, key);
                 if (!key.isEmpty()) {
                     answerKey.put(runtimeQuestionId, key);
                 }
