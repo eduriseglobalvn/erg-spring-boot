@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 558
+  route-count: 559
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -2691,6 +2691,14 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: PATCH /api/v1/lcms/quizzes/{quizId} => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.update
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
     - route: PATCH /api/v1/lcms/quizzes/{quizId}/draft => com.erg.ergspringboot.controller.lcms.LcmsQuizAuthoringController.patchDraft
       classification: persistent-write
       statement-budget: 25

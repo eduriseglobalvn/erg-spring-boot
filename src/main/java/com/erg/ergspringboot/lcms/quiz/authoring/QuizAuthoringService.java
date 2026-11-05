@@ -1,8 +1,10 @@
 package com.erg.ergspringboot.lcms.quiz.authoring;
 
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.CreateQuizRequest;
+import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.UpdateQuizRequest;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.CreateQuizResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.DeleteQuizResponse;
+import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.UpdateQuizResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
@@ -31,6 +33,7 @@ public class QuizAuthoringService {
     private static final String PORTAL_LCMS = "lcms";
     private static final String STATUS_DRAFT = "draft";
     private static final int SCHEMA_VERSION = 1;
+    private static final int MAX_TITLE_LENGTH = 255; // lms_quizzes.title varchar(255)
 
     private final UserRepository userRepository;
     private final QuizRepository quizRepository;
@@ -119,6 +122,36 @@ public class QuizAuthoringService {
             quizRepository.save(quiz);
         }
         return new DeleteQuizResponse(quiz.getId(), true);
+    }
+
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    public UpdateQuizResponse update(String tenantId, String quizId, UpdateQuizRequest request) {
+        String title = request == null || request.title() == null ? null : request.title().trim();
+        String kind = request == null ? null : request.kind();
+        if (title == null && kind == null) {
+            throw new BadRequestException("title or kind is required");
+        }
+        if (title != null && title.isEmpty()) {
+            throw new BadRequestException("title must not be blank");
+        }
+        if (title != null && title.length() > MAX_TITLE_LENGTH) {
+            throw new BadRequestException("title must be at most " + MAX_TITLE_LENGTH + " characters");
+        }
+        if (kind != null && kind.isBlank()) { // normalizedKind defaults blank to "train"; on update it is an error
+            throw new BadRequestException("kind must be 'train' or 'test'");
+        }
+        String normalizedKind = kind == null ? null : normalizedKind(kind);
+        Quiz quiz = quizRepository.findByIdAndTenantId(quizId, tenantId)
+                .filter(found -> found.getDeletedAt() == null)
+                .orElseThrow(() -> new ResourceNotFoundException("quiz not found"));
+        if (title != null) {
+            quiz.setTitle(title);
+        }
+        if (normalizedKind != null) {
+            quiz.setKind(normalizedKind);
+        }
+        Quiz saved = quizRepository.saveAndFlush(quiz);
+        return new UpdateQuizResponse(saved.getId(), saved.getTitle(), saved.getKind(), saved.getUpdatedAt());
     }
 
     private long currentDocVersion(Quiz quiz, String tenantId) {
