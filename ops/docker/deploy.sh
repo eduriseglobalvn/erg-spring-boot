@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploy one commit to the ERG server. Run from a checkout:
-#   git archive <sha> | ssh erg@ssh.erg.edu.vn bash /opt/erg/ops/docker/deploy.sh <sha>
+#   git -c core.autocrlf=false archive <sha> | ssh erg@ssh.erg.edu.vn bash /opt/erg/ops/docker/deploy.sh <sha>
 # (the script on the server is replaced by the commit's copy on every run)
+# autocrlf=false matters on Windows: otherwise the archive carries CRLF and the shell scripts break.
 # Steps: unpack source, build the JVM image, back up Postgres, rehearse the migrations and startup on a
 # restored copy (isolated network, workers off), then switch the backend and nginx and wait for health.
 # Migrations are forward-only: a failed rehearsal stops before production is touched.
