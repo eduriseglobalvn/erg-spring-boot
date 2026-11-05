@@ -257,11 +257,17 @@
     },
     {
       "id": 11,
-      "title": "Modulith publication lag",
+      "title": "Notification outbox (pending / retry / dead)",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "max(spring_modulith_events_publication_lag_seconds)"
+          "expr": "max(notifications_outbox_pending)", "legendFormat": "pending"
+        },
+        {
+          "expr": "max(notifications_outbox_retry)", "legendFormat": "retry"
+        },
+        {
+          "expr": "max(notifications_outbox_dead)", "legendFormat": "dead"
         }
       ],
       "gridPos": {

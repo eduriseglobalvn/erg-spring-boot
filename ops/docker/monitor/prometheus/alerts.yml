@@ -139,3 +139,21 @@ groups:
         annotations:
           summary: "Backend old-gen heap > 85%"
           description: "Heap is at {{ $value | humanizePercentage }}; risk of long GC pauses or OOM."
+
+      - alert: BackupStale
+        expr: time() - erg_backup_last_success_timestamp_seconds > 26 * 3600 or absent(erg_backup_last_success_timestamp_seconds)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful database backup in the last 26 hours"
+          description: "ops/backup/backup.sh (cron 03:00) did not finish; check /opt/erg/ops/backup/backup.log."
+
+      - alert: BackendContainerMemoryHigh
+        expr: sum(jvm_memory_committed_bytes{job="erg-backend"}) > 3.4 * 1024 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend memory near its 4 GB container limit"
+          description: "JVM committed memory is {{ $value | humanize1024 }}B; the kernel kills the backend at the limit."

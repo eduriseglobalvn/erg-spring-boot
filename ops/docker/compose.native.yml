@@ -3,6 +3,8 @@ services:
     image: ${ERG_APP_IMAGE:?set ERG_APP_IMAGE to an immutable registry tag}
     platform: linux/amd64
     restart: unless-stopped
+    # The JVM sizes its heap from this (MaxRAMPercentage=75); without it the heap may grow to ~11 GB and starve Postgres.
+    mem_limit: ${BACKEND_CONTAINER_MEMORY:-4g}
     env_file:
       - ${ERG_SPRING_ENV_FILE:-.env.production}
     environment:

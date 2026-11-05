@@ -20,6 +20,10 @@ rm -rf "$ROOT/src" && mkdir -p "$ROOT/src" && tar xf - -C "$ROOT/src"
 tar cf - -C "$ROOT/src/ops/docker" --exclude='.env.production' --exclude='.env.dev' . | tar xf - -C "$DOCKER_DIR"
 # Prometheus, Grafana and Loki run as non-root users and must read their configs; only secrets are private.
 chmod -R u=rwX,go=rX "$DOCKER_DIR" && chmod 600 "$ENV_FILE" && chmod 750 "$DOCKER_DIR/deploy.sh" && chmod -R o-rwx "$ROOT/src"
+[ -f "$DOCKER_DIR/.env.dev" ] && chmod 600 "$DOCKER_DIR/.env.dev"
+# The nightly cron runs ops/backup/backup.sh; its metrics dir is read by node-exporter (non-root).
+install -d -m 700 "$ROOT/ops/backup" && install -m 750 "$ROOT/src/ops/backup/backup.sh" "$ROOT/ops/backup/backup.sh"
+install -d -m 755 "$ROOT/ops/backup/metrics"
 
 log "build $IMAGE"
 DOCKER_BUILDKIT=1 nice -n 10 docker build -q --target jvm-runtime \
@@ -74,7 +78,7 @@ $C config --quiet
 $C up -d --no-deps backend
 wait_healthy erg-backend-1
 # Single-file bind mounts keep the old inode after the unpack, so these must be recreated to see new config.
-$C up -d --no-deps --force-recreate nginx alertmanager prometheus grafana
+$C up -d --no-deps --force-recreate nginx alertmanager prometheus grafana node-exporter
 wait_healthy erg-nginx-1
 docker logs erg-backend-1 2>&1 | grep -E 'Successfully applied|is up to date' | cut -c1-200
 log "deployed $SHA (previous image: ${PREVIOUS:-none}, backup: $DUMP)"
