@@ -101,6 +101,7 @@ func (b *Bot) Run(ctx context.Context) {
 		}
 		for _, u := range updates {
 			offset = u.UpdateID + 1
+			log.Printf("update %d (message=%t callback=%t)", u.UpdateID, u.Message != nil, u.CallbackQuery != nil)
 			go b.handle(ctx, u)
 		}
 	}
