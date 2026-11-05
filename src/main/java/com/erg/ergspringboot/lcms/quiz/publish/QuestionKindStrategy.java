@@ -69,7 +69,9 @@ public enum QuestionKindStrategy {
             List<String> correct = correctOptionIds(slide);
             if (!correct.isEmpty()) {
                 key.put("correctChoiceIds", correct);
-                key.put("acceptPartial", boolValue(slide.get("acceptPartial")));
+                // The quiz editor stores the toggle under slide.options (a map; "options" can also be a choice list).
+                Object editorAcceptPartial = slide.get("options") instanceof Map<?, ?> options ? options.get("acceptPartial") : null;
+                key.put("acceptPartial", boolValue(firstNonNull(slide.get("acceptPartial"), editorAcceptPartial)));
             }
         }
 

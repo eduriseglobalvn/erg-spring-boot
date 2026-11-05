@@ -162,6 +162,57 @@ class QuizCompileServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void usesPerQuestionPointsFromQuestionSetSettings() {
+        CompiledQuiz compiled = compileSlides(
+                Map.of("slideId", "q1", "type", "true-false", "questionSetSettings", Map.of("points", 4)),
+                Map.of("slideId", "q2", "type", "multiple-choice", "questionSetSettings", Map.of("points", "6.5"))
+        );
+
+        assertThat(compiled.questions()).extracting(CompiledQuestion::points)
+                .containsExactly(new BigDecimal("4.00"), new BigDecimal("6.50"));
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) compiled.runtimeQuiz().get("sections");
+        List<Map<String, Object>> runtimeQuestions = (List<Map<String, Object>>) sections.getFirst().get("questions");
+        assertThat(runtimeQuestions).extracting(q -> q.get("points"))
+                .containsExactly(new BigDecimal("4.00"), new BigDecimal("6.50"));
+    }
+
+    @Test
+    void questionsWithoutValidPointsSplitWhatIsLeftOfTheThousand() {
+        CompiledQuiz compiled = compileSlides(
+                Map.of("slideId", "q1", "type", "true-false", "questionSetSettings", Map.of("points", 400)),
+                Map.of("slideId", "q2", "type", "true-false"),
+                Map.of("slideId", "q3", "type", "true-false", "questionSetSettings", Map.of("points", "abc")),
+                Map.of("slideId", "q4", "type", "true-false", "questionSetSettings", Map.of("points", -5))
+        );
+        assertThat(compiled.questions()).extracting(CompiledQuestion::points).containsExactly(
+                new BigDecimal("400.00"), new BigDecimal("200.00"), new BigDecimal("200.00"), new BigDecimal("200.00"));
+
+        CompiledQuiz overBudget = compileSlides(
+                Map.of("slideId", "q1", "type", "true-false", "questionSetSettings", Map.of("points", 1200)),
+                Map.of("slideId", "q2", "type", "true-false")
+        );
+        assertThat(overBudget.questions()).extracting(CompiledQuestion::points)
+                .containsExactly(new BigDecimal("1200.00"), new BigDecimal("0.00"));
+    }
+
+    @Test
+    void multipleResponseReadsAcceptPartialFromEditorOptions() {
+        CompiledQuiz compiled = compileSlides(
+                Map.of("slideId", "q1", "type", "multiple-response",
+                        "options", Map.of("acceptPartial", true),
+                        "choices", List.of(Map.of("id", "a", "correct", true), Map.of("id", "b", "correct", true),
+                                Map.of("id", "c", "correct", false))),
+                Map.of("slideId", "q2", "type", "multiple-response",
+                        "choices", List.of(Map.of("id", "a", "correct", true), Map.of("id", "b", "correct", false)))
+        );
+        assertThat(compiled.questions().get(0).answerKey()).containsEntry("acceptPartial", true);
+        assertThat(compiled.questions().get(1).answerKey()).containsEntry("acceptPartial", false);
+        assertThat(new GradingEngine().grade("multiple_response", Map.of("choiceIds", List.of("a")),
+                compiled.questions().get(0).answerKey(), BigDecimal.TEN).awardedPoints()).isEqualByComparingTo("5");
+    }
+
+    @Test
     void groupsBecomeSectionsInOrder() {
         CompiledQuiz compiled = service.compile(Map.of(), List.of(
                 Map.of("groupId", "g1", "title", "First", "slides", List.of(
