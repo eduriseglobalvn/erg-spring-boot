@@ -96,7 +96,7 @@
 
 Effort: S < 0,5 ngày · M 0,5–2 ngày · L > 2 ngày (1 dev backend). Mỗi mục kết thúc bằng một test hoặc bằng chứng nghiệm thu. Migration chỉ được thêm mới (append-only).
 
-**Trạng thái (2026-11-05):** ✅ xong và đã deploy lên production (V126, `ops/docker/deploy.sh`) · ⬜ chưa làm. 39/40 việc xong; còn P3-10 chờ Product chốt danh sách module.
+**Trạng thái (2026-11-05):** ✅ xong và đã deploy lên production bằng `ops/docker/deploy.sh`. 40/40 việc xong. Production đang chạy 018817a (DB V128).
 
 ### Giai đoạn 0 — Khẩn cấp (ngày 1–3): đóng lỗ có thể khai thác ngay
 
@@ -156,7 +156,7 @@ Effort: S < 0,5 ngày · M 0,5–2 ngày · L > 2 ngày (1 dev backend). Mỗi m
 | ✅ P3-7 | Đưa seed demo sang một Flyway location riêng chỉ bật ở dev. Chuyển tài khoản demo có `login_count=0` sang `INACTIVE`. Migration phá hủy về sau phải có quarantine và đếm dòng. | D3, N8, D2 (13) | M | DB prod mới không có dữ liệu demo. **2026-11-04:** location `classpath:db/seed/dev` chỉ bật ở profile `dev` (test `FlywayConfigTest`); 3 seeder demo có `@Profile("!prod")`. Dữ liệu demo từ V11/V21/V68 đã áp dụng không xóa (migration append-only, có tài khoản placeholder giữ FK); tài khoản demo đã `INACTIVE` (V112). DB prod mới: đặt `ERG_FLYWAY_DEMO_PURGE=true` cho lần deploy đầu, V125 xóa đúng các id demo (quarantine `_quarantine_v125_*`, đếm dòng, dừng nếu DB không mới hoặc có dòng thật tham chiếu); mặc định là no-op. Giữ `usr_super_admin`, `usr_relationship_placeholder`. Test `DemoSeedPurgeMigrationIntegrationTest`. |
 | ✅ P3-8 | Xóa cấu hình chết (`jwt-*`, `max-failed-login`, `geo-*`, `cookie.*`, `rate-limit.*`). Xóa rule `permitAll` của route prototype. Khai báo `security: []` cho endpoint public trong OpenAPI và đánh dấu deprecated cho 9 path non-v1. | N5 (10), D7, SQ completeness | S–M | Test fail khi có khóa `erg.*` không được bind. **2026-11-04:** `ErgPropertyKeysAreBoundTest` fail khi có khóa `erg.*` không được bind; đã xóa 76 khóa chết. |
 | ✅ P3-9 | Soft-delete user và ẩn danh hóa PII. Đổi FK `user_activities` sang `SET NULL`. Thêm index `user_id` để cascade không phải quét toàn bảng. | N5 (13) | M | Xóa user không làm mất audit trail. **2026-11-05:** `UserLifecycleUseCaseSoftDeleteTest`, V113 FK `SET NULL`. |
-| ⬜ P3-10 | Quyết định cho các module prototype (CMS, catalog, reviews, recruitment, AI, crawler…): làm thật có persistence, hoặc xóa hẳn. | file 12 §3.1, file 14 §5 | L (tùy phạm vi) | Danh sách module được chốt với Product. |
+| ✅ P3-10 | Quyết định cho các module prototype (CMS, catalog, reviews, recruitment, AI, crawler…): làm thật có persistence, hoặc xóa hẳn. | file 12 §3.1, file 14 §5 | L (tùy phạm vi) | Danh sách module được chốt với Product. **2026-11-04:** đã chốt theo quyền chủ repo giao (`p3-10-prototype-decision.md`): module nào có frontend `erg`/`erg-system` gọi thì giữ (vẫn sau `@Profile("prototype")`, production không bật), `MigrationPlatformController` không ai gọi nên đã xoá (68735e8). Biến các module giữ lại thành tính năng thật (migration + RLS + JPA) là việc tính năng, theo dõi ngoài kế hoạch này. Xong. |
 
 ### Ước lượng tổng
 
