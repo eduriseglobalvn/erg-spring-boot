@@ -18,7 +18,8 @@ log "unpack $SHA"
 rm -rf "$ROOT/src" && mkdir -p "$ROOT/src" && tar xf - -C "$ROOT/src"
 # Deploy files come from the commit; secrets (.env.production) stay on the server.
 tar cf - -C "$ROOT/src/ops/docker" --exclude='.env.production' --exclude='.env.dev' . | tar xf - -C "$DOCKER_DIR"
-chmod -R o-rwx "$ROOT/ops" "$ROOT/src"
+# Prometheus, Grafana and Loki run as non-root users and must read their configs; only secrets are private.
+chmod -R u=rwX,go=rX "$DOCKER_DIR" && chmod 600 "$ENV_FILE" && chmod 750 "$DOCKER_DIR/deploy.sh" && chmod -R o-rwx "$ROOT/src"
 
 log "build $IMAGE"
 DOCKER_BUILDKIT=1 nice -n 10 docker build -q --target jvm-runtime \
