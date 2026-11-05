@@ -20,7 +20,7 @@ public final class JpaRegistrationCatalog {
             owned("calendar", 5, 5),
             ownedPartiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
             owned("crm", 6, 6),
-            owned("curriculum", 6, 6),
+            owned("curriculum", 7, 7),
             owned("enterpriseconnectors", 3, 3),
             owned("lcms", 18, 18),
             owned("learningcontent", 4, 5),

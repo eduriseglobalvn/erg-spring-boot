@@ -26,6 +26,9 @@ import com.erg.ergspringboot.lms.authorization.LmsAssignmentProgressRead;
 import com.erg.ergspringboot.lms.authorization.LmsClassRead;
 import com.erg.ergspringboot.lms.authorization.LmsGradeRead;
 import com.erg.ergspringboot.lms.authorization.LmsAttemptGrade;
+import com.erg.ergspringboot.lms.authorization.LmsAttemptImport;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ImportPortableResultRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ImportedAttemptResponse;
 import com.erg.ergspringboot.lms.authorization.LmsQuizPackageRead;
 import com.erg.ergspringboot.lms.authorization.LmsQuizRead;
 import com.erg.ergspringboot.lms.authorization.LmsSubmit;
@@ -189,6 +192,18 @@ public class LmsController {
                 ? body
                 : body.withIdempotencyKey(idempotencyKey);
         return ok("Attempt submitted", lms.submitAttempt(attemptId, effectiveBody, UserAccessContext.from(request)), request);
+    }
+
+    /** Imports a {@code .ergresult} file collected offline; grading stays server-side and the same file is idempotent. */
+    @PostMapping("/attempts/import")
+    @LmsAttemptImport
+    public ApiResponse<ImportedAttemptResponse> importPortableResult(
+            @Valid @RequestBody ImportPortableResultRequest body,
+            @RequestParam(required = false) String assignmentId,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest request
+    ) {
+        return ok("Offline result imported", lms.importPortableResult(body, assignmentId, idempotencyKey, UserAccessContext.from(request)), request);
     }
 
     @PostMapping("/attempts/{attemptId}/answers/{questionId}/grade")

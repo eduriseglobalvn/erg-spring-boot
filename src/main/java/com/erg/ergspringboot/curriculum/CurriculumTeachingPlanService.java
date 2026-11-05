@@ -66,7 +66,7 @@ public class CurriculumTeachingPlanService {
         return toResponse(settings.save(setting));
     }
 
-    private void requireScope(String schoolId, UserAccessContext access, boolean allSchoolAccess) {
+    static void requireScope(String schoolId, UserAccessContext access, boolean allSchoolAccess) {
         if (schoolId == null || schoolId.isBlank() || (!allSchoolAccess && !access.canAccessEducationUnit(schoolId))) {
             throw CurriculumException.notFound("school", schoolId);
         }

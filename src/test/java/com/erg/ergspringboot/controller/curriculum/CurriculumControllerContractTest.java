@@ -30,4 +30,17 @@ class CurriculumControllerContractTest {
         assertThat(cacheable.cacheNames()).containsExactly("curriculumTree");
         assertThat(cacheable.key()).contains("tenantId");
     }
+
+    @Test
+    void exposesClassSubjectAllocationReadAndReplaceUnderTheCurriculumPrefix() throws Exception {
+        Method read = CurriculumController.class.getDeclaredMethod("classSubjects",
+                String.class, String.class, jakarta.servlet.http.HttpServletRequest.class);
+        Method write = CurriculumController.class.getDeclaredMethod("replaceClassSubjects",
+                String.class, String.class, com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumClassSubjectsRequest.class,
+                jakarta.servlet.http.HttpServletRequest.class);
+
+        assertThat(read.getAnnotation(GetMapping.class).value()).containsExactly("/class-subjects");
+        assertThat(write.getAnnotation(org.springframework.web.bind.annotation.PutMapping.class).value())
+                .containsExactly("/class-subjects");
+    }
 }

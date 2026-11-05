@@ -7,7 +7,6 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.exception.*;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy.AssignedQuiz;
-import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.*;
@@ -43,14 +42,13 @@ public class LmsAttemptUseCase {
     private final QuizRuntimePackageService packages;
     private final QuizAttemptGradingService grading;
     private final AttemptEventRecorder events;
-    private final LmsReadCacheInvalidator caches;
     private final MeterRegistry meterRegistry;
     private final Clock clock;
     private final LmsSyncOperationService sync;
-    private final ApplicationEventPublisher publisher;
     private final AttemptDeadlinePolicy deadlines;
     private final AttemptFactory factory;
     private final AttemptProgressProjector progress;
+    private final AttemptCompletionEffects effects;
 
     @Autowired
     public LmsAttemptUseCase(LmsAssignmentAccessPolicy policy, LmsQuizService quizzes, LmsAttemptService attempts,
@@ -69,14 +67,14 @@ public class LmsAttemptUseCase {
             AttemptEventRecorder events, LmsReadCacheInvalidator caches, MeterRegistry meterRegistry,
             LmsSyncOperationService sync, ApplicationEventPublisher publisher, Clock clock, Duration submitGrace) {
         this.policy = policy; this.quizzes = quizzes; this.attempts = attempts;
-        this.packages = packages; this.grading = grading; this.events = events; this.caches = caches;
+        this.packages = packages; this.grading = grading; this.events = events;
         this.meterRegistry = meterRegistry;
         this.sync = sync;
-        this.publisher = publisher;
         this.clock = clock == null ? Clock.systemUTC() : clock;
         this.deadlines = new AttemptDeadlinePolicy(submitGrace);
         this.factory = new AttemptFactory(deadlines);
         this.progress = new AttemptProgressProjector(students, quizzes, grading);
+        this.effects = new AttemptCompletionEffects(events, progress, caches, policy, publisher);
     }
 
     @Transactional("postgresTransactionManager")
@@ -111,7 +109,7 @@ public class LmsAttemptUseCase {
             attempt.setLastActiveAt(now);
             Attempt saved = attempts.save(attempt);
             log.info("EXAM_ATTEMPT_RESUME studentId={} attemptId={} quizId={} assignmentId={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId());
-            evictReads(tenant, saved, assignment);
+            effects.evictReads(tenant, saved, assignment);
             AttemptResponse result = response(saved);
             complete(receipt, result, version(saved));
             return result;
@@ -136,7 +134,7 @@ public class LmsAttemptUseCase {
             throw new ConflictException("an attempt is already in progress for this quiz");
         }
         log.info("EXAM_ATTEMPT_START studentId={} attemptId={} quizId={} assignmentId={} mode={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId(), saved.getMode());
-        evictReads(tenant, saved, assignment);
+        effects.evictReads(tenant, saved, assignment);
         AttemptResponse result = response(saved);
         complete(receipt, result, version(saved));
         return result;
@@ -205,17 +203,27 @@ public class LmsAttemptUseCase {
         Score score = finish(attempt, answers, tenant, submitted, late);
         Attempt saved = attempts.save(attempt);
         log.info("EXAM_ATTEMPT_SUBMIT studentId={} attemptId={} quizId={} assignmentId={} score={}/{} percent={}% passed={} late={}", saved.getStudentId(), saved.getId(), saved.getQuizId(), saved.getAssignmentId(), score.score(), score.max(), score.percent(), score.passed(), late);
-        events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_submitted", null, null, Map.of("score", score.score(), "percent", score.percent(), "passed", score.passed(), "late", late), submitted);
+        effects.submitted(saved, owned.assignment(), tenant, score, submitted, late);
         if (request != null) events.recordClientBatch(saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.clientEvents());
-        progress.projectAfterCommit(saved, owned.assignment(), tenant);
-        evictReads(tenant, saved, owned.assignment());
-        publisher.publishEvent(new LmsAttemptSubmitted("attempt-submitted:" + saved.getId(), tenant, saved.getId(),
-                saved.getAssignmentId(), saved.getStudentId(), saved.getStatus(), score.score(), score.max(), score.passed(),
-                submitted));
         if (sample != null) sample.stop(meterRegistry.timer("erg.lms.attempt.submit", "result", score.passed() ? "passed" : "failed"));
         AttemptSubmitResponse result = new AttemptSubmitResponse(score.score(), score.max(), score.percent(), score.passed());
         complete(receipt, result, version(saved));
         return result;
+    }
+
+    /** Offline import: builds, server-grades and stores the finished attempt (server clock is authoritative). */
+    Attempt saveImported(String tenant, Student student, QuizPackage pkg, Assignment assignment, String key,
+            Map<String, Object> clientMeta, Map<String, Object> answers) {
+        OffsetDateTime now = now();
+        Attempt attempt = factory.newAttempt(tenant, student.getId(), new StartAttemptRequest(assignment.getId(), pkg.getQuizId(),
+                pkg.getId(), pkg.getContentHash()), assignment, quizzes.findByTenantIdAndId(tenant, pkg.getQuizId()).orElse(null),
+                Optional.of(pkg), now, key);
+        attempt.setClassId(blank(assignment.getAcademicClassId()) == null ? student.getAcademicClassId() : assignment.getAcademicClassId());
+        attempt.setSubmitIdempotencyKey(key); attempt.setClient(clientMeta);
+        Map<String, AttemptAnswer> stored = new LinkedHashMap<>(); answers.forEach((qid, value) -> stored.put(qid, answer(qid, value, Map.of(), now)));
+        boolean late = deadlines.effectiveDeadline(attempt, assignment) instanceof OffsetDateTime deadline && now.isAfter(deadline);
+        Score score = finish(attempt, stored, tenant, now, late); Attempt saved = attempts.saveAndFlush(attempt);
+        effects.submitted(saved, assignment, tenant, score, now, late); return saved;
     }
 
     /**
@@ -250,17 +258,12 @@ public class LmsAttemptUseCase {
         log.info("EXAM_ATTEMPT_GRADED attemptId={} questionId={} graderId={} status={}", saved.getId(), questionId, access.userId(), saved.getStatus());
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_answer_graded", questionId, null, Map.of("score", result.score().doubleValue(), "status", saved.getStatus()), now());
         progress.projectAfterCommit(saved, assignment, tenant);
-        evictReads(tenant, saved, assignment);
+        effects.evictReads(tenant, saved, assignment);
         return response(saved);
     }
 
     private record Owned(Attempt attempt, Assignment assignment) { }
-
-    private void evictReads(String tenant, Attempt attempt, Assignment assignment) {
-        caches.evictAttemptAfterCommit(tenant, attempt, assignment,
-                policy.learner(tenant, attempt.getStudentId()).map(Student::getAuthUserId).orElse(null));
-    }
-    private record Score(double score, double max, double percent, boolean passed) { }
+    record Score(double score, double max, double percent, boolean passed) { }
 
     private Owned mutable(String id, UserAccessContext access) {
         Attempt attempt = attempts.findByTenantIdAndId(tenant(access.tenantId()), id).orElseThrow(() -> new ResourceNotFoundException("attempt not found"));
@@ -316,7 +319,7 @@ public class LmsAttemptUseCase {
         Assignment assignment = policy.assignment(tenant, attempt.getAssignmentId());
         if (!deadlines.isExpired(attempt, assignment, now)) return false;
         autoClose(attempt, assignment, tenant, now);
-        evictReads(tenant, attempt, assignment);
+        effects.evictReads(tenant, attempt, assignment);
         return true;
     }
 

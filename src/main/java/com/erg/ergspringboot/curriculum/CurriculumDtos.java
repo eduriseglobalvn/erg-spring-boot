@@ -150,4 +150,11 @@ public final class CurriculumDtos {
             String id, String tenantId, String subjectId, String levelId, String academicYear,
             String name, String status, Long recordVersion, List<CurriculumProgramRowResponse> rows,
             OffsetDateTime createdAt, OffsetDateTime updatedAt) { }
+
+    public record CurriculumClassSubjectAllocationItem(String classId, List<String> subjectIds) { }
+
+    public record CurriculumClassSubjectsRequest(List<CurriculumClassSubjectAllocationItem> allocations, Long expectedVersion) { }
+
+    public record CurriculumClassSubjectsResponse(
+            String schoolId, String academicYear, Long version, List<CurriculumClassSubjectAllocationItem> allocations) { }
 }
