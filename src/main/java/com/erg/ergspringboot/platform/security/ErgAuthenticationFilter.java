@@ -24,6 +24,7 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
     private final ErgPrincipalService principalService;
     private final ErgSecurityProperties securityProperties;
     private final boolean bffEnabled;
+    private final SecurityErrorResponseWriter errorWriter;
 
     /** Compatibility constructor for stateless bearer mode and focused tests. */
     public ErgAuthenticationFilter(ErgPrincipalService principalService, ErgSecurityProperties securityProperties) {
@@ -34,8 +35,9 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
     public ErgAuthenticationFilter(
             ErgPrincipalService principalService,
             ErgSecurityProperties securityProperties,
-            ErgAuthProperties authProperties) {
-        this(principalService, securityProperties, authProperties.isBffEnabled());
+            ErgAuthProperties authProperties,
+            SecurityErrorResponseWriter errorWriter) {
+        this(principalService, securityProperties, authProperties.isBffEnabled(), errorWriter);
     }
 
     /** Compatibility constructor for focused unit tests and old embedders. */
@@ -43,16 +45,27 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
             ErgPrincipalService principalService,
             ErgSecurityProperties securityProperties,
             boolean bffEnabled) {
+        this(principalService, securityProperties, bffEnabled,
+                new SecurityErrorResponseWriter(new tools.jackson.databind.ObjectMapper()));
+    }
+
+    ErgAuthenticationFilter(
+            ErgPrincipalService principalService,
+            ErgSecurityProperties securityProperties,
+            boolean bffEnabled,
+            SecurityErrorResponseWriter errorWriter) {
         this.principalService = principalService;
         this.securityProperties = securityProperties;
         this.bffEnabled = bffEnabled;
+        this.errorWriter = errorWriter;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         if (bffEnabled && bearerToken(request) != null) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "BFF_COOKIE_AUTH_REQUIRED");
+            errorWriter.write(request, response, HttpServletResponse.SC_UNAUTHORIZED, "BFF_COOKIE_AUTH_REQUIRED",
+                    "Bearer tokens are not accepted; sign in with the cookie session");
             return;
         }
         if (SecurityContextHolder.getContext().getAuthentication() == null && hasAuthenticationInput(request)) {
@@ -61,11 +74,13 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
                 markBearerAuthenticationFailure(request);
             }
             if (principal.isPresent() && !canAccessRequestedPortal(request, principal.get())) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Portal session does not match requested API.");
+                errorWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN, "PORTAL_SESSION_MISMATCH",
+                        "Portal session does not match requested API.");
                 return;
             }
             if (principal.isPresent() && isLifecycleRestricted(principal.get()) && !isOnboardingRequest(request)) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCOUNT_LIFECYCLE_RESTRICTED");
+                errorWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN, "ACCOUNT_LIFECYCLE_RESTRICTED",
+                        "Account must finish onboarding before using this API");
                 return;
             }
             principal.ifPresent(this::authenticate);

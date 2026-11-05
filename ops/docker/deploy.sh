@@ -74,7 +74,7 @@ $C config --quiet
 $C up -d --no-deps backend
 wait_healthy erg-backend-1
 # Single-file bind mounts keep the old inode after the unpack, so these must be recreated to see new config.
-$C up -d --no-deps --force-recreate nginx prometheus grafana
+$C up -d --no-deps --force-recreate nginx alertmanager prometheus grafana
 wait_healthy erg-nginx-1
 docker logs erg-backend-1 2>&1 | grep -E 'Successfully applied|is up to date' | cut -c1-200
 log "deployed $SHA (previous image: ${PREVIOUS:-none}, backup: $DUMP)"

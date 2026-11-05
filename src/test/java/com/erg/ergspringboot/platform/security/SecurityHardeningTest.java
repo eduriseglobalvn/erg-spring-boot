@@ -167,6 +167,8 @@ class SecurityHardeningTest {
         filter.doFilter(request, response, new MockFilterChain());
 
         assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getContentType()).startsWith("application/json");
+        assertThat(response.getContentAsString()).contains("BFF_COOKIE_AUTH_REQUIRED");
         verify(principalService, never()).fromBearerToken("legacy-token", "erg");
     }
 
@@ -283,6 +285,8 @@ class SecurityHardeningTest {
         filter.doFilter(request, response, new MockFilterChain());
 
         assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getContentType()).startsWith("application/json");
+        assertThat(response.getContentAsString()).contains("ACCOUNT_LIFECYCLE_RESTRICTED");
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
