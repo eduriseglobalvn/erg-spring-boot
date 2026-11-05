@@ -6,6 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.erg.ergspringboot.lcms.internal.readmodel.LcmsWorkspaceReadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,9 @@ class LcmsQuizPackageSettingsHttpContractTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private LcmsWorkspaceReadService workspaceReadService;
+
     @Test
     void packageSettingsSaveTheDraftThenRenameTheQuiz() throws Exception {
         String created = mockMvc.perform(as(post("/api/v1/lcms/quizzes"))
@@ -58,6 +64,11 @@ class LcmsQuizPackageSettingsHttpContractTest {
         // A second save from the same (now stale) read must not overwrite silently.
         mockMvc.perform(as(put("/api/v1/lcms/quizzes/{quizId}/draft", quizId)).content(draft.formatted(docVersion)))
                 .andExpect(status().isConflict());
+        // The quiz-bank list shows the draft's time limit, not a per-question estimate.
+        assertThat(workspaceReadService.questionBankWorkspace("erg", null, null, null, null, null, null, false, 0, 50).quizzes())
+                .filteredOn(quiz -> quiz.id().equals(quizId))
+                .singleElement()
+                .satisfies(quiz -> assertThat(quiz.durationLabel()).isEqualTo("15 phut"));
 
         mockMvc.perform(as(patch("/api/v1/lcms/quizzes/{quizId}", quizId)).content("{\"title\":\"  Renamed  \",\"kind\":\"TEST\"}"))
                 .andExpect(status().isOk())
