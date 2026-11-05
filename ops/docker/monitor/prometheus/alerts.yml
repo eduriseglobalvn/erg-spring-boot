@@ -83,3 +83,59 @@ groups:
         annotations:
           summary: "PostgreSQL active connections > 80"
           description: "Postgres connections close to limit (max 100/120)."
+
+  - name: erg-dependency-and-abuse-alerts
+    rules:
+      - alert: ScrapeTargetDown
+        expr: up{job!="erg-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is not reachable"
+          description: "Prometheus cannot scrape {{ $labels.instance }}; its database/cache metrics are blind."
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "postgres-exporter cannot connect to the database."
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis ({{ $labels.job }}) is down"
+          description: "The exporter cannot reach {{ $labels.instance }}."
+
+      - alert: NotificationOutboxDeadLetters
+        expr: max(notifications_outbox_dead) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} notifications will never be sent"
+          description: "Outbox rows exhausted their retries (e-mail/OTP/push). Check the backend logs and the SMTP/R2 credentials."
+
+      - alert: LoginFailureSpike
+        expr: sum(rate(http_server_requests_seconds_count{uri="/api/v1/auth/login",status=~"401|403"}[5m])) * 60 > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 30 failed logins per minute"
+          description: "{{ $value | printf \"%.0f\" }} failed logins/min: possible password guessing."
+
+      - alert: BackendHeapHigh
+        expr: max(jvm_memory_used_bytes{area="heap",id="G1 Old Gen"} / jvm_memory_max_bytes{area="heap",id="G1 Old Gen"}) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend old-gen heap > 85%"
+          description: "Heap is at {{ $value | humanizePercentage }}; risk of long GC pauses or OOM."

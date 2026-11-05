@@ -25,6 +25,29 @@ services:
       - redis-state-exporter
       - redis-cache-exporter
 
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    # The token stays out of the repository: it is substituted from .env.production at start.
+    command:
+      - |
+        r=none; [ -n "$$TELEGRAM_BOT_TOKEN" ] && [ -n "$$TELEGRAM_CHAT_ID" ] && r=telegram
+        sed -e "s|__RECEIVER__|$$r|g" -e "s|__TOKEN__|$${TELEGRAM_BOT_TOKEN:-0:unset}|" -e "s|__CHAT_ID__|$${TELEGRAM_CHAT_ID:-1}|" \
+          /etc/alertmanager/alertmanager.yml.tmpl > /tmp/alertmanager.yml
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml --storage.path=/alertmanager
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    mem_limit: 64m
+    volumes:
+      - ./monitor/alertmanager/alertmanager.yml.tmpl:/etc/alertmanager/alertmanager.yml.tmpl:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - edge
+
   loki:
     image: grafana/loki:3.3.0
     restart: unless-stopped
@@ -132,6 +155,7 @@ services:
       - data
 
 volumes:
+  alertmanager-data:
   prometheus-data:
   loki-data:
   grafana-data:

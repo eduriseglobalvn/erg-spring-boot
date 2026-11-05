@@ -1,0 +1,31 @@
+# Rendered at container start from TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (see compose.monitor.yml).
+# Without them alerts go to the "none" receiver, so the stack still starts before the bot exists.
+route:
+  receiver: __RECEIVER__
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: __RECEIVER__
+      repeat_interval: 1h
+
+inhibit_rules:
+  # A dead backend also trips latency and error alerts; send only the root cause.
+  - source_matchers: [alertname="BackendInstanceDown"]
+    target_matchers: [severity="warning"]
+
+receivers:
+  - name: none
+  - name: telegram
+    telegram_configs:
+      - bot_token: '__TOKEN__'
+        chat_id: __CHAT_ID__
+        parse_mode: HTML
+        send_resolved: true
+        message: |-
+          {{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .CommonLabels.alertname }}</b> ({{ .CommonLabels.severity }}) — {{ .Status }}
+          {{ range .Alerts }}• {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
