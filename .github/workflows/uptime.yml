@@ -1,0 +1,39 @@
+name: production-uptime
+
+# Runs outside the server, so it notices what the on-server Alertmanager cannot: power or network loss,
+# a dead Cloudflare tunnel, or the whole Docker host down. GitHub only runs schedules on the default branch.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe api.erg.edu.vn/ready (tunnel, nginx and backend)
+        id: probe
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://api.erg.edu.vn/ready || true)
+            [ "$code" = 200 ] && { echo "up ($code)"; exit 0; }
+            echo "attempt $attempt: HTTP $code"; sleep 20
+          done
+          echo "code=$code" >> "$GITHUB_OUTPUT"; exit 1
+      - name: Tell Telegram
+        if: failure()
+        shell: bash
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] || { echo "Telegram secrets not set"; exit 0; }
+          curl -s -m 15 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=🔴 api.erg.edu.vn/ready is down from outside (HTTP ${{ steps.probe.outputs.code }}). The server may be offline: on-server alerts cannot fire." \
+            -o /dev/null -w 'telegram %{http_code}\n'

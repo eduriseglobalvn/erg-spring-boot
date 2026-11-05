@@ -52,5 +52,12 @@ echo "Cleaning up backups older than $RETENTION_DAYS days..."
 find "$BACKUP_DIR" -name "*.sql.gz" -mtime "+$RETENTION_DAYS" -delete
 find "$BACKUP_DIR" -name "*.rdb" -mtime "+$RETENTION_DAYS" -delete
 
+# 4. Freshness metric for node-exporter's textfile collector; BackupStale alerts when it ages.
+METRICS_DIR="$ROOT/ops/backup/metrics"
+mkdir -p "$METRICS_DIR" && chmod 755 "$METRICS_DIR"
+printf 'erg_backup_last_success_timestamp_seconds %s\nerg_backup_postgres_bytes %s\n' \
+  "$(date +%s)" "$(stat -c %s "$BACKUP_DIR/pg_full_$DATE.sql.gz")" > "$METRICS_DIR/erg_backup.prom.tmp"
+chmod 644 "$METRICS_DIR/erg_backup.prom.tmp" && mv "$METRICS_DIR/erg_backup.prom.tmp" "$METRICS_DIR/erg_backup.prom"
+
 echo "=== [$(date -Iseconds)] Backup Completed Successfully ==="
 ls -lh "$BACKUP_DIR"
