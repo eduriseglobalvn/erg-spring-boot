@@ -23,6 +23,8 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=jvm-builder --chown=erg:erg /workspace/target/erg-spring-0.0.1-SNAPSHOT.jar /app/erg-spring.jar
+# Same path as the native image, so compose.native.yml's FLYWAY_LOCATIONS works for either runtime.
+COPY --from=jvm-builder --chown=erg:erg /workspace/target/classes/db/migration/postgres/ /app/db/migration/postgres/
 
 USER erg
 EXPOSE 1606

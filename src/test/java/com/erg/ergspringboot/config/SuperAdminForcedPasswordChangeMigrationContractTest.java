@@ -23,4 +23,15 @@ class SuperAdminForcedPasswordChangeMigrationContractTest {
         assertThat(guarded.group(1)).isEqualTo(rotated.group(1));
         assertThat(v126).contains("must_change_password = true").contains("id = 'usr_super_admin'");
     }
+
+    @Test
+    void rotationOnlyReplacesThePublicSeedHash() throws Exception {
+        String v7 = Files.readString(DIR.resolve("V7__enterprise_admin_account_seed.sql"));
+        String v110 = Files.readString(DIR.resolve("V110__rotate_super_admin_password.sql"));
+        var seed = HASH.matcher(v7);
+        assertThat(seed.find()).isTrue();
+        // Without this guard V110 would overwrite an owner-rotated password with the documented temporary one.
+        assertThat(v110).contains("AND password_hash = '" + seed.group(1) + "'")
+                .contains("WHERE user_id IN (SELECT id FROM rotated)");
+    }
 }
