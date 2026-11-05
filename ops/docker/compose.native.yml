@@ -57,7 +57,7 @@ services:
     volumes:
       - ./nginx/native.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "${ERG_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${ERG_HTTP_PORT:-8080}:8080"
     networks:
       - edge
     healthcheck:
