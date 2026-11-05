@@ -225,6 +225,9 @@
                     </excludes>
                     <systemPropertyVariables>
                         <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
+                        <!-- ApplicationModules.of caches per JVM: whichever test builds it first fixes the
+                             strategy for all others, so a per-test @BeforeAll made the result order-dependent. -->
+                        <spring.modulith.detection-strategy>explicitly-annotated</spring.modulith.detection-strategy>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
