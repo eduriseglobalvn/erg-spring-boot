@@ -11,8 +11,10 @@ import com.erg.ergspringboot.notifications.internal.CampaignDelivery;
 import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
-import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
+import com.erg.ergspringboot.platform.security.ErgPolicyService;
+import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
+import com.erg.ergspringboot.users.UserAuthorizationProjection;
 import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -38,7 +40,8 @@ public class NotificationCampaignService {
     private static final Set<String> RECIPIENT_ROLES = Set.of("TEACHER", "STUDENT", "STAFF");
     private static final int MAX_LIST_SIZE = NotificationAudienceResolver.MAX_RECIPIENTS;
     private static final int MAX_SCHEDULE_DAYS = 30;
-    static final String SEND_PERMISSION = "notification.campaign.send";
+    /** Same alternatives as {@code @NotificationCampaignSend}. */
+    private static final List<String> SEND_GATE = List.of("notification.campaign.send", "*");
 
     private final NotificationCampaignRepository campaigns;
     private final AudienceScopeGuard guard;
@@ -47,19 +50,21 @@ public class NotificationCampaignService {
     private final NotificationCampaignQueryService queries;
     private final UserAuthorizationPort authorizations;
     private final UserDirectoryPort users;
+    private final ErgPolicyService policy;
     private final Clock clock;
 
     @Autowired
     public NotificationCampaignService(NotificationCampaignRepository campaigns, AudienceScopeGuard guard,
             NotificationAudienceResolver resolver, NotificationCommandService commands,
-            NotificationCampaignQueryService queries, UserAuthorizationPort authorizations, UserDirectoryPort users) {
-        this(campaigns, guard, resolver, commands, queries, authorizations, users, Clock.systemUTC());
+            NotificationCampaignQueryService queries, UserAuthorizationPort authorizations, UserDirectoryPort users,
+            ErgPolicyService policy) {
+        this(campaigns, guard, resolver, commands, queries, authorizations, users, policy, Clock.systemUTC());
     }
 
     NotificationCampaignService(NotificationCampaignRepository campaigns, AudienceScopeGuard guard,
             NotificationAudienceResolver resolver, NotificationCommandService commands,
             NotificationCampaignQueryService queries, UserAuthorizationPort authorizations, UserDirectoryPort users,
-            Clock clock) {
+            ErgPolicyService policy, Clock clock) {
         this.campaigns = campaigns;
         this.guard = guard;
         this.resolver = resolver;
@@ -67,6 +72,7 @@ public class NotificationCampaignService {
         this.queries = queries;
         this.authorizations = authorizations;
         this.users = users;
+        this.policy = policy;
         this.clock = clock;
     }
 
@@ -185,8 +191,9 @@ public class NotificationCampaignService {
     }
 
     /**
-     * The creator as they are now. An inactive or missing account, or one that no longer holds the send permission
-     * (nor the platform-wide '*'), is nobody, so the guard denies and the campaign ends FAILED.
+     * The creator as they are now. An inactive or missing account, or one the HTTP gate would now refuse (same
+     * ErgPolicyService decision and permission list as {@code @NotificationCampaignSend}: wildcard grants count,
+     * any matching deny wins), is nobody, so the guard denies and the campaign ends FAILED.
      */
     private CampaignActor creator(String tenantId, String userId) {
         boolean active = users.findByTenantIdAndIds(tenantId, List.of(userId)).stream()
@@ -195,11 +202,18 @@ public class NotificationCampaignService {
             return CampaignActor.none(tenantId, userId);
         }
         return authorizations.find(userId, tenantId)
+                .filter(grants -> policy.isAllowedAny(principal(tenantId, userId, grants), null, tenantId, SEND_GATE))
                 .map(grants -> CampaignActor.of(tenantId, userId, grants.roleNames(), grants.effectivePermissions(),
                         grants.deniedPermissions()))
-                .filter(actor -> actor.permissions().contains(SEND_PERMISSION) || WorkspaceCapabilityMapper
-                        .isPlatformWide(List.copyOf(actor.roles()), actor.permissions(), actor.deniedPermissions()))
                 .orElseGet(() -> CampaignActor.none(tenantId, userId));
+    }
+
+    /** The principal the HTTP gate would see for this user: raw role + user grants, user denies. */
+    private static ErgPrincipal principal(String tenantId, String userId, UserAuthorizationProjection grants) {
+        List<String> granted = java.util.stream.Stream.concat(
+                grants.rolePermissions().stream(), grants.grantedPermissions().stream()).distinct().toList();
+        return ErgPrincipal.authenticated(userId, null, tenantId, grants.roleNames(), granted,
+                grants.deniedPermissions(), List.of(), "erg", "", java.util.Map.of());
     }
 
     private NotificationCampaignEntity lockOwned(CampaignActor actor, String id) {

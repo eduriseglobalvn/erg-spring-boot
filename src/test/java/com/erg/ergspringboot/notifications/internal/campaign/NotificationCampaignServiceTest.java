@@ -34,6 +34,7 @@ import com.erg.ergspringboot.notifications.persistence.NotificationOutboxReposit
 import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceRepository;
 import com.erg.ergspringboot.notifications.persistence.NotificationRecipientRepository;
+import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.users.UserAccountProjection;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
 import com.erg.ergspringboot.users.UserAuthorizationProjection;
@@ -87,7 +88,7 @@ class NotificationCampaignServiceTest {
                 new NotificationPushProperties(), new NotificationTokenCipher(new NotificationPushProperties()),
                 metrics, preferences);
         service = new NotificationCampaignService(campaigns, guard, resolver, commands, queries, authorizations, users,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                new ErgPolicyService(), Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(guard.isAdmin(any(CampaignActor.class)))
                 .thenAnswer(invocation -> invocation.<CampaignActor>getArgument(0).roles().contains("admin"));
         lenient().when(campaigns.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -391,6 +392,49 @@ class NotificationCampaignServiceTest {
 
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.FAILED);
         verifyNoInteractions(resolver, messages, outbox);
+    }
+
+    @Test
+    void scheduledDispatchAcceptsAWildcardSendGrantLikeTheHttpGate() {
+        NotificationCampaignEntity campaign = dueCampaignOf("teacher-1");
+        creatorHolds(List.of("notification.*", "lms.assignment.read"), List.of());
+        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(2)));
+
+        assertThat(service.dispatchDue(TENANT, "c1")).isTrue();
+
+        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENT);
+        assertThat(captureMessages()).hasSize(2);
+    }
+
+    @Test
+    void scheduledDispatchHonoursWildcardDeniesLikeTheHttpGate() {
+        for (String deny : List.of("notification.*", "*.send", "*")) {
+            org.mockito.Mockito.reset(campaigns, guard, users, authorizations);
+            NotificationCampaignEntity campaign = dueCampaignOf("teacher-1");
+            creatorHolds(List.of("notification.campaign.send", "lms.assignment.read"), List.of(deny));
+            doThrow(new AccessDeniedException("no")).when(guard)
+                    .assertAllowed(CampaignActor.none(TENANT, "teacher-1"), CLASS_7A);
+
+            assertThat(service.dispatchDue(TENANT, "c1")).as(deny).isFalse();
+
+            assertThat(campaign.getStatus()).as(deny).isEqualTo(CampaignStatus.FAILED);
+        }
+        verifyNoInteractions(resolver, messages);
+    }
+
+    private NotificationCampaignEntity dueCampaignOf(String creator) {
+        NotificationCampaignEntity campaign = campaign("c1", creator, CampaignStatus.SENDING, NotificationPriority.INFO);
+        when(campaigns.claimDue(eq(TENANT), eq("c1"), any())).thenReturn(1);
+        when(campaigns.findByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
+        lenient().when(campaigns.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        return campaign;
+    }
+
+    private void creatorHolds(List<String> rolePermissions, List<String> denied) {
+        when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
+                .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
+        when(authorizations.find("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
+                "teacher-1", TENANT, List.of("lms_teacher_standard"), rolePermissions, List.of(), denied)));
     }
 
     private List<NotificationMessageEntity> captureMessages() {
