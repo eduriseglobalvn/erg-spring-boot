@@ -47,6 +47,18 @@ public class QuizCompileService {
             Map<String, Map<String, Object>> questionSettings,
             Map<String, Map<String, Object>> questionSetSettings
     ) {
+        return compile(settings, tree, questionSettings, questionSetSettings, null);
+    }
+
+    /** {@code playerTemplate} is the teacher's chosen player look (draft.playerTemplate); absent or empty adds no key. */
+    @SuppressWarnings("unchecked")
+    public CompiledQuiz compile(
+            Map<String, Object> settings,
+            Object tree,
+            Map<String, Map<String, Object>> questionSettings,
+            Map<String, Map<String, Object>> questionSetSettings,
+            Map<String, Object> playerTemplate
+    ) {
         List<CompiledSection> sections = new ArrayList<>();
         List<CompiledQuestion> questions = new ArrayList<>();
         Map<String, Object> answerKey = new LinkedHashMap<>();
@@ -98,12 +110,13 @@ public class QuizCompileService {
         }
 
         questions = allocatePoints(questions);
-        Map<String, Object> runtimeQuiz = buildRuntimeQuiz(settings, sections, questions);
+        Map<String, Object> runtimeQuiz = buildRuntimeQuiz(settings, playerTemplate, sections, questions);
         return new CompiledQuiz(sections, questions, runtimeQuiz, answerKey);
     }
 
     private Map<String, Object> buildRuntimeQuiz(
             Map<String, Object> settings,
+            Map<String, Object> playerTemplate,
             List<CompiledSection> sections,
             List<CompiledQuestion> questions
     ) {
@@ -126,6 +139,9 @@ public class QuizCompileService {
             if (theme != null) {
                 runtime.put("theme", theme);
             }
+        }
+        if (playerTemplate != null && !playerTemplate.isEmpty()) {
+            runtime.put("playerTemplate", playerTemplate);
         }
         List<Map<String, Object>> runtimeSections = new ArrayList<>();
         for (CompiledSection section : sections) {

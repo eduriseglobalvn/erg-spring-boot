@@ -641,4 +641,22 @@ class QuizCompileServiceTest {
         assertThat(new GradingEngine().grade("single_choice", Map.of("choiceId", "a"), question.answerKey(),
                 BigDecimal.TEN).correct()).isTrue();
     }
+
+    @Test
+    void copiesTheDraftPlayerTemplateIntoTheRuntimeQuiz() {
+        Map<String, Object> template = Map.of("accentColor", "#0071E3", "roundedCorners", false);
+
+        CompiledQuiz compiled = service.compile(Map.of(), List.of(tree()), Map.of(), Map.of(), template);
+
+        assertThat(compiled.runtimeQuiz()).containsEntry("playerTemplate", template);
+    }
+
+    @Test
+    void runtimeQuizHasNoPlayerTemplateKeyWhenTheDraftHasNone() {
+        assertThat(service.compile(Map.of(), List.of(tree()), Map.of(), Map.of(), null).runtimeQuiz())
+                .doesNotContainKey("playerTemplate");
+        assertThat(service.compile(Map.of(), List.of(tree()), Map.of(), Map.of(), Map.of()).runtimeQuiz())
+                .doesNotContainKey("playerTemplate");
+        assertThat(compileSlides().runtimeQuiz()).doesNotContainKey("playerTemplate");
+    }
 }

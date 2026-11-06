@@ -136,7 +136,7 @@ class QuizPublishServiceTest {
         when(quizDraftRepository.findFirstByQuizIdAndTenantIdOrderByUpdatedAtDesc("quiz-1", "tenant-a")).thenReturn(Optional.of(draft));
         when(bankQuestionRepository.findByTenantIdAndIdIn("tenant-a", List.of("bank-question-1"))).thenReturn(List.of());
         when(quizQuestionRepository.findByTenantIdAndQuizIdOrderByOrderIndexAsc("tenant-a", "quiz-1")).thenReturn(List.of());
-        when(compileService.compile(eq(draft.getSettings()), eq(draft.getTree()), eq(Map.of()), eq(Map.of()))).thenReturn(compiled);
+        when(compileService.compile(eq(draft.getSettings()), eq(draft.getTree()), eq(Map.of()), eq(Map.of()), eq(draft.getPlayerTemplate()))).thenReturn(compiled);
         when(validationService.validate(compiled)).thenReturn(List.of());
         when(quizVersionRepository.findTopByQuizIdAndTenantIdOrderByVersionNumberDesc("quiz-1", "tenant-a")).thenReturn(Optional.empty());
         when(objectMapper.writeValueAsString(any())).thenAnswer(invocation -> {
