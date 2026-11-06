@@ -2,20 +2,30 @@ package com.erg.ergspringboot.notifications.internal;
 
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.PreferenceUpdateItemRequest;
 import com.erg.ergspringboot.common.response.PageResponse;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AckResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.ArchiveResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.MarkReadResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.NotificationItemResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.NotificationPreferenceResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.UnreadCountResponse;
+import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.notifications.NotificationPriority;
+import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
+import com.erg.ergspringboot.notifications.persistence.NotificationMessageEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationMessageRepository;
 import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationRecipientEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceRepository;
 import com.erg.ergspringboot.notifications.persistence.NotificationRecipientRepository;
 import com.erg.ergspringboot.notifications.persistence.projection.NotificationInboxProjection;
+import com.erg.ergspringboot.users.UserAccountProjection;
+import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,13 +39,22 @@ public class NotificationService {
 
     private final NotificationRecipientRepository recipientRepository;
     private final NotificationPreferenceRepository preferenceRepository;
+    private final NotificationMessageRepository messageRepository;
+    private final NotificationCampaignRepository campaignRepository;
+    private final UserDirectoryPort users;
 
     public NotificationService(
             NotificationRecipientRepository recipientRepository,
-            NotificationPreferenceRepository preferenceRepository
+            NotificationPreferenceRepository preferenceRepository,
+            NotificationMessageRepository messageRepository,
+            NotificationCampaignRepository campaignRepository,
+            UserDirectoryPort users
     ) {
         this.recipientRepository = recipientRepository;
         this.preferenceRepository = preferenceRepository;
+        this.messageRepository = messageRepository;
+        this.campaignRepository = campaignRepository;
+        this.users = users;
     }
 
     @Transactional(readOnly = true)
@@ -55,38 +74,60 @@ public class NotificationService {
                 normalizedStatus(status),
                 pageable
         );
-        return page(page.getContent().stream().map(this::toItem).toList(), page.getNumber(), page.getSize(), page.getTotalElements());
+        return page(toItems(tenantId, page.getContent()), page.getNumber(), page.getSize(), page.getTotalElements());
     }
 
     @Transactional(readOnly = true)
     public NotificationItemResponse detail(String tenantId, String userId, String portal, String id) {
-        return recipientRepository.findOwnDetail(tenantId, userId, portal, id)
-                .map(this::toItem)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification not found."));
+        List<NotificationInboxProjection> rows = recipientRepository.findOwnDetail(tenantId, userId, portal, id);
+        if (rows.isEmpty()) throw new ResourceNotFoundException("Notification not found.");
+        return toItems(tenantId, rows.subList(0, 1)).getFirst();
     }
 
     @Transactional(readOnly = true)
     public UnreadCountResponse unreadCount(String tenantId, String userId, String portal) {
-        return new UnreadCountResponse(
-                recipientRepository.countByTenantIdAndUserIdAndPortalAndStatusAndArchivedAtIsNull(
-                        tenantId,
-                        userId,
-                        portal,
-                        "unread"
-                )
-        );
+        return new UnreadCountResponse(recipientRepository.countUnread(tenantId, userId, portal));
     }
 
     @Transactional
     public MarkReadResponse markRead(String tenantId, String userId, String portal, String id) {
         NotificationRecipientEntity recipient = ownRecipient(tenantId, userId, portal, id);
-        if (!"read".equals(recipient.getStatus())) {
-            recipient.setStatus("read");
-            recipient.setReadAt(OffsetDateTime.now());
-            recipientRepository.save(recipient);
-            return new MarkReadResponse(true, 1);
+        return new MarkReadResponse(true, markRead(recipient, OffsetDateTime.now()) ? 1 : 0);
+    }
+
+    /**
+     * Read acknowledgement of a campaign message that asks for one. Idempotent: the first ackedAt is kept.
+     * Acknowledging also marks the message read when it is still unread (an ack implies the user saw it).
+     */
+    @Transactional
+    public AckResponse ack(String tenantId, String userId, String portal, String id) {
+        NotificationRecipientEntity recipient = ownRecipient(tenantId, userId, portal, id);
+        NotificationMessageEntity message = messageRepository.findById(recipient.getNotificationId())
+                .filter(found -> tenantId.equals(found.getTenantId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found."));
+        boolean requiresAck = message.getCampaignId() != null && campaignRepository
+                .findByTenantIdAndId(tenantId, message.getCampaignId())
+                .map(campaign -> campaign.isRequireReadAck())
+                .orElse(false);
+        if (!requiresAck) {
+            throw new ConflictException("Thông báo này không yêu cầu xác nhận đã đọc");
         }
-        return new MarkReadResponse(true, 0);
+        // Microsecond precision = what Postgres stores, so a repeated ack returns the identical value.
+        OffsetDateTime now = OffsetDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        if (message.getAckedAt() == null) {
+            message.setAckedAt(now);
+            messageRepository.save(message);
+        }
+        markRead(recipient, now);
+        return new AckResponse(message.getId(), message.getAckedAt(), recipient.getReadAt());
+    }
+
+    private boolean markRead(NotificationRecipientEntity recipient, OffsetDateTime now) {
+        if ("read".equals(recipient.getStatus())) return false;
+        recipient.setStatus("read");
+        recipient.setReadAt(now);
+        recipientRepository.save(recipient);
+        return true;
     }
 
     @Transactional
@@ -151,12 +192,22 @@ public class NotificationService {
     }
 
     private NotificationRecipientEntity ownRecipient(String tenantId, String userId, String portal, String id) {
-        return recipientRepository.findByTenantIdAndUserIdAndPortalAndId(tenantId, userId, portal, id)
-                .or(() -> recipientRepository.findByTenantIdAndUserIdAndPortalAndNotificationId(tenantId, userId, portal, id))
+        return recipientRepository.findOwn(tenantId, userId, portal, id).stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found."));
     }
 
-    private NotificationItemResponse toItem(NotificationInboxProjection projection) {
+    /** Maps rows; campaign sender names are looked up in one batch per call (no N+1). */
+    private List<NotificationItemResponse> toItems(String tenantId, List<NotificationInboxProjection> rows) {
+        List<String> senderIds = rows.stream().map(NotificationInboxProjection::campaignCreatedBy)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<String, String> names = senderIds.isEmpty() ? Map.of() : users.findByTenantIdAndIds(tenantId, senderIds).stream()
+                .filter(user -> user.displayName() != null)
+                .collect(Collectors.toMap(UserAccountProjection::id, UserAccountProjection::displayName, (a, b) -> a));
+        return rows.stream().map(row -> toItem(row,
+                row.campaignCreatedBy() == null ? null : names.get(row.campaignCreatedBy()))).toList();
+    }
+
+    private NotificationItemResponse toItem(NotificationInboxProjection projection, String senderName) {
         return new NotificationItemResponse(
                 projection.notificationId(),
                 projection.recipientId(),
@@ -171,7 +222,12 @@ public class NotificationService {
                 projection.recipientStatus(),
                 projection.readAt(),
                 projection.createdAt(),
-                projection.payloadData() == null ? Map.of() : projection.payloadData()
+                projection.payloadData() == null ? Map.of() : projection.payloadData(),
+                NotificationPriority.fromStored(projection.priority()),
+                Boolean.TRUE.equals(projection.campaignRequiresAck()),
+                projection.ackedAt(),
+                projection.campaignId(),
+                projection.campaignId() == null ? null : senderName
         );
     }
 

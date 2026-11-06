@@ -1714,6 +1714,14 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: GET /api/v1/notification-devices/web-push-config => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.webPushConfig
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
     - route: GET /api/v1/notifications => com.erg.ergspringboot.controller.notifications.NotificationController.list
       classification: persistent-read
       statement-budget: 12
@@ -3750,6 +3758,14 @@ rest:
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
     - route: POST /api/v1/notification-devices/unregister => com.erg.ergspringboot.controller.notifications.NotificationDeviceController.unregister
+      classification: persistent-write
+      statement-budget: 25
+      row-budget: 1000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-outbox
+      cache-policy: post-commit-tenant-generation
+      pagination-policy: none
+    - route: POST /api/v1/notifications/{id}/ack => com.erg.ergspringboot.controller.notifications.NotificationController.ack
       classification: persistent-write
       statement-budget: 25
       row-budget: 1000

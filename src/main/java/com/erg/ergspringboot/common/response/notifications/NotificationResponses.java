@@ -1,6 +1,8 @@
 package com.erg.ergspringboot.common.response.notifications;
 
 import com.erg.ergspringboot.common.response.PageResponse;
+import com.erg.ergspringboot.notifications.NotificationPriority;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +26,26 @@ public final class NotificationResponses {
             String status,
             OffsetDateTime readAt,
             OffsetDateTime createdAt,
-            Map<String, String> data
+            Map<String, String> data,
+            @Schema(description = "priority normalised to INFO|IMPORTANT|URGENT (legacy normal->INFO, high->IMPORTANT); "
+                    + "the raw priority field is unchanged for existing clients")
+            NotificationPriority priorityLevel,
+            @Schema(description = "true only for a campaign message whose campaign asks for a read acknowledgement")
+            boolean requireReadAck,
+            OffsetDateTime ackedAt,
+            String campaignId,
+            @Schema(description = "display name of the campaign creator; null when unknown")
+            String senderName
+    ) {
+    }
+
+    public record AckResponse(String id, OffsetDateTime ackedAt, OffsetDateTime readAt) {
+    }
+
+    public record WebPushConfigResponse(
+            boolean enabled,
+            @Schema(description = "VAPID applicationServerKey (base64url); null when Web Push is disabled")
+            String publicKey
     ) {
     }
 
@@ -46,7 +67,8 @@ public final class NotificationResponses {
             String platform,
             String permissionState,
             boolean enabled,
-            OffsetDateTime lastSeenAt
+            OffsetDateTime lastSeenAt,
+            @Schema(description = "FCM or WEB_PUSH") String transport
     ) {
     }
 

@@ -298,28 +298,33 @@ public class NotificationCommandService {
         if (token == null && fid == null) {
             return null;
         }
+        Map<String, String> payload = payload(message, command, Map.of("deviceRegistrationId", device.getId()));
+        if ("WEB_PUSH".equals(device.getTransport())) {
+            // Endpoint and keys stay encrypted on the device row; the adapter loads them by device id.
+            return outbox(message, "web_push", device.getId(), payload, "vapid");
+        }
         String targetKind = token == null ? "fid" : "registration_token";
         String targetRef = token == null ? fid : tokenCipher.encrypt(token);
-        Map<String, String> payload = payload(message, command, Map.of("deviceRegistrationId", device.getId()));
-        return outbox(message, targetKind, targetRef, payload);
+        return outbox(message, targetKind, targetRef, payload, "firebase");
     }
 
     private NotificationOutboxEntity outboxForTopic(NotificationMessageEntity message, NotificationCommand command, String topicName) {
-        return outbox(message, "topic", topicName, payload(message, command, Map.of()));
+        return outbox(message, "topic", topicName, payload(message, command, Map.of()), "firebase");
     }
 
     private NotificationOutboxEntity outbox(
             NotificationMessageEntity message,
             String targetKind,
             String targetRef,
-            Map<String, String> payload
+            Map<String, String> payload,
+            String provider
     ) {
         NotificationOutboxEntity outbox = new NotificationOutboxEntity();
         outbox.setTenantId(message.getTenantId());
         outbox.setNotificationId(message.getId());
         outbox.setTargetKind(targetKind);
         outbox.setTargetRef(targetRef);
-        outbox.setProvider("firebase");
+        outbox.setProvider(provider);
         outbox.setPayload(payload);
         outbox.setStatus("pending");
         outbox.setAttemptCount(0);

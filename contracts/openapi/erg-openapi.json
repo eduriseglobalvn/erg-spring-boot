@@ -117,6 +117,22 @@
         },
         "type": "object"
       },
+      "AckResponse": {
+        "properties": {
+          "ackedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "readAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ActivityListResponse": {
         "properties": {
           "items": {
@@ -419,6 +435,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AcademicYearResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseAckResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AckResponse"
           },
           "errors": {},
           "message": {
@@ -4605,6 +4647,32 @@
         },
         "type": "object"
       },
+      "ApiResponseWebPushConfigResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/WebPushConfigResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseWorkspaceResponse": {
         "properties": {
           "data": {
@@ -8620,6 +8688,10 @@
           },
           "portal": {
             "type": "string"
+          },
+          "transport": {
+            "description": "FCM or WEB_PUSH",
+            "type": "string"
           }
         },
         "type": "object"
@@ -10088,10 +10160,17 @@
       },
       "NotificationItemResponse": {
         "properties": {
+          "ackedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "actionUrl": {
             "type": "string"
           },
           "bodyPreview": {
+            "type": "string"
+          },
+          "campaignId": {
             "type": "string"
           },
           "channel": {
@@ -10116,11 +10195,28 @@
           "priority": {
             "type": "string"
           },
+          "priorityLevel": {
+            "description": "priority normalised to INFO|IMPORTANT|URGENT (legacy normal->INFO, high->IMPORTANT); the raw priority field is unchanged for existing clients",
+            "enum": [
+              "INFO",
+              "IMPORTANT",
+              "URGENT"
+            ],
+            "type": "string"
+          },
           "readAt": {
             "format": "date-time",
             "type": "string"
           },
           "recipientId": {
+            "type": "string"
+          },
+          "requireReadAck": {
+            "description": "true only for a campaign message whose campaign asks for a read acknowledgement",
+            "type": "boolean"
+          },
+          "senderName": {
+            "description": "display name of the campaign creator; null when unknown",
             "type": "string"
           },
           "sourceId": {
@@ -11222,6 +11318,10 @@
           "firebaseInstallationId": {
             "type": "string"
           },
+          "keys": {
+            "$ref": "#/components/schemas/WebPushKeysRequest",
+            "description": "PushSubscription.toJSON().keys; required for WEB_PUSH"
+          },
           "locale": {
             "type": "string"
           },
@@ -11243,6 +11343,10 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "transport": {
+            "description": "FCM (default) or WEB_PUSH",
             "type": "string"
           }
         },
@@ -13713,6 +13817,29 @@
         "required": [
           "version"
         ],
+        "type": "object"
+      },
+      "WebPushConfigResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicKey": {
+            "description": "VAPID applicationServerKey (base64url); null when Web Push is disabled",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "WebPushKeysRequest": {
+        "properties": {
+          "auth": {
+            "type": "string"
+          },
+          "p256dh": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "WorkspacePage": {
@@ -22355,6 +22482,26 @@
         ]
       }
     },
+    "/api/v1/notification-devices/web-push-config": {
+      "get": {
+        "operationId": "webPushConfig",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseWebPushConfigResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-device-controller"
+        ]
+      }
+    },
     "/api/v1/notification-devices/{deviceId}": {
       "delete": {
         "operationId": "revoke_1",
@@ -22632,6 +22779,44 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseNotificationItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/ack": {
+      "post": {
+        "operationId": "ack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "portal",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAckResponse"
                 }
               }
             },

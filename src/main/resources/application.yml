@@ -306,6 +306,11 @@ erg:
         lease-timeout: ${NOTIFICATIONS__WORKER__LEASE_TIMEOUT:60s}
         initial-backoff: ${NOTIFICATIONS__WORKER__INITIAL_BACKOFF:10s}
         max-backoff: ${NOTIFICATIONS__WORKER__MAX_BACKOFF:60m}
+    web-push:
+      # VAPID key pair (base64url). Empty = Web Push disabled; WEB_PUSH device registration returns 400.
+      public-key: ${NOTIFICATIONS__WEB_PUSH__PUBLIC_KEY:}
+      private-key: ${NOTIFICATIONS__WEB_PUSH__PRIVATE_KEY:}
+      subject: ${NOTIFICATIONS__WEB_PUSH__SUBJECT:}
   auth:
     # Per-account lockout (LoginFailureEnforcementService): after max-failed-login wrong
     # passwords within failed-login-window the account is refused for block-duration.

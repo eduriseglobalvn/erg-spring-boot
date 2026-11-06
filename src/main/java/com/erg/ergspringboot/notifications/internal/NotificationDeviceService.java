@@ -4,6 +4,8 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.H
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.RegisterDeviceRequest;
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.UnregisterDeviceRequest;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeviceRegistrationResponse;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.WebPushConfigResponse;
+import com.erg.ergspringboot.notifications.config.WebPushProperties;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -17,6 +19,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,21 +29,44 @@ public class NotificationDeviceService {
     private final NotificationDeviceRegistrationRepository deviceRepository;
     private final NotificationTopicMembershipRepository topicMembershipRepository;
     private final NotificationTokenCipher tokenCipher;
+    private final WebPushProperties webPush;
 
     public NotificationDeviceService(
             NotificationDeviceRegistrationRepository deviceRepository,
             NotificationTopicMembershipRepository topicMembershipRepository,
-            NotificationTokenCipher tokenCipher
+            NotificationTokenCipher tokenCipher,
+            WebPushProperties webPush
     ) {
         this.deviceRepository = deviceRepository;
         this.topicMembershipRepository = topicMembershipRepository;
         this.tokenCipher = tokenCipher;
+        this.webPush = webPush;
+    }
+
+    public WebPushConfigResponse webPushConfig() {
+        boolean enabled = webPush.isConfigured();
+        return new WebPushConfigResponse(enabled, enabled ? webPush.getPublicKey() : null);
     }
 
     @Transactional
     public DeviceRegistrationResponse register(String tenantId, String userId, String portal, RegisterDeviceRequest request) {
-        String fid = trimToNull(request.firebaseInstallationId());
+        String transport = transport(request.transport());
+        boolean webPushTransport = WEB_PUSH.equals(transport);
+        String fid = webPushTransport ? null : trimToNull(request.firebaseInstallationId());
         String token = trimToNull(request.registrationToken());
+        String p256dh = null;
+        String auth = null;
+        if (webPushTransport) {
+            if (!webPush.isConfigured()) {
+                throw new BadRequestException("Web Push chưa được cấu hình");
+            }
+            // The endpoint is the subscription identity: stored and deduped exactly like an FCM token.
+            token = WebPushSubscriptionValidator.endpoint(request.endpoint());
+            p256dh = WebPushSubscriptionValidator.key(request.keys() == null ? null : request.keys().p256dh(),
+                    WebPushSubscriptionValidator.P256DH_BYTES, "p256dh");
+            auth = WebPushSubscriptionValidator.key(request.keys() == null ? null : request.keys().auth(),
+                    WebPushSubscriptionValidator.AUTH_BYTES, "auth");
+        }
         if (fid == null && token == null) {
             throw new BadRequestException("firebaseInstallationId or registrationToken is required.");
         }
@@ -57,7 +83,10 @@ public class NotificationDeviceService {
         entity.setFirebaseInstallationId(fid);
         entity.setRegistrationToken(tokenCipher.encrypt(token));
         entity.setRegistrationTokenHash(tokenHash);
-        entity.setEndpointHash(request.endpoint() == null ? null : sha256(request.endpoint()));
+        entity.setEndpointHash(request.endpoint() == null ? null : sha256(webPushTransport ? token : request.endpoint()));
+        entity.setTransport(transport);
+        entity.setP256dh(tokenCipher.encrypt(p256dh));
+        entity.setAuth(tokenCipher.encrypt(auth));
         entity.setServiceWorkerScope(trimToNull(request.serviceWorkerScope()));
         entity.setPermissionState(firstText(request.permissionState(), "granted"));
         entity.setLocale(trimToNull(request.locale()));
@@ -175,8 +204,19 @@ public class NotificationDeviceService {
                 entity.getPlatform(),
                 entity.getPermissionState(),
                 Boolean.TRUE.equals(entity.getEnabled()),
-                entity.getLastSeenAt()
+                entity.getLastSeenAt(),
+                entity.getTransport()
         );
+    }
+
+    private static final String WEB_PUSH = "WEB_PUSH";
+
+    private String transport(String value) {
+        String transport = value == null || value.isBlank() ? "FCM" : value.trim().toUpperCase(Locale.ROOT);
+        if (!"FCM".equals(transport) && !WEB_PUSH.equals(transport)) {
+            throw new BadRequestException("transport chỉ gồm FCM, WEB_PUSH");
+        }
+        return transport;
     }
 
     private String sanitize(String value) {

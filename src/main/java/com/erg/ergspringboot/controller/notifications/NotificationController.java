@@ -3,6 +3,7 @@ package com.erg.ergspringboot.controller.notifications;
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.UpdatePreferencesRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.PageResponse;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.AckResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.ArchiveResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.MarkReadResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.NotificationItemResponse;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -112,6 +114,22 @@ public class NotificationController {
         return ok(
                 "Notification marked read",
                 notifications.markRead(principal.tenantId(), principal.userId(), verifiedPortal, id),
+                request
+        );
+    }
+
+    /** Acknowledge a campaign message that requires it; also marks it read. Idempotent. 409 if no ack required. */
+    @PostMapping("/{id}/ack")
+    public ApiResponse<AckResponse> ack(
+            @PathVariable String id,
+            @RequestParam(required = false) String portal,
+            HttpServletRequest request
+    ) {
+        ErgPrincipal principal = security.principal();
+        String verifiedPortal = security.verifiedPortal(principal, portal);
+        return ok(
+                "Notification acknowledged",
+                notifications.ack(principal.tenantId(), principal.userId(), verifiedPortal, id),
                 request
         );
     }
