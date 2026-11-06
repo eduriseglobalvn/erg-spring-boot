@@ -59,7 +59,7 @@ class LmsAudienceReadAdapter implements LmsAudienceReadPort {
             return List.of();
         }
         Map<String, List<String>> byClass = new LinkedHashMap<>();
-        students.findByTenantIdAndAcademicClassIdInAndAuthUserIdIsNotNullOrderByFullNameAsc(
+        students.findAudienceStudentsInClasses(
                         tenantId, classIds, PageRequest.ofSize(limit))
                 .forEach(student -> byClass.computeIfAbsent(student.getAcademicClassId(), key -> new java.util.ArrayList<>())
                         .add(student.getAuthUserId()));
@@ -83,7 +83,7 @@ class LmsAudienceReadAdapter implements LmsAudienceReadPort {
 
     @Override
     public List<String> allStudentUserIds(String tenantId, int limit) {
-        return students.findByTenantIdAndAuthUserIdIsNotNullOrderByFullNameAsc(tenantId, PageRequest.ofSize(limit))
+        return students.findAudienceStudents(tenantId, PageRequest.ofSize(limit))
                 .stream().map(Student::getAuthUserId).toList();
     }
 
@@ -93,14 +93,20 @@ class LmsAudienceReadAdapter implements LmsAudienceReadPort {
         if (classIds.isEmpty() || userIds.isEmpty()) {
             return List.of();
         }
-        return students.findByTenantIdAndAcademicClassIdInAndAuthUserIdIn(tenantId, classIds, userIds).stream()
+        return students.findAudienceStudentsInClassesAmong(tenantId, classIds, userIds).stream()
                 .map(Student::getAuthUserId).distinct().toList();
+    }
+
+    /** Same roll rule as the audience queries in StudentRepository. */
+    private static boolean isAudienceStudent(Student student) {
+        String status = student.getStatus() == null ? null : student.getStatus().toLowerCase(java.util.Locale.ROOT);
+        return student.getAuthUserId() != null && (status == null || status.equals("active") || status.equals("enrolled"));
     }
 
     /** Keeps the order of {@code studentIds} (group membership order). */
     private static List<String> userIdsOf(List<Student> found, Set<String> studentIds) {
         Map<String, String> userIdByStudent = new LinkedHashMap<>();
-        found.stream().filter(student -> student.getAuthUserId() != null)
+        found.stream().filter(LmsAudienceReadAdapter::isAudienceStudent)
                 .forEach(student -> userIdByStudent.put(student.getId(), student.getAuthUserId()));
         return studentIds.stream().map(userIdByStudent::get).filter(Objects::nonNull).distinct().toList();
     }

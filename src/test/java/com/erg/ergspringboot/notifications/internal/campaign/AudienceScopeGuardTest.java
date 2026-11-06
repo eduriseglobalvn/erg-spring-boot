@@ -30,7 +30,7 @@ class AudienceScopeGuardTest {
     void teachesSevenAAndSevenB() {
         when(lms.classIdsTaughtBy(TENANT, TEACHER)).thenReturn(List.of("7A", "7B"));
         // only s1 is a student of 7A/7B; whatever else is asked about is "outside"
-        when(lms.studentUserIdsInClassesAmong(eq(TENANT), any(Collection.class), any(Collection.class)))
+        when(lms.studentUserIdsInClassesAmong(eq(TENANT), eq(List.of("7A", "7B")), any(Collection.class)))
                 .thenAnswer(call -> ((Collection<String>) call.getArgument(2)).stream()
                         .filter("s1"::equals).toList());
     }
@@ -95,6 +95,23 @@ class AudienceScopeGuardTest {
 
         assertThatCode(() -> guard.assertAllowed(TENANT, "ad1", Set.of("admin"), everything))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void pickedListOverFiveThousandIsRejectedBeforeAnyQuery() {
+        List<String> many = java.util.stream.IntStream.rangeClosed(1, 5001).mapToObj(i -> "u" + i).toList();
+
+        assertThatThrownBy(() -> teacherSends(new CampaignAudience(false, null, null, null, null, null, many)))
+                .isInstanceOf(AudienceTooLargeException.class);
+        org.mockito.Mockito.verify(lms, org.mockito.Mockito.never()).studentUserIdsInClassesAmong(any(), any(), any());
+    }
+
+    @Test
+    void missingRolesFailClosedAsForbidden() {
+        assertThatThrownBy(() -> guard.assertAllowed(TENANT, TEACHER, null, classes("7A")))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guard.assertAllowed(TENANT, TEACHER, java.util.Collections.singleton(null), classes("7A")))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test

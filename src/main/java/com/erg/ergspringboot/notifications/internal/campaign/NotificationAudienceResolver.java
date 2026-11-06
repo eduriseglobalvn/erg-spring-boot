@@ -55,13 +55,15 @@ public class NotificationAudienceResolver {
             classIds.addAll(lms.classIdsOf(tenantId, audience.schoolIds(), audience.gradeIds()));
         }
         if (!classIds.isEmpty()) {
-            add(reached, Kind.STUDENT, lms.studentUserIdsInClasses(tenantId, List.copyOf(classIds), FETCH_LIMIT));
+            add(reached, Kind.STUDENT,
+                    withActiveLogin(tenantId, lms.studentUserIdsInClasses(tenantId, List.copyOf(classIds), FETCH_LIMIT)));
         }
         if (!audience.groupIds().isEmpty()) {
-            add(reached, Kind.STUDENT, lms.studentUserIdsInGroups(tenantId, audience.groupIds(), FETCH_LIMIT));
+            add(reached, Kind.STUDENT,
+                    withActiveLogin(tenantId, lms.studentUserIdsInGroups(tenantId, audience.groupIds(), FETCH_LIMIT)));
         }
         if (audience.wholeTenant() || audience.roles().contains("STUDENT")) {
-            add(reached, Kind.STUDENT, lms.allStudentUserIds(tenantId, FETCH_LIMIT));
+            add(reached, Kind.STUDENT, withActiveLogin(tenantId, lms.allStudentUserIds(tenantId, FETCH_LIMIT)));
         }
     }
 
@@ -79,11 +81,7 @@ public class NotificationAudienceResolver {
     private int addPicked(String tenantId, Set<String> picked, Map<String, Kind> reached) {
         List<String> unknown = picked.stream().filter(id -> !reached.containsKey(id)).toList();
         Set<String> valid = new LinkedHashSet<>();
-        if (!unknown.isEmpty()) {
-            users.findByTenantIdAndIds(tenantId, unknown).stream()
-                    .filter(user -> user.status() == null || "ACTIVE".equalsIgnoreCase(user.status()))
-                    .forEach(user -> valid.add(user.id()));
-        }
+        valid.addAll(activeAmong(tenantId, unknown));
         int duplicates = 0;
         for (String id : picked) {
             if (reached.containsKey(id)) {
@@ -94,6 +92,23 @@ public class NotificationAudienceResolver {
         }
         requireWithinLimit(reached);
         return duplicates;
+    }
+
+    /** Drops students whose login account is missing or not active, keeping order. */
+    private List<String> withActiveLogin(String tenantId, List<String> studentUserIds) {
+        Set<String> active = activeAmong(tenantId, studentUserIds);
+        return studentUserIds.stream().filter(active::contains).toList();
+    }
+
+    /** A missing status counts as active, like the teacher directory query. */
+    private Set<String> activeAmong(String tenantId, List<String> userIds) {
+        Set<String> active = new LinkedHashSet<>();
+        if (!userIds.isEmpty()) {
+            users.findByTenantIdAndIds(tenantId, userIds).stream()
+                    .filter(user -> user.status() == null || "ACTIVE".equalsIgnoreCase(user.status()))
+                    .forEach(user -> active.add(user.id()));
+        }
+        return active;
     }
 
     private static void add(Map<String, Kind> reached, Kind kind, List<String> ids) {

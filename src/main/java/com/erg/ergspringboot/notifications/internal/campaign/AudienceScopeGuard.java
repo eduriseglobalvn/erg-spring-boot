@@ -4,6 +4,7 @@ import com.erg.ergspringboot.lms.LmsAudienceReadPort;
 import com.erg.ergspringboot.notifications.CampaignAudience;
 import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.List;
 import java.util.Set;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,7 +22,8 @@ public class AudienceScopeGuard {
 
     public void assertAllowed(String tenantId, String actorId, Set<String> actorRoles, CampaignAudience audience) {
         List<String> workspaces = WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
-                List.copyOf(actorRoles), List.of(), List.of());
+                actorRoles == null ? List.of() : actorRoles.stream().filter(Objects::nonNull).toList(),
+                List.of(), List.of());
         if (workspaces.contains("ADMIN")) {
             return;
         }
@@ -32,18 +34,27 @@ public class AudienceScopeGuard {
                 || !audience.roles().isEmpty()) {
             throw denied();
         }
+        // Bound the IN lists before any query: same 5,000 rule as the resolver.
+        Set<String> people = new HashSet<>(audience.userIds());
+        requireWithinLimit(people.size());
         List<String> taught = lms.classIdsTaughtBy(tenantId, actorId);
         if (!taught.containsAll(audience.classIds())) {
             throw denied();
         }
-        Set<String> people = new HashSet<>(audience.userIds());
         if (!audience.groupIds().isEmpty()) {
             people.addAll(lms.studentUserIdsInGroups(
                     tenantId, audience.groupIds(), NotificationAudienceResolver.MAX_RECIPIENTS + 1));
         }
+        requireWithinLimit(people.size());
         if (!people.isEmpty()
                 && !Set.copyOf(lms.studentUserIdsInClassesAmong(tenantId, taught, people)).containsAll(people)) {
             throw denied();
+        }
+    }
+
+    private static void requireWithinLimit(int count) {
+        if (count > NotificationAudienceResolver.MAX_RECIPIENTS) {
+            throw new AudienceTooLargeException();
         }
     }
 
