@@ -123,6 +123,7 @@ final class QuestionBodyCompiler {
             }
             body.put(entry.getKey(), entry.getValue());
         }
+        applyFeedbackRows(body, slide);
         if (body.get("options") instanceof Map) {
             body.remove("options");
         }
@@ -144,6 +145,34 @@ final class QuestionBodyCompiler {
         QuestionKindStrategy.stripAllAnswers(body);
         applyQuestionSettings(body, slide, bankQuestionId, questionSettings, questionSetSettings);
         return body;
+    }
+
+    /**
+     * A slide made from a question-bank question keeps its "when right / wrong" messages only in the editor's
+     * feedbackRows ({kind, feedback}); the learner reads {@code feedback: {correct, partial, incorrect}}. A feedback
+     * object the editor already wrote on the runtime question wins.
+     */
+    private void applyFeedbackRows(Map<String, Object> body, Map<String, Object> slide) {
+        if (body.get("feedback") instanceof Map || !(slide.get("feedbackRows") instanceof List<?> rows)) {
+            return;
+        }
+        Map<String, Object> feedback = new LinkedHashMap<>();
+        feedback.put("correct", "");
+        feedback.put("partial", "");
+        feedback.put("incorrect", "");
+        boolean any = false;
+        for (Object row : rows) {
+            if (row instanceof Map<?, ?> map && feedback.containsKey(string(map.get("kind")))) {
+                String text = string(map.get("feedback"));
+                if (text != null && !text.isBlank()) {
+                    feedback.put(string(map.get("kind")), text);
+                    any = true;
+                }
+            }
+        }
+        if (any) {
+            body.put("feedback", feedback);
+        }
     }
 
     @SuppressWarnings("unchecked")

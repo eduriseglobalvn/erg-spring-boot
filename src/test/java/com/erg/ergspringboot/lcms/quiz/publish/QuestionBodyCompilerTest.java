@@ -12,6 +12,32 @@ class QuestionBodyCompilerTest {
     private final QuestionBodyCompiler compiler = new QuestionBodyCompiler();
 
     @Test
+    void bankSlideFeedbackRowsBecomeTheLearnerFeedbackObject() {
+        Map<String, Object> slide = new LinkedHashMap<>();
+        slide.put("id", "s1");
+        slide.put("feedbackRows", List.of(
+                Map.of("kind", "correct", "feedback", "Đúng rồi"),
+                Map.of("kind", "incorrect", "feedback", "Chưa đúng")));
+
+        Map<String, Object> body = compiler.compileBody(slide, "single_choice", "bq1", Map.of(), Map.of());
+
+        assertThat(body.get("feedback")).isEqualTo(Map.of("correct", "Đúng rồi", "partial", "", "incorrect", "Chưa đúng"));
+        assertThat(body).doesNotContainKey("feedbackRows");
+    }
+
+    @Test
+    void feedbackTheEditorAlreadyWroteOnTheRuntimeQuestionWins() {
+        Map<String, Object> slide = new LinkedHashMap<>();
+        slide.put("id", "s1");
+        slide.put("feedback", Map.of("correct", "Từ editor", "partial", "", "incorrect", ""));
+        slide.put("feedbackRows", List.of(Map.of("kind", "correct", "feedback", "Từ hàng")));
+
+        Map<String, Object> body = compiler.compileBody(slide, "single_choice", "bq1", Map.of(), Map.of());
+
+        assertThat(((Map<?, ?>) body.get("feedback")).get("correct")).isEqualTo("Từ editor");
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void keyedMatchingFoldsItsResponsesBackIntoThePairs() {
         Map<String, Object> slide = new LinkedHashMap<>();
