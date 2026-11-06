@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +30,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -153,6 +155,12 @@ class QuizPublishServiceTest {
         when(cacheManager.getCache("quizRuntimePackage")).thenReturn(runtimeCache);
 
         ContentLifecyclePort lifecycle = mock(ContentLifecyclePort.class);
+        // The lifecycle reads a "published" status as already published and would skip the DRAFT -> PUBLISHED transition.
+        AtomicReference<String> statusSeenByLifecycle = new AtomicReference<>("unset");
+        doAnswer(invocation -> {
+            statusSeenByLifecycle.set(quiz.getStatus());
+            return null;
+        }).when(lifecycle).recordPublishedSnapshot(anyString(), anyString(), anyString(), anyString());
         QuizPublishService service = new QuizPublishService(
                 quizRepository,
                 bankQuestionRepository,
@@ -189,6 +197,7 @@ class QuizPublishServiceTest {
         verify(runtimeCache).evict("tenant-a:quiz-1");
         verify(quizRepository).save(quiz);
         verify(lifecycle).recordPublishedSnapshot("tenant-a", "quiz-1", "author-1", "publish-key-1");
+        assertThat(statusSeenByLifecycle.get()).isNotEqualTo("unset").isNotEqualTo("published");
         assertThat(quiz.getCurrentVersionId()).isEqualTo("version-1");
         assertThat(quiz.getPackageHash()).isEqualTo("sha256:abcdef1234567890");
         assertThat(versionCaptor.getValue().getAuthoringSnapshot())
