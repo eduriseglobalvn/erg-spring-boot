@@ -28,6 +28,14 @@ public interface StudentRepository extends JpaRepository<Student, String> {
 
     List<Student> findByTenantIdAndAcademicClassIdOrderByFullNameAsc(String tenantId, String academicClassId);
 
+    List<Student> findByTenantIdAndAcademicClassIdInAndAuthUserIdIsNotNullOrderByFullNameAsc(
+            String tenantId, Collection<String> academicClassIds, Pageable pageable);
+
+    List<Student> findByTenantIdAndAuthUserIdIsNotNullOrderByFullNameAsc(String tenantId, Pageable pageable);
+
+    List<Student> findByTenantIdAndAcademicClassIdInAndAuthUserIdIn(
+            String tenantId, Collection<String> academicClassIds, Collection<String> authUserIds);
+
     Optional<Student> findFirstByTenantIdAndAuthUserId(String tenantId, String authUserId);
 
     @Query(
