@@ -3,6 +3,7 @@ package com.erg.ergspringboot.notifications.internal.campaign;
 import com.erg.ergspringboot.lms.LmsAudienceReadPort;
 import com.erg.ergspringboot.notifications.CampaignAudience;
 import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.List;
@@ -21,9 +22,7 @@ public class AudienceScopeGuard {
     }
 
     public void assertAllowed(String tenantId, String actorId, Set<String> actorRoles, CampaignAudience audience) {
-        List<String> workspaces = WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
-                actorRoles == null ? List.of() : actorRoles.stream().filter(Objects::nonNull).toList(),
-                List.of(), List.of());
+        List<String> workspaces = workspacesOf(actorRoles);
         if (workspaces.contains("ADMIN")) {
             return;
         }
@@ -50,6 +49,21 @@ public class AudienceScopeGuard {
                 && !Set.copyOf(lms.studentUserIdsInClassesAmong(tenantId, taught, people)).containsAll(people)) {
             throw denied();
         }
+    }
+
+    public boolean isAdmin(Collection<String> actorRoles) {
+        return workspacesOf(actorRoles).contains("ADMIN");
+    }
+
+    public boolean isTeacher(Collection<String> actorRoles) {
+        return workspacesOf(actorRoles).contains("TEACHER");
+    }
+
+    /** Single source of truth for admin/teacher detection; null roles count as none (fail closed). */
+    private static List<String> workspacesOf(Collection<String> actorRoles) {
+        return WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                actorRoles == null ? List.of() : actorRoles.stream().filter(Objects::nonNull).toList(),
+                List.of(), List.of());
     }
 
     private static void requireWithinLimit(int count) {

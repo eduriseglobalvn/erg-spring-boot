@@ -59,6 +59,19 @@ public interface StudentRepository extends JpaRepository<Student, String> {
     List<Student> findAudienceStudentsInClassesAmong(
             String tenantId, Collection<String> academicClassIds, Collection<String> authUserIds);
 
+    /** Lookup by code (upper-case), email (lower-case) or phone with spaces/dots/dashes removed. */
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId
+              and student.authUserId is not null
+              and (student.status is null or lower(student.status) in ('active', 'enrolled'))
+              and (upper(student.studentCode) in :codes
+                   or lower(student.email) in :emails
+                   or replace(replace(replace(student.phone, ' ', ''), '.', ''), '-', '') in :phones)
+            """)
+    List<Student> findAudienceStudentsByKeys(
+            String tenantId, Collection<String> codes, Collection<String> emails, Collection<String> phones);
+
     Optional<Student> findFirstByTenantIdAndAuthUserId(String tenantId, String authUserId);
 
     @Query(

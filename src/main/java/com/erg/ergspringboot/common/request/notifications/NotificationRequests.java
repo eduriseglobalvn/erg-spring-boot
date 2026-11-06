@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.common.request.notifications;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -77,5 +78,8 @@ public final class NotificationRequests {
             String topicName,
             Map<String, String> data
     ) {
+    }
+
+    public record ResolvePeopleRequest(@NotNull List<String> lines) {
     }
 }
