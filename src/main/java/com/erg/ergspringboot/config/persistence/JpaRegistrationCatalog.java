@@ -27,7 +27,7 @@ public final class JpaRegistrationCatalog {
             owned("learningoutcomes", 7, 7),
             owned("learningstandards", 4, 4),
             owned("lms", 12, 13),
-            owned("notifications", 7, 7),
+            owned("notifications", 8, 8),
             owned("outbox", "auth", 1, 1),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
