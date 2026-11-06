@@ -36,6 +36,12 @@ public class NotificationCommandService {
             "deviceRegistrationId"
     );
 
+    public static final String CAMPAIGN_EVENT_TYPE = "CAMPAIGN";
+    public static final String CAMPAIGN_PORTAL = "lms";
+    /** Outbox payload marker: URGENT campaigns are pushed even to users who opted out of campaign pushes. */
+    public static final String BYPASS_PREFERENCES_KEY = "bypassPreferences";
+    private static final int BODY_PREVIEW_MAX = 500;
+
     private final NotificationMessageRepository messageRepository;
     private final NotificationRecipientRepository recipientRepository;
     private final NotificationDeviceRegistrationRepository deviceRepository;
@@ -157,6 +163,72 @@ public class NotificationCommandService {
 
         metrics.created(savedMessage.getEventType(), firstText(command.portal(), "lms"), recipientCount, outboxCount);
         return new NotificationCommandResult(savedMessage.getId(), recipientCount, outboxCount);
+    }
+
+    /** Campaign send: inbox is always on; push honours per-user opt-outs unless the campaign is URGENT. */
+    @Transactional
+    public NotificationCommandResult enqueueCampaign(CampaignDelivery delivery) {
+        boolean urgent = delivery.priority() == com.erg.ergspringboot.notifications.NotificationPriority.URGENT;
+        Map<String, String> data = new java.util.LinkedHashMap<>();
+        data.put("campaignId", delivery.campaignId());
+        data.put("priority", delivery.priority().name());
+        if (urgent) data.put(BYPASS_PREFERENCES_KEY, "true");
+        String preview = delivery.body().length() > BODY_PREVIEW_MAX
+                ? delivery.body().substring(0, BODY_PREVIEW_MAX) : delivery.body();
+        NotificationCommand command = new NotificationCommand(delivery.tenantId(), delivery.createdBy(), null,
+                CAMPAIGN_EVENT_TYPE, "notification_campaign", delivery.campaignId(), delivery.title(), preview,
+                null, delivery.priority().name(), CAMPAIGN_PORTAL, delivery.userIds(), null, data);
+        Set<String> userIds = normalizedUserIds(delivery.userIds());
+        Map<String, NotificationMessageEntity> messages = new java.util.LinkedHashMap<>();
+        for (String userId : userIds) {
+            NotificationMessageEntity message = new NotificationMessageEntity();
+            message.setTenantId(delivery.tenantId());
+            message.setEventType(CAMPAIGN_EVENT_TYPE);
+            message.setSourceType(command.sourceType());
+            message.setSourceId(delivery.campaignId());
+            message.setCampaignId(delivery.campaignId());
+            message.setTitle(delivery.title());
+            message.setBodyPreview(preview);
+            message.setPriority(delivery.priority().name());
+            message.setChannel(delivery.pushEnabled() ? "push" : "inbox");
+            message.setVisibility("private");
+            message.setCreatedBy(trimToNull(delivery.createdBy()));
+            message.setPayloadData(data);
+            messages.put(userId, message);
+        }
+        // Persist (not merge): ids are assigned by @PrePersist, so recipients are linked after saving.
+        messageRepository.saveAll(messages.values());
+        List<NotificationRecipientEntity> recipients = new ArrayList<>();
+        messages.forEach((userId, message) -> {
+            NotificationRecipientEntity recipient = new NotificationRecipientEntity();
+            recipient.setTenantId(delivery.tenantId());
+            recipient.setNotificationId(message.getId());
+            recipient.setUserId(userId);
+            recipient.setPortal(CAMPAIGN_PORTAL);
+            recipients.add(recipient);
+        });
+        recipientRepository.saveAll(recipients);
+
+        List<NotificationOutboxEntity> outboxes = new ArrayList<>();
+        if (delivery.pushEnabled() && !userIds.isEmpty()) {
+            Set<String> pushDisabled = new java.util.HashSet<>();
+            if (!urgent) {
+                preferenceRepository.findByTenantIdAndPortalAndEventTypeAndUserIdIn(
+                                delivery.tenantId(), CAMPAIGN_PORTAL, CAMPAIGN_EVENT_TYPE, userIds).stream()
+                        .filter(preference -> Boolean.FALSE.equals(preference.getPushEnabled()))
+                        .forEach(preference -> pushDisabled.add(preference.getUserId()));
+            }
+            for (NotificationDeviceRegistrationEntity device : deviceRepository
+                    .findByTenantIdAndUserIdInAndPortalAndEnabledTrue(delivery.tenantId(), userIds, CAMPAIGN_PORTAL)) {
+                NotificationMessageEntity message = messages.get(device.getUserId());
+                if (message == null || pushDisabled.contains(device.getUserId())) continue;
+                NotificationOutboxEntity outbox = outboxForDevice(message, command, device);
+                if (outbox != null) outboxes.add(outbox);
+            }
+            if (!outboxes.isEmpty()) outboxRepository.saveAll(outboxes);
+        }
+        metrics.created(CAMPAIGN_EVENT_TYPE, CAMPAIGN_PORTAL, recipients.size(), outboxes.size());
+        return new NotificationCommandResult(delivery.campaignId(), recipients.size(), outboxes.size());
     }
 
     private void validateTargets(Set<String> userIds, String topicName) {
