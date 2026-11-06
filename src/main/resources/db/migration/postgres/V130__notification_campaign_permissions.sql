@@ -26,7 +26,7 @@ SELECT role.id, permission.id
 FROM roles role
 JOIN permissions permission ON permission.name = 'notification.campaign.send'
 WHERE role.id IN (
-    'role_system_admin', 'role_lms_admin', 'role_pdt_operator',
+    'role_lms_admin',
     'role_lms_teacher', 'role_lms_teacher_standard', 'role_lms_homeroom_teacher',
     'role_lms_subject_teacher', 'role_lms_teacher_lead'
 )

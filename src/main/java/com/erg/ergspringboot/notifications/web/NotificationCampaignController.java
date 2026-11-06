@@ -121,9 +121,8 @@ public class NotificationCampaignController {
     @GetMapping("/people")
     public ApiResponse<List<RecipientCard>> searchPeople(
             @RequestParam(required = false) String q, HttpServletRequest request) {
-        CampaignActor actor = actor();
         return ok("People found",
-                people.search(actor.tenantId(), actor.userId(), List.copyOf(actor.roles()), q, PEOPLE_SEARCH_LIMIT),
+                people.search(actor(), q, PEOPLE_SEARCH_LIMIT),
                 request);
     }
 
@@ -131,9 +130,8 @@ public class NotificationCampaignController {
     @PostMapping("/people/resolve")
     public ApiResponse<ResolvePeopleResult> resolvePeople(
             @Valid @RequestBody ResolvePeopleRequest body, HttpServletRequest request) {
-        CampaignActor actor = actor();
         return ok("People resolved",
-                people.resolveLines(actor.tenantId(), actor.userId(), List.copyOf(actor.roles()), body.lines()),
+                people.resolveLines(actor(), body.lines()),
                 request);
     }
 

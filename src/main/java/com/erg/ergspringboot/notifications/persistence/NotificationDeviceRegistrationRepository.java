@@ -30,6 +30,12 @@ public interface NotificationDeviceRegistrationRepository extends JpaRepository<
             String portal
     );
 
+    /** Every enabled device of these users in the tenant, whatever portal (workspace) registered it. */
+    List<NotificationDeviceRegistrationEntity> findByTenantIdAndUserIdInAndEnabledTrue(
+            String tenantId,
+            Collection<String> userIds
+    );
+
     List<NotificationDeviceRegistrationEntity> findByTenantIdAndUserIdInAndPortalAndEnabledTrue(
             String tenantId,
             Collection<String> userIds,

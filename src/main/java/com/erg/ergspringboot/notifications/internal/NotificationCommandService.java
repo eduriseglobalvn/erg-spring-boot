@@ -211,18 +211,24 @@ public class NotificationCommandService {
 
         List<NotificationOutboxEntity> outboxes = new ArrayList<>();
         if (delivery.pushEnabled() && !userIds.isEmpty()) {
+            // Devices register under the portal of the session that enabled push (students: elearning, teachers:
+            // lms, ...), so look across portals and honour the opt-out stored for that same portal.
             Set<String> pushDisabled = new java.util.HashSet<>();
             if (!urgent) {
-                preferenceRepository.findByTenantIdAndPortalAndEventTypeAndUserIdIn(
-                                delivery.tenantId(), CAMPAIGN_PORTAL, CAMPAIGN_EVENT_TYPE, userIds).stream()
+                preferenceRepository.findByTenantIdAndEventTypeAndUserIdIn(
+                                delivery.tenantId(), CAMPAIGN_EVENT_TYPE, userIds).stream()
                         .filter(preference -> Boolean.FALSE.equals(preference.getPushEnabled()))
-                        .forEach(preference -> pushDisabled.add(preference.getUserId()));
+                        .forEach(preference -> pushDisabled.add(preference.getUserId() + "|" + preference.getPortal()));
             }
             for (NotificationDeviceRegistrationEntity device : deviceRepository
-                    .findByTenantIdAndUserIdInAndPortalAndEnabledTrue(delivery.tenantId(), userIds, CAMPAIGN_PORTAL)) {
+                    .findByTenantIdAndUserIdInAndEnabledTrue(delivery.tenantId(), userIds)) {
                 NotificationMessageEntity message = messages.get(device.getUserId());
-                if (message == null || pushDisabled.contains(device.getUserId())) continue;
-                NotificationOutboxEntity outbox = outboxForDevice(message, command, device);
+                if (message == null || pushDisabled.contains(device.getUserId() + "|" + device.getPortal())) continue;
+                NotificationCommand devicePortal = new NotificationCommand(command.tenantId(), command.createdBy(), null,
+                        command.eventType(), command.sourceType(), command.sourceId(), command.title(),
+                        command.bodyPreview(), null, command.priority(), device.getPortal(), command.userIds(), null,
+                        command.data());
+                NotificationOutboxEntity outbox = outboxForDevice(message, devicePortal, device);
                 if (outbox != null) outboxes.add(outbox);
             }
             if (!outboxes.isEmpty()) outboxRepository.saveAll(outboxes);

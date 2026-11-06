@@ -21,14 +21,20 @@ public class AudienceScopeGuard {
         this.lms = lms;
     }
 
+    /** Roles-only form (no permissions); see {@link #assertAllowed(CampaignActor, CampaignAudience)}. */
     public void assertAllowed(String tenantId, String actorId, Set<String> actorRoles, CampaignAudience audience) {
-        List<String> workspaces = workspacesOf(actorRoles);
-        if (workspaces.contains("ADMIN")) {
+        assertAllowed(new CampaignActor(tenantId, actorId, actorRoles), audience);
+    }
+
+    public void assertAllowed(CampaignActor actor, CampaignAudience audience) {
+        if (isAdmin(actor)) {
             return;
         }
-        if (!workspaces.contains("TEACHER")) {
+        if (!isTeacher(actor)) {
             throw denied();
         }
+        String tenantId = actor.tenantId();
+        String actorId = actor.userId();
         if (audience.wholeTenant() || !audience.schoolIds().isEmpty() || !audience.gradeIds().isEmpty()
                 || !audience.roles().isEmpty()) {
             throw denied();
@@ -57,6 +63,17 @@ public class AudienceScopeGuard {
 
     public boolean isTeacher(Collection<String> actorRoles) {
         return workspacesOf(actorRoles).contains("TEACHER");
+    }
+
+    /** ADMIN never comes from permissions: roles only (plus the platform-wide "admin" CampaignActor adds). */
+    public boolean isAdmin(CampaignActor actor) {
+        return isAdmin(actor.roles());
+    }
+
+    /** TEACHER follows the platform rule over verified roles + permissions minus denies (fail closed when empty). */
+    public boolean isTeacher(CampaignActor actor) {
+        return WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                List.copyOf(actor.roles()), actor.permissions(), actor.deniedPermissions()).contains("TEACHER");
     }
 
     /** Single source of truth for admin/teacher detection; null roles count as none (fail closed). */

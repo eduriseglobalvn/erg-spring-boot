@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.notifications.internal.campaign;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +42,40 @@ class AudienceScopeGuardTest {
 
     private void teacherSends(CampaignAudience audience) {
         guard.assertAllowed(TENANT, TEACHER, TEACHER_ROLES, audience);
+    }
+
+    @Test
+    void seededTeacherRoleIsATeacherThroughItsVerifiedPermissions() {
+        CampaignActor seeded = new CampaignActor(TENANT, TEACHER, Set.of("lms_teacher_standard"),
+                List.of("lms.assignment.read", "notification.campaign.send"), List.of());
+
+        assertThat(guard.isTeacher(seeded)).isTrue();
+        assertThat(guard.isAdmin(seeded)).isFalse();
+        assertThatCode(() -> guard.assertAllowed(seeded, classes("7A"))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> guard.assertAllowed(seeded, classes("8A"))).isInstanceOf(AccessDeniedException.class);
+        // the role name alone (no permissions) is still nobody
+        assertThatThrownBy(() -> guard.assertAllowed(TENANT, TEACHER, Set.of("lms_teacher_standard"), classes("7A")))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void adminIsNeverDerivedFromPermissions() {
+        CampaignActor contentEditor = new CampaignActor(TENANT, "ed1", Set.of("content_editor"),
+                List.of("content.read", "rbac.role.read"), List.of());
+
+        assertThat(guard.isAdmin(contentEditor)).isFalse();
+        assertThatThrownBy(() -> guard.assertAllowed(contentEditor,
+                new CampaignAudience(true, null, null, null, null, null, null)))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void deniedTeacherWorkspaceFailsClosed() {
+        CampaignActor denied = new CampaignActor(TENANT, TEACHER, Set.of("lms_teacher_standard"),
+                List.of("lms.assignment.read"), List.of("workspace.*"));
+
+        assertThat(guard.isTeacher(denied)).isFalse();
+        assertThat(guard.isTeacher(new CampaignActor(TENANT, TEACHER, null, null, null))).isFalse();
     }
 
     @Test

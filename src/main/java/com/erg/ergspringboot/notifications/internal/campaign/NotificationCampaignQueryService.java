@@ -80,7 +80,7 @@ public class NotificationCampaignQueryService {
             }
             default -> throw new BadRequestException("box chỉ gồm SENT, SCHEDULED, DRAFT");
         }
-        String createdBy = guard.isAdmin(actor.roles()) && !mine ? null : actor.userId();
+        String createdBy = guard.isAdmin(actor) && !mine ? null : actor.userId();
         Page<NotificationCampaignEntity> result = campaigns.findPage(actor.tenantId(), statuses, createdBy,
                 PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), sort));
         Map<String, CampaignDeliveryCounts> counts = counts(actor.tenantId(),
@@ -104,6 +104,10 @@ public class NotificationCampaignQueryService {
             throw new BadRequestException("filter chỉ gồm ALL, UNREAD, UNACKED");
         }
         NotificationCampaignEntity campaign = owned(actor, id);
+        if ("UNACKED".equals(normalized) && !campaign.isRequireReadAck()) {
+            // Nothing to acknowledge on this campaign, so nobody is "unacknowledged".
+            return new PageResponse<>(List.of(), Math.max(page, 0), Math.clamp(size, 1, 100), 0, 0, false, false);
+        }
         Page<CampaignRecipientRow> rows = messages.findCampaignRecipients(actor.tenantId(), campaign.getId(),
                 "UNREAD".equals(normalized), "UNACKED".equals(normalized),
                 PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100)));
@@ -119,7 +123,7 @@ public class NotificationCampaignQueryService {
 
     @Transactional(readOnly = true)
     public CampaignSummaryResponse summary(CampaignActor actor) {
-        String createdBy = guard.isAdmin(actor.roles()) ? null : actor.userId();
+        String createdBy = guard.isAdmin(actor) ? null : actor.userId();
         OffsetDateTime monthStart = LocalDate.now(clock.withZone(CAMPAIGN_ZONE)).withDayOfMonth(1)
                 .atStartOfDay(CAMPAIGN_ZONE).toOffsetDateTime();
         long sent = campaigns.countSentSince(actor.tenantId(), monthStart, createdBy);
@@ -141,7 +145,7 @@ public class NotificationCampaignQueryService {
     }
 
     boolean canAccess(CampaignActor actor, NotificationCampaignEntity campaign) {
-        return guard.isAdmin(actor.roles()) || actor.userId().equals(campaign.getCreatedBy());
+        return guard.isAdmin(actor) || actor.userId().equals(campaign.getCreatedBy());
     }
 
     public CampaignResponse toResponse(NotificationCampaignEntity campaign) {

@@ -3,7 +3,6 @@ package com.erg.ergspringboot.notifications.internal.campaign;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -89,7 +88,8 @@ class NotificationCampaignServiceTest {
                 metrics, preferences);
         service = new NotificationCampaignService(campaigns, guard, resolver, commands, queries, authorizations, users,
                 Clock.fixed(NOW, ZoneOffset.UTC));
-        lenient().when(guard.isAdmin(Set.of("admin"))).thenReturn(true);
+        lenient().when(guard.isAdmin(any(CampaignActor.class)))
+                .thenAnswer(invocation -> invocation.<CampaignActor>getArgument(0).roles().contains("admin"));
         lenient().when(campaigns.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(messages.saveAll(any())).thenAnswer(invocation -> {
             Collection<NotificationMessageEntity> saved = invocation.getArgument(0);
@@ -105,7 +105,7 @@ class NotificationCampaignServiceTest {
         when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
         List<String> people = people(32);
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people));
-        when(devices.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq(TENANT), any(), eq("lms")))
+        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any()))
                 .thenReturn(people.stream().map(NotificationCampaignServiceTest::device).toList());
 
         service.send(ADMIN, "c1");
@@ -122,7 +122,7 @@ class NotificationCampaignServiceTest {
         assertThat(campaign.getResolvedCount()).isEqualTo(32);
         assertThat(campaign.getSentAt()).isEqualTo(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
         InOrder order = inOrder(guard, resolver, messages, campaigns);
-        order.verify(guard).assertAllowed(TENANT, "admin-1", Set.of("admin"), CLASS_7A);
+        order.verify(guard).assertAllowed(ADMIN, CLASS_7A);
         order.verify(resolver).resolve(TENANT, CLASS_7A);
         order.verify(messages).saveAll(any());
         order.verify(campaigns).save(campaign);
@@ -166,7 +166,7 @@ class NotificationCampaignServiceTest {
         NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.URGENT);
         when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of("u0", "u1")));
-        when(devices.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq(TENANT), any(), eq("lms")))
+        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any()))
                 .thenReturn(List.of(device("u0"), device("u1")));
 
         service.send(ADMIN, "c1");
@@ -183,10 +183,11 @@ class NotificationCampaignServiceTest {
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of("u0", "u1")));
         NotificationPreferenceEntity optOut = new NotificationPreferenceEntity();
         optOut.setUserId("u1");
+        optOut.setPortal("lms");
         optOut.setPushEnabled(false);
-        when(preferences.findByTenantIdAndPortalAndEventTypeAndUserIdIn(eq(TENANT), eq("lms"), eq("CAMPAIGN"), any()))
+        when(preferences.findByTenantIdAndEventTypeAndUserIdIn(eq(TENANT), eq("CAMPAIGN"), any()))
                 .thenReturn(List.of(optOut));
-        when(devices.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq(TENANT), any(), eq("lms")))
+        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any()))
                 .thenReturn(List.of(device("u0"), device("u1")));
 
         service.send(ADMIN, "c1");
@@ -194,6 +195,33 @@ class NotificationCampaignServiceTest {
         assertThat(captureMessages()).hasSize(2);
         assertThat(captureOutbox()).singleElement()
                 .satisfies(entry -> assertThat(entry.getPayload()).containsEntry("deviceRegistrationId", "dev-u0"));
+    }
+
+    @Test
+    void pushReachesDevicesOfEveryPortalAndHonoursThatPortalsOptOut() {
+        NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.INFO);
+        when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
+        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of("student", "muted")));
+        NotificationPreferenceEntity optOut = new NotificationPreferenceEntity();
+        optOut.setUserId("muted");
+        optOut.setPortal("elearning");
+        optOut.setPushEnabled(false);
+        NotificationPreferenceEntity otherPortal = new NotificationPreferenceEntity();
+        otherPortal.setUserId("student");
+        otherPortal.setPortal("lms");
+        otherPortal.setPushEnabled(false);
+        when(preferences.findByTenantIdAndEventTypeAndUserIdIn(eq(TENANT), eq("CAMPAIGN"), any()))
+                .thenReturn(List.of(optOut, otherPortal));
+        NotificationDeviceRegistrationEntity phone = device("student");
+        phone.setPortal("elearning");
+        NotificationDeviceRegistrationEntity mutedPhone = device("muted");
+        mutedPhone.setPortal("elearning");
+        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any())).thenReturn(List.of(phone, mutedPhone));
+
+        service.send(ADMIN, "c1");
+
+        assertThat(captureOutbox()).singleElement().satisfies(entry -> assertThat(entry.getPayload())
+                .containsEntry("deviceRegistrationId", "dev-student").containsEntry("portal", "elearning"));
     }
 
     @Test
@@ -221,7 +249,7 @@ class NotificationCampaignServiceTest {
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SCHEDULED);
         assertThat(campaign.getScheduledAt()).isEqualTo(when);
         InOrder order = inOrder(guard, campaigns);
-        order.verify(guard).assertAllowed(TENANT, "admin-1", Set.of("admin"), CLASS_7A);
+        order.verify(guard).assertAllowed(ADMIN, CLASS_7A);
         order.verify(campaigns).save(campaign);
     }
 
@@ -246,7 +274,7 @@ class NotificationCampaignServiceTest {
 
         ArgumentCaptor<NotificationCampaignEntity> saved = ArgumentCaptor.forClass(NotificationCampaignEntity.class);
         InOrder order = inOrder(guard, campaigns);
-        order.verify(guard).assertAllowed(TENANT, "admin-1", Set.of("admin"), normalised);
+        order.verify(guard).assertAllowed(ADMIN, normalised);
         order.verify(campaigns).save(saved.capture());
         assertThat(saved.getValue().getStatus()).isEqualTo(CampaignStatus.DRAFT);
         assertThat(saved.getValue().getPriority()).isEqualTo(NotificationPriority.URGENT);
@@ -257,7 +285,7 @@ class NotificationCampaignServiceTest {
 
     @Test
     void createStopsWhenTheGuardDenies() {
-        doThrow(new AccessDeniedException("no")).when(guard).assertAllowed(anyString(), anyString(), any(), any());
+        doThrow(new AccessDeniedException("no")).when(guard).assertAllowed(any(CampaignActor.class), any());
 
         assertThatThrownBy(() -> service.create(TEACHER, draft(CLASS_7A, null)))
                 .isInstanceOf(AccessDeniedException.class);
@@ -286,7 +314,7 @@ class NotificationCampaignServiceTest {
         assertThat(service.estimate(TEACHER, CLASS_7A).total()).isEqualTo(4);
 
         InOrder order = inOrder(guard, resolver);
-        order.verify(guard).assertAllowed(TENANT, "teacher-1", Set.of("teacher"), CLASS_7A);
+        order.verify(guard).assertAllowed(TEACHER, CLASS_7A);
         order.verify(resolver).resolve(TENANT, CLASS_7A);
     }
 
@@ -318,12 +346,14 @@ class NotificationCampaignServiceTest {
         when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
                 .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
         when(authorizations.find("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
-                "teacher-1", TENANT, List.of("teacher"), List.of(), List.of(), List.of())));
+                "teacher-1", TENANT, List.of("lms_teacher_standard"), List.of("lms.assignment.read", "notification.campaign.send"),
+                List.of(), List.of())));
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(30)));
 
         assertThat(service.dispatchDue(TENANT, "c1")).isTrue();
 
-        verify(guard).assertAllowed(TENANT, "teacher-1", Set.of("teacher"), CLASS_7A);
+        verify(guard).assertAllowed(new CampaignActor(TENANT, "teacher-1", Set.of("lms_teacher_standard"),
+                List.of("lms.assignment.read", "notification.campaign.send"), List.of()), CLASS_7A);
         assertThat(captureMessages()).hasSize(30);
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENT);
         assertThat(campaign.getResolvedCount()).isEqualTo(30);
@@ -336,12 +366,31 @@ class NotificationCampaignServiceTest {
         when(campaigns.findByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
         when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
                 .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "SUSPENDED")));
-        doThrow(new AccessDeniedException("no")).when(guard).assertAllowed(TENANT, "teacher-1", Set.of(), CLASS_7A);
+        doThrow(new AccessDeniedException("no")).when(guard)
+                .assertAllowed(CampaignActor.none(TENANT, "teacher-1"), CLASS_7A);
 
         assertThat(service.dispatchDue(TENANT, "c1")).isFalse();
 
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.FAILED);
         verifyNoInteractions(resolver, messages);
+    }
+
+    @Test
+    void scheduledDispatchFailsTheCampaignWhenTheCreatorNoLongerHoldsTheSendPermission() {
+        NotificationCampaignEntity campaign = campaign("c1", "teacher-1", CampaignStatus.SENDING, NotificationPriority.INFO);
+        when(campaigns.claimDue(eq(TENANT), eq("c1"), any())).thenReturn(1);
+        when(campaigns.findByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
+        when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
+                .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
+        when(authorizations.find("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
+                "teacher-1", TENANT, List.of("teacher"), List.of("lms.assignment.read"), List.of(), List.of())));
+        doThrow(new AccessDeniedException("no")).when(guard)
+                .assertAllowed(CampaignActor.none(TENANT, "teacher-1"), CLASS_7A);
+
+        assertThat(service.dispatchDue(TENANT, "c1")).isFalse();
+
+        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.FAILED);
+        verifyNoInteractions(resolver, messages, outbox);
     }
 
     private List<NotificationMessageEntity> captureMessages() {

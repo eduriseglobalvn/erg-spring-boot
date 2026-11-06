@@ -11,6 +11,7 @@ import com.erg.ergspringboot.notifications.internal.CampaignDelivery;
 import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
+import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
 import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.time.Clock;
@@ -37,6 +38,7 @@ public class NotificationCampaignService {
     private static final Set<String> RECIPIENT_ROLES = Set.of("TEACHER", "STUDENT", "STAFF");
     private static final int MAX_LIST_SIZE = NotificationAudienceResolver.MAX_RECIPIENTS;
     private static final int MAX_SCHEDULE_DAYS = 30;
+    static final String SEND_PERMISSION = "notification.campaign.send";
 
     private final NotificationCampaignRepository campaigns;
     private final AudienceScopeGuard guard;
@@ -71,7 +73,7 @@ public class NotificationCampaignService {
     @Transactional(readOnly = true)
     public AudienceBreakdown estimate(CampaignActor actor, CampaignAudience requested) {
         CampaignAudience audience = validated(requested);
-        guard.assertAllowed(actor.tenantId(), actor.userId(), actor.roles(), audience);
+        guard.assertAllowed(actor, audience);
         return resolver.resolve(actor.tenantId(), audience).breakdown();
     }
 
@@ -79,11 +81,11 @@ public class NotificationCampaignService {
     public CampaignResponse create(CampaignActor actor, CampaignDraftRequest request) {
         NotificationPriority priority = priority(request.priority());
         CampaignAudience audience = validated(request.audience());
-        guard.assertAllowed(actor.tenantId(), actor.userId(), actor.roles(), audience);
+        guard.assertAllowed(actor, audience);
         NotificationCampaignEntity campaign = new NotificationCampaignEntity();
         campaign.setTenantId(actor.tenantId());
         campaign.setCreatedBy(actor.userId());
-        campaign.setSenderRole(guard.isAdmin(actor.roles()) ? "ADMIN" : "TEACHER");
+        campaign.setSenderRole(guard.isAdmin(actor) ? "ADMIN" : "TEACHER");
         campaign.setStatus(CampaignStatus.DRAFT);
         apply(campaign, request, priority, audience);
         campaign.setEstimatedCount(resolver.resolve(actor.tenantId(), audience).breakdown().total());
@@ -96,7 +98,7 @@ public class NotificationCampaignService {
         CampaignAudience audience = validated(request.audience());
         NotificationCampaignEntity campaign = lockOwned(actor, id);
         requireEditable(campaign, "Chỉ sửa được thông báo nháp hoặc đang hẹn giờ");
-        guard.assertAllowed(actor.tenantId(), actor.userId(), actor.roles(), audience);
+        guard.assertAllowed(actor, audience);
         apply(campaign, request, priority, audience);
         campaign.setEstimatedCount(resolver.resolve(actor.tenantId(), audience).breakdown().total());
         return queries.toResponse(campaigns.save(campaign));
@@ -106,7 +108,7 @@ public class NotificationCampaignService {
     public CampaignResponse send(CampaignActor actor, String id) {
         NotificationCampaignEntity campaign = lockOwned(actor, id);
         requireEditable(campaign, "Thông báo đã được gửi hoặc đã huỷ");
-        guard.assertAllowed(actor.tenantId(), actor.userId(), actor.roles(), campaign.getAudience());
+        guard.assertAllowed(actor, campaign.getAudience());
         deliver(campaign);
         return queries.toResponse(campaign);
     }
@@ -122,7 +124,7 @@ public class NotificationCampaignService {
         }
         NotificationCampaignEntity campaign = lockOwned(actor, id);
         requireEditable(campaign, "Thông báo đã được gửi hoặc đã huỷ");
-        guard.assertAllowed(actor.tenantId(), actor.userId(), actor.roles(), campaign.getAudience());
+        guard.assertAllowed(actor, campaign.getAudience());
         campaign.setScheduledAt(scheduledAt);
         campaign.setStatus(CampaignStatus.SCHEDULED);
         return queries.toResponse(campaigns.save(campaign));
@@ -149,8 +151,7 @@ public class NotificationCampaignService {
         }
         NotificationCampaignEntity campaign = campaigns.findByTenantIdAndId(tenantId, id).orElseThrow();
         try {
-            guard.assertAllowed(tenantId, campaign.getCreatedBy(), creatorRoles(tenantId, campaign.getCreatedBy()),
-                    campaign.getAudience());
+            guard.assertAllowed(creator(tenantId, campaign.getCreatedBy()), campaign.getAudience());
         } catch (AccessDeniedException denied) {
             log.warn("Scheduled campaign {} failed: creator {} is no longer allowed to reach its audience",
                     id, campaign.getCreatedBy());
@@ -183,22 +184,27 @@ public class NotificationCampaignService {
         campaigns.save(campaign);
     }
 
-    /** The creator's roles as they are now; an inactive or missing account has none (the guard then denies). */
-    private Set<String> creatorRoles(String tenantId, String userId) {
+    /**
+     * The creator as they are now. An inactive or missing account, or one that no longer holds the send permission
+     * (nor the platform-wide '*'), is nobody, so the guard denies and the campaign ends FAILED.
+     */
+    private CampaignActor creator(String tenantId, String userId) {
         boolean active = users.findByTenantIdAndIds(tenantId, List.of(userId)).stream()
                 .anyMatch(user -> user.status() == null || "ACTIVE".equalsIgnoreCase(user.status()));
         if (!active) {
-            return Set.of();
+            return CampaignActor.none(tenantId, userId);
         }
         return authorizations.find(userId, tenantId)
-                .map(grants -> CampaignActor.guardRoles(grants.roleNames(), grants.effectivePermissions(),
+                .map(grants -> CampaignActor.of(tenantId, userId, grants.roleNames(), grants.effectivePermissions(),
                         grants.deniedPermissions()))
-                .orElse(Set.of());
+                .filter(actor -> actor.permissions().contains(SEND_PERMISSION) || WorkspaceCapabilityMapper
+                        .isPlatformWide(List.copyOf(actor.roles()), actor.permissions(), actor.deniedPermissions()))
+                .orElseGet(() -> CampaignActor.none(tenantId, userId));
     }
 
     private NotificationCampaignEntity lockOwned(CampaignActor actor, String id) {
         return campaigns.lockByTenantIdAndId(actor.tenantId(), id)
-                .filter(campaign -> guard.isAdmin(actor.roles()) || actor.userId().equals(campaign.getCreatedBy()))
+                .filter(campaign -> guard.isAdmin(actor) || actor.userId().equals(campaign.getCreatedBy()))
                 .orElseThrow(NotificationCampaignQueryService::notFound);
     }
 

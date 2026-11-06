@@ -65,6 +65,7 @@ class NotificationCampaignControllerIT {
         school.setName("Campaign School");
         school.setType("school");
         entityManager.persist(school);
+        entityManager.persist(user("gv-std"));
         Classroom classroom = new Classroom();
         classroom.setId(CLASS_ID);
         classroom.setTenantId(TENANT);
@@ -73,7 +74,17 @@ class NotificationCampaignControllerIT {
         classroom.setGrade("7");
         classroom.setAcademicYear("2026");
         classroom.setStatus("active");
+        classroom.setHomeroomTeacherId("gv-std");
         entityManager.persist(classroom);
+        Classroom other = new Classroom();
+        other.setId("class-other");
+        other.setTenantId(TENANT);
+        other.setSchoolId("school-camp");
+        other.setName("8B");
+        other.setGrade("8");
+        other.setAcademicYear("2026");
+        other.setStatus("active");
+        entityManager.persist(other);
         entityManager.persist(user("admin-1"));
         for (String id : List.of("stu-1", "stu-2", "stu-3")) {
             entityManager.persist(user(id));
@@ -177,6 +188,46 @@ class NotificationCampaignControllerIT {
         mockMvc.perform(as(post(BASE + "/" + id + "/cancel"), "admin-1", "admin"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    void seededTeacherRoleWithItsRealPermissionsMayReachOnlyTheClassesItTeaches() throws Exception {
+        @SuppressWarnings("unchecked")
+        List<String> permissions = entityManager.createNativeQuery("""
+                select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
+                where rp.role_id = 'role_lms_teacher_standard'
+                """).getResultList();
+        assertThat(permissions).contains("notification.campaign.send");
+        String granted = String.join(",", permissions);
+
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "gv-std")
+                        .header("X-Roles", "lms_teacher_standard").header("X-Permissions", granted)
+                        .contentType("application/json").content(classAudienceJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "gv-std")
+                        .header("X-Roles", "lms_teacher_standard").header("X-Permissions", granted)
+                        .contentType("application/json")
+                        .content("{\"wholeTenant\":false,\"classIds\":[\"class-other\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void theJobFailsACampaignWhoseCreatorNoLongerHoldsTheSendPermission() {
+        // Read-only teacher role: still a teacher of 7A, but without notification.campaign.send.
+        entityManager.find(User.class, "gv-std").getRoles().add(entityManager.find(Role.class, "role_lms_teacher_readonly"));
+        NotificationCampaignEntity due = campaigns.save(
+                campaign("gv-std", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1)));
+        entityManager.flush();
+
+        job.dispatchDue();
+
+        entityManager.flush(); // what the dispatch transaction commit does
+        entityManager.clear();
+        assertThat(campaigns.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.FAILED);
+        assertThat(entityManager.createNativeQuery(
+                "select count(*) from notification_messages where campaign_id = :id")
+                .setParameter("id", due.getId()).getSingleResult()).isEqualTo(0L);
     }
 
     @Test

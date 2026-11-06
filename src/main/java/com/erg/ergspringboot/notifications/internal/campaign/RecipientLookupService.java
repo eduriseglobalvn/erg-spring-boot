@@ -132,7 +132,12 @@ public class RecipientLookupService {
     }
 
     public List<RecipientCard> search(String tenantId, String actorId, List<String> actorRoles, String query, int limit) {
-        Scope scope = scopeOf(tenantId, actorId, actorRoles);
+        return search(new CampaignActor(tenantId, actorId, actorRoles), query, limit);
+    }
+
+    public List<RecipientCard> search(CampaignActor actor, String query, int limit) {
+        String tenantId = actor.tenantId();
+        Scope scope = scopeOf(actor);
         String text = query == null ? "" : query.trim();
         if (text.isEmpty()) {
             return List.of();
@@ -162,10 +167,15 @@ public class RecipientLookupService {
     }
 
     public ResolvePeopleResult resolveLines(String tenantId, String actorId, List<String> actorRoles, List<String> lines) {
+        return resolveLines(new CampaignActor(tenantId, actorId, actorRoles), lines);
+    }
+
+    public ResolvePeopleResult resolveLines(CampaignActor actor, List<String> lines) {
+        String tenantId = actor.tenantId();
         if (lines == null || lines.size() > MAX_LINES) {
             throw new BadRequestException("Tối đa 5.000 dòng mỗi lần");
         }
-        Scope scope = scopeOf(tenantId, actorId, actorRoles);
+        Scope scope = scopeOf(actor);
         List<String> clean = lines.stream().filter(l -> l != null && !l.isBlank()).map(String::trim).toList();
 
         Supplier<List<Person>> staff = new Once<>(() -> staffDirectory(tenantId));
@@ -199,14 +209,14 @@ public class RecipientLookupService {
         return new ResolvePeopleResult(List.copyOf(matched.values()), notFound, ambiguous);
     }
 
-    private Scope scopeOf(String tenantId, String actorId, List<String> actorRoles) {
-        if (guard.isAdmin(actorRoles)) {
+    private Scope scopeOf(CampaignActor actor) {
+        if (guard.isAdmin(actor)) {
             return new Scope(null, true);
         }
-        if (!guard.isTeacher(actorRoles)) {
+        if (!guard.isTeacher(actor)) {
             throw new AccessDeniedException("Bạn không có quyền tìm người nhận");
         }
-        return new Scope(List.copyOf(lms.classIdsTaughtBy(tenantId, actorId)), false);
+        return new Scope(List.copyOf(lms.classIdsTaughtBy(actor.tenantId(), actor.userId())), false);
     }
 
     /** One batched query for every code, email and phone among {@code texts}; students not yet login-checked. */
