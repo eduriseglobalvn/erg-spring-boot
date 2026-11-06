@@ -154,11 +154,12 @@ public class QuizPublishService {
         String canonicalPackagePayload = packageAssembler.canonicalJson(packagePayload);
         String contentHash = packageSigner.contentHash(canonicalPackagePayload);
 
-        // Deactivate the previous active version, then insert this one active.
+        // Deactivate the previous active version, then insert this one active. Flushed: Hibernate runs inserts
+        // before updates, and uq_quiz_versions_active allows one active version per quiz.
         quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue(quizId, tenantId)
                 .ifPresent(active -> {
                     active.setIsActive(false);
-                    quizVersionRepository.save(active);
+                    quizVersionRepository.saveAndFlush(active);
                 });
 
         QuizVersion version = new QuizVersion();

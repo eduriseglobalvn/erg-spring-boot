@@ -39,6 +39,22 @@ import tools.jackson.databind.ObjectMapper;
 
 class QuizPublishServiceTest {
 
+    private QuizVersion previouslyActive;
+    private QuizVersionRepository versions;
+
+    @Test
+    void republishDeactivatesTheOldVersionAndFlushesBeforeInsertingTheNewOne() {
+        previouslyActive = new QuizVersion();
+        previouslyActive.setIsActive(true);
+
+        publishAndCapture("test", "server-authoritative", false);
+
+        var order = org.mockito.Mockito.inOrder(versions);
+        order.verify(versions).saveAndFlush(previouslyActive);
+        order.verify(versions).save(any(QuizVersion.class));
+        assertThat(previouslyActive.getIsActive()).isFalse();
+    }
+
     @Test
     void publishEvictsRuntimePackageCacheForTenantQuiz() {
         publishAndCapture(null, "server-authoritative", true);
@@ -62,6 +78,7 @@ class QuizPublishServiceTest {
         QuizQuestionRepository quizQuestionRepository = mock(QuizQuestionRepository.class);
         QuizDraftRepository quizDraftRepository = mock(QuizDraftRepository.class);
         QuizVersionRepository quizVersionRepository = mock(QuizVersionRepository.class);
+        versions = quizVersionRepository;
         QuizVersionSectionRepository sectionRepository = mock(QuizVersionSectionRepository.class);
         QuizVersionQuestionRepository questionRepository = mock(QuizVersionQuestionRepository.class);
         QuizPackageRepository packageRepository = mock(QuizPackageRepository.class);
@@ -138,7 +155,7 @@ class QuizPublishServiceTest {
                 "level", Map.of("id", "level-1", "label", "GS6 Level 1"),
                 "topic", Map.of("id", "topic-1", "label", "Hardware")
         ));
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a")).thenReturn(Optional.empty());
+        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a")).thenReturn(Optional.ofNullable(previouslyActive));
         when(sectionRepository.save(any(QuizVersionSection.class))).thenAnswer(invocation -> {
             QuizVersionSection section = invocation.getArgument(0);
             section.setId("section-db-1");
