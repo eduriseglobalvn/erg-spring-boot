@@ -51,14 +51,17 @@ final class AnswerGrading {
         if (expected.isEmpty()) {
             expected = mapList(key.get("targets"));
         }
-        Map<String, Object> actual = answerMap(answerValue(rawAnswer, "pairs"));
+        Object pairs = answerValue(rawAnswer, "pairs");
+        Object targets = answerValue(rawAnswer, "targets");
+        Map<String, Object> actual = answerMap(pairs);
         if (actual.isEmpty()) {
-            actual = answerMap(answerValue(rawAnswer, "targets"));
+            actual = answerMap(targets);
         }
         if (expected.isEmpty()) {
             return zero();
         }
-        if (actual.isEmpty()) {
+        // Only an answer with no assignment map at all is a legacy row-order answer; an empty map means nothing connected.
+        if (pairs == null && targets == null) {
             actual = positionalAssignments(rawAnswer, expected);
         }
         long right = 0;
@@ -93,6 +96,16 @@ final class AnswerGrading {
         Double height = doubleValue(region.get("height"));
         if (rx == null || ry == null || width == null || height == null) {
             return false;
+        }
+        if ("ellipse".equals(region.get("shape"))) {
+            double radiusX = width / 2;
+            double radiusY = height / 2;
+            if (radiusX <= 0 || radiusY <= 0) {
+                return false;
+            }
+            double nx = (x - rx - radiusX) / radiusX;
+            double ny = (y - ry - radiusY) / radiusY;
+            return nx * nx + ny * ny <= 1;
         }
         return x >= rx && x <= rx + width && y >= ry && y <= ry + height;
     }
@@ -186,12 +199,19 @@ final class AnswerGrading {
         return result;
     }
 
-    static List<String> firstBlankAnswers(Object value) {
-        List<Map<String, Object>> blanks = mapList(value);
-        if (blanks.isEmpty()) {
-            return List.of();
+    /**
+     * Short answer: {@code correctAnswers}, else every blank's answers (the FE writes one textBlank per accepted
+     * answer). Blank candidates are dropped so an empty response can never match them.
+     */
+    static List<String> acceptedAnswers(Map<String, Object> key) {
+        List<String> accepted = stringList(key.get("correctAnswers"));
+        if (accepted.isEmpty()) {
+            for (Map<String, Object> blank : mapList(key.get("blanks"))) {
+                accepted.addAll(stringList(blank.get("answers")));
+            }
         }
-        return stringList(blanks.get(0).get("answers"));
+        accepted.removeIf(candidate -> normalizeText(candidate).isEmpty());
+        return accepted;
     }
 
     static String normalizeText(String value) {

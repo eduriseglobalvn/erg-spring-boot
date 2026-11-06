@@ -154,15 +154,29 @@ final class AnswerKeySources {
         return result.isEmpty() ? null : result;
     }
 
+    /**
+     * {@code [{itemId, targetId}]} from {@code dragDropItems}: the runtime {@code correctTargetId}, else the editor's
+     * group label {@code target} mapped to the {@code dropTargets} id with that label (what learners submit).
+     */
     @SuppressWarnings("unchecked")
-    static List<Map<String, Object>> dragDropTargets(Object value) {
+    static List<Map<String, Object>> dragDropTargets(Map<String, Object> slide) {
+        Map<String, Object> targetIdByLabel = new LinkedHashMap<>();
+        if (slide.get("dropTargets") instanceof List<?> targets) {
+            for (Object target : targets) {
+                if (target instanceof Map<?, ?> map && map.get("label") != null && map.get("id") != null) {
+                    targetIdByLabel.putIfAbsent(map.get("label").toString().trim(), map.get("id"));
+                }
+            }
+        }
         List<Map<String, Object>> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
+        if (slide.get("dragDropItems") instanceof List<?> list) {
             for (Object item : list) {
                 if (item instanceof Map<?, ?> map) {
                     Map<String, Object> dragItem = (Map<String, Object>) map;
                     Object id = dragItem.get("id");
-                    Object targetId = firstNonNull(dragItem.get("correctTargetId"), dragItem.get("target"));
+                    Object label = dragItem.get("target");
+                    Object targetId = firstNonNull(dragItem.get("correctTargetId"),
+                            label == null ? null : targetIdByLabel.getOrDefault(label.toString().trim(), label));
                     if (id != null && targetId != null) {
                         result.add(Map.of("itemId", id, "targetId", targetId));
                     }
