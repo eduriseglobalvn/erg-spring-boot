@@ -190,13 +190,14 @@ public class QuizPublishService {
                 canonicalPackagePayload);
         QuizPackage savedPackage = packageRepository.save(pkg);
 
+        // Before status flips to "published": the lifecycle reads that status as already published and skips the transition.
+        lifecycle.recordPublishedSnapshot(tenantId, quizId, userId, key);
         quiz.setCurrentVersionId(savedVersion.getId());
         quiz.setStatus("published");
         quiz.setVersion(versionNumber);
         quiz.setPackageHash(contentHash);
         quiz.setPublishedAt(savedVersion.getPublishedAt());
         quizRepository.save(quiz);
-        lifecycle.recordPublishedSnapshot(tenantId, quizId, userId, key);
 
         cacheEvictor.evictQuizCachesAfterCommit(tenantId, quizId);
 
