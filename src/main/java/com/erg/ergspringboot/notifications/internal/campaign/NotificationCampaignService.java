@@ -208,12 +208,20 @@ public class NotificationCampaignService {
                 .orElseGet(() -> CampaignActor.none(tenantId, userId));
     }
 
-    /** The principal the HTTP gate would see for this user: raw role + user grants, user denies. */
+    /**
+     * The principal the HTTP gate would see for this user: role + user grants, user denies. Names are normalised
+     * (the policy matches case-sensitively, so a mixed-case DENY row must not fail open).
+     */
     private static ErgPrincipal principal(String tenantId, String userId, UserAuthorizationProjection grants) {
-        List<String> granted = java.util.stream.Stream.concat(
-                grants.rolePermissions().stream(), grants.grantedPermissions().stream()).distinct().toList();
+        List<String> granted = normalised(java.util.stream.Stream.concat(
+                grants.rolePermissions().stream(), grants.grantedPermissions().stream()).toList());
         return ErgPrincipal.authenticated(userId, null, tenantId, grants.roleNames(), granted,
-                grants.deniedPermissions(), List.of(), "erg", "", java.util.Map.of());
+                normalised(grants.deniedPermissions()), List.of(), "erg", "", java.util.Map.of());
+    }
+
+    private static List<String> normalised(List<String> permissions) {
+        return permissions.stream().filter(java.util.Objects::nonNull)
+                .map(permission -> permission.trim().toLowerCase(Locale.ROOT)).distinct().toList();
     }
 
     private NotificationCampaignEntity lockOwned(CampaignActor actor, String id) {

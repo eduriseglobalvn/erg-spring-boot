@@ -398,9 +398,15 @@ class NotificationCampaignServiceTest {
     void scheduledDispatchAcceptsAWildcardSendGrantLikeTheHttpGate() {
         NotificationCampaignEntity campaign = dueCampaignOf("teacher-1");
         creatorHolds(List.of("notification.*", "lms.assignment.read"), List.of());
+        // A creator wrongly reduced to "nobody" would be denied here and end FAILED.
+        lenient().doThrow(new AccessDeniedException("no")).when(guard)
+                .assertAllowed(CampaignActor.none(TENANT, "teacher-1"), CLASS_7A);
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(2)));
 
         assertThat(service.dispatchDue(TENANT, "c1")).isTrue();
+
+        verify(guard).assertAllowed(new CampaignActor(TENANT, "teacher-1", Set.of("lms_teacher_standard"),
+                List.of("notification.*", "lms.assignment.read"), List.of()), CLASS_7A);
 
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENT);
         assertThat(captureMessages()).hasSize(2);
@@ -408,7 +414,7 @@ class NotificationCampaignServiceTest {
 
     @Test
     void scheduledDispatchHonoursWildcardDeniesLikeTheHttpGate() {
-        for (String deny : List.of("notification.*", "*.send", "*")) {
+        for (String deny : List.of("notification.*", "*.send", "*", " Notification.* ", "NOTIFICATION.CAMPAIGN.SEND")) {
             org.mockito.Mockito.reset(campaigns, guard, users, authorizations);
             NotificationCampaignEntity campaign = dueCampaignOf("teacher-1");
             creatorHolds(List.of("notification.campaign.send", "lms.assignment.read"), List.of(deny));
