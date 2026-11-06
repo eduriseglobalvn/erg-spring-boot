@@ -114,12 +114,13 @@ public class NotificationService {
         }
         // Microsecond precision = what Postgres stores, so a repeated ack returns the identical value.
         OffsetDateTime now = OffsetDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
-        if (message.getAckedAt() == null) {
-            message.setAckedAt(now);
-            messageRepository.save(message);
-        }
         markRead(recipient, now);
-        return new AckResponse(message.getId(), message.getAckedAt(), recipient.getReadAt());
+        String messageId = message.getId();
+        // Conditional update: concurrent first acks cannot overwrite each other; return what is stored.
+        messageRepository.ackOnce(tenantId, userId, messageId, now);
+        OffsetDateTime ackedAt = messageRepository.findById(messageId).map(NotificationMessageEntity::getAckedAt)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found."));
+        return new AckResponse(messageId, ackedAt, recipient.getReadAt());
     }
 
     private boolean markRead(NotificationRecipientEntity recipient, OffsetDateTime now) {

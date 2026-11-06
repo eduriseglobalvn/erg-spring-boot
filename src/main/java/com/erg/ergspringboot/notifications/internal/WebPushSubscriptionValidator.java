@@ -4,13 +4,16 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 
 /**
- * Validates a browser PushSubscription before the server ever POSTs to its endpoint (SSRF-minded):
- * https only, no credentials, no localhost and no IP-literal host (push services always use DNS names).
+ * Validates a browser PushSubscription before the server ever POSTs to it (SSRF guard): https, port 443
+ * or default, no userinfo, and a host on the configured push-service allowlist (label-boundary match, so
+ * {@code evilnotify.windows.com} does not match {@code notify.windows.com}). Used at registration and
+ * again at send time.
  */
-final class WebPushSubscriptionValidator {
+public final class WebPushSubscriptionValidator {
 
     static final int MAX_ENDPOINT_LENGTH = 2048;
     static final int P256DH_BYTES = 65;
@@ -18,7 +21,7 @@ final class WebPushSubscriptionValidator {
 
     private WebPushSubscriptionValidator() { }
 
-    static String endpoint(String value) {
+    public static String endpoint(String value, List<String> allowedHostSuffixes) {
         String endpoint = value == null ? "" : value.trim();
         if (endpoint.isEmpty() || endpoint.length() > MAX_ENDPOINT_LENGTH) {
             throw invalid("endpoint");
@@ -30,7 +33,9 @@ final class WebPushSubscriptionValidator {
             throw invalid("endpoint");
         }
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null || !isPublicDnsName(host)) {
+        boolean portOk = uri.getPort() == -1 || uri.getPort() == 443;
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo() != null || !portOk
+                || !allowedHost(host, allowedHostSuffixes)) {
             throw invalid("endpoint");
         }
         return endpoint;
@@ -48,14 +53,14 @@ final class WebPushSubscriptionValidator {
         return key;
     }
 
-    private static boolean isPublicDnsName(String host) {
-        if (host.isEmpty() || host.startsWith("[") || host.equals("localhost") || host.endsWith(".localhost")) {
-            return false;
+    private static boolean allowedHost(String host, List<String> suffixes) {
+        if (host.isEmpty() || suffixes == null) return false;
+        for (String configured : suffixes) {
+            String suffix = configured == null ? "" : configured.trim().toLowerCase(Locale.ROOT);
+            while (suffix.startsWith(".")) suffix = suffix.substring(1);
+            if (!suffix.isEmpty() && (host.equals(suffix) || host.endsWith("." + suffix))) return true;
         }
-        String[] labels = host.split("\\.");
-        // An IPv4 literal (or decimal/hex form) never ends in a label starting with a letter; real TLDs do.
-        String tld = labels[labels.length - 1];
-        return labels.length >= 2 && !tld.isEmpty() && Character.isLetter(tld.charAt(0));
+        return false;
     }
 
     private static BadRequestException invalid(String field) {

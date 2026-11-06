@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.notifications.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -166,6 +167,23 @@ class NotificationAckIT {
         // The legacy lms row is untouched by an elearning read-all.
         mockMvc.perform(as(get(BASE + "/unread-count"), "stu-ack", TENANT, "lms").param("portal", "lms"))
                 .andExpect(jsonPath("$.data.unread").value(1));
+        // Another user's campaign row of the same campaign stays unread.
+        mockMvc.perform(as(get(BASE + "/unread-count"), "stu-other", TENANT, "elearning").param("portal", "elearning"))
+                .andExpect(jsonPath("$.data.unread").value(1));
+    }
+
+    @Test
+    void archiveFromTheStudentPortalWorksOnlyForTheOwnCampaignRow() throws Exception {
+        mockMvc.perform(student(delete(BASE + "/" + otherUsersMessage).param("portal", "elearning")))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(student(delete(BASE + "/" + infoMessage).param("portal", "elearning")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.archived").value(true));
+
+        mockMvc.perform(student(get(BASE + "/" + infoMessage).param("portal", "elearning")))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(as(get(BASE + "/" + otherUsersMessage), "stu-other", TENANT, "elearning").param("portal", "elearning"))
+                .andExpect(status().isOk());
     }
 
     private String deliver(String userId, String campaignId, String priority, String portal) {

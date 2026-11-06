@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 559
+  route-count: 561
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write

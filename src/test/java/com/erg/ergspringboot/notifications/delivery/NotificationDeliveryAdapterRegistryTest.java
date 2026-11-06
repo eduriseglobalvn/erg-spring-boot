@@ -69,7 +69,7 @@ class NotificationDeliveryAdapterRegistryTest {
                         new com.erg.ergspringboot.notifications.config.NotificationPushProperties()));
 
         NotificationDeliveryAdapter webPush = new WebPushNotificationDeliveryAdapter(
-                null, java.time.Duration.ofSeconds(1), null, null, null, null);
+                null, List.of(), null, null, java.time.Duration.ofSeconds(1), null, null, null, null);
         NotificationDeliveryAdapterRegistry registry = new NotificationDeliveryAdapterRegistry(List.of(adapter, webPush));
 
         // Selection is by device transport: FCM devices get firebase keys, WEB_PUSH devices the vapid key.

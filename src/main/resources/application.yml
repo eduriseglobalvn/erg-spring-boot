@@ -311,6 +311,8 @@ erg:
       public-key: ${NOTIFICATIONS__WEB_PUSH__PUBLIC_KEY:}
       private-key: ${NOTIFICATIONS__WEB_PUSH__PRIVATE_KEY:}
       subject: ${NOTIFICATIONS__WEB_PUSH__SUBJECT:}
+      # Only these push service hosts (or their subdomains) are accepted and contacted (SSRF guard).
+      allowed-host-suffixes: ${NOTIFICATIONS__WEB_PUSH__ALLOWED_HOST_SUFFIXES:fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com}
   auth:
     # Per-account lockout (LoginFailureEnforcementService): after max-failed-login wrong
     # passwords within failed-login-window the account is refused for block-duration.

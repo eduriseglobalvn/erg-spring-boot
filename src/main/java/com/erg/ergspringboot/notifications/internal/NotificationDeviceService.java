@@ -5,7 +5,7 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.R
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.UnregisterDeviceRequest;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeviceRegistrationResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.WebPushConfigResponse;
-import com.erg.ergspringboot.notifications.config.WebPushProperties;
+import com.erg.ergspringboot.notifications.config.WebPushVapidKeys;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -29,13 +29,13 @@ public class NotificationDeviceService {
     private final NotificationDeviceRegistrationRepository deviceRepository;
     private final NotificationTopicMembershipRepository topicMembershipRepository;
     private final NotificationTokenCipher tokenCipher;
-    private final WebPushProperties webPush;
+    private final WebPushVapidKeys webPush;
 
     public NotificationDeviceService(
             NotificationDeviceRegistrationRepository deviceRepository,
             NotificationTopicMembershipRepository topicMembershipRepository,
             NotificationTokenCipher tokenCipher,
-            WebPushProperties webPush
+            WebPushVapidKeys webPush
     ) {
         this.deviceRepository = deviceRepository;
         this.topicMembershipRepository = topicMembershipRepository;
@@ -44,8 +44,7 @@ public class NotificationDeviceService {
     }
 
     public WebPushConfigResponse webPushConfig() {
-        boolean enabled = webPush.isConfigured();
-        return new WebPushConfigResponse(enabled, enabled ? webPush.getPublicKey() : null);
+        return new WebPushConfigResponse(webPush.enabled(), webPush.publicKey());
     }
 
     @Transactional
@@ -57,11 +56,11 @@ public class NotificationDeviceService {
         String p256dh = null;
         String auth = null;
         if (webPushTransport) {
-            if (!webPush.isConfigured()) {
+            if (!webPush.enabled()) {
                 throw new BadRequestException("Web Push chưa được cấu hình");
             }
             // The endpoint is the subscription identity: stored and deduped exactly like an FCM token.
-            token = WebPushSubscriptionValidator.endpoint(request.endpoint());
+            token = WebPushSubscriptionValidator.endpoint(request.endpoint(), webPush.allowedHostSuffixes());
             p256dh = WebPushSubscriptionValidator.key(request.keys() == null ? null : request.keys().p256dh(),
                     WebPushSubscriptionValidator.P256DH_BYTES, "p256dh");
             auth = WebPushSubscriptionValidator.key(request.keys() == null ? null : request.keys().auth(),

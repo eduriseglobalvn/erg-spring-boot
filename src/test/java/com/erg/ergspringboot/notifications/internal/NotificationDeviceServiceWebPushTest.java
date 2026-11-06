@@ -15,7 +15,9 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.W
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.notifications.NotificationTokenCipher;
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
+import com.erg.ergspringboot.notifications.config.VapidTestKeys;
 import com.erg.ergspringboot.notifications.config.WebPushProperties;
+import com.erg.ergspringboot.notifications.config.WebPushVapidKeys;
 import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
 import com.erg.ergspringboot.notifications.persistence.NotificationTopicMembershipRepository;
@@ -38,7 +40,7 @@ class NotificationDeviceServiceWebPushTest {
 
     private final NotificationDeviceRegistrationRepository devices = mock(NotificationDeviceRegistrationRepository.class);
     private final NotificationTopicMembershipRepository topics = mock(NotificationTopicMembershipRepository.class);
-    private final WebPushProperties webPush = new WebPushProperties();
+    private final WebPushProperties webPush = VapidTestKeys.properties();
     private NotificationTokenCipher cipher;
     private NotificationDeviceService service;
 
@@ -47,10 +49,7 @@ class NotificationDeviceServiceWebPushTest {
         NotificationPushProperties properties = new NotificationPushProperties();
         properties.getCredentials().setRegistrationTokenEncryptionKey("unit-test-key");
         cipher = new NotificationTokenCipher(properties);
-        webPush.setPublicKey("public");
-        webPush.setPrivateKey("private");
-        webPush.setSubject("mailto:ops@example.test");
-        service = new NotificationDeviceService(devices, topics, cipher, webPush);
+        service = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush));
         when(devices.findByTenantIdAndRegistrationTokenHash(anyString(), anyString())).thenReturn(Optional.empty());
         when(devices.save(any())).thenAnswer(invocation -> {
             NotificationDeviceRegistrationEntity entity = invocation.getArgument(0);
@@ -94,6 +93,10 @@ class NotificationDeviceServiceWebPushTest {
             "https://2130706433/push",
             "https://user:pass@fcm.googleapis.com/x",
             "ftp://fcm.googleapis.com/x",
+            "https://evil.example.com/push",
+            "https://evilnotify.windows.com/w",
+            "https://fcm.googleapis.com.evil.com/x",
+            "https://fcm.googleapis.com:8443/fcm/send/abc",
             "not a url",
             ""
     })
@@ -117,9 +120,37 @@ class NotificationDeviceServiceWebPushTest {
         verify(devices, never()).save(any());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://fcm.googleapis.com/fcm/send/abc",
+            "https://FCM.GoogleAPIs.com:443/fcm/send/abc",
+            "https://updates.push.services.mozilla.com/wpush/v2/x",
+            "https://db5p.notify.windows.com/w/?token=x",
+            "https://web.push.apple.com/QGx"
+    })
+    void acceptsAllowlistedPushServices(String endpoint) {
+        var response = service.register("tenant", "user", "lms", request("WEB_PUSH", endpoint, P256DH, AUTH));
+
+        assertThat(response.transport()).isEqualTo("WEB_PUSH");
+    }
+
+    @Test
+    void invalidVapidKeysBehaveAsNotConfigured() {
+        WebPushProperties broken = VapidTestKeys.properties();
+        broken.setPrivateKey(VapidTestKeys.generate()[1]);
+        NotificationDeviceService misconfigured = new NotificationDeviceService(devices, topics, cipher,
+                new WebPushVapidKeys(broken));
+
+        assertThat(misconfigured.webPushConfig().enabled()).isFalse();
+        assertThatThrownBy(() -> misconfigured.register("t", "u", "lms", request("WEB_PUSH", ENDPOINT, P256DH, AUTH)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Web Push chưa được cấu hình");
+    }
+
     @Test
     void webPushRegistrationIsRejectedWhileVapidIsNotConfigured() {
-        NotificationDeviceService unconfigured = new NotificationDeviceService(devices, topics, cipher, new WebPushProperties());
+        NotificationDeviceService unconfigured = new NotificationDeviceService(devices, topics, cipher,
+                new WebPushVapidKeys(new WebPushProperties()));
 
         assertThatThrownBy(() -> unconfigured.register("t", "u", "lms", request("WEB_PUSH", ENDPOINT, P256DH, AUTH)))
                 .isInstanceOf(BadRequestException.class)
@@ -131,7 +162,7 @@ class NotificationDeviceServiceWebPushTest {
     @Test
     void exposesThePublicKeyOnlyWhenConfigured() {
         assertThat(service.webPushConfig().enabled()).isTrue();
-        assertThat(service.webPushConfig().publicKey()).isEqualTo("public");
+        assertThat(service.webPushConfig().publicKey()).isEqualTo(webPush.getPublicKey());
     }
 
     @Test

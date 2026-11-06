@@ -10,12 +10,27 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface NotificationMessageRepository extends JpaRepository<NotificationMessageEntity, String> {
 
     Optional<NotificationMessageEntity> findByTenantIdAndDedupeKey(String tenantId, String dedupeKey);
+
+    /** First acknowledgement wins: only sets ackedAt while it is still null, and only on the user's own message. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update NotificationMessageEntity m
+            set m.ackedAt = :ackedAt
+            where m.id = :id
+              and m.tenantId = :tenantId
+              and m.ackedAt is null
+              and exists (select r.id from NotificationRecipientEntity r
+                          where r.notificationId = m.id and r.tenantId = :tenantId and r.userId = :userId)
+            """)
+    int ackOnce(@Param("tenantId") String tenantId, @Param("userId") String userId, @Param("id") String id,
+                @Param("ackedAt") OffsetDateTime ackedAt);
 
     @Query("""
             select new com.erg.ergspringboot.notifications.persistence.projection.CampaignDeliveryCounts(
