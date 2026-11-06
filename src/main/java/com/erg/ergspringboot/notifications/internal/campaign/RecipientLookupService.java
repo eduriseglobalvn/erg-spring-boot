@@ -20,7 +20,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -41,11 +46,73 @@ public class RecipientLookupService {
     private static final int ACTIVE_CHUNK = 1_000;
     private static final Pageable STAFF_PAGE = PageRequest.ofSize(MAX_LINES + 1);
     private static final String SEP = " · ";
+    private static final Logger log = LoggerFactory.getLogger(RecipientLookupService.class);
+    private static final Pattern PHONE_STRIP = Pattern.compile("[\\s.\\-()]");
+    private static final Pattern PHONE_SHAPE = Pattern.compile("0\\d{8,10}");
+    private static final Pattern MARKS = Pattern.compile("\\p{M}+");
+    private static final Pattern SPACES = Pattern.compile("\\s+");
 
     private record Person(String userId, String name, String role, String meta,
-                          String code, String email, String phone, boolean student) {
+                          String code, String email, String phone, boolean student, String folded) {
         RecipientCard card() {
             return new RecipientCard(userId, name, role, meta);
+        }
+    }
+
+    /** Per-request lookup tables so every pasted line costs O(1). Keys are never empty. */
+    private record Index(Map<String, List<Person>> byCode, Map<String, List<Person>> byEmail,
+                         Map<String, List<Person>> byPhone) {
+        static Index of(List<Person> people) {
+            Index index = new Index(new HashMap<>(), new HashMap<>(), new HashMap<>());
+            for (Person p : people) {
+                if (p.student() && p.code() != null && !p.code().isBlank()) {
+                    index.byCode.computeIfAbsent(p.code().trim().toUpperCase(Locale.ROOT), k -> new ArrayList<>()).add(p);
+                }
+                if (p.email() != null && !p.email().isBlank()) {
+                    index.byEmail.computeIfAbsent(p.email().trim().toLowerCase(Locale.ROOT), k -> new ArrayList<>()).add(p);
+                }
+                if (p.phone() != null) {
+                    String phone = normalisePhone(p.phone());
+                    if (PHONE_SHAPE.matcher(phone).matches()) {
+                        index.byPhone.computeIfAbsent(phone, k -> new ArrayList<>()).add(p);
+                    }
+                }
+            }
+            return index;
+        }
+
+        List<Person> find(String line) {
+            Map<String, Person> hit = new LinkedHashMap<>();
+            if (line.indexOf('@') >= 0) {
+                byEmail.getOrDefault(line.toLowerCase(Locale.ROOT), List.of()).forEach(p -> hit.putIfAbsent(p.userId(), p));
+            } else {
+                byCode.getOrDefault(line.toUpperCase(Locale.ROOT), List.of()).forEach(p -> hit.putIfAbsent(p.userId(), p));
+                String phone = normalisePhone(line);
+                if (PHONE_SHAPE.matcher(phone).matches()) {
+                    byPhone.getOrDefault(phone, List.of()).forEach(p -> hit.putIfAbsent(p.userId(), p));
+                }
+            }
+            return List.copyOf(hit.values());
+        }
+    }
+
+    /** Computes a value at most once per request. */
+    private static final class Once<T> implements Supplier<T> {
+        private final Supplier<T> source;
+        private T value;
+        private boolean done;
+
+        Once(Supplier<T> source) {
+            this.source = source;
+        }
+
+        @Override
+        public T get() {
+            if (!done) {
+                value = source.get();
+                done = true;
+            }
+            return value;
         }
     }
 
@@ -72,17 +139,20 @@ public class RecipientLookupService {
         }
         int max = Math.max(1, Math.min(limit, MAX_SEARCH_LIMIT));
         String needle = fold(text);
+        if (needle.isEmpty()) {
+            return List.of();
+        }
         Map<String, Person> found = new LinkedHashMap<>();
         keyedStudents(tenantId, scope, List.of(text)).forEach(p -> found.putIfAbsent(p.userId(), p));
-        students.listStudents(tenantId, scope.classIds(), DIRECTORY_CAP).stream().map(RecipientLookupService::person)
-                .filter(p -> fold(p.name()).contains(needle)).forEach(p -> found.putIfAbsent(p.userId(), p));
+        directory(tenantId, scope).stream()
+                .filter(p -> p.folded().contains(needle)).forEach(p -> found.putIfAbsent(p.userId(), p));
         if (scope.staffVisible()) {
             staffDirectory(tenantId).stream()
-                    .filter(p -> fold(p.name()).contains(needle) || text.equalsIgnoreCase(p.email()))
+                    .filter(p -> p.folded().contains(needle) || text.equalsIgnoreCase(p.email()))
                     .forEach(p -> found.putIfAbsent(p.userId(), p));
         }
         List<Person> sorted = found.values().stream()
-                .sorted(Comparator.comparing((Person p) -> fold(p.name())).thenComparing(Person::userId)).toList();
+                .sorted(Comparator.comparing(Person::folded).thenComparing(Person::userId)).toList();
         List<RecipientCard> cards = new ArrayList<>();
         for (int from = 0; from < sorted.size() && cards.size() < max; from += max) {
             withActiveLogin(tenantId, sorted.subList(from, Math.min(sorted.size(), from + max))).stream()
@@ -98,17 +168,19 @@ public class RecipientLookupService {
         Scope scope = scopeOf(tenantId, actorId, actorRoles);
         List<String> clean = lines.stream().filter(l -> l != null && !l.isBlank()).map(String::trim).toList();
 
+        Supplier<List<Person>> staff = new Once<>(() -> staffDirectory(tenantId));
         Map<String, List<Person>> byLine = new HashMap<>();
         List<Person> keyed = keyedStudents(tenantId, scope, clean);
         if (scope.staffVisible() && clean.stream().anyMatch(l -> l.indexOf('@') >= 0)) {
-            keyed = Stream.concat(keyed.stream(), staffDirectory(tenantId).stream()).toList();
+            keyed = Stream.concat(keyed.stream(), staff.get().stream()).toList();
         }
+        Index index = Index.of(keyed);
         for (String line : clean) {
-            byLine.put(line, matching(keyed, line));
+            byLine.computeIfAbsent(line, index::find);
         }
         List<String> unmatched = clean.stream().distinct().filter(l -> byLine.get(l).isEmpty()).toList();
         if (!unmatched.isEmpty()) {
-            matchByName(tenantId, scope, unmatched, byLine);
+            matchByName(tenantId, scope, unmatched, byLine, staff);
         }
 
         Map<String, RecipientCard> matched = new LinkedHashMap<>();
@@ -151,7 +223,7 @@ public class RecipientLookupService {
                 codes.add(text.toUpperCase(Locale.ROOT));
             }
             String phone = normalisePhone(text);
-            if (phone.matches("0\\d{8,10}")) {
+            if (PHONE_SHAPE.matcher(phone).matches()) {
                 phones.add(phone);
                 phones.add("+84" + phone.substring(1));
             }
@@ -163,40 +235,38 @@ public class RecipientLookupService {
                 .map(RecipientLookupService::person).toList());
     }
 
-    private void matchByName(String tenantId, Scope scope, List<String> unmatched, Map<String, List<Person>> byLine) {
+    private void matchByName(String tenantId, Scope scope, List<String> unmatched,
+            Map<String, List<Person>> byLine, Supplier<List<Person>> staff) {
         Map<String, List<Person>> index = new HashMap<>();
-        students.listStudents(tenantId, scope.classIds(), DIRECTORY_CAP).stream().map(RecipientLookupService::person)
-                .forEach(p -> index.computeIfAbsent(fold(p.name()), k -> new ArrayList<>()).add(p));
+        directory(tenantId, scope).stream().filter(p -> !p.folded().isEmpty())
+                .forEach(p -> index.computeIfAbsent(p.folded(), k -> new ArrayList<>()).add(p));
         Set<String> staffIds = new LinkedHashSet<>();
         if (scope.staffVisible()) {
-            staffDirectory(tenantId).forEach(p -> {
-                index.computeIfAbsent(fold(p.name()), k -> new ArrayList<>()).add(p);
+            staff.get().stream().filter(p -> !p.folded().isEmpty()).forEach(p -> {
+                index.computeIfAbsent(p.folded(), k -> new ArrayList<>()).add(p);
                 staffIds.add(p.userId());
             });
         }
+        Map<String, List<Person>> byName = new HashMap<>();
         Map<String, Person> candidates = new LinkedHashMap<>();
-        unmatched.forEach(l -> index.getOrDefault(fold(l), List.of()).forEach(p -> candidates.put(p.userId(), p)));
+        for (String line : unmatched) {
+            List<Person> found = index.getOrDefault(fold(line), List.of());
+            byName.put(line, found);
+            found.forEach(p -> candidates.put(p.userId(), p));
+        }
         Set<String> active = new LinkedHashSet<>(staffIds);
         withActiveLogin(tenantId, candidates.values().stream().filter(p -> !staffIds.contains(p.userId())).toList())
                 .forEach(p -> active.add(p.userId()));
-        unmatched.forEach(l -> byLine.put(l, index.getOrDefault(fold(l), List.of()).stream()
-                .filter(p -> active.contains(p.userId())).toList()));
+        byName.forEach((line, found) ->
+                byLine.put(line, found.stream().filter(p -> active.contains(p.userId())).toList()));
     }
 
-    private static List<Person> matching(List<Person> keyed, String line) {
-        String lower = line.toLowerCase(Locale.ROOT);
-        String phone = normalisePhone(line);
-        Map<String, Person> hit = new LinkedHashMap<>();
-        for (Person p : keyed) {
-            boolean match = line.indexOf('@') >= 0
-                    ? lower.equals(lower(p.email()))
-                    : (p.student() && line.equalsIgnoreCase(p.code()))
-                        || (p.phone() != null && phone.equals(normalisePhone(p.phone())));
-            if (match) {
-                hit.putIfAbsent(p.userId(), p);
-            }
+    private List<Person> directory(String tenantId, Scope scope) {
+        List<StudentCard> cards = students.listStudents(tenantId, scope.classIds(), DIRECTORY_CAP);
+        if (cards.size() >= DIRECTORY_CAP) {
+            log.warn("Student directory hit its cap of {} for tenant {}; name search is truncated", DIRECTORY_CAP, tenantId);
         }
-        return List.copyOf(hit.values());
+        return cards.stream().map(RecipientLookupService::person).toList();
     }
 
     /** Teachers and staff are visible to admins only; both are already filtered to active accounts. */
@@ -204,7 +274,13 @@ public class RecipientLookupService {
         Map<String, Person> byId = new LinkedHashMap<>();
         users.findCalendarTeachersByTenant(tenantId, STAFF_PAGE).stream().filter(RecipientLookupService::isActive)
                 .forEach(u -> byId.putIfAbsent(u.id(), person(u, "TEACHER", "Giáo viên")));
+        if (byId.size() >= STAFF_PAGE.getPageSize()) {
+            log.warn("Teacher directory hit its cap of {} for tenant {}", STAFF_PAGE.getPageSize(), tenantId);
+        }
         List<String> staffIds = users.findActiveStaffUserIds(tenantId, STAFF_PAGE);
+        if (staffIds.size() >= STAFF_PAGE.getPageSize()) {
+            log.warn("Staff directory hit its cap of {} for tenant {}", STAFF_PAGE.getPageSize(), tenantId);
+        }
         if (!staffIds.isEmpty()) {
             users.findByTenantIdAndIds(tenantId, staffIds).stream().filter(RecipientLookupService::isActive)
                     .forEach(u -> byId.putIfAbsent(u.id(), person(u, "STAFF", "Nhân viên")));
@@ -231,24 +307,20 @@ public class RecipientLookupService {
 
     private static Person person(StudentCard s) {
         return new Person(s.userId(), s.fullName(), "STUDENT", join("Học sinh", s.className(), s.studentCode()),
-                s.studentCode(), s.email(), s.phone(), true);
+                s.studentCode(), s.email(), s.phone(), true, fold(s.fullName()));
     }
 
     private static Person person(UserAccountProjection u, String role, String label) {
-        return new Person(u.id(), u.displayName(), role, join(label, u.email()), null, u.email(), null, false);
+        return new Person(u.id(), u.displayName(), role, join(label, u.email()), null, u.email(), null, false, fold(u.displayName()));
     }
 
     private static String join(String... parts) {
-        return Stream.of(parts).filter(p -> p != null && !p.isBlank()).collect(java.util.stream.Collectors.joining(SEP));
-    }
-
-    private static String lower(String value) {
-        return value == null ? null : value.toLowerCase(Locale.ROOT);
+        return Stream.of(parts).filter(p -> p != null && !p.isBlank()).collect(Collectors.joining(SEP));
     }
 
     /** Strips spaces, dots, dashes and brackets; a +84 prefix becomes the national leading 0. */
     static String normalisePhone(String raw) {
-        String digits = raw.replaceAll("[\\s.\\-()]", "");
+        String digits = PHONE_STRIP.matcher(raw).replaceAll("");
         return digits.startsWith("+84") ? "0" + digits.substring(3) : digits;
     }
 
@@ -257,8 +329,8 @@ public class RecipientLookupService {
         if (raw == null) {
             return "";
         }
-        String plain = Normalizer.normalize(raw, Normalizer.Form.NFD).replaceAll("\\p{M}+", "")
+        String plain = MARKS.matcher(Normalizer.normalize(raw, Normalizer.Form.NFD)).replaceAll("")
                 .replace('đ', 'd').replace('Đ', 'D');
-        return plain.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ");
+        return SPACES.matcher(plain.toLowerCase(Locale.ROOT).trim()).replaceAll(" ");
     }
 }

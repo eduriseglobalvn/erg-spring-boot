@@ -19,6 +19,7 @@ import com.erg.ergspringboot.users.UserDirectoryPort;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,7 @@ class RecipientLookupServiceTest {
 
     private final LmsAudienceReadPort lms = mock(LmsAudienceReadPort.class);
     private final UserDirectoryPort users = mock(UserDirectoryPort.class);
+    private int largestUserLookup;
     private final FakeStudents students = new FakeStudents();
     private final RecipientLookupService service =
             new RecipientLookupService(students, lms, users, new AudienceScopeGuard(lms));
@@ -58,12 +60,14 @@ class RecipientLookupServiceTest {
         when(users.findCalendarTeachersByTenant(eq(TENANT), any(Pageable.class))).thenReturn(teachers);
         when(users.findActiveStaffUserIds(eq(TENANT), any(Pageable.class))).thenReturn(List.of("st-lan"));
         when(users.findByTenantIdAndIds(eq(TENANT), anyCollection())).thenAnswer(call -> {
-            Collection<String> ids = call.getArgument(1);
+            Set<String> ids = Set.copyOf((Collection<String>) call.getArgument(1));
+            largestUserLookup = Math.max(largestUserLookup, ids.size());
             List<UserAccountProjection> all = new ArrayList<>(teachers);
             all.addAll(staff);
             roll.forEach(s -> all.add(new UserAccountProjection(s.userId(), TENANT, s.fullName(), s.email(),
                     s.userId().equals("u-gone") ? "SUSPENDED" : "ACTIVE")));
-            students.extra.forEach(s -> all.add(new UserAccountProjection(s.userId(), TENANT, s.fullName(), null, "ACTIVE")));
+            students.extra.forEach(s -> all.add(new UserAccountProjection(s.userId(), TENANT, s.fullName(), null,
+                    s.userId().startsWith("sus-") ? "SUSPENDED" : "ACTIVE")));
             return all.stream().filter(user -> ids.contains(user.id())).toList();
         });
     }
@@ -245,6 +249,88 @@ class RecipientLookupServiceTest {
     void searchDropsStudentsWhoseLoginIsSuspended() {
         assertThat(service.search(TENANT, "ad1", ADMIN, "Khoá", 20)).isEmpty();
         assertThat(service.search(TENANT, "ad1", ADMIN, "HS0200", 20)).isEmpty();
+    }
+
+    @Test
+    void teacherNameOrPhoneSharedWithAStudentOutsideTheirClassesIsStillOneMatch() {
+        students.extra = List.of(
+                new StudentCard("u-t1", "Hoàng Trùng Tên", "T1", null, "0955 000 111", "7A"),
+                new StudentCard("u-t2", "Hoàng Trùng Tên", "T2", null, "0955.000.111", "9C"),
+                new StudentCard("u-out", "Chỉ Ngoài Lớp", "OUT1", null, "0966 000 222", "9C"));
+
+        ResolvePeopleResult teacher = service.resolveLines(
+                TENANT, "gv1", TEACHER, List.of("hoang trung ten", "0955000111", "OUT1", "0966000222", "Chỉ Ngoài Lớp"));
+        assertThat(ids(teacher)).containsExactly("u-t1");
+        assertThat(teacher.ambiguous()).isEmpty();
+        assertThat(teacher.notFound()).containsExactly("OUT1", "0966000222", "Chỉ Ngoài Lớp");
+
+        ResolvePeopleResult admin = resolveAsAdmin("hoang trung ten", "0955000111", "OUT1");
+        assertThat(admin.ambiguous()).extracting(a -> a.candidates()).containsExactly(2, 2);
+        assertThat(ids(admin)).containsExactly("u-out");
+    }
+
+    @Test
+    void adminSearchFindsTeachersAndStaffByNameAndEmail() {
+        assertThat(service.search(TENANT, "ad1", ADMIN, "đỗ thị", 20)).containsExactly(
+                new RecipientCard("t-hoa", "Đỗ Thị Hoa", "TEACHER", "Giáo viên · hoa@erg.edu.vn"));
+        assertThat(service.search(TENANT, "ad1", ADMIN, "HOA@erg.edu.vn", 20)).extracting(RecipientCard::userId)
+                .containsExactly("t-hoa");
+        assertThat(service.search(TENANT, "ad1", ADMIN, "vu lan", 20)).containsExactly(
+                new RecipientCard("st-lan", "Vũ Lan", "STAFF", "Nhân viên · lan@erg.edu.vn"));
+        assertThat(service.search(TENANT, "ad1", ADMIN, "lan@erg.edu.vn", 20)).extracting(RecipientCard::userId)
+                .containsExactly("st-lan");
+        assertThat(service.search(TENANT, "ad1", ADMIN, "nghi", 20)).isEmpty(); // suspended teacher
+    }
+
+    @Test
+    void loginCheckIsChunkedAndStillFiltersCorrectlyAcrossThousandsOfStudents() {
+        students.extra = IntStream.range(0, 2_500)
+                .mapToObj(i -> new StudentCard((i % 5 == 0 ? "sus-" : "ok-") + i, "Khối Lớn " + i,
+                        "BIG%04d".formatted(i), null, null, "7A"))
+                .toList();
+        List<String> lines = IntStream.range(0, 2_500).mapToObj(i -> "big%04d".formatted(i)).toList();
+
+        ResolvePeopleResult result = service.resolveLines(TENANT, "ad1", ADMIN, lines);
+
+        assertThat(result.matched()).hasSize(2_000);
+        assertThat(result.notFound()).hasSize(500).contains("big0000", "big2495");
+        assertThat(largestUserLookup).isBetween(1, 1_000);
+    }
+
+    @Test
+    void blankPunctuationAndCombiningMarkLinesNeverMatchAnyone() {
+        students.extra = List.of(
+                new StudentCard("u-blank", "", "", "", "", "7A"),
+                new StudentCard("u-null", null, null, null, null, "7A"));
+
+        ResolvePeopleResult result = resolveAsAdmin("-", ".", "()", "  ", "", "́", "@");
+
+        assertThat(result.matched()).isEmpty();
+        assertThat(result.ambiguous()).isEmpty();
+        assertThat(result.notFound()).containsExactly("-", ".", "()", "́", "@");
+        assertThat(service.search(TENANT, "ad1", ADMIN, "́", 20)).isEmpty();
+        assertThat(service.search(TENANT, "ad1", ADMIN, "()", 20)).isEmpty();
+    }
+
+    @Test
+    void fiveThousandLinesAgainstFiveThousandStudentsResolveQuickly() {
+        students.extra = IntStream.range(0, 5_000)
+                .mapToObj(i -> new StudentCard("p" + i, "Học Sinh Mẫu " + i, "PERF%04d".formatted(i),
+                        "p" + i + "@erg.edu.vn", "09%08d".formatted(i), "7A"))
+                .toList();
+        List<String> lines = IntStream.range(0, 5_000)
+                .mapToObj(i -> switch (i % 3) {
+                    case 0 -> "perf%04d".formatted(i);
+                    case 1 -> "P" + i + "@ERG.edu.vn";
+                    default -> "09 %08d".formatted(i);
+                }).toList();
+
+        long start = System.nanoTime();
+        ResolvePeopleResult result = service.resolveLines(TENANT, "ad1", ADMIN, lines);
+        long millis = (System.nanoTime() - start) / 1_000_000;
+
+        assertThat(result.matched()).hasSize(5_000);
+        assertThat(millis).as("resolve time in ms").isLessThan(3_000);
     }
 
     /** In-memory stand-in for the lms read port with the same filtering contract. */
