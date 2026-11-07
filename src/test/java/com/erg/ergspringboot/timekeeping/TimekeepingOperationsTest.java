@@ -14,6 +14,8 @@ import com.erg.ergspringboot.timekeeping.internal.evidence.FaceConsentService;
 import com.erg.ergspringboot.timekeeping.internal.evidence.LocalPrivateObjectStorage;
 import com.erg.ergspringboot.timekeeping.internal.me.SelfViewService;
 import com.erg.ergspringboot.timekeeping.internal.punch.PunchService;
+import com.erg.ergspringboot.timekeeping.internal.request.ApprovalService;
+import com.erg.ergspringboot.timekeeping.internal.request.RequestService;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +31,8 @@ class TimekeepingOperationsTest {
     @SuppressWarnings("unchecked")
     private final ObjectProvider<LocalPrivateObjectStorage> noLocalStore = mock(ObjectProvider.class);
     private final TimekeepingOperations operations = new TimekeepingOperations(punches, mock(SelfViewService.class),
-            mock(DayAggregationService.class), mock(FaceConsentService.class), noLocalStore, Clock.systemUTC());
+            mock(DayAggregationService.class), mock(FaceConsentService.class), noLocalStore, mock(RequestService.class),
+            mock(ApprovalService.class), Clock.systemUTC());
     private final ErgPrincipal teacher = new ErgPrincipal("u-1", "s", "tenant-a", List.of(), List.of(), List.of(),
             List.of(), "staff", "user", Map.of());
     private final PunchCommand command = new PunchCommand(PunchDirection.IN, 21.0, 105.0, 10.0, false, null, null);

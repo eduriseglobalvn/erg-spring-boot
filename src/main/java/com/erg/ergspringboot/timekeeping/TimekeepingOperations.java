@@ -1,6 +1,11 @@
 package com.erg.ergspringboot.timekeeping;
 
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.ExplanationContext;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.LeavePreview;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestPage;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestView;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.ClockView;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.DayDetailView;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.MonthView;
@@ -13,6 +18,8 @@ import com.erg.ergspringboot.timekeeping.internal.evidence.FaceConsentService;
 import com.erg.ergspringboot.timekeeping.internal.evidence.LocalPrivateObjectStorage;
 import com.erg.ergspringboot.timekeeping.internal.me.SelfViewService;
 import com.erg.ergspringboot.timekeeping.internal.punch.PunchService;
+import com.erg.ergspringboot.timekeeping.internal.request.ApprovalService;
+import com.erg.ergspringboot.timekeeping.internal.request.RequestService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -34,15 +41,20 @@ public class TimekeepingOperations {
     private final DayAggregationService days;
     private final FaceConsentService consents;
     private final ObjectProvider<LocalPrivateObjectStorage> localPhotos;
+    private final RequestService requests;
+    private final ApprovalService approvals;
     private final Clock clock;
 
     TimekeepingOperations(PunchService punches, SelfViewService views, DayAggregationService days,
-            FaceConsentService consents, ObjectProvider<LocalPrivateObjectStorage> localPhotos, Clock clock) {
+            FaceConsentService consents, ObjectProvider<LocalPrivateObjectStorage> localPhotos, RequestService requests,
+            ApprovalService approvals, Clock clock) {
         this.punches = punches;
         this.views = views;
         this.days = days;
         this.consents = consents;
         this.localPhotos = localPhotos;
+        this.requests = requests;
+        this.approvals = approvals;
         this.clock = clock;
     }
 
@@ -85,6 +97,51 @@ public class TimekeepingOperations {
     /** Rebuilds one person's day from its punches (and, from T5, its approved requests). */
     public void recomputeDay(String tenantId, String userId, LocalDate date) {
         days.recompute(tenantId, userId, date);
+    }
+
+    public RequestView createRequest(ErgPrincipal principal, RequestCommand command) {
+        return requests.create(principal.tenantId(), principal.userId(), command);
+    }
+
+    public RequestView updateRequest(ErgPrincipal principal, String id, RequestCommand command) {
+        return requests.update(principal.tenantId(), principal.userId(), id, command);
+    }
+
+    public RequestView submitRequest(ErgPrincipal principal, String id) {
+        return requests.submit(principal.tenantId(), principal.userId(), id);
+    }
+
+    public RequestView cancelRequest(ErgPrincipal principal, String id) {
+        return requests.cancel(principal.tenantId(), principal.userId(), id);
+    }
+
+    public RequestView remindRequest(ErgPrincipal principal, String id) {
+        return requests.remind(principal.tenantId(), principal.userId(), id);
+    }
+
+    public RequestView request(ErgPrincipal principal, String id) {
+        return requests.get(principal.tenantId(), principal.userId(), id);
+    }
+
+    public RequestPage myRequests(ErgPrincipal principal, RequestStatus status, int page, int size) {
+        return requests.mine(principal.tenantId(), principal.userId(), status, page, size);
+    }
+
+    public LeavePreview previewLeave(ErgPrincipal principal, LocalDate from, LocalDate to, DayPart part, LeaveKind kind) {
+        return requests.previewLeave(principal.tenantId(), principal.userId(), from, to, part, kind);
+    }
+
+    public ExplanationContext explanationContext(ErgPrincipal principal, LocalDate date) {
+        return requests.explanationContext(principal.tenantId(), principal.userId(), date);
+    }
+
+    /** For the approval inbox (T6): {@code actor} is the verified caller; see ApprovalService for the rules. */
+    public void approveStep(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment) {
+        approvals.approveStep(tenantId, requestId, actor, onBehalf, comment);
+    }
+
+    public void rejectStep(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment) {
+        approvals.rejectStep(tenantId, requestId, actor, onBehalf, comment);
     }
 
     /**

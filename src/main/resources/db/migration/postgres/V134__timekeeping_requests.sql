@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS tk_requests (
 CREATE INDEX IF NOT EXISTS idx_tk_requests_user_status ON tk_requests(tenant_id, user_id, status);
 CREATE INDEX IF NOT EXISTS idx_tk_requests_school_status ON tk_requests(tenant_id, school_id, status);
 
--- resolver: MANAGER or SCHOOL_ROLE:<roles.name>. activated_at/due_at drive the overdue badge and reminders.
+-- resolver: MANAGER, SCHOOL_ROLE:<role suffix> or ESCALATION. A step held by several people (e.g. two vice
+-- principals) has one row per approver with the same step_no; the first to act wins, the others become SKIPPED.
+-- activated_at/due_at drive the overdue badge and reminders.
 CREATE TABLE IF NOT EXISTS tk_request_steps (
     id varchar(36) PRIMARY KEY,
     tenant_id varchar(255) NOT NULL,
@@ -47,7 +49,7 @@ CREATE TABLE IF NOT EXISTS tk_request_steps (
     due_at timestamp with time zone,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
-    CONSTRAINT uq_tk_request_steps_no UNIQUE (request_id, step_no)
+    CONSTRAINT uq_tk_request_steps_no UNIQUE (request_id, step_no, approver_id)
 );
 CREATE INDEX IF NOT EXISTS idx_tk_request_steps_approver ON tk_request_steps(tenant_id, approver_id, status);
 

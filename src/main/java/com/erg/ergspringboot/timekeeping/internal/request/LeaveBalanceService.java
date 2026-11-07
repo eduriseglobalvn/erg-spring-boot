@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.timekeeping.internal.request;
 
 import com.erg.ergspringboot.timekeeping.DayPart;
+import com.erg.ergspringboot.timekeeping.RequestStatus;
 import com.erg.ergspringboot.timekeeping.internal.rules.LeaveDayCounter;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
@@ -51,6 +52,29 @@ public class LeaveBalanceService {
         return entitlement(tenantId, userId, year).subtract(used);
     }
 
+    /**
+     * The balance once other PENDING annual leave is also taken out, so two pending requests cannot overdraw it.
+     * {@code excludeRequestId} (nullable) is the request being checked.
+     */
+    public BigDecimal availableAnnual(String tenantId, String userId, int year, String excludeRequestId) {
+        LocalDate first = LocalDate.of(year, 1, 1);
+        LocalDate last = LocalDate.of(year, 12, 31);
+        BigDecimal pending = requests.findAnnualLeaveOverlapping(tenantId, userId, RequestStatus.PENDING, first, last)
+                .stream().filter(r -> !r.getId().equals(excludeRequestId))
+                .map(r -> daysInside(r, first, last))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return annualBalance(tenantId, userId, year).subtract(pending);
+    }
+
+    /** Leave days in {@code from..to} at the school: its shift weekdays minus its holidays (half a day for AM/PM). */
+    public BigDecimal countDays(String tenantId, String schoolId, LocalDate from, LocalDate to, DayPart part) {
+        Set<DayOfWeek> workdays = context.shiftsOf(tenantId, schoolId).stream()
+                .flatMap(shift -> Arrays.stream(shift.getWeekdays())).map(DayOfWeek::of).collect(Collectors.toSet());
+        Set<LocalDate> holidayDates = holidays.findForSchool(tenantId, schoolId, from, to).stream()
+                .map(TkHoliday::getHolidayDate).collect(Collectors.toSet());
+        return LeaveDayCounter.count(from, to, part, workdays, holidayDates);
+    }
+
     public BigDecimal entitlement(String tenantId, String userId, int year) {
         TkPolicy policy = context.policyFor(tenantId, context.schoolOf(tenantId, userId).orElse(""),
                 LocalDate.of(year, 12, 31));
@@ -73,11 +97,7 @@ public class LeaveBalanceService {
         }
         LocalDate from = leave.getFromDate().isBefore(first) ? first : leave.getFromDate();
         LocalDate to = leave.getToDate().isAfter(last) ? last : leave.getToDate();
-        Set<DayOfWeek> workdays = context.shiftsOf(leave.getTenantId(), leave.getSchoolId()).stream()
-                .flatMap(shift -> Arrays.stream(shift.getWeekdays())).map(DayOfWeek::of).collect(Collectors.toSet());
-        Set<LocalDate> holidayDates = holidays.findForSchool(leave.getTenantId(), leave.getSchoolId(), from, to).stream()
-                .map(TkHoliday::getHolidayDate).collect(Collectors.toSet());
         DayPart part = from.equals(to) ? leave.getPart() : DayPart.FULL;
-        return LeaveDayCounter.count(from, to, part, workdays, holidayDates);
+        return countDays(leave.getTenantId(), leave.getSchoolId(), from, to, part);
     }
 }

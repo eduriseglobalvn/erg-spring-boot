@@ -325,4 +325,18 @@ public interface UserRepository extends JpaRepository<User, String> {
             """, nativeQuery = true)
     List<String> findActiveUserIdsHoldingPermission(@Param("tenantId") String tenantId,
             @Param("permission") String permission, @Param("date") java.time.LocalDate date);
+
+    /** Ids of ACTIVE users of the tenant holding the role named {@code roleName} directly or by an active assignment. */
+    @Query(value = """
+            select u.id from users u
+            where u.tenant_id = :tenantId and upper(u.status) = 'ACTIVE'
+              and (exists (select 1 from user_roles ur join roles r on r.id = ur.role_id
+                           where ur.user_id = u.id and lower(r.name) = lower(:roleName))
+                or exists (select 1 from user_role_assignments a join roles r on r.id = a.role_id
+                           where a.user_id = u.id and a.tenant_id = u.tenant_id and a.revoked_at is null
+                             and (a.expires_at is null or a.expires_at > now())
+                             and lower(r.name) = lower(:roleName)))
+            order by u.id
+            """, nativeQuery = true)
+    List<String> findActiveUserIdsHoldingRole(@Param("tenantId") String tenantId, @Param("roleName") String roleName);
 }

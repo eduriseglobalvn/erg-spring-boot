@@ -4,6 +4,7 @@ package com.erg.ergspringboot.timekeeping.web;
 final class TimekeepingPaths {
 
     static final String ME = "/api/v1/timekeeping/me";
+    static final String REQUESTS = "/api/v1/timekeeping/requests";
 
     private TimekeepingPaths() {}
 }

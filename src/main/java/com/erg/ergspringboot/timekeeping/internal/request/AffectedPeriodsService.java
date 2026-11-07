@@ -25,9 +25,11 @@ public class AffectedPeriodsService {
     }
 
     public List<TeacherPeriod> affected(String tenantId, String userId, LocalDate from, LocalDate to, DayPart part) {
-        return calendar.teacherPeriods(tenantId, userId, from, to).stream()
-                .filter(p -> part == DayPart.FULL || (part == DayPart.AM) == morning(p))
-                .toList();
+        return inPart(calendar.teacherPeriods(tenantId, userId, from, to), part);
+    }
+
+    public static List<TeacherPeriod> inPart(List<TeacherPeriod> periods, DayPart part) {
+        return periods.stream().filter(p -> part == DayPart.FULL || (part == DayPart.AM) == morning(p)).toList();
     }
 
     private static boolean morning(TeacherPeriod period) {

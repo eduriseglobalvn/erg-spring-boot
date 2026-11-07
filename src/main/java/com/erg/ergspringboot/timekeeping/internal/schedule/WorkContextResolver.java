@@ -113,15 +113,16 @@ public class WorkContextResolver {
         return sites.findByTenantIdAndSchoolIdAndActiveTrueOrderByNameAsc(tenantId, schoolId);
     }
 
-    /** A rule applies when it names the person, names the weekday, or the person has an approved WFH that day. */
+    /** Remote when the person has an approved WFH request covering the day, or a rule names the person or weekday. */
     public boolean isRemote(String tenantId, String schoolId, String userId, LocalDate date, String shiftId) {
+        if (requests.hasApprovedWfh(tenantId, userId, date)) return true;
         int weekday = date.getDayOfWeek().getValue();
         for (TkRemoteRule rule : remoteRules.findByTenantIdAndSchoolIdAndActiveTrue(tenantId, schoolId)) {
             if (rule.getShiftId() != null && !rule.getShiftId().equals(shiftId)) continue;
             boolean applies = switch (rule.getKind()) {
                 case USERS -> rule.getUserIds() != null && rule.getUserIds().contains(userId);
                 case WEEKDAY -> rule.getWeekday() != null && rule.getWeekday() == weekday;
-                case APPROVED_WFH -> requests.hasApprovedWfh(tenantId, userId, date);
+                case APPROVED_WFH -> false; // checked above for everyone; the rule kind is kept for old rows
             };
             if (applies) return true;
         }

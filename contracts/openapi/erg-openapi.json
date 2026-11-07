@@ -2093,6 +2093,32 @@
         },
         "type": "object"
       },
+      "ApiResponseExplanationContext": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ExplanationContext"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseFeatureConfigResponse": {
         "properties": {
           "data": {
@@ -2435,6 +2461,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/LearningPathResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseLeavePreview": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LeavePreview"
           },
           "errors": {},
           "message": {
@@ -3760,6 +3812,58 @@
         },
         "type": "object"
       },
+      "ApiResponseRequestPage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RequestPage"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRequestView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RequestView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRevokeResponse": {
         "properties": {
           "data": {
@@ -4601,6 +4705,27 @@
         "required": [
           "expectedVersion"
         ],
+        "type": "object"
+      },
+      "ApproverRef": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "resolver": {
+            "type": "string"
+          },
+          "stepNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ArchiveResponse": {
@@ -8821,6 +8946,38 @@
         ],
         "type": "object"
       },
+      "EvidenceView": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ExplanationContext": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceView"
+            },
+            "type": "array"
+          },
+          "remaining": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "suggestedOut": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "FeatureAccessResponse": {
         "properties": {
           "dashboardWidgets": {
@@ -9529,6 +9686,32 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LeavePreview": {
+        "properties": {
+          "affectedPeriods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodView"
+            },
+            "type": "array"
+          },
+          "approvers": {
+            "items": {
+              "$ref": "#/components/schemas/ApproverRef"
+            },
+            "type": "array"
+          },
+          "balanceAfter": {
+            "type": "number"
+          },
+          "balanceBefore": {
+            "type": "number"
+          },
+          "days": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -11276,6 +11459,240 @@
             "type": "object"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RequestCommand": {
+        "properties": {
+          "explanationReason": {
+            "enum": [
+              "FORGOT",
+              "DEVICE",
+              "OUTSIDE",
+              "BUSINESS_TRIP"
+            ],
+            "type": "string"
+          },
+          "fromDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "leaveKind": {
+            "enum": [
+              "ANNUAL",
+              "SICK",
+              "PAID_PERSONAL",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "part": {
+            "enum": [
+              "FULL",
+              "AM",
+              "PM"
+            ],
+            "type": "string"
+          },
+          "proposedOut": {
+            "type": "string"
+          },
+          "toDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "LEAVE",
+              "EXPLANATION",
+              "WFH",
+              "BUSINESS"
+            ],
+            "type": "string"
+          },
+          "workDate": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RequestPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequestView"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RequestStepView": {
+        "properties": {
+          "actedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actedBy": {
+            "type": "string"
+          },
+          "activatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "approverId": {
+            "type": "string"
+          },
+          "approverName": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "dueAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "onBehalf": {
+            "type": "boolean"
+          },
+          "resolver": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "WAITING",
+              "APPROVED",
+              "REJECTED",
+              "SKIPPED"
+            ],
+            "type": "string"
+          },
+          "stepNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "viewedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RequestView": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "currentStep": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "days": {
+            "type": "number"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceView"
+            },
+            "type": "array"
+          },
+          "explanationReason": {
+            "enum": [
+              "FORGOT",
+              "DEVICE",
+              "OUTSIDE",
+              "BUSINESS_TRIP"
+            ],
+            "type": "string"
+          },
+          "fromDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastRemindedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "leaveKind": {
+            "enum": [
+              "ANNUAL",
+              "SICK",
+              "PAID_PERSONAL",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "part": {
+            "enum": [
+              "FULL",
+              "AM",
+              "PM"
+            ],
+            "type": "string"
+          },
+          "proposedOut": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RequestStepView"
+            },
+            "type": "array"
+          },
+          "submittedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "toDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "LEAVE",
+              "EXPLANATION",
+              "WFH",
+              "BUSINESS"
+            ],
+            "type": "string"
+          },
+          "workDate": {
+            "format": "date",
             "type": "string"
           }
         },
@@ -15290,7 +15707,7 @@
     },
     "/api/v1/calendar": {
       "post": {
-        "operationId": "create_4",
+        "operationId": "create_5",
         "requestBody": {
           "content": {
             "application/json": {
@@ -18171,7 +18588,7 @@
     },
     "/api/v1/lcms/questions": {
       "post": {
-        "operationId": "create_3",
+        "operationId": "create_4",
         "requestBody": {
           "content": {
             "application/json": {
@@ -18229,7 +18646,7 @@
         ]
       },
       "put": {
-        "operationId": "update",
+        "operationId": "update_1",
         "parameters": [
           {
             "in": "path",
@@ -18448,7 +18865,7 @@
     },
     "/api/v1/lcms/quizzes": {
       "post": {
-        "operationId": "create_2",
+        "operationId": "create_3",
         "parameters": [
           {
             "in": "header",
@@ -18516,7 +18933,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_2",
+        "operationId": "update_3",
         "parameters": [
           {
             "in": "path",
@@ -18892,7 +19309,7 @@
     },
     "/api/v1/lcms/schools": {
       "post": {
-        "operationId": "create_1",
+        "operationId": "create_2",
         "requestBody": {
           "content": {
             "application/json": {
@@ -20830,7 +21247,7 @@
     },
     "/api/v1/lms/assignments": {
       "post": {
-        "operationId": "create",
+        "operationId": "create_1",
         "parameters": [
           {
             "in": "header",
@@ -20898,7 +21315,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_1",
+        "operationId": "update_2",
         "parameters": [
           {
             "in": "path",
@@ -22128,7 +22545,7 @@
         ]
       },
       "get": {
-        "operationId": "get",
+        "operationId": "get_1",
         "parameters": [
           {
             "in": "path",
@@ -23219,6 +23636,350 @@
         "security": [],
         "tags": [
           "timekeeping-photo-file-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests": {
+      "post": {
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/explanation-context": {
+      "get": {
+        "operationId": "explanationContext",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExplanationContext"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/mine": {
+      "get": {
+        "operationId": "mine",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "DRAFT",
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/preview-leave": {
+      "get": {
+        "operationId": "previewLeave",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "required": false,
+            "schema": {
+              "default": "FULL",
+              "enum": [
+                "FULL",
+                "AM",
+                "PM"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ANNUAL",
+                "SICK",
+                "PAID_PERSONAL",
+                "UNPAID"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLeavePreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/{id}": {
+      "get": {
+        "operationId": "get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      },
+      "put": {
+        "operationId": "update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/{id}/cancel": {
+      "post": {
+        "operationId": "cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/{id}/remind": {
+      "post": {
+        "operationId": "remind",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/{id}/submit": {
+      "post": {
+        "operationId": "submit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
         ]
       }
     },

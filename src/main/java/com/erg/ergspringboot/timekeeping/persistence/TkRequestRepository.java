@@ -3,6 +3,11 @@ package com.erg.ergspringboot.timekeeping.persistence;
 import com.erg.ergspringboot.timekeeping.RequestStatus;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -70,4 +75,43 @@ public interface TkRequestRepository extends JpaRepository<TkRequest, String> {
             """)
     boolean hasApprovedWfh(@Param("tenantId") String tenantId, @Param("userId") String userId,
             @Param("date") LocalDate date);
+
+    /** Serialises approve/reject/remind on one request (row lock until commit). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from TkRequest r where r.tenantId = :tenantId and r.id = :id")
+    Optional<TkRequest> findForUpdate(@Param("tenantId") String tenantId, @Param("id") String id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from TkRequest r where r.tenantId = :tenantId and r.userId = :userId and r.id = :id")
+    Optional<TkRequest> findOwnForUpdate(@Param("tenantId") String tenantId, @Param("userId") String userId,
+            @Param("id") String id);
+
+    Optional<TkRequest> findByTenantIdAndUserIdAndId(String tenantId, String userId, String id);
+
+    Page<TkRequest> findByTenantIdAndUserId(String tenantId, String userId, Pageable pageable);
+
+    Page<TkRequest> findByTenantIdAndUserIdAndStatus(String tenantId, String userId, RequestStatus status, Pageable pageable);
+
+    /** ANNUAL leave in {@code status} overlapping {@code from..to}. */
+    @Query("""
+            select r from TkRequest r
+            where r.tenantId = :tenantId and r.userId = :userId
+              and r.type = com.erg.ergspringboot.timekeeping.RequestType.LEAVE
+              and r.leaveKind = com.erg.ergspringboot.timekeeping.LeaveKind.ANNUAL
+              and r.status = :status
+              and r.fromDate <= :to and r.toDate >= :from
+            """)
+    List<TkRequest> findAnnualLeaveOverlapping(@Param("tenantId") String tenantId, @Param("userId") String userId,
+            @Param("status") RequestStatus status, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** PENDING/APPROVED requests of the user touching {@code from..to} (ranges, or an explanation day). */
+    @Query("""
+            select r from TkRequest r
+            where r.tenantId = :tenantId and r.userId = :userId and r.id <> :excludeId
+              and r.status in (com.erg.ergspringboot.timekeeping.RequestStatus.PENDING,
+                               com.erg.ergspringboot.timekeeping.RequestStatus.APPROVED)
+              and ((r.fromDate <= :to and r.toDate >= :from) or (r.workDate between :from and :to))
+            """)
+    List<TkRequest> findActiveTouching(@Param("tenantId") String tenantId, @Param("userId") String userId,
+            @Param("excludeId") String excludeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

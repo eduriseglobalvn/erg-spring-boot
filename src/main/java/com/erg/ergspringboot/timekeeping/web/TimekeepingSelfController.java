@@ -103,7 +103,7 @@ public class TimekeepingSelfController {
         }
     }
 
-    private static ErgPrincipal principal() {
+    static ErgPrincipal principal() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof ErgPrincipal principal)) {
             throw new ForbiddenException("Authentication is required.");
@@ -112,7 +112,7 @@ public class TimekeepingSelfController {
         return principal;
     }
 
-    private static <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
+    static <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
         return ApiResponse.success(200, message, data, request.getRequestURI(), RequestCorrelation.current(request));
     }
 }
