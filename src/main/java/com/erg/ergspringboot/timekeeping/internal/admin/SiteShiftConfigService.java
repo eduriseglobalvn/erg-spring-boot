@@ -163,6 +163,7 @@ public class SiteShiftConfigService {
         if (row != existing) row.setCreatedAt(support.clock().instant().atOffset(ZoneOffset.UTC));
         retire(row, !active);
         ShiftConfig saved = shift(shifts.save(row));
+        if (existing != null && row != existing) remoteRules.repointShift(tenantId, existing.getId(), saved.id());
         String action = existing == null ? "CREATE_SHIFT" : row == existing ? "UPDATE_SHIFT" : "REPLACE_SHIFT";
         support.auditChange(tenantId, actorId, action, "SHIFT", saved.id(), before, AdminSupport.summary(saved));
         return saved;
