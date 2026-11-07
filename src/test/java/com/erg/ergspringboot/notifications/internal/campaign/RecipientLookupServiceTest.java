@@ -52,7 +52,7 @@ class RecipientLookupServiceTest {
     private int largestUserLookup;
     private final FakeStudents students = new FakeStudents();
     private final RecipientLookupService service =
-            new RecipientLookupService(students, lms, users, new AudienceScopeGuard(lms));
+            new RecipientLookupService(students, lms, users, new AudienceScopeGuard(lms, mock(com.erg.ergspringboot.users.UserAuthorizationPort.class)));
 
     @BeforeEach
     void wireDirectory() {

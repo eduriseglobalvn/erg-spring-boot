@@ -5,6 +5,7 @@ import com.erg.ergspringboot.common.request.notifications.NotificationRequests.R
 import com.erg.ergspringboot.common.request.notifications.NotificationRequests.UnregisterDeviceRequest;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.DeviceRegistrationResponse;
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.WebPushConfigResponse;
+import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.notifications.config.WebPushVapidKeys;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
@@ -30,21 +31,26 @@ public class NotificationDeviceService {
     private final NotificationTopicMembershipRepository topicMembershipRepository;
     private final NotificationTokenCipher tokenCipher;
     private final WebPushVapidKeys webPush;
+    private final NotificationPushProperties push;
 
     public NotificationDeviceService(
             NotificationDeviceRegistrationRepository deviceRepository,
             NotificationTopicMembershipRepository topicMembershipRepository,
             NotificationTokenCipher tokenCipher,
-            WebPushVapidKeys webPush
+            WebPushVapidKeys webPush,
+            NotificationPushProperties push
     ) {
         this.deviceRepository = deviceRepository;
         this.topicMembershipRepository = topicMembershipRepository;
         this.tokenCipher = tokenCipher;
         this.webPush = webPush;
+        this.push = push;
     }
 
     public WebPushConfigResponse webPushConfig() {
-        return new WebPushConfigResponse(webPush.enabled(), webPush.publicKey());
+        // The outbox worker only runs when push is enabled, so a subscription made otherwise would never be served.
+        boolean enabled = push.isEnabled() && webPush.enabled();
+        return new WebPushConfigResponse(enabled, enabled ? webPush.publicKey() : null);
     }
 
     @Transactional
@@ -58,6 +64,9 @@ public class NotificationDeviceService {
         if (webPushTransport) {
             if (!webPush.enabled()) {
                 throw new BadRequestException("Web Push chưa được cấu hình");
+            }
+            if (!push.isEnabled()) {
+                throw new BadRequestException("Web Push chưa được bật");
             }
             // The endpoint is the subscription identity: stored and deduped exactly like an FCM token.
             token = WebPushSubscriptionValidator.endpoint(request.endpoint(), webPush.allowedHostSuffixes());

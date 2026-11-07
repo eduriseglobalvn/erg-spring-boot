@@ -51,6 +51,18 @@ class NotificationCommandServiceTest {
     private NotificationPreferenceRepository preferenceRepository;
 
     @Test
+    void campaignBodyPreviewNeverSplitsAnEmojiAtTheLimit() {
+        String emojiAcrossTheLimit = "a".repeat(499) + "😀" + "tail";
+
+        String preview = NotificationCommandService.bodyPreview(emojiAcrossTheLimit);
+
+        assertThat(preview).isEqualTo("a".repeat(499));
+        assertThat(NotificationCommandService.bodyPreview("a".repeat(498) + "😀" + "tail"))
+                .hasSize(500).endsWith("😀");
+        assertThat(NotificationCommandService.bodyPreview("ngắn")).isEqualTo("ngắn");
+    }
+
+    @Test
     void enqueueRejectsTopicOutsideTenantNamespace() {
         NotificationCommandService service = service();
         NotificationCommand command = command(List.of(), "t_tenant_b_portal_lms", Map.of("kind", "schedule"));

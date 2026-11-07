@@ -213,6 +213,9 @@ public class RecipientLookupService {
         if (guard.isAdmin(actor)) {
             return new Scope(null, true);
         }
+        if (guard.isUnitAdmin(actor)) {
+            return new Scope(guard.managedClassIds(actor), false);
+        }
         if (!guard.isTeacher(actor)) {
             throw new AccessDeniedException("Bạn không có quyền tìm người nhận");
         }

@@ -41,6 +41,7 @@ class NotificationDeviceServiceWebPushTest {
     private final NotificationDeviceRegistrationRepository devices = mock(NotificationDeviceRegistrationRepository.class);
     private final NotificationTopicMembershipRepository topics = mock(NotificationTopicMembershipRepository.class);
     private final WebPushProperties webPush = VapidTestKeys.properties();
+    private final NotificationPushProperties pushEnabled = enabledPush();
     private NotificationTokenCipher cipher;
     private NotificationDeviceService service;
 
@@ -49,7 +50,7 @@ class NotificationDeviceServiceWebPushTest {
         NotificationPushProperties properties = new NotificationPushProperties();
         properties.getCredentials().setRegistrationTokenEncryptionKey("unit-test-key");
         cipher = new NotificationTokenCipher(properties);
-        service = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush));
+        service = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush), pushEnabled);
         when(devices.findByTenantIdAndRegistrationTokenHash(anyString(), anyString())).thenReturn(Optional.empty());
         when(devices.save(any())).thenAnswer(invocation -> {
             NotificationDeviceRegistrationEntity entity = invocation.getArgument(0);
@@ -139,7 +140,7 @@ class NotificationDeviceServiceWebPushTest {
         WebPushProperties broken = VapidTestKeys.properties();
         broken.setPrivateKey(VapidTestKeys.generate()[1]);
         NotificationDeviceService misconfigured = new NotificationDeviceService(devices, topics, cipher,
-                new WebPushVapidKeys(broken));
+                new WebPushVapidKeys(broken), pushEnabled);
 
         assertThat(misconfigured.webPushConfig().enabled()).isFalse();
         assertThatThrownBy(() -> misconfigured.register("t", "u", "lms", request("WEB_PUSH", ENDPOINT, P256DH, AUTH)))
@@ -150,13 +151,26 @@ class NotificationDeviceServiceWebPushTest {
     @Test
     void webPushRegistrationIsRejectedWhileVapidIsNotConfigured() {
         NotificationDeviceService unconfigured = new NotificationDeviceService(devices, topics, cipher,
-                new WebPushVapidKeys(new WebPushProperties()));
+                new WebPushVapidKeys(new WebPushProperties()), pushEnabled);
 
         assertThatThrownBy(() -> unconfigured.register("t", "u", "lms", request("WEB_PUSH", ENDPOINT, P256DH, AUTH)))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("Web Push chưa được cấu hình");
         assertThat(unconfigured.webPushConfig().enabled()).isFalse();
         assertThat(unconfigured.webPushConfig().publicKey()).isNull();
+    }
+
+    @Test
+    void webPushIsOffWhilePushDeliveryIsDisabledEvenWithValidKeys() {
+        NotificationDeviceService pushOff = new NotificationDeviceService(devices, topics, cipher,
+                new WebPushVapidKeys(webPush), new NotificationPushProperties());
+
+        assertThat(pushOff.webPushConfig().enabled()).isFalse();
+        assertThat(pushOff.webPushConfig().publicKey()).isNull();
+        assertThatThrownBy(() -> pushOff.register("t", "u", "lms", request("WEB_PUSH", ENDPOINT, P256DH, AUTH)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Web Push chưa được bật");
+        verify(devices, never()).save(any());
     }
 
     @Test
@@ -194,5 +208,10 @@ class NotificationDeviceServiceWebPushTest {
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
         }
+    }
+    private static NotificationPushProperties enabledPush() {
+        NotificationPushProperties properties = new NotificationPushProperties();
+        properties.setEnabled(true);
+        return properties;
     }
 }

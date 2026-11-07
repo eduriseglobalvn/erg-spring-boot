@@ -165,6 +165,15 @@ public class NotificationCommandService {
         return new NotificationCommandResult(savedMessage.getId(), recipientCount, outboxCount);
     }
 
+    /** At most {@value #BODY_PREVIEW_MAX} chars, never cutting a surrogate pair (emoji) in half. */
+    static String bodyPreview(String body) {
+        if (body.length() <= BODY_PREVIEW_MAX) {
+            return body;
+        }
+        int end = Character.isHighSurrogate(body.charAt(BODY_PREVIEW_MAX - 1)) ? BODY_PREVIEW_MAX - 1 : BODY_PREVIEW_MAX;
+        return body.substring(0, end);
+    }
+
     /** Campaign send: inbox is always on; push honours per-user opt-outs unless the campaign is URGENT. */
     @Transactional
     public NotificationCommandResult enqueueCampaign(CampaignDelivery delivery) {
@@ -173,8 +182,7 @@ public class NotificationCommandService {
         data.put("campaignId", delivery.campaignId());
         data.put("priority", delivery.priority().name());
         if (urgent) data.put(BYPASS_PREFERENCES_KEY, "true");
-        String preview = delivery.body().length() > BODY_PREVIEW_MAX
-                ? delivery.body().substring(0, BODY_PREVIEW_MAX) : delivery.body();
+        String preview = bodyPreview(delivery.body());
         NotificationCommand command = new NotificationCommand(delivery.tenantId(), delivery.createdBy(), null,
                 CAMPAIGN_EVENT_TYPE, "notification_campaign", delivery.campaignId(), delivery.title(), preview,
                 null, delivery.priority().name(), CAMPAIGN_PORTAL, delivery.userIds(), null, data);

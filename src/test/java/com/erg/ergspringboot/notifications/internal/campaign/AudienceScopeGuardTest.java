@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.lms.LmsAudienceReadPort;
 import com.erg.ergspringboot.notifications.CampaignAudience;
+import com.erg.ergspringboot.users.UserAuthorizationPort;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -25,7 +26,8 @@ class AudienceScopeGuardTest {
     private static final Set<String> TEACHER_ROLES = Set.of("teacher");
 
     private final LmsAudienceReadPort lms = mock(LmsAudienceReadPort.class);
-    private final AudienceScopeGuard guard = new AudienceScopeGuard(lms);
+    private final UserAuthorizationPort authorizations = mock(UserAuthorizationPort.class);
+    private final AudienceScopeGuard guard = new AudienceScopeGuard(lms, authorizations);
 
     @BeforeEach
     void teachesSevenAAndSevenB() {
@@ -155,5 +157,54 @@ class AudienceScopeGuardTest {
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> guard.assertAllowed(TENANT, "x", Set.of(), classes("7A")))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void seededLmsAdminIsUnitScopedToTheSchoolsItManages() {
+        when(authorizations.managedEducationUnitIds("la1", TENANT)).thenReturn(List.of("center-1", "school-1"));
+        when(lms.classIdsOf(TENANT, List.of("center-1", "school-1"), List.of())).thenReturn(List.of("7A", "9C"));
+        when(lms.studentUserIdsInClassesAmong(eq(TENANT), eq(List.of("7A", "9C")), any(Collection.class)))
+                .thenAnswer(call -> ((Collection<String>) call.getArgument(2)).stream()
+                        .filter("s9"::equals).toList());
+        CampaignActor lmsAdmin = new CampaignActor(TENANT, "la1", Set.of("lms.admin"),
+                List.of("perm_lms_manage", "notification.campaign.send"), List.of());
+
+        assertThat(guard.isAdmin(lmsAdmin)).isFalse();
+        assertThat(guard.isUnitAdmin(lmsAdmin)).isTrue();
+        assertThatCode(() -> guard.assertAllowed(lmsAdmin, new CampaignAudience(false, List.of("school-1"), null,
+                List.of("9C"), null, null, List.of("s9")))).doesNotThrowAnyException();
+        // foreign school, foreign class, foreign student
+        assertThatThrownBy(() -> guard.assertAllowed(lmsAdmin, new CampaignAudience(false, List.of("school-2"), null,
+                null, null, null, null))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guard.assertAllowed(lmsAdmin, classes("8A"))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guard.assertAllowed(lmsAdmin, new CampaignAudience(false, null, null, null, null, null,
+                List.of("s1")))).isInstanceOf(AccessDeniedException.class);
+        // tenant-wide scopes fail closed
+        assertThatThrownBy(() -> guard.assertAllowed(lmsAdmin, new CampaignAudience(true, null, null, null, null, null,
+                null))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guard.assertAllowed(lmsAdmin, new CampaignAudience(false, null, List.of("10"), null,
+                null, null, null))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> guard.assertAllowed(lmsAdmin, new CampaignAudience(false, null, null, null, null,
+                List.of("TEACHER"), null))).isInstanceOf(AccessDeniedException.class);
+        assertThat(guard.managedClassIds(lmsAdmin)).containsExactly("7A", "9C");
+    }
+
+    @Test
+    void unitAdminWithoutManagedUnitsMaySendNothing() {
+        CampaignActor schoolAdmin = new CampaignActor(TENANT, "sa1", Set.of("school_admin"));
+
+        assertThatThrownBy(() -> guard.assertAllowed(schoolAdmin, classes("7A"))).isInstanceOf(AccessDeniedException.class);
+        assertThat(guard.managedClassIds(schoolAdmin)).isEmpty();
+    }
+
+    @Test
+    void unitAdminRoleNamesAreExactAndNeverComeFromPermissions() {
+        assertThat(guard.isUnitAdmin(new CampaignActor(TENANT, "x", Set.of("vice_principal")))).isFalse();
+        assertThat(guard.isUnitAdmin(new CampaignActor(TENANT, "x", Set.of(), List.of("lms.admin"), List.of()))).isFalse();
+        // tenant-wide admins keep tenant-wide reach even when they also hold a unit role
+        CampaignActor both = new CampaignActor(TENANT, "x", Set.of("admin", "principal"));
+        assertThat(guard.isUnitAdmin(both)).isFalse();
+        assertThatCode(() -> guard.assertAllowed(both, new CampaignAudience(true, null, null, null, null, null, null)))
+                .doesNotThrowAnyException();
     }
 }

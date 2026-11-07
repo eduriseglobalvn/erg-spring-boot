@@ -17,6 +17,7 @@ import com.erg.ergspringboot.notifications.persistence.NotificationCampaignEntit
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.persistence.EntityManager;
@@ -251,6 +252,106 @@ class NotificationCampaignControllerIT {
         assertThat(campaigns.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.SENT);
         assertThat(campaigns.findById(due.getId()).orElseThrow().getResolvedCount()).isEqualTo(3);
         assertThat(campaigns.findById(later.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.SCHEDULED);
+    }
+
+    @Test
+    void tenantWideAdminsMaySendToTheWholeTenant() throws Exception {
+        mockMvc.perform(as(post(BASE + "/estimate"), "admin-1", "admin").contentType("application/json")
+                        .content("{\"wholeTenant\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").isNumber());
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "root")
+                        .header("X-Roles", "system.super_admin").header("X-Permissions", "*")
+                        .contentType("application/json").content("{\"wholeTenant\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void seededLmsAdminReachesOnlyTheSchoolsItManages() throws Exception {
+        String granted = seedLmsAdmin("la-1");
+
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"schoolIds\":[\"school-camp\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted).content(classAudienceJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"schoolIds\":[\"school-far\"]}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"classIds\":[\"class-far\"]}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted).content("{\"wholeTenant\":true}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"gradeIds\":[\"7\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void theJobAppliesTheSameUnitScopeToASeededLmsAdmin() {
+        seedLmsAdmin("la-1");
+        NotificationCampaignEntity own = campaign("la-1", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1));
+        own.setAudience(new CampaignAudience(false, List.of("school-camp"), null, null, null, null, null));
+        NotificationCampaignEntity foreign = campaign("la-1", CampaignStatus.SCHEDULED,
+                OffsetDateTime.now().minusMinutes(1));
+        foreign.setAudience(new CampaignAudience(false, List.of("school-far"), null, null, null, null, null));
+        campaigns.save(own);
+        campaigns.save(foreign);
+        entityManager.flush();
+
+        job.dispatchDue();
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(campaigns.findById(own.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.SENT);
+        assertThat(campaigns.findById(foreign.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.FAILED);
+    }
+
+    /** User holding the seeded lms.admin role, assigned to school-camp only; returns the role's real permissions. */
+    private String seedLmsAdmin(String userId) {
+        EducationUnit far = new EducationUnit();
+        far.setId("school-far");
+        far.setTenantId(TENANT);
+        far.setName("Far School");
+        far.setType("school");
+        entityManager.persist(far);
+        Classroom farClass = new Classroom();
+        farClass.setId("class-far");
+        farClass.setTenantId(TENANT);
+        farClass.setSchoolId("school-far");
+        farClass.setName("9Z");
+        farClass.setGrade("9");
+        farClass.setAcademicYear("2026");
+        farClass.setStatus("active");
+        entityManager.persist(farClass);
+        User admin = user(userId);
+        admin.getRoles().add(entityManager.find(Role.class, "role_lms_admin"));
+        entityManager.persist(admin);
+        UserRoleAssignment assignment = new UserRoleAssignment();
+        assignment.setUserId(userId);
+        assignment.setRoleId("role_lms_admin");
+        assignment.setTenantId(TENANT);
+        assignment.setScopeType("SCHOOL");
+        assignment.setScopeId("school-camp");
+        assignment.setAssignedBy("admin-1");
+        entityManager.persist(assignment);
+        entityManager.flush();
+        @SuppressWarnings("unchecked")
+        List<String> permissions = entityManager.createNativeQuery("""
+                select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
+                where rp.role_id = 'role_lms_admin'
+                """).getResultList();
+        assertThat(permissions).contains("notification.campaign.send");
+        return String.join(",", permissions);
+    }
+
+    private static MockHttpServletRequestBuilder asLmsAdmin(
+            MockHttpServletRequestBuilder request, String userId, String granted) {
+        return request.header("X-Tenant-ID", TENANT).header("X-User-ID", userId).header("X-Roles", "lms.admin")
+                .header("X-Permissions", granted).contentType("application/json");
     }
 
     private String createDraft() throws Exception {

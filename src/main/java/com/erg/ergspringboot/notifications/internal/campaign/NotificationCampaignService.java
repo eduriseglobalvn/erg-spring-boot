@@ -91,7 +91,7 @@ public class NotificationCampaignService {
         NotificationCampaignEntity campaign = new NotificationCampaignEntity();
         campaign.setTenantId(actor.tenantId());
         campaign.setCreatedBy(actor.userId());
-        campaign.setSenderRole(guard.isAdmin(actor) ? "ADMIN" : "TEACHER");
+        campaign.setSenderRole(guard.isAdmin(actor) || guard.isUnitAdmin(actor) ? "ADMIN" : "TEACHER");
         campaign.setStatus(CampaignStatus.DRAFT);
         apply(campaign, request, priority, audience);
         campaign.setEstimatedCount(resolver.resolve(actor.tenantId(), audience).breakdown().total());

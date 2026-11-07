@@ -308,6 +308,8 @@ erg:
         max-backoff: ${NOTIFICATIONS__WORKER__MAX_BACKOFF:60m}
     web-push:
       # VAPID key pair (base64url). Empty = Web Push disabled; WEB_PUSH device registration returns 400.
+      # Also needs erg.notifications.push.enabled=true: the outbox worker that delivers pushes only runs then, so
+      # with push disabled web-push-config reports enabled=false and WEB_PUSH registration returns 400.
       public-key: ${NOTIFICATIONS__WEB_PUSH__PUBLIC_KEY:}
       private-key: ${NOTIFICATIONS__WEB_PUSH__PRIVATE_KEY:}
       subject: ${NOTIFICATIONS__WEB_PUSH__SUBJECT:}

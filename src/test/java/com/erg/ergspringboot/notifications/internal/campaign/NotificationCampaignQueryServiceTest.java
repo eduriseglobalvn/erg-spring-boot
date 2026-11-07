@@ -17,7 +17,8 @@ class NotificationCampaignQueryServiceTest {
 
     private final NotificationCampaignRepository campaigns = mock(NotificationCampaignRepository.class);
     private final NotificationMessageRepository messages = mock(NotificationMessageRepository.class);
-    private final AudienceScopeGuard guard = new AudienceScopeGuard(mock(com.erg.ergspringboot.lms.LmsAudienceReadPort.class));
+    private final AudienceScopeGuard guard = new AudienceScopeGuard(mock(com.erg.ergspringboot.lms.LmsAudienceReadPort.class),
+            mock(com.erg.ergspringboot.users.UserAuthorizationPort.class));
     private final NotificationCampaignQueryService queries =
             new NotificationCampaignQueryService(campaigns, messages, guard, mock(UserDirectoryPort.class));
 
