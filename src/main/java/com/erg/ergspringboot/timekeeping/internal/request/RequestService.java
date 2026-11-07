@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -112,6 +113,8 @@ public class RequestService {
 
     @Transactional
     public RequestView submit(String tenantId, String userId, String id) {
+        // one submit per person at a time: overlap, balance and explanation-limit checks read the others' rows
+        requests.lockSubmitsOf(tenantId + ":" + userId);
         TkRequest r = own(tenantId, userId, id);
         if (r.getStatus() != RequestStatus.DRAFT) throw conflict("NOT_DRAFT", "Đơn đã được gửi");
         rules.checkForSubmit(r);
@@ -194,8 +197,12 @@ public class RequestService {
         TkRequest probe = new TkRequest();
         RequestRules.apply(probe, new RequestCommand(RequestType.LEAVE, kind, from, to, part, null, null, null, null));
         BigDecimal days = balance.countDays(tenantId, schoolId, from, to, probe.getPart());
-        BigDecimal before = balance.availableAnnual(tenantId, userId, from.getYear(), null);
-        BigDecimal after = kind == LeaveKind.ANNUAL ? before.subtract(days) : before;
+        // per calendar year as at submit; across year-end the year left with the least balance is shown
+        RequestRules.YearBalance binding = rules.annualByYear(tenantId, userId, schoolId, from, to, probe.getPart(), null)
+                .stream().min(Comparator.comparing(y -> y.available().subtract(kind == LeaveKind.ANNUAL
+                        ? y.wanted() : BigDecimal.ZERO))).orElseThrow();
+        BigDecimal before = binding.available();
+        BigDecimal after = kind == LeaveKind.ANNUAL ? before.subtract(binding.wanted()) : before;
         List<PeriodView> hit = affected.affected(tenantId, userId, from, to, probe.getPart()).stream()
                 .map(RequestService::period).toList();
         return new LeavePreview(days, before, after, hit,

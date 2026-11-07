@@ -23,6 +23,8 @@ import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -137,17 +139,29 @@ class RequestRules {
 
     /** Checked per calendar year the leave touches; the available balance already excludes other pending leave. */
     private void checkAnnualBalance(TkRequest r) {
-        for (int year = r.getFromDate().getYear(); year <= r.getToDate().getYear(); year++) {
-            LocalDate from = max(r.getFromDate(), LocalDate.of(year, 1, 1));
-            LocalDate to = min(r.getToDate(), LocalDate.of(year, 12, 31));
-            BigDecimal wanted = balance.countDays(r.getTenantId(), r.getSchoolId(), from, to,
-                    from.equals(to) ? r.getPart() : DayPart.FULL);
-            BigDecimal available = balance.availableAnnual(r.getTenantId(), r.getUserId(), year, r.getId()).max(BigDecimal.ZERO);
-            if (wanted.compareTo(available) > 0) {
+        for (YearBalance year : annualByYear(r.getTenantId(), r.getUserId(), r.getSchoolId(), r.getFromDate(),
+                r.getToDate(), r.getPart(), r.getId())) {
+            if (year.wanted().compareTo(year.available()) > 0) {
                 throw unprocessable("INSUFFICIENT_LEAVE",
-                        "Phép năm còn " + vi(available) + " ngày, không đủ cho " + vi(wanted) + " ngày");
+                        "Phép năm còn " + vi(year.available()) + " ngày, không đủ cho " + vi(year.wanted()) + " ngày");
             }
         }
+    }
+
+    /** Annual leave wanted vs available (other pending leave taken out, floored at 0) per year the range touches. */
+    record YearBalance(int year, BigDecimal wanted, BigDecimal available) {}
+
+    List<YearBalance> annualByYear(String tenantId, String userId, String schoolId, LocalDate start, LocalDate end,
+            DayPart part, String excludeRequestId) {
+        List<YearBalance> years = new ArrayList<>();
+        for (int year = start.getYear(); year <= end.getYear(); year++) {
+            LocalDate from = max(start, LocalDate.of(year, 1, 1));
+            LocalDate to = min(end, LocalDate.of(year, 12, 31));
+            BigDecimal wanted = balance.countDays(tenantId, schoolId, from, to, from.equals(to) ? part : DayPart.FULL);
+            BigDecimal available = balance.availableAnnual(tenantId, userId, year, excludeRequestId).max(BigDecimal.ZERO);
+            years.add(new YearBalance(year, wanted, available));
+        }
+        return years;
     }
 
     private void checkExplanation(TkRequest r) {

@@ -335,6 +335,35 @@ public class RequestServiceIT {
     }
 
     @Test
+    void approvingIntoAMonthLockedAfterSubmitIsRefusedButRejectingStillWorks() {
+        RequestView sent = submit(leave(LeaveKind.ANNUAL, MON, MON, DayPart.FULL));
+        jdbc.update("insert into tk_period_locks (id, tenant_id, school_id, period, locked_at, locked_by)"
+                + " values (?, ?, ?, '2026-11', now(), 'admin')", UUID.randomUUID().toString(), TENANT, f.school);
+
+        assertError(() -> approvals.approveStep(TENANT, sent.id(), principal(f.lead), false, null), HttpStatus.CONFLICT,
+                "Kỳ công đã chốt");
+
+        RequestView unchanged = requests.get(TENANT, f.teacher, sent.id());
+        assertThat(unchanged.status()).isEqualTo(RequestStatus.PENDING);
+        assertThat(unchanged.currentStep()).isEqualTo(1);
+        assertThat(unchanged.steps()).hasSize(3).allSatisfy(s -> {
+            assertThat(s.status()).isEqualTo(StepStatus.WAITING);
+            assertThat(s.actedBy()).isNull();
+        });
+        approvals.rejectStep(TENANT, sent.id(), principal(f.lead), false, "Kỳ đã chốt");
+        assertThat(requests.get(TENANT, f.teacher, sent.id()).status()).isEqualTo(RequestStatus.REJECTED);
+    }
+
+    @Test
+    void aManageHolderCannotApproveTheirOwnRequestOnBehalf() {
+        RequestView sent = submit(new RequestCommand(RequestType.WFH, null, MON, MON, null, null, null, null, "Ở nhà"));
+
+        assertThatThrownBy(() -> approvals.approveStep(TENANT, sent.id(), principal(f.teacher, "timekeeping.manage"),
+                true, null)).isInstanceOf(AccessDeniedException.class);
+        assertThat(requests.get(TENANT, f.teacher, sent.id()).status()).isEqualTo(RequestStatus.PENDING);
+    }
+
+    @Test
     void nobodyToApproveIsRefused() {
         Fixture lonely = Fixture.seed(jdbc, TENANT, "x");
         jdbc.update("update employee_profiles set manager_id = null where user_id = ?", lonely.teacher);
@@ -406,6 +435,67 @@ public class RequestServiceIT {
         } finally {
             clearInvocations(notifications);
             // inside a transaction: the tenant-aware transaction manager makes RLS permissive for context-free work
+            transactions.executeWithoutResult(status -> Fixture.purge(jdbc, tenant));
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void twoOverlappingDraftsSubmittedAtOnceExactlyOnePasses() throws Exception {
+        String tenant = "tk-race-" + UUID.randomUUID().toString().substring(0, 8);
+        Fixture race = transactions.execute(status -> Fixture.seed(jdbc, tenant, tenant.substring(8, 12)));
+        try {
+            List<String> drafts = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                drafts.add(transactions.execute(status -> requests.create(tenant, race.teacher,
+                        leave(LeaveKind.SICK, MON, TUE, DayPart.FULL)).id()));
+            }
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            List<Future<String>> results = new ArrayList<>();
+            for (String draft : drafts) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        transactions.executeWithoutResult(status -> requests.submit(tenant, race.teacher, draft));
+                        return "submitted";
+                    } catch (ApiException lost) {
+                        return lost.getCode();
+                    }
+                }));
+            }
+            start.countDown();
+            List<String> outcomes = new ArrayList<>();
+            for (Future<String> result : results) outcomes.add(result.get());
+            pool.shutdown();
+            pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertThat(outcomes).containsExactlyInAnyOrder("submitted", "REQUEST_OVERLAP");
+        } finally {
+            transactions.executeWithoutResult(status -> Fixture.purge(jdbc, tenant));
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void aFailingNotificationDoesNotUndoTheApproval() {
+        String tenant = "tk-race-" + UUID.randomUUID().toString().substring(0, 8);
+        Fixture race = transactions.execute(status -> Fixture.seed(jdbc, tenant, tenant.substring(8, 12)));
+        org.mockito.Mockito.doThrow(new IllegalStateException("outbox down")).when(notifications)
+                .send(anyString(), anyString(), any());
+        try {
+            String id = transactions.execute(status -> requests.submit(tenant, race.teacher,
+                    requests.create(tenant, race.teacher, new RequestCommand(RequestType.WFH, null, MON, MON, null,
+                            null, null, null, "Ở nhà")).id()).id());
+            transactions.executeWithoutResult(status -> approvals.approveStep(tenant, id, principalIn(tenant, race.lead),
+                    false, null));
+
+            assertThat(jdbc.queryForObject("select status from tk_requests where id = ?", String.class, id))
+                    .isEqualTo("APPROVED");
+            verify(notifications, times(1)).send(eq(tenant), anyString(), argThat((AdminSendRequest r) ->
+                    r.idempotencyKey().equals("tk-req:" + id + ":APPROVED:1")));
+        } finally {
+            org.mockito.Mockito.reset(notifications);
             transactions.executeWithoutResult(status -> Fixture.purge(jdbc, tenant));
         }
     }

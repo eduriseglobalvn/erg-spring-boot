@@ -7,6 +7,7 @@ import com.erg.ergspringboot.timekeeping.RequestStatus;
 import com.erg.ergspringboot.timekeeping.RequestType;
 import com.erg.ergspringboot.timekeeping.StepStatus;
 import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
+import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkAuditLog;
 import com.erg.ergspringboot.timekeeping.persistence.TkAuditLogRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequest;
@@ -16,6 +17,7 @@ import com.erg.ergspringboot.timekeeping.persistence.TkRequestStepRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,10 +44,13 @@ public class ApprovalService {
     private final DayAggregationService days;
     private final ErgPolicyService policy;
     private final RequestNotifier notifier;
+    private final WorkContextResolver context;
     private final Clock clock;
 
     ApprovalService(TkRequestRepository requests, TkRequestStepRepository steps, TkAuditLogRepository audit,
-            DayAggregationService days, ErgPolicyService policy, RequestNotifier notifier, Clock clock) {
+            DayAggregationService days, ErgPolicyService policy, RequestNotifier notifier, WorkContextResolver context,
+            Clock clock) {
+        this.context = context;
         this.requests = requests;
         this.steps = steps;
         this.audit = audit;
@@ -92,6 +97,7 @@ public class ApprovalService {
             }
             acted = current.get(0);
         }
+        if (approve) requireOpen(r); // rejecting changes no day, so it stays allowed in a locked month
         Instant now = clock.instant();
         acted.setStatus(approve ? StepStatus.APPROVED : StepStatus.REJECTED);
         acted.setActedBy(actor.userId());
@@ -127,6 +133,15 @@ public class ApprovalService {
             days.recompute(tenantId, r.getUserId(), date);
         }
         notifier.approved(r, stepNo);
+    }
+
+    /** 409 PERIOD_LOCKED when any month the request covers is locked for the requester's school. */
+    private void requireOpen(TkRequest r) {
+        List<LocalDate> covered = dates(r);
+        for (YearMonth m = YearMonth.from(covered.get(0)); !m.isAfter(YearMonth.from(covered.get(covered.size() - 1)));
+                m = m.plusMonths(1)) {
+            context.requireOpen(r.getTenantId(), r.getSchoolId(), m.atDay(1));
+        }
     }
 
     private void audit(TkRequest r, ErgPrincipal actor, boolean approve, int stepNo, String comment, Instant now) {

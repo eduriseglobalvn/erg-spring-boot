@@ -92,6 +92,10 @@ public interface TkRequestRepository extends JpaRepository<TkRequest, String> {
 
     Page<TkRequest> findByTenantIdAndUserIdAndStatus(String tenantId, String userId, RequestStatus status, Pageable pageable);
 
+    /** Transaction-scoped advisory lock on {@code key} (released at commit/rollback). */
+    @Query(value = "select 1 from (select pg_advisory_xact_lock(hashtext(:key))) locked", nativeQuery = true)
+    Integer lockSubmitsOf(@Param("key") String key);
+
     /** ANNUAL leave in {@code status} overlapping {@code from..to}. */
     @Query("""
             select r from TkRequest r
