@@ -8947,6 +8947,15 @@
             "format": "int32",
             "type": "integer"
           },
+          "leaveKind": {
+            "enum": [
+              "ANNUAL",
+              "SICK",
+              "PAID_PERSONAL",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
           "missing": {
             "enum": [
               "IN",
@@ -10759,6 +10768,15 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "leaveKind": {
+            "enum": [
+              "ANNUAL",
+              "SICK",
+              "PAID_PERSONAL",
+              "UNPAID"
+            ],
+            "type": "string"
           },
           "status": {
             "enum": [

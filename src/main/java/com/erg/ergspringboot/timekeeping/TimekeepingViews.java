@@ -53,8 +53,8 @@ public final class TimekeepingViews {
             PunchStatus verdict, PunchView punch, boolean alreadyPunched, Integer minutesVsShift,
             PeriodView nextPeriod, String messageVi) {}
 
-    /** {@code flags}: REMOTE, FLAGGED, PENDING_REVIEW. */
-    public record MonthDayView(LocalDate date, DayStatus status, BigDecimal units, List<String> flags) {}
+    /** {@code flags}: REMOTE, FLAGGED, PENDING_REVIEW. {@code leaveKind}: null unless the day is a leave day. */
+    public record MonthDayView(LocalDate date, DayStatus status, BigDecimal units, List<String> flags, LeaveKind leaveKind) {}
 
     public record MonthView(
             String period,
@@ -88,7 +88,8 @@ public final class TimekeepingViews {
             boolean remote,
             LocalTime suggestedOut,
             int explanationsRemaining,
-            List<String> flags) {}
+            List<String> flags,
+            LeaveKind leaveKind) {}
 
     /** Bytes of a locally stored punch photo, for the dev-only signed file endpoint. */
     public record PhotoFile(byte[] bytes, String contentType) {}

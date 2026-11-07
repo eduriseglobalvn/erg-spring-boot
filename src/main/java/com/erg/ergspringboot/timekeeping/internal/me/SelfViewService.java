@@ -119,7 +119,7 @@ public class SelfViewService {
                 .findByTenantIdAndUserIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId, userId, from, to).stream()
                 .collect(Collectors.groupingBy(TkPunch::getWorkDate));
         List<MonthDayView> dayViews = dayRows.stream().map(d -> new MonthDayView(d.getWorkDate(), d.getStatus(),
-                d.getWorkUnits(), flags(d.getRemote(), punchesByDay.getOrDefault(d.getWorkDate(), List.of())))).toList();
+                d.getWorkUnits(), flags(d.getRemote(), punchesByDay.getOrDefault(d.getWorkDate(), List.of())), d.getLeaveKind())).toList();
         BigDecimal actual = dayRows.stream().map(TkDay::getWorkUnits).reduce(BigDecimal.ZERO, BigDecimal::add);
         int lateCount = (int) dayRows.stream().filter(d -> d.getLateMinutes() > 0).count();
         int lateMinutes = dayRows.stream().mapToInt(TkDay::getLateMinutes).sum();
@@ -164,7 +164,8 @@ public class SelfViewService {
                 day.map(TkDay::getRemote).orElse(false),
                 shift == null ? null : ExplanationSuggester.suggestOut(shift.getEndTime(), lastPeriodEnd),
                 (int) Math.max(0, policy.getExplanationsPerMonth() - usedExplanations),
-                flags(day.map(TkDay::getRemote).orElse(false), dayPunches));
+                flags(day.map(TkDay::getRemote).orElse(false), dayPunches),
+                day.map(TkDay::getLeaveKind).orElse(null));
     }
 
     /** Working days of the month (shift weekdays minus holidays) times the shift's units. */

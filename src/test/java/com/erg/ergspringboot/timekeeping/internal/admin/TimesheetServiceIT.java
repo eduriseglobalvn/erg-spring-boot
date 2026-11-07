@@ -2,7 +2,10 @@ package com.erg.ergspringboot.timekeeping.internal.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.erg.ergspringboot.timekeeping.LeaveKind;
 import com.erg.ergspringboot.timekeeping.PeriodStage;
+import com.erg.ergspringboot.timekeeping.TimekeepingOperations;
+import com.erg.ergspringboot.timekeeping.TimekeepingViews.MonthDayView;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.DayCell;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.Timesheet;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TimesheetRow;
@@ -18,6 +21,7 @@ class TimesheetServiceIT extends AdminITBase {
     private static final String T = "tk-sheet-it";
 
     @Autowired TimesheetService sheets;
+    @Autowired TimekeepingOperations operations;
 
     private Fixture f;
 
@@ -59,6 +63,17 @@ class TimesheetServiceIT extends AdminITBase {
         assertThat(row.leave()).isEqualByComparingTo("1.5");
         assertThat(row.kpKc()).isEqualByComparingTo("2.0");
         assertThat(row.deductMinutes()).isEqualTo(15);
+    }
+
+    @Test
+    void selfMonthAndDayExposeTheLeaveKind() {
+        var me = principal(T, f.teacher());
+        var days = operations.month(me, "2026-11").days();
+
+        assertThat(days).filteredOn(d -> d.date().equals(nov(5))).extracting(MonthDayView::leaveKind).containsExactly(LeaveKind.UNPAID);
+        assertThat(days).filteredOn(d -> d.date().equals(nov(2))).extracting(MonthDayView::leaveKind).containsNull();
+        assertThat(operations.day(me, nov(5)).leaveKind()).isEqualTo(LeaveKind.UNPAID);
+        assertThat(operations.day(me, nov(2)).leaveKind()).isNull();
     }
 
     @Test
