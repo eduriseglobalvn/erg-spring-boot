@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.timekeeping.internal.punch;
 
-import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.timekeeping.PunchDirection;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
@@ -16,6 +15,7 @@ import com.erg.ergspringboot.timekeeping.internal.rules.PunchCheck;
 import com.erg.ergspringboot.timekeeping.internal.rules.PunchInput;
 import com.erg.ergspringboot.timekeeping.internal.rules.PunchValidator;
 import com.erg.ergspringboot.timekeeping.internal.rules.SitePolicy;
+import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunch;
@@ -61,13 +61,13 @@ public class PunchService {
     private final FaceConsentService consents;
     private final PunchCodeGenerator codes;
     private final DayAggregationService days;
-    private final CalendarReadPort calendar;
+    private final TeacherPeriodReader calendar;
     private final Clock clock;
 
     PunchService(TkPunchRepository punches, TkSiteRepository sites, TkShiftRepository shifts,
             WorkContextResolver context, PunchPhotoService photos,
             FaceConsentService consents, PunchCodeGenerator codes, DayAggregationService days,
-            CalendarReadPort calendar, Clock clock) {
+            TeacherPeriodReader calendar, Clock clock) {
         this.punches = punches;
         this.sites = sites;
         this.shifts = shifts;
@@ -201,8 +201,8 @@ public class PunchService {
             LocalDateTime reference = punch.getWorkDate().atTime(
                     punch.getDirection() == PunchDirection.IN ? shift.getStartTime() : shift.getEndTime());
             minutesVsShift = (int) Duration.between(reference, local).toMinutes();
-            next = calendar.teacherPeriods(punch.getTenantId(), punch.getUserId(), punch.getWorkDate(),
-                            punch.getWorkDate()).stream()
+            next = calendar.read(punch.getTenantId(), punch.getUserId(), punch.getWorkDate(), punch.getWorkDate())
+                    .orElse(List.of()).stream()
                     .filter(p -> p.start().isAfter(punch.getServerTime()))
                     .findFirst()
                     .map(p -> new PeriodView(p.start(), p.end(), p.className(), p.subject(), p.room()))

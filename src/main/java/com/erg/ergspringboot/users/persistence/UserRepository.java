@@ -294,6 +294,8 @@ public interface UserRepository extends JpaRepository<User, String> {
      * Ids of ACTIVE users of the tenant who hold {@code permission} through a direct role, an active scoped role
      * assignment or an unexpired grant override, and have no unexpired deny/revoke override for it. Mirrors
      * EffectivePermissionResolver for one permission (a deny wins); the {@code *} wildcard is not expanded.
+     * Users whose employee profile says they had left before {@code date} or join after it are excluded; users
+     * without a profile are kept.
      */
     @Query(value = """
             select u.id from users u
@@ -316,8 +318,11 @@ public interface UserRepository extends JpaRepository<User, String> {
                               where o.user_id = u.id and lower(trim(o.permission)) = lower(:permission)
                                 and (o.expires_at is null or o.expires_at > now())
                                 and lower(trim(coalesce(o.grant_type, ''))) not in ('', 'grant', 'allow'))
+              and not exists (select 1 from employee_profiles ep
+                              where ep.user_id = u.id and ep.tenant_id = u.tenant_id
+                                and (ep.terminated_at < :date or ep.joined_at > :date))
             order by u.id
             """, nativeQuery = true)
     List<String> findActiveUserIdsHoldingPermission(@Param("tenantId") String tenantId,
-            @Param("permission") String permission);
+            @Param("permission") String permission, @Param("date") java.time.LocalDate date);
 }

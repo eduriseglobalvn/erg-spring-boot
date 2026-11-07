@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.calendar.TeacherPeriod;
+import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
+import org.springframework.transaction.PlatformTransactionManager;
 import com.erg.ergspringboot.timekeeping.PunchDirection;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
@@ -122,6 +124,17 @@ class PunchServiceTest {
         assertThat(saved.getLng()).isEqualByComparingTo("105.8542");
         assertThat(saved.getAccuracyM()).isEqualTo(20);
         assertThat(saved.getSiteId()).isEqualTo("site-1");
+        verify(days).recompute(T, U, DAY);
+    }
+
+    @Test
+    void calendarFailureDoesNotFailThePunch() {
+        when(calendar.teacherPeriods(eq(T), eq(U), any(), any())).thenThrow(new IllegalStateException("calendar down"));
+
+        PunchResult result = service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
+
+        assertThat(result.punch().code()).isEqualTo("CC-121126-0001");
+        assertThat(result.nextPeriod()).isNull();
         verify(days).recompute(T, U, DAY);
     }
 
@@ -348,7 +361,8 @@ class PunchServiceTest {
     }
 
     private PunchService service(Instant now) {
-        return new PunchService(punches, sites, shifts, context, photos, consents, codes, days, calendar,
+        return new PunchService(punches, sites, shifts, context, photos, consents, codes, days,
+                new TeacherPeriodReader(calendar, mock(PlatformTransactionManager.class)),
                 Clock.fixed(now, ZoneOffset.UTC));
     }
 

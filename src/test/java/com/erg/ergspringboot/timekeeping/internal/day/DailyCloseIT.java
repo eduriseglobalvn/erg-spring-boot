@@ -1,10 +1,19 @@
 package com.erg.ergspringboot.timekeeping.internal.day;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
 import com.erg.ergspringboot.timekeeping.internal.request.LeaveBalanceService;
+import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
+import com.erg.ergspringboot.users.persistence.UserRepository;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.transaction.support.TransactionTemplate;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Clock;
@@ -61,6 +70,9 @@ class DailyCloseIT {
     @Autowired DailyCloseJob job;
     @Autowired DayAggregationService aggregation;
     @Autowired LeaveBalanceService leaveBalance;
+    @Autowired UserRepository users;
+    @Autowired TeacherPeriodReader periodReader;
+    @Autowired PlatformTransactionManager transactionManager;
     @PersistenceContext EntityManager entityManager;
 
     @BeforeEach
@@ -149,6 +161,53 @@ class DailyCloseIT {
 
         assertThat(leaveBalance.annualBalance(TENANT, "usr_tkc_a", 2026)).isEqualByComparingTo("8.5");
         assertThat(leaveBalance.annualBalance(TENANT, "usr_tkc_b", 2026)).isEqualByComparingTo("12");
+    }
+
+    @Test
+    void rosterLeavesOutStaffWhoLeftBeforeOrJoinAfterTheDay() {
+        staff("usr_tkc_t", "active", true);
+        staff("usr_tkc_j", "active", true);
+        staff("usr_tkc_x", "active", true);
+        profile("usr_tkc_a", "2016-08-01", null);
+        profile("usr_tkc_t", "2020-01-01", "2026-11-11"); // left the day before
+        profile("usr_tkc_j", "2026-11-13", null);         // joins the day after
+        profile("usr_tkc_x", "2020-01-01", "2026-11-12"); // last day is the day itself
+
+        List<String> roster = users.findActiveUserIdsHoldingPermission(TENANT, "timekeeping.self", DAY);
+
+        assertThat(roster).contains("usr_tkc_a", "usr_tkc_b", "usr_tkc_x") // b has no profile row
+                .doesNotContain("usr_tkc_t", "usr_tkc_j", "usr_tkc_d", "usr_tkc_e");
+    }
+
+    @Test
+    void failingCalendarReadDoesNotMarkTheCallersTransactionRollbackOnly() {
+        // Behaves like the real @Transactional calendar use case: joins a running transaction, then fails.
+        when(calendar.teacherPeriods(any(), any(), any(), any())).thenAnswer(call -> new TransactionTemplate(
+                transactionManager).execute(status -> { throw new IllegalStateException("calendar down"); }));
+        TransactionTemplate punchLike = new TransactionTemplate(transactionManager);
+        punchLike.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        boolean[] rollbackOnly = new boolean[1];
+        punchLike.executeWithoutResult(status -> {
+            assertThat(periodReader.read(TENANT, "usr_tkc_a", DAY, DAY)).isEmpty();
+            rollbackOnly[0] = status.isRollbackOnly();
+        });
+        assertThat(rollbackOnly[0]).isFalse();
+
+        // Without the reader the same failure, even caught, dooms the caller's transaction.
+        assertThatThrownBy(() -> punchLike.executeWithoutResult(status -> {
+            try {
+                calendar.teacherPeriods(TENANT, "usr_tkc_a", DAY, DAY);
+            } catch (IllegalStateException caught) {
+                // swallowed, as a plain try/catch would
+            }
+        })).isInstanceOf(UnexpectedRollbackException.class);
+    }
+
+    private void profile(String userId, String joinedAt, String terminatedAt) {
+        jdbc.update("insert into employee_profiles (id, tenant_id, user_id, employee_code, joined_at, terminated_at)"
+                + " values (?, ?, ?, ?, ?::date, ?::date)", "ep_" + userId, TENANT, userId, "NV-" + userId,
+                joinedAt, terminatedAt);
     }
 
     private Map<String, Map<String, Object>> rows() {

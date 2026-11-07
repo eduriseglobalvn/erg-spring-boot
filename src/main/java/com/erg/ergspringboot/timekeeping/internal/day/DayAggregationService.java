@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.timekeeping.internal.day;
 
-import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.DayStatus;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
@@ -10,6 +9,7 @@ import com.erg.ergspringboot.timekeeping.RequestType;
 import com.erg.ergspringboot.timekeeping.internal.rules.DayInput;
 import com.erg.ergspringboot.timekeeping.internal.rules.DayResult;
 import com.erg.ergspringboot.timekeeping.internal.rules.WorkUnitCalculator;
+import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
@@ -71,19 +71,19 @@ public class DayAggregationService {
     private final TkHolidayRepository holidays;
     private final TkRequestRepository requests;
     private final WorkContextResolver context;
-    private final CalendarReadPort calendar;
+    private final TeacherPeriodReader periods;
     private final UserRepository users;
     private final Clock clock;
 
     DayAggregationService(TkPunchRepository punches, TkDayRepository days, TkHolidayRepository holidays,
-            TkRequestRepository requests, WorkContextResolver context, CalendarReadPort calendar, UserRepository users,
+            TkRequestRepository requests, WorkContextResolver context, TeacherPeriodReader periods, UserRepository users,
             Clock clock) {
         this.punches = punches;
         this.days = days;
         this.holidays = holidays;
         this.requests = requests;
         this.context = context;
-        this.calendar = calendar;
+        this.periods = periods;
         this.users = users;
         this.clock = clock;
     }
@@ -138,7 +138,7 @@ public class DayAggregationService {
     public int closeDay(String tenantId, LocalDate date) {
         Map<String, List<TkPunch>> punchesByUser = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, date)
                 .stream().collect(Collectors.groupingBy(TkPunch::getUserId, LinkedHashMap::new, Collectors.toList()));
-        Set<String> people = new LinkedHashSet<>(users.findActiveUserIdsHoldingPermission(tenantId, SELF_PERMISSION));
+        Set<String> people = new LinkedHashSet<>(users.findActiveUserIdsHoldingPermission(tenantId, SELF_PERMISSION, date));
         people.addAll(punchesByUser.keySet());
         Map<String, String> schoolOf = context.schoolsOf(tenantId, people);
         Map<String, List<TkRequest>> requestsByUser = requests.findApprovedOn(tenantId, date).stream()
@@ -245,7 +245,8 @@ public class DayAggregationService {
         }
         // shortcut: one calendar call per person and day (calendar has no bulk teacherPeriods); add a bulk read
         // to CalendarReadPort when the daily close of a large tenant gets slow.
-        day.setPeriods(calendar.teacherPeriods(school.tenantId(), userId, date, date).size());
+        // A failed read keeps the row's previous count (0 for a new row); the day itself is still written.
+        periods.read(school.tenantId(), userId, date, date).ifPresent(list -> day.setPeriods(list.size()));
         return Optional.of(day);
     }
 

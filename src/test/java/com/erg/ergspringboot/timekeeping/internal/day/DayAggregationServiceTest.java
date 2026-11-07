@@ -19,7 +19,9 @@ import com.erg.ergspringboot.timekeeping.PunchDirection;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.RequestStatus;
 import com.erg.ergspringboot.timekeeping.RequestType;
+import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
+import org.springframework.transaction.PlatformTransactionManager;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
@@ -228,7 +230,7 @@ class DayAggregationServiceTest {
 
     @Test
     void closeMarksNoPunchNoRequestAsAbsentAndPunchedDaysFromThePunches() {
-        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self")).thenReturn(List.of(U, U2));
+        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY)).thenReturn(List.of(U, U2));
         when(context.schoolsOf(eq(T), anyCollection())).thenReturn(Map.of(U, SCHOOL, U2, SCHOOL));
         when(punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(T, DAY)).thenReturn(List.of(
                 punch(U2, PunchDirection.IN, "2026-11-12T00:25:00Z"), punch(U2, PunchDirection.OUT, "2026-11-12T04:31:00Z")));
@@ -243,7 +245,7 @@ class DayAggregationServiceTest {
 
     @Test
     void closeAppliesTenantWideHolidaysButNotAnotherSchoolsHoliday() {
-        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self")).thenReturn(List.of(U, U2));
+        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY)).thenReturn(List.of(U, U2));
         when(context.schoolsOf(eq(T), anyCollection())).thenReturn(Map.of(U, SCHOOL, U2, "school-2"));
         when(context.shiftFor(eq(T), eq("school-2"), any())).thenReturn(Optional.of(shift));
         when(context.policyFor(eq(T), eq("school-2"), any())).thenReturn(new TkPolicy());
@@ -261,20 +263,48 @@ class DayAggregationServiceTest {
 
     @Test
     void closeSkipsALockedSchoolAndOneFailingPersonDoesNotStopTheOthers() {
-        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self")).thenReturn(List.of(U, U2, "teacher-3"));
-        when(context.schoolsOf(eq(T), anyCollection()))
-                .thenReturn(Map.of(U, SCHOOL, U2, SCHOOL, "teacher-3", "school-locked"));
+        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY))
+                .thenReturn(List.of(U, U2, "teacher-3", "teacher-4"));
+        when(context.schoolsOf(eq(T), anyCollection())).thenReturn(
+                Map.of(U, SCHOOL, U2, SCHOOL, "teacher-3", "school-locked", "teacher-4", "school-bad"));
         when(context.isLocked(T, "school-locked", DAY)).thenReturn(true);
-        when(calendar.teacherPeriods(T, U, DAY, DAY)).thenThrow(new IllegalStateException("calendar down"));
+        when(context.shiftFor(T, "school-bad", DAY)).thenThrow(new IllegalStateException("bad shift config"));
 
         Map<String, TkDay> rows = close();
 
-        assertThat(rows).containsOnlyKeys(U2);
+        assertThat(rows).containsOnlyKeys(U, U2);
+    }
+
+    @Test
+    void calendarFailureStillWritesTheDayAndKeepsThePreviousPeriods() {
+        TkDay existing = new TkDay();
+        existing.setPeriods(3);
+        when(days.findByTenantIdAndUserIdAndWorkDate(T, U, DAY)).thenReturn(Optional.of(existing));
+        punched(punch(PunchDirection.IN, "2026-11-12T00:25:00Z"), punch(PunchDirection.OUT, "2026-11-12T04:31:00Z"));
+        when(calendar.teacherPeriods(T, U, DAY, DAY)).thenThrow(new IllegalStateException("calendar down"));
+
+        TkDay day = recompute();
+
+        assertThat(day.getStatus()).isEqualTo(DayStatus.FULL);
+        assertThat(day.getWorkUnits()).isEqualByComparingTo("1.0");
+        assertThat(day.getPeriods()).isEqualTo(3);
+    }
+
+    @Test
+    void closeWritesTheDayWithZeroPeriodsWhenTheCalendarFailsForANewRow() {
+        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY)).thenReturn(List.of(U));
+        when(context.schoolsOf(eq(T), anyCollection())).thenReturn(Map.of(U, SCHOOL));
+        when(calendar.teacherPeriods(T, U, DAY, DAY)).thenThrow(new IllegalStateException("calendar down"));
+
+        TkDay day = close().get(U);
+
+        assertThat(day.getStatus()).isEqualTo(DayStatus.ABSENT_UNPAID);
+        assertThat(day.getPeriods()).isZero();
     }
 
     @Test
     void closeUsesApprovedRequestsLoadedOnceForTheTenant() {
-        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self")).thenReturn(List.of(U, U2));
+        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY)).thenReturn(List.of(U, U2));
         when(context.schoolsOf(eq(T), anyCollection())).thenReturn(Map.of(U, SCHOOL, U2, SCHOOL));
         TkRequest sick = leave(LeaveKind.SICK, DayPart.FULL);
         when(requests.findApprovedOn(T, DAY)).thenReturn(List.of(sick));
@@ -312,7 +342,8 @@ class DayAggregationServiceTest {
     }
 
     private DayAggregationService service(Instant now) {
-        return new DayAggregationService(punches, days, holidays, requests, context, calendar, users,
+        return new DayAggregationService(punches, days, holidays, requests, context,
+                new TeacherPeriodReader(calendar, mock(PlatformTransactionManager.class)), users,
                 Clock.fixed(now, ZoneOffset.UTC));
     }
 
