@@ -346,7 +346,7 @@ class NotificationCampaignServiceTest {
         when(campaigns.findByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
         when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
                 .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
-        when(authorizations.find("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
+        when(authorizations.findEffective("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
                 "teacher-1", TENANT, List.of("lms_teacher_standard"), List.of("lms.assignment.read", "notification.campaign.send"),
                 List.of(), List.of())));
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(30)));
@@ -383,7 +383,7 @@ class NotificationCampaignServiceTest {
         when(campaigns.findByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
         when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
                 .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
-        when(authorizations.find("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
+        when(authorizations.findEffective("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
                 "teacher-1", TENANT, List.of("teacher"), List.of("lms.assignment.read"), List.of(), List.of())));
         doThrow(new AccessDeniedException("no")).when(guard)
                 .assertAllowed(CampaignActor.none(TENANT, "teacher-1"), CLASS_7A);
@@ -439,7 +439,7 @@ class NotificationCampaignServiceTest {
     private void creatorHolds(List<String> rolePermissions, List<String> denied) {
         when(users.findByTenantIdAndIds(TENANT, List.of("teacher-1")))
                 .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
-        when(authorizations.find("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
+        when(authorizations.findEffective("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
                 "teacher-1", TENANT, List.of("lms_teacher_standard"), rolePermissions, List.of(), denied)));
     }
 

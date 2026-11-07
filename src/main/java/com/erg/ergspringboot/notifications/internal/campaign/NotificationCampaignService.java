@@ -201,7 +201,7 @@ public class NotificationCampaignService {
         if (!active) {
             return CampaignActor.none(tenantId, userId);
         }
-        return authorizations.find(userId, tenantId)
+        return authorizations.findEffective(userId, tenantId)
                 .filter(grants -> policy.isAllowedAny(principal(tenantId, userId, grants), null, tenantId, SEND_GATE))
                 .map(grants -> CampaignActor.of(tenantId, userId, grants.roleNames(), grants.effectivePermissions(),
                         grants.deniedPermissions()))

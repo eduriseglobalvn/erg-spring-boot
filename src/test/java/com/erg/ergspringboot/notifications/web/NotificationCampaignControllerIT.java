@@ -310,8 +310,122 @@ class NotificationCampaignControllerIT {
         assertThat(campaigns.findById(foreign.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.FAILED);
     }
 
+    @Test
+    void theJobHonoursRolesHeldOnlyThroughActiveAssignments() {
+        seedFarSchool();
+        // lms.admin and a teacher role held ONLY through role assignments (no user_roles rows), like HTTP sees them.
+        entityManager.persist(user("la-asg"));
+        assign("la-asg", "role_lms_admin", "school-camp", null, null);
+        entityManager.persist(user("gv-asg"));
+        assign("gv-asg", "role_lms_teacher_standard", "school-camp", null, null);
+        Classroom taught = new Classroom();
+        taught.setId("class-asg");
+        taught.setTenantId(TENANT);
+        taught.setSchoolId("school-camp");
+        taught.setName("6C");
+        taught.setGrade("6");
+        taught.setAcademicYear("2026");
+        taught.setStatus("active");
+        taught.setHomeroomTeacherId("gv-asg");
+        entityManager.persist(taught);
+        entityManager.persist(user("stu-4"));
+        Student student = new Student();
+        student.setId("s-stu-4");
+        student.setTenantId(TENANT);
+        student.setSchoolId("school-camp");
+        student.setAcademicClassId("class-asg");
+        student.setStudentCode("C-stu-4");
+        student.setFullName("stu-4");
+        student.setUsername("stu-4");
+        student.setAuthUserId("stu-4");
+        student.setStatus("active");
+        entityManager.persist(student);
+        // Same roles, but the assignment is revoked or expired: nobody at dispatch.
+        entityManager.persist(user("la-revoked"));
+        assign("la-revoked", "role_lms_admin", "school-camp", OffsetDateTime.now().minusDays(1), null);
+        entityManager.persist(user("gv-expired"));
+        assign("gv-expired", "role_lms_teacher_standard", "school-camp", null, OffsetDateTime.now().minusDays(1));
+
+        NotificationCampaignEntity adminOwn = due("la-asg", schools("school-camp"));
+        NotificationCampaignEntity adminForeign = due("la-asg", schools("school-far"));
+        NotificationCampaignEntity teacherOwn = due("gv-asg", classesOf("class-asg"));
+        NotificationCampaignEntity teacherForeign = due("gv-asg", classesOf(CLASS_ID));
+        NotificationCampaignEntity revoked = due("la-revoked", schools("school-camp"));
+        NotificationCampaignEntity expired = due("gv-expired", classesOf("class-asg"));
+        entityManager.flush();
+
+        job.dispatchDue();
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(statusOf(adminOwn)).isEqualTo(CampaignStatus.SENT);
+        assertThat(statusOf(adminForeign)).isEqualTo(CampaignStatus.FAILED);
+        assertThat(statusOf(teacherOwn)).isEqualTo(CampaignStatus.SENT);
+        assertThat(statusOf(teacherForeign)).isEqualTo(CampaignStatus.FAILED);
+        assertThat(statusOf(revoked)).isEqualTo(CampaignStatus.FAILED);
+        assertThat(statusOf(expired)).isEqualTo(CampaignStatus.FAILED);
+    }
+
+    private NotificationCampaignEntity due(String createdBy, CampaignAudience audience) {
+        NotificationCampaignEntity campaign = campaign(createdBy, CampaignStatus.SCHEDULED,
+                OffsetDateTime.now().minusMinutes(1));
+        campaign.setAudience(audience);
+        return campaigns.save(campaign);
+    }
+
+    private CampaignStatus statusOf(NotificationCampaignEntity campaign) {
+        return campaigns.findById(campaign.getId()).orElseThrow().getStatus();
+    }
+
+    private static CampaignAudience schools(String... ids) {
+        return new CampaignAudience(false, List.of(ids), null, null, null, null, null);
+    }
+
+    private static CampaignAudience classesOf(String... ids) {
+        return new CampaignAudience(false, null, null, List.of(ids), null, null, null);
+    }
+
     /** User holding the seeded lms.admin role, assigned to school-camp only; returns the role's real permissions. */
     private String seedLmsAdmin(String userId) {
+        seedFarSchool();
+        User admin = user(userId);
+        admin.getRoles().add(entityManager.find(Role.class, "role_lms_admin"));
+        entityManager.persist(admin);
+        assign(userId, "role_lms_admin", "school-camp", null, null);
+        @SuppressWarnings("unchecked")
+        List<String> permissions = entityManager.createNativeQuery("""
+                select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
+                where rp.role_id = 'role_lms_admin'
+                """).getResultList();
+        assertThat(permissions).contains("notification.campaign.send");
+        return String.join(",", permissions);
+    }
+
+    private void assign(String userId, String roleId, String schoolId, OffsetDateTime revokedAt,
+            OffsetDateTime expiresAt) {
+        UserRoleAssignment assignment = new UserRoleAssignment();
+        assignment.setUserId(userId);
+        assignment.setRoleId(roleId);
+        assignment.setTenantId(TENANT);
+        assignment.setScopeType("SCHOOL");
+        assignment.setScopeId(schoolId);
+        assignment.setAssignedBy("admin-1");
+        assignment.setRevokedAt(revokedAt);
+        if (revokedAt != null) {
+            assignment.setRevokedBy("admin-1");
+        }
+        entityManager.persist(assignment);
+        if (expiresAt != null) {
+            // ck_user_role_assignments_expiry wants expires_at after created_at: backdate both together.
+            entityManager.flush();
+            entityManager.createNativeQuery("update user_role_assignments set created_at = cast(:at as timestamptz) - interval '1 day', "
+                    + "expires_at = cast(:at as timestamptz) where id = :id").setParameter("at", expiresAt)
+                    .setParameter("id", assignment.getId()).executeUpdate();
+        }
+        entityManager.flush();
+    }
+
+    private void seedFarSchool() {
         EducationUnit far = new EducationUnit();
         far.setId("school-far");
         far.setTenantId(TENANT);
@@ -327,25 +441,6 @@ class NotificationCampaignControllerIT {
         farClass.setAcademicYear("2026");
         farClass.setStatus("active");
         entityManager.persist(farClass);
-        User admin = user(userId);
-        admin.getRoles().add(entityManager.find(Role.class, "role_lms_admin"));
-        entityManager.persist(admin);
-        UserRoleAssignment assignment = new UserRoleAssignment();
-        assignment.setUserId(userId);
-        assignment.setRoleId("role_lms_admin");
-        assignment.setTenantId(TENANT);
-        assignment.setScopeType("SCHOOL");
-        assignment.setScopeId("school-camp");
-        assignment.setAssignedBy("admin-1");
-        entityManager.persist(assignment);
-        entityManager.flush();
-        @SuppressWarnings("unchecked")
-        List<String> permissions = entityManager.createNativeQuery("""
-                select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
-                where rp.role_id = 'role_lms_admin'
-                """).getResultList();
-        assertThat(permissions).contains("notification.campaign.send");
-        return String.join(",", permissions);
     }
 
     private static MockHttpServletRequestBuilder asLmsAdmin(

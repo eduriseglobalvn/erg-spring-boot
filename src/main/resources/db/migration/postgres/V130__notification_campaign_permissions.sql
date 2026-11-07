@@ -1,5 +1,6 @@
 -- P2 notifications: admins and teachers may compose and send notification campaigns.
--- Who they may address is decided per request by AudienceScopeGuard (admin: whole tenant,
+-- Who they may address is decided per request by AudienceScopeGuard (tenant-wide admin: whole tenant;
+-- unit-scoped admin such as lms.admin: schools, classes and students of the units it manages;
 -- teacher: students of the classes they teach); this permission only opens the API.
 INSERT INTO permissions (
     id, created_at, updated_at, name, group_name, label, description,

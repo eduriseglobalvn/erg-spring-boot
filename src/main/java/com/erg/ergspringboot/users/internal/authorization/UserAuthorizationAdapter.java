@@ -9,6 +9,9 @@ import com.erg.ergspringboot.users.UserAuthorizationPort;
 import com.erg.ergspringboot.users.UserAuthorizationProjection;
 import com.erg.ergspringboot.users.UserPermissionOverrideProjection;
 import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.platform.security.EffectivePermissionResolver;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
@@ -55,6 +58,30 @@ public final class UserAuthorizationAdapter implements UserAuthorizationPort {
             return List.of();
         }
         return overrides.findByUserId(userId).stream().map(this::map).toList();
+    }
+
+    @Override
+    public Optional<UserAuthorizationProjection> findEffective(String userId, String tenantId) {
+        String scopedTenant = normalizeTenant(tenantId);
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return users.findByIdAndTenantId(userId, scopedTenant).map(user -> {
+            OffsetDateTime now = OffsetDateTime.now();
+            List<UserRoleAssignment> active = assignments.findActiveForUser(userId, scopedTenant, now);
+            Set<String> roleNames = new LinkedHashSet<>();
+            java.util.stream.Stream.concat(
+                            user.getRoles() == null ? java.util.stream.Stream.<Role>empty() : user.getRoles().stream(),
+                            active.stream().map(UserRoleAssignment::getRole))
+                    .filter(java.util.Objects::nonNull)
+                    .map(Role::getName)
+                    .filter(this::nonBlank)
+                    .map(name -> name.trim().toLowerCase(java.util.Locale.ROOT))
+                    .forEach(roleNames::add);
+            EffectivePermissionResolver.Result resolved = EffectivePermissionResolver.resolve(user, active, now);
+            return new UserAuthorizationProjection(userId, scopedTenant, List.copyOf(roleNames), resolved.granted(),
+                    List.of(), resolved.denied());
+        });
     }
 
     @Override
