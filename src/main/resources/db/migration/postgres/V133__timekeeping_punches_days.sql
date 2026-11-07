@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS tk_punches (
 );
 CREATE INDEX IF NOT EXISTS idx_tk_punches_user_date ON tk_punches(tenant_id, user_id, work_date);
 CREATE INDEX IF NOT EXISTS idx_tk_punches_school_date ON tk_punches(tenant_id, school_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_tk_punches_site ON tk_punches(site_id);
+CREATE INDEX IF NOT EXISTS idx_tk_punches_shift ON tk_punches(shift_id);
 CREATE INDEX IF NOT EXISTS idx_tk_punches_photo_purge ON tk_punches(server_time)
     WHERE photo_key IS NOT NULL AND photo_purged_at IS NULL;
 
@@ -72,6 +74,9 @@ CREATE TABLE IF NOT EXISTS tk_days (
     CONSTRAINT uq_tk_days_user_date UNIQUE (tenant_id, user_id, work_date)
 );
 CREATE INDEX IF NOT EXISTS idx_tk_days_school_date ON tk_days(tenant_id, school_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_tk_days_shift ON tk_days(shift_id);
+CREATE INDEX IF NOT EXISTS idx_tk_days_in_punch ON tk_days(in_punch_id);
+CREATE INDEX IF NOT EXISTS idx_tk_days_out_punch ON tk_days(out_punch_id);
 
 CREATE TABLE IF NOT EXISTS tk_period_locks (
     id varchar(36) PRIMARY KEY,

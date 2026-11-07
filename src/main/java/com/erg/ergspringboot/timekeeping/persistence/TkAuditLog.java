@@ -3,6 +3,7 @@ package com.erg.ergspringboot.timekeeping.persistence;
 import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -41,4 +42,11 @@ public class TkAuditLog extends BaseEntity {
 
     @Column(name = "at", nullable = false)
     private Instant at;
+
+    @PrePersist
+    void stampAt() {
+        if (at == null) {
+            at = Instant.now();
+        }
+    }
 }

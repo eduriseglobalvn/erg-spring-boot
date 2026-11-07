@@ -71,13 +71,14 @@ CREATE TABLE IF NOT EXISTS tk_remote_rules (
     kind varchar(20) NOT NULL CHECK (kind IN ('USERS', 'WEEKDAY', 'APPROVED_WFH')),
     user_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
     weekday integer CHECK (weekday BETWEEN 1 AND 7),
-    shift_id varchar(36) REFERENCES tk_shifts(id) ON DELETE CASCADE,
+    shift_id varchar(36) REFERENCES tk_shifts(id) ON DELETE RESTRICT,
     active boolean NOT NULL DEFAULT true,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT ck_tk_remote_rules_weekday CHECK (kind <> 'WEEKDAY' OR weekday IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS idx_tk_remote_rules_school ON tk_remote_rules(tenant_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_tk_remote_rules_shift ON tk_remote_rules(shift_id);
 
 CREATE TABLE IF NOT EXISTS tk_face_consents (
     id varchar(36) PRIMARY KEY,

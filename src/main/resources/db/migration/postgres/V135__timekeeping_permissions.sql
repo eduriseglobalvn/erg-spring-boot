@@ -61,19 +61,20 @@ FROM roles role
 JOIN permissions permission ON permission.name = 'timekeeping.approve'
 WHERE role.id IN (
     'role_lms_teacher_lead', 'role_school_vice_principal',
-    'role_school_manager', 'role_pdt_operator', 'role_system_admin', 'role_super_admin', 'role_lms_admin'
+    'role_school_manager', 'role_system_admin', 'role_super_admin', 'role_lms_admin'
 )
   AND NOT EXISTS (
       SELECT 1 FROM role_permissions existing
       WHERE existing.role_id = role.id AND existing.permission_id = permission.id
   );
 
+-- Admin roles only; no center/school admin role exists in the seeds (managers approve, they do not configure).
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT role.id, permission.id
 FROM roles role
 JOIN permissions permission ON permission.name = 'timekeeping.manage'
 WHERE role.id IN (
-    'role_school_manager', 'role_pdt_operator', 'role_system_admin', 'role_super_admin', 'role_lms_admin'
+    'role_system_admin', 'role_super_admin', 'role_lms_admin'
 )
   AND NOT EXISTS (
       SELECT 1 FROM role_permissions existing

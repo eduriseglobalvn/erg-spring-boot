@@ -44,6 +44,7 @@ class TimekeepingRepositoryIT {
     @Autowired private TkPunchRepository punches;
     @Autowired private TkPolicyRepository policies;
     @Autowired private TkRequestRepository requests;
+    @Autowired private TkAuditLogRepository auditLog;
     @Autowired private JdbcTemplate jdbc;
 
     @Test
@@ -89,14 +90,37 @@ class TimekeepingRepositoryIT {
     }
 
     @Test
+    void auditLogStampsAtWhenNotSet() {
+        TkAuditLog entry = new TkAuditLog();
+        entry.setTenantId(TENANT);
+        entry.setActorId("user-tk");
+        entry.setAction("PUNCH_REVIEWED");
+        entry.setTargetType("PUNCH");
+        entry.setTargetId("punch-1");
+
+        assertThat(auditLog.saveAndFlush(entry).getAt()).isNotNull();
+    }
+
+    @Test
     void v135GrantsTimekeepingPermissionsToExplicitRoles() {
         assertThat(granted("timekeeping.self", "role_lms_teacher_standard")).isTrue();
         assertThat(granted("timekeeping.self", "role_lms_teacher")).isTrue();
         assertThat(granted("timekeeping.approve", "role_lms_teacher_lead")).isTrue();
         assertThat(granted("timekeeping.approve", "role_school_vice_principal")).isTrue();
+        assertThat(granted("timekeeping.approve", "role_school_manager")).isTrue();
         assertThat(granted("timekeeping.manage", "role_lms_admin")).isTrue();
+        assertThat(granted("timekeeping.manage", "role_super_admin")).isTrue();
+        assertThat(granted("timekeeping.manage", "role_system_admin")).isTrue();
+
+        assertThat(granted("timekeeping.self", "role_pdt_operator")).isTrue();
+        assertThat(granted("timekeeping.approve", "role_pdt_operator")).isFalse();
+        assertThat(granted("timekeeping.manage", "role_pdt_operator")).isFalse();
+        assertThat(granted("timekeeping.manage", "role_school_manager")).isFalse();
         assertThat(granted("timekeeping.manage", "role_lms_teacher_lead")).isFalse();
-        assertThat(granted("timekeeping.self", "role_lms_student")).isFalse();
+        assertThat(jdbc.queryForObject("""
+                select count(*) from role_permissions rp join permissions p on p.id = rp.permission_id
+                where p.name like 'timekeeping.%' and rp.role_id = 'role_lms_student'
+                """, Integer.class)).isZero();
         assertThat(jdbc.queryForObject(
                 "select name from roles where id = 'role_school_vice_principal'", String.class))
                 .isEqualTo("school.vice_principal");

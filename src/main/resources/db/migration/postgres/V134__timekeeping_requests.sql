@@ -1,5 +1,5 @@
 -- Timekeeping (P5) requests (leave, explanation, WFH, business trip), their approval steps, schedule
--- evidence (no file attachments, D14) and an append-only action log.
+-- evidence (no file attachments, D14) and an action log.
 CREATE TABLE IF NOT EXISTS tk_requests (
     id varchar(36) PRIMARY KEY,
     tenant_id varchar(255) NOT NULL,
