@@ -30,6 +30,18 @@ public final class AccessScopeAssembler {
         return scopeType != null
                 && EDUCATION_UNIT_SCOPE_TYPES.contains(scopeType.trim().toUpperCase(java.util.Locale.ROOT));
     }
+    private static final java.util.Set<String> EDUCATION_UNIT_ADMIN_ROLES = java.util.Set.of(
+            "center_admin", "school_admin", "principal", "lms.admin");
+
+    /**
+     * The one rule for unit-scoped admin roles: they manage their units and every descendant, never the whole
+     * tenant. Shared by session bootstrap and notification campaigns. Exact names only: "vice_principal" or
+     * "school_admin_assistant" must not inherit unit-admin scope.
+     */
+    public static boolean isEducationUnitAdminRole(String roleName) {
+        return roleName != null
+                && EDUCATION_UNIT_ADMIN_ROLES.contains(roleName.trim().toLowerCase(java.util.Locale.ROOT));
+    }
 
     /**
      * The one rule for whether a legacy access scope grants LMS reach: no module list, the

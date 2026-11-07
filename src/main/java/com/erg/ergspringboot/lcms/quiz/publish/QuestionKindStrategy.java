@@ -69,7 +69,9 @@ public enum QuestionKindStrategy {
             List<String> correct = correctOptionIds(slide);
             if (!correct.isEmpty()) {
                 key.put("correctChoiceIds", correct);
-                key.put("acceptPartial", boolValue(slide.get("acceptPartial")));
+                // The quiz editor stores the toggle under slide.options (a map; "options" can also be a choice list).
+                Object editorAcceptPartial = slide.get("options") instanceof Map<?, ?> options ? options.get("acceptPartial") : null;
+                key.put("acceptPartial", boolValue(firstNonNull(slide.get("acceptPartial"), editorAcceptPartial)));
             }
         }
 
@@ -98,7 +100,7 @@ public enum QuestionKindStrategy {
         }
     },
 
-    /** NFC-normalized, whitespace-collapsed, case-insensitive match against any accepted answer. */
+    /** NFC-normalized, whitespace-collapsed, case-insensitive match against any accepted answer (or runtime textBlanks). */
     SHORT_ANSWER {
         @Override
         void stripAnswers(Map<String, Object> body) {
@@ -114,15 +116,12 @@ public enum QuestionKindStrategy {
 
         @Override
         String missingAnswerKey(Map<String, Object> key) {
-            return emptyList(key.get("correctAnswers")) ? "accepted answers" : null;
+            return acceptedAnswers(key).isEmpty() ? "accepted answers" : null;
         }
 
         @Override
         GradeResult gradeAnswer(Object rawAnswer, Map<String, Object> key, BigDecimal max) {
-            List<String> accepted = stringList(key.get("correctAnswers"));
-            if (accepted.isEmpty()) {
-                accepted = firstBlankAnswers(key.get("blanks"));
-            }
+            List<String> accepted = acceptedAnswers(key);
             String actual = normalizeText(string(answerValue(rawAnswer, "text")));
             return allOrNothing(accepted.stream().anyMatch(candidate -> normalizeText(candidate).equals(actual)), max);
         }
@@ -133,8 +132,7 @@ public enum QuestionKindStrategy {
         @Override
         @SuppressWarnings("unchecked")
         void stripAnswers(Map<String, Object> body) {
-            body.remove("correctAnswer");
-            body.remove("tolerance");
+            body.keySet().removeAll(List.of("correctAnswer", "value", "tolerance"));
             Object numericAnswer = body.get("numericAnswer");
             if (numericAnswer instanceof Map<?, ?> map) {
                 Map<String, Object> stripped = new LinkedHashMap<>((Map<String, Object>) map);
@@ -173,8 +171,7 @@ public enum QuestionKindStrategy {
     SEQUENCE {
         @Override
         void stripAnswers(Map<String, Object> body) {
-            body.remove("correctOrder");
-            body.remove("order");
+            body.keySet().removeAll(List.of("correctOrder", "order", "sequenceCorrectOrder"));
         }
 
         @Override
@@ -208,8 +205,7 @@ public enum QuestionKindStrategy {
     MATCHING {
         @Override
         void stripAnswers(Map<String, Object> body) {
-            body.remove("correctPairs");
-            body.remove("pairs");
+            body.keySet().removeAll(List.of("correctPairs", "pairs", "matchingKey"));
         }
 
         @Override
@@ -273,9 +269,9 @@ public enum QuestionKindStrategy {
     HOTSPOT {
         @Override
         void stripAnswers(Map<String, Object> body) {
-            stripListItems(body, "hotspotAreas", "correct");
-            body.remove("correctRegions");
-            body.remove("regions");
+            // Every drawn area is a correct one, so its geometry is the answer: the learner gets the image only,
+            // and review/training read the areas from the answer key (regions).
+            body.keySet().removeAll(List.of("hotspotAreas", "correctRegions", "regions"));
         }
 
         @Override
@@ -305,18 +301,18 @@ public enum QuestionKindStrategy {
         }
     },
 
-    /** Per-item ratio, graded like matching. */
+    /** Per-item ratio, graded like matching. An editor item's {@code target} is its group label: the answer. */
     DRAG_DROP {
         @Override
         void stripAnswers(Map<String, Object> body) {
-            stripListItems(body, "dragDropItems", "correctTargetId");
+            stripListItems(body, "dragDropItems", "correctTargetId", "target", "targetMedia", "emoji");
             body.remove("correctTargets");
             body.remove("targets");
         }
 
         @Override
         void extractAnswerKey(Map<String, Object> slide, Map<String, Object> key) {
-            putIfPresent(key, "targets", firstNonNull(slide.get("correctTargets"), slide.get("targets"), dragDropTargets(slide.get("dragDropItems"))));
+            putIfPresent(key, "targets", firstNonNull(slide.get("correctTargets"), slide.get("targets"), dragDropTargets(slide)));
         }
 
         @Override
@@ -338,8 +334,13 @@ public enum QuestionKindStrategy {
         }
     },
 
-    /** essay: no answer key, teacher-graded (deferred). */
+    /** essay: no answer key, teacher-graded (deferred); the marking guide is for teachers only (spec §7). */
     MANUAL {
+        @Override
+        void stripAnswers(Map<String, Object> body) {
+            body.remove("essayRubric");
+        }
+
         @Override
         GradeResult gradeAnswer(Object rawAnswer, Map<String, Object> key, BigDecimal max) {
             return new GradeResult(null, false, BigDecimal.ZERO, true);

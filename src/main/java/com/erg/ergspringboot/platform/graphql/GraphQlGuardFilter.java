@@ -23,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -51,7 +52,8 @@ public class GraphQlGuardFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !graphQlPath.equals(request.getRequestURI());
+        // A browser preflight carries no query; the CORS layer answers it, and a 405 here blocks every cross-origin call.
+        return !graphQlPath.equals(request.getRequestURI()) || CorsUtils.isPreFlightRequest(request);
     }
 
     @Override

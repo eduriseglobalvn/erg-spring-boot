@@ -20,6 +20,12 @@ public interface NotificationPreferenceRepository extends JpaRepository<Notifica
             String eventType
     );
 
+    List<NotificationPreferenceEntity> findByTenantIdAndEventTypeAndUserIdIn(
+            String tenantId,
+            String eventType,
+            java.util.Collection<String> userIds
+    );
+
     List<NotificationPreferenceEntity> findByTenantIdAndPortalAndEventTypeAndUserIdIn(
             String tenantId,
             String portal,

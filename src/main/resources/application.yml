@@ -306,6 +306,15 @@ erg:
         lease-timeout: ${NOTIFICATIONS__WORKER__LEASE_TIMEOUT:60s}
         initial-backoff: ${NOTIFICATIONS__WORKER__INITIAL_BACKOFF:10s}
         max-backoff: ${NOTIFICATIONS__WORKER__MAX_BACKOFF:60m}
+    web-push:
+      # VAPID key pair (base64url). Empty = Web Push disabled; WEB_PUSH device registration returns 400.
+      # Also needs erg.notifications.push.enabled=true: the outbox worker that delivers pushes only runs then, so
+      # with push disabled web-push-config reports enabled=false and WEB_PUSH registration returns 400.
+      public-key: ${NOTIFICATIONS__WEB_PUSH__PUBLIC_KEY:}
+      private-key: ${NOTIFICATIONS__WEB_PUSH__PRIVATE_KEY:}
+      subject: ${NOTIFICATIONS__WEB_PUSH__SUBJECT:}
+      # Only these push service hosts (or their subdomains) are accepted and contacted (SSRF guard).
+      allowed-host-suffixes: ${NOTIFICATIONS__WEB_PUSH__ALLOWED_HOST_SUFFIXES:fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com}
   auth:
     # Per-account lockout (LoginFailureEnforcementService): after max-failed-login wrong
     # passwords within failed-login-window the account is refused for block-duration.

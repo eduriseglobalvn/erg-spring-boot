@@ -5,6 +5,7 @@ import com.erg.ergspringboot.lcms.quiz.publish.CompiledQuiz.CompiledSection;
 import com.erg.ergspringboot.lcms.quiz.publish.QuestionKindMapping.Mapping;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,7 +52,6 @@ public class QuizCompileService {
         Map<String, Object> answerKey = new LinkedHashMap<>();
 
         List<Map<String, Object>> groups = asMapList(tree);
-        int totalQuestionCount = countQuestionSlides(groups);
         int sectionOrder = 0;
         int questionOrder = 0;
         for (Map<String, Object> group : groups) {
@@ -70,7 +70,6 @@ public class QuizCompileService {
                         string(slide.get("questionId")), string(slide.get("slideId")), string(slide.get("id")), IdGenerator.newId());
                 String sourceSlideId = firstNonBlank(string(slide.get("slideId")), string(slide.get("id")));
                 String bankQuestionId = firstNonBlank(string(slide.get("bankQuestionId")), string(slide.get("questionId")));
-                BigDecimal points = autoQuestionPoints(questionOrder, totalQuestionCount);
 
                 Map<String, Object> runtimeSlide = bodyCompiler.mergeRuntimeQuestion(slide);
                 Map<String, Object> body = bodyCompiler.compileBody(
@@ -88,7 +87,7 @@ public class QuizCompileService {
                         bankQuestionId,
                         mapping.runtimeKind(),
                         authoringType,
-                        points,
+                        explicitPoints(body),
                         mapping.autoGradable(),
                         mapping.gradingPolicy(),
                         questionOrder++,
@@ -98,6 +97,7 @@ public class QuizCompileService {
             }
         }
 
+        questions = allocatePoints(questions);
         Map<String, Object> runtimeQuiz = buildRuntimeQuiz(settings, sections, questions);
         return new CompiledQuiz(sections, questions, runtimeQuiz, answerKey);
     }
@@ -158,27 +158,53 @@ public class QuizCompileService {
         return null;
     }
 
-    private int countQuestionSlides(List<Map<String, Object>> groups) {
-        int count = 0;
-        for (Map<String, Object> group : groups) {
-            for (Map<String, Object> slide : asMapList(group.get("slides"))) {
-                String authoringType = firstNonBlank(string(slide.get("type")), string(slide.get("kind")));
-                if (QuestionKindMapping.isQuestionType(authoringType)) {
-                    count += 1;
-                }
+    /**
+     * Questions keep their own positive points (settings.points, e.g. the editor's questionSetSettings.points).
+     * The rest split what is left of the 1000-point package equally (floored at 0); with no own points at all
+     * this is the original equal 1000 split, so existing quizzes compile unchanged.
+     */
+    private List<CompiledQuestion> allocatePoints(List<CompiledQuestion> questions) {
+        long ownCents = 0;
+        int unsetCount = 0;
+        for (CompiledQuestion question : questions) {
+            if (question.points() == null) {
+                unsetCount += 1;
+            } else {
+                ownCents += question.points().movePointRight(2).longValue();
             }
         }
-        return count;
+        long remainingCents = Math.max(0, PACKAGE_TOTAL_POINT_CENTS - ownCents);
+        List<CompiledQuestion> result = new ArrayList<>(questions.size());
+        int unsetIndex = 0;
+        for (CompiledQuestion q : questions) {
+            BigDecimal points = q.points() != null ? q.points() : splitPoints(remainingCents, unsetIndex++, unsetCount);
+            result.add(new CompiledQuestion(q.runtimeQuestionId(), q.sourceSlideId(), q.sectionId(), q.bankQuestionId(),
+                    q.kind(), q.authoringType(), points, q.autoGradable(), q.gradingPolicy(), q.orderIndex(),
+                    q.body(), q.answerKey()));
+        }
+        return result;
     }
 
-    private BigDecimal autoQuestionPoints(int questionIndex, int totalQuestionCount) {
-        if (totalQuestionCount <= 0) {
-            return BigDecimal.ZERO;
-        }
-        long baseCents = PACKAGE_TOTAL_POINT_CENTS / totalQuestionCount;
-        long remainderCents = PACKAGE_TOTAL_POINT_CENTS % totalQuestionCount;
-        long cents = baseCents + (questionIndex < remainderCents ? 1 : 0);
+    private BigDecimal splitPoints(long totalCents, int index, int count) {
+        long cents = totalCents / count + (index < totalCents % count ? 1 : 0);
         return BigDecimal.valueOf(cents, 2);
+    }
+
+    /** Positive settings.points rounded to cents, or null when absent/invalid (falls back to the equal split). */
+    private BigDecimal explicitPoints(Map<String, Object> body) {
+        if (!(body.get("settings") instanceof Map<?, ?> settings)) {
+            return null;
+        }
+        Object value = settings.get("points");
+        if (value == null) {
+            return null;
+        }
+        try {
+            BigDecimal points = new BigDecimal(value.toString().trim()).setScale(2, RoundingMode.HALF_UP);
+            return points.signum() > 0 ? points : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Hides the authoring order from the player-facing body of sequence and matching questions. Runs after the
+ * Hides the authoring order from the player-facing body of sequence, matching and drag_words questions. Runs after the
  * answer key is extracted from the authoring slide, so the key keeps the real order/pairs while the body only
  * carries a shuffled list and opaque response ids. The shuffle is random (not seeded by the question id): a
  * seed a student can recompute would let them invert the permutation. Key and body are stored together at
@@ -26,35 +26,53 @@ final class PlayerBodyShuffler {
     private PlayerBodyShuffler() {
     }
 
-    /** Runs the sequence/matching step for that kind after the answer key was extracted; other kinds are untouched. */
+    /** Runs the sequence/matching/word-bank step for that kind after the answer key was extracted; others are untouched. */
     static void apply(String runtimeKind, Map<String, Object> body, Map<String, Object> key) {
         QuestionKindStrategy strategy = QuestionKindStrategy.forRuntimeKind(runtimeKind);
         if (strategy == QuestionKindStrategy.SEQUENCE) {
             sequence(body, key);
         } else if (strategy == QuestionKindStrategy.MATCHING) {
             matching(body, key);
+        } else if (strategy == QuestionKindStrategy.BLANKS) {
+            wordBank(body, key);
         }
     }
 
     /** Shuffles {@code sequenceItems} so it never equals the key's correct order (when there are 2+ items). */
     static void sequence(Map<String, Object> body, Map<String, Object> key) {
-        if (!(body.get("sequenceItems") instanceof List<?> items) || items.size() < 2) {
+        shuffleAwayFrom(body, "sequenceItems", stringList(key.get("order")));
+    }
+
+    /** drag_words: the word bank is authored in slot order, so it never starts with the slots' correct words in order. */
+    static void wordBank(Map<String, Object> body, Map<String, Object> key) {
+        List<String> slotWords = new ArrayList<>();
+        for (Map<String, Object> blank : mapList(key.get("blanks"))) {
+            List<String> answers = stringList(blank.get("answers"));
+            if (!answers.isEmpty()) {
+                slotWords.add(answers.getFirst());
+            }
+        }
+        shuffleAwayFrom(body, "wordBank", slotWords);
+    }
+
+    /** Shuffles a list field so its ids never start with {@code correct} in order (when there are 2+ items). */
+    private static void shuffleAwayFrom(Map<String, Object> body, String field, List<String> correct) {
+        if (!(body.get(field) instanceof List<?> items) || items.size() < 2) {
             return;
         }
         List<Object> shuffled = new ArrayList<>(items);
-        List<String> correct = stringList(key.get("order"));
-        for (int attempt = 0; attempt < 8 && matches(shuffled, correct); attempt++) {
+        for (int attempt = 0; attempt < 8 && startsWith(shuffled, correct); attempt++) {
             Collections.shuffle(shuffled, RANDOM);
         }
-        if (matches(shuffled, correct)) {
-            Collections.rotate(shuffled, 1); // all-equal-after-retries is only possible for duplicate ids
+        if (startsWith(shuffled, correct)) {
+            Collections.rotate(shuffled, 1); // still matching after retries is only possible for duplicate ids
         }
-        body.put("sequenceItems", shuffled);
+        body.put(field, shuffled);
     }
 
-    private static boolean matches(List<Object> items, List<String> order) {
+    private static boolean startsWith(List<Object> items, List<String> order) {
         List<String> ids = AnswerKeySources.ids(items);
-        return ids != null && ids.equals(order);
+        return ids != null && !order.isEmpty() && ids.size() >= order.size() && ids.subList(0, order.size()).equals(order);
     }
 
     /**
@@ -92,9 +110,19 @@ final class PlayerBodyShuffler {
                 newKey.add(Map.of("promptId", promptId, "responseId", responseId));
             }
         }
-        Collections.shuffle(responses, RANDOM);
+        List<Object> correctOrder = newKey.stream().map(pair -> pair.get("responseId")).toList();
+        for (int attempt = 0; attempt < 8 && responseIds(responses).equals(correctOrder); attempt++) {
+            Collections.shuffle(responses, RANDOM);
+        }
+        if (responseIds(responses).equals(correctOrder)) {
+            Collections.rotate(responses, 1); // never hand the learner a solved board
+        }
         body.put("matching", prompts);
         body.put("matchingResponses", responses);
         key.put("pairs", newKey);
+    }
+
+    private static List<Object> responseIds(List<Map<String, Object>> responses) {
+        return responses.stream().map(response -> response.get("id")).toList();
     }
 }

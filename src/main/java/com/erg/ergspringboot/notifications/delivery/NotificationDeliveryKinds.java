@@ -9,7 +9,8 @@ public final class NotificationDeliveryKinds {
     private static final Set<NotificationDeliveryKey> PERSISTED_KEYS = Set.of(
             NotificationDeliveryKey.of("push", "registration_token", "firebase"),
             NotificationDeliveryKey.of("push", "fid", "firebase"),
-            NotificationDeliveryKey.of("push", "topic", "firebase")
+            NotificationDeliveryKey.of("push", "topic", "firebase"),
+            NotificationDeliveryKey.of("push", "web_push", "vapid")
     );
 
     private NotificationDeliveryKinds() { }

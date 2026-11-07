@@ -5,12 +5,14 @@ import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.PublishRe
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.ReorderRequest;
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.SaveDraftRequest;
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.SlideUpsertRequest;
+import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.UpdateQuizRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.CreateQuizResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.DeleteQuizResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ForkResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.PublishResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.SaveDraftResponse;
+import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.UpdateQuizResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ValidationResultResponse;
 import com.erg.ergspringboot.lcms.LcmsOperations;
 import com.erg.ergspringboot.lcms.authorization.LcmsQuizCreate;
@@ -140,6 +142,17 @@ public class LcmsQuizAuthoringController {
     ) {
         UserAccessContext access = UserAccessContext.from(request);
         return ok("Quiz version forked", lcms.forkQuizVersion(access.tenantId(), quizId, versionId, access.userId()), request);
+    }
+
+    @PatchMapping("/api/v1/lcms/quizzes/{quizId}")
+    @LcmsQuizUpdate
+    public ApiResponse<UpdateQuizResponse> update(
+            @PathVariable String quizId,
+            @RequestBody UpdateQuizRequest body,
+            HttpServletRequest request
+    ) {
+        UserAccessContext access = UserAccessContext.from(request);
+        return ok("Quiz updated", lcms.updateQuiz(access.tenantId(), quizId, body), request);
     }
 
     @DeleteMapping("/api/v1/lcms/quizzes/{quizId}")

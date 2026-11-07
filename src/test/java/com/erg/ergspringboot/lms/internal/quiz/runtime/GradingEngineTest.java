@@ -72,6 +72,25 @@ class GradingEngineTest {
     }
 
     @Test
+    void multipleResponsePartialSharesDeductExtraWrongPicksAndFloorAtZero() {
+        Map<String, Object> partialKey = Map.of("correctChoiceIds", List.of("a", "b", "c", "d"), "acceptPartial", true);
+        // 2 right, 1 extra wrong of 4 shares -> (2-1)/4 * 10 = 2.5
+        assertThat(engine.grade("multiple_response", Map.of("choiceIds", List.of("a", "b", "x")), partialKey, TEN)
+                .awardedPoints()).isEqualByComparingTo("2.5");
+        // 1 right, 3 wrong -> negative ratio floored at 0
+        GradeResult floored = engine.grade("multiple_response", Map.of("choiceIds", List.of("a", "x", "y", "z")),
+                partialKey, TEN);
+        assertThat(floored.awardedPoints()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(floored.partiallyRight()).isFalse();
+
+        // acceptPartial off: every correct pick plus one wrong pick is not an exact set match -> 0
+        Map<String, Object> strictKey = Map.of("correctChoiceIds", List.of("a", "b"), "acceptPartial", false);
+        GradeResult strict = engine.grade("multiple_response", Map.of("choiceIds", List.of("a", "b", "x")), strictKey, TEN);
+        assertThat(strict.correct()).isFalse();
+        assertThat(strict.awardedPoints()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
     void shortAnswerNormalizesCaseAndSpace() {
         Map<String, Object> key = Map.of("correctAnswers", List.of("Paris", "paris "));
         GradeResult result = engine.grade("short_answer", Map.of("text", "  PARIS "), key, TEN);

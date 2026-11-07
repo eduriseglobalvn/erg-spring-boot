@@ -22,6 +22,16 @@ tar cf - -C "$ROOT/src/ops/docker" --exclude='.env.production' --exclude='.env.d
 # Prometheus, Grafana and Loki run as non-root users and must read their configs; only secrets are private.
 chmod -R u=rwX,go=rX "$DOCKER_DIR" && chmod 600 "$ENV_FILE" && chmod 750 "$DOCKER_DIR/deploy.sh" && chmod -R o-rwx "$ROOT/src"
 [ -f "$DOCKER_DIR/.env.dev" ] && chmod 600 "$DOCKER_DIR/.env.dev"
+# Secrets the app needs but the repo must not hold: created once on a new server, never replaced
+# (a new quiz-package key would stop verifying every package already signed). Back up .env.production with the data.
+ensure_env() { # $1 name, $2 value used only when the name is missing or empty
+  grep -q "^$1=." "$ENV_FILE" && return 0
+  sed -i "/^$1=\$/d" "$ENV_FILE"
+  [ -n "$(tail -c1 "$ENV_FILE")" ] && echo >> "$ENV_FILE"
+  echo "$1=$2" >> "$ENV_FILE"; log "added $1 to .env.production"
+}
+ensure_env SECRET_QUIZ_PACKAGE_SIGNING_KEY "$(openssl rand -hex 32)"
+ensure_env QUIZ_PACKAGE_PUBLIC_KEY_ID quiz-pkg-1
 # The nightly cron runs ops/backup/backup.sh; its metrics dir is read by node-exporter (non-root).
 install -d -m 700 "$ROOT/ops/backup" && install -m 750 "$ROOT/src/ops/backup/backup.sh" "$ROOT/ops/backup/backup.sh"
 install -d -m 755 "$ROOT/ops/backup/metrics"

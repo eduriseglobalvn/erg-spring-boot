@@ -33,8 +33,6 @@ final class SessionUnitScopeResolver {
 
     private static final int MAX_BOOTSTRAP_UNITS = 500;
     private static final int MAX_BOOTSTRAP_CLASSES = 500;
-    private static final Set<String> EDUCATION_UNIT_ADMIN_ROLES = Set.of(
-            "center_admin", "school_admin", "principal", "lms.admin");
 
     private final EducationUnitRepository educationUnitRepository;
     private final ClassroomRepository classroomRepository;
@@ -233,9 +231,8 @@ final class SessionUnitScopeResolver {
         return roleNames.stream().anyMatch(this::isEducationUnitAdminRoleName);
     }
 
-    /** Exact role names only: "vice_principal" or "school_admin_assistant" must not inherit unit-admin scope. */
     private boolean isEducationUnitAdminRoleName(String roleName) {
-        return EDUCATION_UNIT_ADMIN_ROLES.contains(safe(roleName).trim().toLowerCase(Locale.ROOT));
+        return AccessScopeAssembler.isEducationUnitAdminRole(roleName);
     }
 
     private boolean isTeacherLike(List<String> roleNames) {

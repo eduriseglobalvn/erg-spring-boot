@@ -23,6 +23,13 @@ public final class QuizAuthoringRequests {
     ) {
     }
 
+    /** Quiz-bank metadata edit (PATCH). Both fields optional, at least one required. */
+    public record UpdateQuizRequest(
+            String title,
+            String kind
+    ) {
+    }
+
     /** Full-document autosave (PUT). {@code docVersion} must equal the server's current value. */
     public record SaveDraftRequest(
             Long docVersion,

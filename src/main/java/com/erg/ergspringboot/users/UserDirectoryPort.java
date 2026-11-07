@@ -24,4 +24,7 @@ public interface UserDirectoryPort {
             String tenantId, Collection<String> schoolIds);
 
     List<UserAccountProjection> findByTenantIdAndIds(String tenantId, Collection<String> ids);
+
+    /** Active employees (employee profile, not terminated) by name; used to address staff. */
+    List<String> findActiveStaffUserIds(String tenantId, Pageable pageable);
 }

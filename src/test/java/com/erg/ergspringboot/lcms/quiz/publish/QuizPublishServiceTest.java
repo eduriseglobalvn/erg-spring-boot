@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,6 +30,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -36,6 +38,22 @@ import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
 class QuizPublishServiceTest {
+
+    private QuizVersion previouslyActive;
+    private QuizVersionRepository versions;
+
+    @Test
+    void republishDeactivatesTheOldVersionAndFlushesBeforeInsertingTheNewOne() {
+        previouslyActive = new QuizVersion();
+        previouslyActive.setIsActive(true);
+
+        publishAndCapture("test", "server-authoritative", false);
+
+        var order = org.mockito.Mockito.inOrder(versions);
+        order.verify(versions).saveAndFlush(previouslyActive);
+        order.verify(versions).save(any(QuizVersion.class));
+        assertThat(previouslyActive.getIsActive()).isFalse();
+    }
 
     @Test
     void publishEvictsRuntimePackageCacheForTenantQuiz() {
@@ -60,6 +78,7 @@ class QuizPublishServiceTest {
         QuizQuestionRepository quizQuestionRepository = mock(QuizQuestionRepository.class);
         QuizDraftRepository quizDraftRepository = mock(QuizDraftRepository.class);
         QuizVersionRepository quizVersionRepository = mock(QuizVersionRepository.class);
+        versions = quizVersionRepository;
         QuizVersionSectionRepository sectionRepository = mock(QuizVersionSectionRepository.class);
         QuizVersionQuestionRepository questionRepository = mock(QuizVersionQuestionRepository.class);
         QuizPackageRepository packageRepository = mock(QuizPackageRepository.class);
@@ -136,7 +155,7 @@ class QuizPublishServiceTest {
                 "level", Map.of("id", "level-1", "label", "GS6 Level 1"),
                 "topic", Map.of("id", "topic-1", "label", "Hardware")
         ));
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a")).thenReturn(Optional.empty());
+        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a")).thenReturn(Optional.ofNullable(previouslyActive));
         when(sectionRepository.save(any(QuizVersionSection.class))).thenAnswer(invocation -> {
             QuizVersionSection section = invocation.getArgument(0);
             section.setId("section-db-1");
@@ -153,6 +172,12 @@ class QuizPublishServiceTest {
         when(cacheManager.getCache("quizRuntimePackage")).thenReturn(runtimeCache);
 
         ContentLifecyclePort lifecycle = mock(ContentLifecyclePort.class);
+        // The lifecycle reads a "published" status as already published and would skip the DRAFT -> PUBLISHED transition.
+        AtomicReference<String> statusSeenByLifecycle = new AtomicReference<>("unset");
+        doAnswer(invocation -> {
+            statusSeenByLifecycle.set(quiz.getStatus());
+            return null;
+        }).when(lifecycle).recordPublishedSnapshot(anyString(), anyString(), anyString(), anyString());
         QuizPublishService service = new QuizPublishService(
                 quizRepository,
                 bankQuestionRepository,
@@ -189,6 +214,7 @@ class QuizPublishServiceTest {
         verify(runtimeCache).evict("tenant-a:quiz-1");
         verify(quizRepository).save(quiz);
         verify(lifecycle).recordPublishedSnapshot("tenant-a", "quiz-1", "author-1", "publish-key-1");
+        assertThat(statusSeenByLifecycle.get()).isNotEqualTo("unset").isNotEqualTo("published");
         assertThat(quiz.getCurrentVersionId()).isEqualTo("version-1");
         assertThat(quiz.getPackageHash()).isEqualTo("sha256:abcdef1234567890");
         assertThat(versionCaptor.getValue().getAuthoringSnapshot())

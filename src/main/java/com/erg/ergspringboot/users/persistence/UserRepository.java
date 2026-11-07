@@ -72,6 +72,17 @@ public interface UserRepository extends JpaRepository<User, String> {
             @Param("tenantId") String tenantId,
             @Param("ids") Collection<String> ids);
 
+    @Query("""
+            select u.id from User u
+            where u.tenantId = :tenantId
+              and (u.status is null or lower(u.status) = 'active')
+              and exists (
+                  select 1 from EmployeeProfile e
+                  where e.tenantId = :tenantId and e.userId = u.id and e.terminatedAt is null)
+            order by u.fullName asc, u.id asc
+            """)
+    List<String> findActiveStaffUserIds(@Param("tenantId") String tenantId, Pageable pageable);
+
     @Query("select u from User u where u.tenantId = :tenantId and u.id in :ids")
     List<User> findByTenantIdAndIdInAnyStatus(
             @Param("tenantId") String tenantId,

@@ -117,6 +117,22 @@
         },
         "type": "object"
       },
+      "AckResponse": {
+        "properties": {
+          "ackedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "readAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ActivityListResponse": {
         "properties": {
           "items": {
@@ -389,6 +405,18 @@
         ],
         "type": "object"
       },
+      "AmbiguousLine": {
+        "properties": {
+          "candidates": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "line": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "AnswerResultResponse": {
         "properties": {
           "attemptId": {
@@ -407,6 +435,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AcademicYearResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseAckResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AckResponse"
           },
           "errors": {},
           "message": {
@@ -693,6 +747,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AttemptSyncResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseAudienceBreakdown": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AudienceBreakdown"
           },
           "errors": {},
           "message": {
@@ -1083,6 +1163,58 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/CalendarWorkspaceResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseCampaignResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CampaignResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseCampaignSummaryResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CampaignSummaryResponse"
           },
           "errors": {},
           "message": {
@@ -2837,6 +2969,35 @@
         },
         "type": "object"
       },
+      "ApiResponseListRecipientCard": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RecipientCard"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListRoleResponse": {
         "properties": {
           "data": {
@@ -3266,6 +3427,58 @@
         },
         "type": "object"
       },
+      "ApiResponsePageResponseCampaignRecipientResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseCampaignRecipientResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePageResponseCampaignResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PageResponseCampaignResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePageResponseNotificationItemResponse": {
         "properties": {
           "data": {
@@ -3634,6 +3847,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ReportJobResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseResolvePeopleResult": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ResolvePeopleResult"
           },
           "errors": {},
           "message": {
@@ -4228,6 +4467,32 @@
         },
         "type": "object"
       },
+      "ApiResponseUpdateQuizResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UpdateQuizResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseUserCreatedResponse": {
         "properties": {
           "data": {
@@ -4361,6 +4626,32 @@
       "ApiResponseVoid": {
         "properties": {
           "data": {},
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseWebPushConfigResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/WebPushConfigResponse"
+          },
           "errors": {},
           "message": {
             "type": "string"
@@ -4974,6 +5265,35 @@
           },
           "status": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AudienceBreakdown": {
+        "properties": {
+          "duplicatesMerged": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "picked": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "staff": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "students": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "teachers": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6054,6 +6374,215 @@
           },
           "viewMode": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CampaignAudience": {
+        "properties": {
+          "classIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "gradeIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "groupIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "schoolIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "userIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "wholeTenant": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "CampaignDraftRequest": {
+        "properties": {
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudience"
+          },
+          "body": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "priority": {
+            "description": "INFO | IMPORTANT | URGENT (default INFO)",
+            "type": "string"
+          },
+          "pushEnabled": {
+            "description": "Send a push to the recipients' devices too (default true)",
+            "type": "boolean"
+          },
+          "requireReadAck": {
+            "type": "boolean"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "audience",
+          "body",
+          "title"
+        ],
+        "type": "object"
+      },
+      "CampaignRecipientResponse": {
+        "properties": {
+          "ackedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "readAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CampaignResponse": {
+        "properties": {
+          "ackedCount": {
+            "description": "Recipients who acknowledged reading",
+            "format": "int64",
+            "type": "integer"
+          },
+          "audience": {
+            "$ref": "#/components/schemas/CampaignAudience"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "estimatedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "INFO",
+              "IMPORTANT",
+              "URGENT"
+            ],
+            "type": "string"
+          },
+          "pushEnabled": {
+            "type": "boolean"
+          },
+          "recipientCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "requireReadAck": {
+            "type": "boolean"
+          },
+          "resolvedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "senderRole": {
+            "description": "ADMIN or TEACHER",
+            "type": "string"
+          },
+          "sentAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "SCHEDULED",
+              "SENDING",
+              "SENT",
+              "CANCELLED",
+              "FAILED"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "viewedCount": {
+            "description": "Recipients who opened the message",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CampaignSummaryResponse": {
+        "properties": {
+          "avgViewedRate": {
+            "description": "Viewed recipients / recipients over campaigns sent this month, 0..1 (0 when none)",
+            "format": "double",
+            "type": "number"
+          },
+          "sentThisMonth": {
+            "description": "Campaigns sent since the start of the current month (Asia/Ho_Chi_Minh)",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unackedCampaigns": {
+            "description": "Sent campaigns requiring acknowledgement with at least one recipient not acknowledged",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unackedTotal": {
+            "description": "Recipients who have not acknowledged, over sent campaigns that require acknowledgement",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -8159,6 +8688,10 @@
           },
           "portal": {
             "type": "string"
+          },
+          "transport": {
+            "description": "FCM or WEB_PUSH",
+            "type": "string"
           }
         },
         "type": "object"
@@ -9627,10 +10160,17 @@
       },
       "NotificationItemResponse": {
         "properties": {
+          "ackedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
           "actionUrl": {
             "type": "string"
           },
           "bodyPreview": {
+            "type": "string"
+          },
+          "campaignId": {
             "type": "string"
           },
           "channel": {
@@ -9655,11 +10195,28 @@
           "priority": {
             "type": "string"
           },
+          "priorityLevel": {
+            "description": "priority normalised to INFO|IMPORTANT|URGENT (legacy normal->INFO, high->IMPORTANT); the raw priority field is unchanged for existing clients",
+            "enum": [
+              "INFO",
+              "IMPORTANT",
+              "URGENT"
+            ],
+            "type": "string"
+          },
           "readAt": {
             "format": "date-time",
             "type": "string"
           },
           "recipientId": {
+            "type": "string"
+          },
+          "requireReadAck": {
+            "description": "true only for a campaign message whose campaign asks for a read acknowledgement",
+            "type": "boolean"
+          },
+          "senderName": {
+            "description": "display name of the campaign creator; null when unknown",
             "type": "string"
           },
           "sourceId": {
@@ -9912,6 +10469,72 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/AttemptResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalItems": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PageResponseCampaignRecipientResponse": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignRecipientResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalItems": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PageResponseCampaignResponse": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignResponse"
             },
             "type": "array"
           },
@@ -10502,6 +11125,23 @@
         },
         "type": "object"
       },
+      "RecipientCard": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "meta": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RecordAttainmentRequest": {
         "properties": {
           "classId": {
@@ -10678,6 +11318,10 @@
           "firebaseInstallationId": {
             "type": "string"
           },
+          "keys": {
+            "$ref": "#/components/schemas/WebPushKeysRequest",
+            "description": "PushSubscription.toJSON().keys; required for WEB_PUSH"
+          },
           "locale": {
             "type": "string"
           },
@@ -10699,6 +11343,10 @@
             "type": "string"
           },
           "timezone": {
+            "type": "string"
+          },
+          "transport": {
+            "description": "FCM (default) or WEB_PUSH",
             "type": "string"
           }
         },
@@ -10838,6 +11486,43 @@
           },
           "status": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ResolvePeopleRequest": {
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "type": "object"
+      },
+      "ResolvePeopleResult": {
+        "properties": {
+          "ambiguous": {
+            "items": {
+              "$ref": "#/components/schemas/AmbiguousLine"
+            },
+            "type": "array"
+          },
+          "matched": {
+            "items": {
+              "$ref": "#/components/schemas/RecipientCard"
+            },
+            "type": "array"
+          },
+          "notFound": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -11159,6 +11844,19 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "ScheduleCampaignRequest": {
+        "properties": {
+          "scheduledAt": {
+            "description": "Must be in (now, now + 30 days]",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scheduledAt"
+        ],
         "type": "object"
       },
       "SchoolContactResponse": {
@@ -12650,6 +13348,35 @@
         },
         "type": "object"
       },
+      "UpdateQuizRequest": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateQuizResponse": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "quizId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpdateRecipientsRequest": {
         "properties": {
           "classId": {
@@ -13090,6 +13817,29 @@
         "required": [
           "version"
         ],
+        "type": "object"
+      },
+      "WebPushConfigResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "publicKey": {
+            "description": "VAPID applicationServerKey (base64url); null when Web Push is disabled",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "WebPushKeysRequest": {
+        "properties": {
+          "auth": {
+            "type": "string"
+          },
+          "p256dh": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "WorkspacePage": {
@@ -17947,6 +18697,44 @@
         "tags": [
           "lcms-quiz-authoring-controller"
         ]
+      },
+      "patch": {
+        "operationId": "update_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quizId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuizRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUpdateQuizResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lcms-quiz-authoring-controller"
+        ]
       }
     },
     "/api/v1/lcms/quizzes/{quizId}/bundle": {
@@ -21181,6 +21969,429 @@
         ]
       }
     },
+    "/api/v1/notification-campaigns": {
+      "get": {
+        "operationId": "listCampaigns",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "box",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createCampaign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/estimate": {
+      "post": {
+        "operationId": "estimateAudience",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignAudience"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAudienceBreakdown"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/people": {
+      "get": {
+        "operationId": "searchPeople",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRecipientCard"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/people/resolve": {
+      "post": {
+        "operationId": "resolvePeople",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePeopleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseResolvePeopleResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/summary": {
+      "get": {
+        "operationId": "campaignSummary",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignSummaryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/{id}": {
+      "get": {
+        "operationId": "getCampaign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      },
+      "put": {
+        "operationId": "updateCampaign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/{id}/cancel": {
+      "post": {
+        "operationId": "cancelCampaign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/{id}/recipients": {
+      "get": {
+        "operationId": "listCampaignRecipients",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePageResponseCampaignRecipientResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/{id}/schedule": {
+      "post": {
+        "operationId": "scheduleCampaign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-campaigns/{id}/send": {
+      "post": {
+        "operationId": "sendCampaign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-campaign-controller"
+        ]
+      }
+    },
     "/api/v1/notification-devices": {
       "post": {
         "operationId": "register",
@@ -21260,6 +22471,26 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-device-controller"
+        ]
+      }
+    },
+    "/api/v1/notification-devices/web-push-config": {
+      "get": {
+        "operationId": "webPushConfig",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseWebPushConfigResponse"
                 }
               }
             },
@@ -21548,6 +22779,44 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseNotificationItemResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "notification-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/ack": {
+      "post": {
+        "operationId": "ack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "portal",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAckResponse"
                 }
               }
             },

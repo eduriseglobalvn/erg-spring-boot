@@ -80,9 +80,8 @@ class QuestionKindRegistryTest {
 
         QuestionKindStrategy.stripAllAnswers(body);
 
-        assertThat(body).containsOnlyKeys("options", "hotspotAreas", "wordSlots", "numericAnswer");
+        assertThat(body).containsOnlyKeys("options", "wordSlots", "numericAnswer");
         assertThat(body.get("options")).isEqualTo(List.of(Map.of("id", "a")));
-        assertThat(body.get("hotspotAreas")).isEqualTo(List.of(Map.of("id", "h")));
         assertThat(body.get("wordSlots")).isEqualTo(List.of(Map.of("id", "w")));
         assertThat(body.get("numericAnswer")).isEqualTo(Map.of("unit", "cm"));
     }

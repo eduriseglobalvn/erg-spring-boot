@@ -60,6 +60,7 @@ public class LcmsCommandUseCase implements LcmsCommandPort {
     @Override public ValidationResultResponse validateQuiz(String tenantId, String quizId) { return publishing.validate(tenantId, quizId); }
     @Override public PublishResponse publishQuiz(String tenantId, String quizId, String userId, String idempotencyKey, PublishRequest request) { return publishing.publish(tenantId, quizId, userId, idempotencyKey, request); }
     @Override public ForkResponse forkQuizVersion(String tenantId, String quizId, String versionId, String userId) { return publishing.fork(tenantId, quizId, versionId, userId); }
+    @Override public UpdateQuizResponse updateQuiz(String tenantId, String quizId, UpdateQuizRequest request) { return quizzes.update(tenantId, quizId, request); }
     @Override public DeleteQuizResponse deleteQuiz(String tenantId, String quizId) { return quizzes.delete(tenantId, quizId); }
     @Override public MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request) { return media.presign(tenantId, userId, request); }
     @Override public long maxMediaUploadBytes() { return MediaService.MAX_IMAGE_BYTES; }

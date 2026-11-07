@@ -213,6 +213,8 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/notifications/{id}/read", "/api/v1/notifications/read-all")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
+                        .requestMatchers(HttpMethod.POST, "/api/v1/notifications/{id}/ack")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/notifications/{id}")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
                         .requestMatchers(HttpMethod.GET, "/api/v1/notifications/preferences")
@@ -224,6 +226,8 @@ public class SecurityConfig {
                                 "/api/v1/notification-devices/unregister", "/api/v1/notification-devices/heartbeat")
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/notification-devices/{deviceId}")
+                        .access((auth, context) -> permissions.require("profile.self", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/notification-devices/web-push-config")
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
                         // Admin notification API — requires notifications.manage
                         .requestMatchers("/api/v1/admin/notifications/**")
