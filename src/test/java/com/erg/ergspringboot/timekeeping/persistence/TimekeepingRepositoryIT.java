@@ -8,6 +8,8 @@ import com.erg.ergspringboot.timekeeping.PunchDirection;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.RequestStatus;
 import com.erg.ergspringboot.timekeeping.RequestType;
+import com.erg.ergspringboot.timekeeping.internal.evidence.FaceConsentService;
+import java.time.Duration;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -46,6 +48,7 @@ class TimekeepingRepositoryIT {
     @Autowired private TkRequestRepository requests;
     @Autowired private TkAuditLogRepository auditLog;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private FaceConsentService consents;
 
     @Test
     void siteRadiusOutsideFiftyToFiveHundredIsRejected() {
@@ -124,6 +127,47 @@ class TimekeepingRepositoryIT {
         assertThat(jdbc.queryForObject(
                 "select name from roles where id = 'role_school_vice_principal'", String.class))
                 .isEqualTo("school.vice_principal");
+    }
+
+    @Test
+    void photoPurgeCandidatesAreOnlyPhotosOlderThanTheCutoff() {
+        Instant now = Instant.parse("2026-11-06T20:30:00Z");
+        TkShift shift = shifts.saveAndFlush(shift());
+        TkPunch old = photoPunch(shift, "CC-P-0001", now.minus(Duration.ofDays(61)), "private/timekeeping/tenant-tk/old.jpg");
+        photoPunch(shift, "CC-P-0002", now.minus(Duration.ofDays(59)), "private/timekeeping/tenant-tk/young.jpg");
+        photoPunch(shift, "CC-P-0003", now.minus(Duration.ofDays(90)), null);
+
+        var candidates = punches.findPhotoPurgeCandidates(now.minus(Duration.ofDays(60)), "", 10);
+
+        assertThat(candidates).extracting(TkPunchRepository.PhotoPurgeRef::getId).containsExactly(old.getId());
+        assertThat(candidates.get(0).getPhotoKey()).isEqualTo("private/timekeeping/tenant-tk/old.jpg");
+        assertThat(punches.findPhotoPurgeCandidates(now.minus(Duration.ofDays(60)), old.getId(), 10)).isEmpty();
+
+        assertThat(punches.markPhotoPurged(old.getId(), TENANT, "private/timekeeping/tenant-tk/old.jpg", now)).isEqualTo(1);
+        assertThat(punches.markPhotoPurged(old.getId(), TENANT, "private/timekeeping/tenant-tk/old.jpg", now)).isZero();
+        assertThat(jdbc.queryForObject("select photo_key is null and photo_purged_at is not null from tk_punches where id = ?",
+                Boolean.class, old.getId())).isTrue();
+        assertThat(punches.findByIdAndTenantId(old.getId(), "other-tenant")).isEmpty();
+    }
+
+    @Test
+    void recordingFaceConsentTwiceKeepsOneRow() {
+        assertThat(consents.hasConsent(TENANT, "user-consent")).isFalse();
+
+        consents.recordConsent(TENANT, "user-consent");
+        consents.recordConsent(TENANT, "user-consent");
+
+        assertThat(consents.hasConsent(TENANT, "user-consent")).isTrue();
+        assertThat(consents.hasConsent("other-tenant", "user-consent")).isFalse();
+        assertThat(jdbc.queryForObject("select count(*) from tk_face_consents where tenant_id = ? and user_id = ?",
+                Integer.class, TENANT, "user-consent")).isEqualTo(1);
+    }
+
+    private TkPunch photoPunch(TkShift shift, String code, Instant serverTime, String photoKey) {
+        TkPunch punch = punch(shift, code, code);
+        punch.setServerTime(serverTime);
+        punch.setPhotoKey(photoKey);
+        return punches.saveAndFlush(punch);
     }
 
     private boolean granted(String permission, String roleId) {

@@ -339,6 +339,21 @@ erg:
     bucket-name: ${R2__BUCKET_NAME:}
     public-domain: ${R2__PUBLIC_DOMAIN:}
     region: ${R2__REGION:auto}
+  timekeeping:
+    photos:
+      # Punch selfies (private). Separate bucket from erg.r2 (that one is publicly served); no public domain.
+      r2:
+        enabled: ${TK_PHOTOS_R2__ENABLED:false}
+        endpoint: ${TK_PHOTOS_R2__ENDPOINT:}
+        access-key-id: ${SECRET_TK_PHOTOS_R2__ACCESS_KEY_ID:}
+        secret-key: ${SECRET_TK_PHOTOS_R2__SECRET_KEY:}
+        bucket-name: ${TK_PHOTOS_R2__BUCKET_NAME:}
+        region: ${TK_PHOTOS_R2__REGION:auto}
+      # Local/dev store when R2 is off. Blank secret = random per process (URLs die on restart, single instance only).
+      local-root: ${ERG_TK_PHOTOS_LOCAL_ROOT:.erg-private}
+      signing-secret: ${SECRET_TK_PHOTO_URL_SIGNING_KEY:}
+      retention-days: ${TK_PHOTOS_RETENTION_DAYS:60}
+      purge-cron: ${TK_PHOTOS_PURGE_CRON:0 30 3 * * *}
   logging:
     mask-sensitive: ${ERG_LOGGING_MASK_SENSITIVE:true}
   graphql:
