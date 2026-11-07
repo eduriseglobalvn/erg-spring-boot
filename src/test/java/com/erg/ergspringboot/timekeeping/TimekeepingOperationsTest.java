@@ -32,7 +32,7 @@ class TimekeepingOperationsTest {
     private final ObjectProvider<LocalPrivateObjectStorage> noLocalStore = mock(ObjectProvider.class);
     private final TimekeepingOperations operations = new TimekeepingOperations(punches, mock(SelfViewService.class),
             mock(DayAggregationService.class), mock(FaceConsentService.class), noLocalStore, mock(RequestService.class),
-            mock(ApprovalService.class), Clock.systemUTC());
+            mock(ApprovalService.class), Clock.systemUTC(), null, null, null, null, null, null, null);
     private final ErgPrincipal teacher = new ErgPrincipal("u-1", "s", "tenant-a", List.of(), List.of(), List.of(),
             List.of(), "staff", "user", Map.of());
     private final PunchCommand command = new PunchCommand(PunchDirection.IN, 21.0, 105.0, 10.0, false, null, null);

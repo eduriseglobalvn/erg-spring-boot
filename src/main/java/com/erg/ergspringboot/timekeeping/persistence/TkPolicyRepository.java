@@ -9,4 +9,9 @@ public interface TkPolicyRepository extends JpaRepository<TkPolicy, String> {
     /** The policy in force on {@code date}: the latest one that started on or before it. */
     Optional<TkPolicy> findFirstByTenantIdAndSchoolIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
             String tenantId, String schoolId, LocalDate date);
+
+    Optional<TkPolicy> findFirstByTenantIdAndSchoolIdAndEffectiveFromGreaterThanOrderByEffectiveFromAsc(
+            String tenantId, String schoolId, LocalDate date);
+
+    Optional<TkPolicy> findByTenantIdAndSchoolIdAndEffectiveFrom(String tenantId, String schoolId, LocalDate date);
 }

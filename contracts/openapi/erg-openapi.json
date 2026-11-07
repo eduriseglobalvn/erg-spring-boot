@@ -117,6 +117,26 @@
         },
         "type": "object"
       },
+      "ActionItem": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ActivityListResponse": {
         "properties": {
           "items": {
@@ -533,6 +553,58 @@
         },
         "type": "object"
       },
+      "ApiResponseApprovalDetail": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ApprovalDetail"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseApprovalPage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ApprovalPage"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseArchiveResponse": {
         "properties": {
           "data": {
@@ -745,6 +817,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AuthResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseBulkApproveResult": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BulkApproveResult"
           },
           "errors": {},
           "message": {
@@ -2301,6 +2399,32 @@
         },
         "type": "object"
       },
+      "ApiResponseHolidayConfig": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HolidayConfig"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseImportedAttemptResponse": {
         "properties": {
           "data": {
@@ -2738,6 +2862,35 @@
         },
         "type": "object"
       },
+      "ApiResponseListHolidayConfig": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayConfig"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListLearningPathResponse": {
         "properties": {
           "data": {
@@ -2941,11 +3094,98 @@
         },
         "type": "object"
       },
+      "ApiResponseListRemoteRuleConfig": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RemoteRuleConfig"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListRoleResponse": {
         "properties": {
           "data": {
             "items": {
               "$ref": "#/components/schemas/RoleResponse"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListShiftConfig": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ShiftConfig"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListSiteConfig": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SiteConfig"
             },
             "type": "array"
           },
@@ -3500,6 +3740,32 @@
         },
         "type": "object"
       },
+      "ApiResponsePeriodLockView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PeriodLockView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePermissionOverrideResponse": {
         "properties": {
           "data": {
@@ -3556,6 +3822,58 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PermissionResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePolicyConfig": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PolicyConfig"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePolicyVersions": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PolicyVersions"
           },
           "errors": {},
           "message": {
@@ -3734,6 +4052,32 @@
         },
         "type": "object"
       },
+      "ApiResponseRecentPunch": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecentPunch"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRecoveryEmailChallengeResponse": {
         "properties": {
           "data": {
@@ -3764,6 +4108,58 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/RecoveryEmailVerificationResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRemindResult": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RemindResult"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRemoteRuleConfig": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RemoteRuleConfig"
           },
           "errors": {},
           "message": {
@@ -4176,6 +4572,58 @@
         },
         "type": "object"
       },
+      "ApiResponseShiftConfig": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ShiftConfig"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseSiteConfig": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SiteConfig"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseStudentAssignmentListResponse": {
         "properties": {
           "data": {
@@ -4336,6 +4784,58 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SyncRunResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTimesheet": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Timesheet"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTodayDashboard": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TodayDashboard"
           },
           "errors": {},
           "message": {
@@ -4690,6 +5190,83 @@
           "timestamp": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApprovalComment": {
+        "properties": {
+          "comment": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApprovalDetail": {
+        "properties": {
+          "actingOnBehalf": {
+            "type": "boolean"
+          },
+          "affectedPeriods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodView"
+            },
+            "type": "array"
+          },
+          "canAct": {
+            "type": "boolean"
+          },
+          "context": {
+            "$ref": "#/components/schemas/MonthContext"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ApprovalItem"
+          },
+          "teammatesOnLeave": {
+            "items": {
+              "$ref": "#/components/schemas/TeammateLeave"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ApprovalItem": {
+        "properties": {
+          "overdue": {
+            "type": "boolean"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RequestView"
+          },
+          "requesterName": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApprovalPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalItem"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -5389,6 +5966,50 @@
           },
           "user": {
             "$ref": "#/components/schemas/ProfileResponse"
+          }
+        },
+        "type": "object"
+      },
+      "Bucket": {
+        "properties": {
+          "in": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "out": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "time": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "BulkApproveCommand": {
+        "properties": {
+          "requestIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "BulkApproveResult": {
+        "properties": {
+          "approved": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/Skipped"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -8287,6 +8908,18 @@
         },
         "type": "object"
       },
+      "DayCell": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "d": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "DayDetailView": {
         "properties": {
           "date": {
@@ -9216,6 +9849,39 @@
         },
         "type": "object"
       },
+      "HolidayCommand": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayConfig": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ImportPortableResultRequest": {
         "properties": {
           "body": {
@@ -10069,6 +10735,19 @@
         },
         "type": "object"
       },
+      "MonthContext": {
+        "properties": {
+          "approvedExplanations": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lateCount": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "MonthDayView": {
         "properties": {
           "date": {
@@ -10547,6 +11226,50 @@
         },
         "type": "object"
       },
+      "PeriodLockCommand": {
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PeriodLockView": {
+        "properties": {
+          "lockedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lockedBy": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "reopenedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reopenedBy": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "COLLECT",
+              "REVIEW",
+              "LOCKED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PeriodView": {
         "properties": {
           "className": {
@@ -10736,6 +11459,113 @@
           },
           "status": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PolicyCommand": {
+        "properties": {
+          "allowOutside": {
+            "type": "boolean"
+          },
+          "annualLeaveDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "approvalChains": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "explanationWindowDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "explanationsPerMonth": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lateBlockMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lateToleranceMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lockDayOfMonth": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requireFace": {
+            "type": "boolean"
+          },
+          "seniorityStepYears": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PolicyConfig": {
+        "properties": {
+          "allowOutside": {
+            "type": "boolean"
+          },
+          "annualLeaveDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "approvalChains": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "effectiveFrom": {
+            "format": "date",
+            "type": "string"
+          },
+          "explanationWindowDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "explanationsPerMonth": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lateBlockMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lateToleranceMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lockDayOfMonth": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requireFace": {
+            "type": "boolean"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "seniorityStepYears": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PolicyVersions": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/PolicyConfig"
+          },
+          "next": {
+            "$ref": "#/components/schemas/PolicyConfig"
           }
         },
         "type": "object"
@@ -10958,6 +11788,21 @@
         },
         "type": "object"
       },
+      "PunchReviewCommand": {
+        "properties": {
+          "comment": {
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "ACCEPT",
+              "REJECT"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PunchView": {
         "properties": {
           "code": {
@@ -11120,6 +11965,55 @@
           "version": {
             "format": "int32",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RecentPunch": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "hasPhoto": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "VALID",
+              "FLAGGED",
+              "PENDING_REVIEW",
+              "REJECTED"
+            ],
+            "type": "string"
+          },
+          "time": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -11328,6 +12222,97 @@
           "platform",
           "portal"
         ],
+        "type": "object"
+      },
+      "RemindCommand": {
+        "properties": {
+          "userIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RemindResult": {
+        "properties": {
+          "sent": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "skipped": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RemoteRuleCommand": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "USERS",
+              "WEEKDAY",
+              "APPROVED_WFH"
+            ],
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "shiftId": {
+            "type": "string"
+          },
+          "userIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "weekday": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RemoteRuleConfig": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "USERS",
+              "WEEKDAY",
+              "APPROVED_WFH"
+            ],
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "shiftId": {
+            "type": "string"
+          },
+          "userIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "weekday": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "ReorderGroup": {
@@ -12586,6 +13571,69 @@
         },
         "type": "object"
       },
+      "ShiftCommand": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "weekdays": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "workUnits": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "ShiftConfig": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "weekdays": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "workUnits": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "ShiftView": {
         "properties": {
           "end": {
@@ -12623,6 +13671,86 @@
         },
         "type": "object"
       },
+      "SiteCommand": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "address": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lng": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "radiusM": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SiteConfig": {
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "address": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lng": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "radiusM": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SiteCount": {
+        "properties": {
+          "late": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "present": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "SiteView": {
         "properties": {
           "id": {
@@ -12642,6 +13770,17 @@
           "radiusM": {
             "format": "int32",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Skipped": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -13104,6 +14243,213 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TeammateLeave": {
+        "properties": {
+          "fromDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PENDING",
+              "APPROVED",
+              "REJECTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "toDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Timesheet": {
+        "properties": {
+          "issues": {
+            "$ref": "#/components/schemas/TimesheetIssues"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "period": {
+            "type": "string"
+          },
+          "reviewUntil": {
+            "format": "date",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TimesheetRow"
+            },
+            "type": "array"
+          },
+          "schoolId": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "stage": {
+            "enum": [
+              "COLLECT",
+              "REVIEW",
+              "LOCKED"
+            ],
+            "type": "string"
+          },
+          "standardDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TimesheetIssues": {
+        "properties": {
+          "missingDays": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "pendingRequests": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TimesheetRow": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayCell"
+            },
+            "type": "array"
+          },
+          "deductMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "employeeCode": {
+            "type": "string"
+          },
+          "kpKc": {
+            "type": "number"
+          },
+          "late": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "leave": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "periods": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "team": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "work": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "TodayDashboard": {
+        "properties": {
+          "actionItems": {
+            "items": {
+              "$ref": "#/components/schemas/ActionItem"
+            },
+            "type": "array"
+          },
+          "business": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "bySite": {
+            "items": {
+              "$ref": "#/components/schemas/SiteCount"
+            },
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "inBuckets": {
+            "items": {
+              "$ref": "#/components/schemas/Bucket"
+            },
+            "type": "array"
+          },
+          "late": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lateMinutesTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "leave": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "notPunched": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "notPunchedWithPeriodSoon": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "overdueRequests": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "pendingRequests": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "present": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "recentPunches": {
+            "items": {
+              "$ref": "#/components/schemas/RecentPunch"
+            },
+            "type": "array"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -22333,7 +23679,7 @@
     },
     "/api/v1/notifications": {
       "get": {
-        "operationId": "list",
+        "operationId": "list_1",
         "parameters": [
           {
             "in": "query",
@@ -23365,6 +24711,1020 @@
         },
         "tags": [
           "session-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/holidays": {
+      "get": {
+        "operationId": "holidays",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListHolidayConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createHoliday",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HolidayCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/holidays/{id}": {
+      "delete": {
+        "operationId": "deleteHoliday",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/periods/{period}/lock": {
+      "post": {
+        "operationId": "lock",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeriodLockCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePeriodLockView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/periods/{period}/reopen": {
+      "post": {
+        "operationId": "reopen",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeriodLockCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePeriodLockView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/policies/{schoolId}": {
+      "get": {
+        "operationId": "policy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schoolId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyVersions"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "put": {
+        "operationId": "savePolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schoolId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicyConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/punches/{id}/review": {
+      "post": {
+        "operationId": "review",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PunchReviewCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRecentPunch"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/remind": {
+      "post": {
+        "operationId": "remind_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemindCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRemindResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/remote-rules": {
+      "get": {
+        "operationId": "remoteRules",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRemoteRuleConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createRemoteRule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteRuleCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRemoteRuleConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/remote-rules/{id}": {
+      "delete": {
+        "operationId": "deleteRemoteRule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "put": {
+        "operationId": "updateRemoteRule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteRuleCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRemoteRuleConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/shifts": {
+      "get": {
+        "operationId": "shifts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListShiftConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createShift",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseShiftConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/shifts/{id}": {
+      "delete": {
+        "operationId": "deleteShift",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "put": {
+        "operationId": "updateShift",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShiftCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseShiftConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/sites": {
+      "get": {
+        "operationId": "sites",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSiteConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "post": {
+        "operationId": "createSite",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSiteConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/sites/{id}": {
+      "delete": {
+        "operationId": "deleteSite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "put": {
+        "operationId": "updateSite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSiteConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/timesheet": {
+      "get": {
+        "operationId": "timesheet",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "team",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTimesheet"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/today": {
+      "get": {
+        "operationId": "today_1",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "siteId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTodayDashboard"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/approvals": {
+      "get": {
+        "operationId": "list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "box",
+            "required": false,
+            "schema": {
+              "default": "MINE",
+              "enum": [
+                "MINE",
+                "DONE",
+                "ALL"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "enum": [
+                "LEAVE",
+                "EXPLANATION",
+                "WFH",
+                "BUSINESS"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "siteId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "enum": [
+                "OVERDUE",
+                "SOON"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseApprovalPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-approval-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/approvals/bulk-approve": {
+      "post": {
+        "operationId": "bulkApprove",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkApproveCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBulkApproveResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-approval-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/approvals/{requestId}": {
+      "get": {
+        "operationId": "detail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseApprovalDetail"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-approval-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/approvals/{requestId}/approve": {
+      "post": {
+        "operationId": "approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalComment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-approval-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/approvals/{requestId}/reject": {
+      "post": {
+        "operationId": "reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalComment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-approval-controller"
         ]
       }
     },

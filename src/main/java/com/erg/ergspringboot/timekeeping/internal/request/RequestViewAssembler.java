@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 
 /** Request views with their steps (approver names) and evidence, loaded in bulk for a page. */
 @Component
-class RequestViewAssembler {
+public class RequestViewAssembler {
 
     static final String SCHEDULE = "SCHEDULE";
     private static final DateTimeFormatter DAY_TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm");
@@ -37,11 +37,11 @@ class RequestViewAssembler {
         this.chains = chains;
     }
 
-    RequestView one(TkRequest r) {
+    public RequestView one(TkRequest r) {
         return many(r.getTenantId(), List.of(r)).get(0);
     }
 
-    List<RequestView> many(String tenantId, List<TkRequest> requests) {
+    public List<RequestView> many(String tenantId, List<TkRequest> requests) {
         if (requests.isEmpty()) return List.of();
         List<String> ids = requests.stream().map(TkRequest::getId).toList();
         Map<String, List<TkRequestStep>> stepsByRequest = steps

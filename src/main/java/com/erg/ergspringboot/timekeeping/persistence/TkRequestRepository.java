@@ -1,5 +1,7 @@
 package com.erg.ergspringboot.timekeeping.persistence;
 
+import java.time.Instant;
+import java.util.Collection;
 import com.erg.ergspringboot.timekeeping.RequestStatus;
 import java.time.LocalDate;
 import java.util.List;
@@ -86,6 +88,8 @@ public interface TkRequestRepository extends JpaRepository<TkRequest, String> {
     Optional<TkRequest> findOwnForUpdate(@Param("tenantId") String tenantId, @Param("userId") String userId,
             @Param("id") String id);
 
+    Optional<TkRequest> findByTenantIdAndId(String tenantId, String id);
+
     Optional<TkRequest> findByTenantIdAndUserIdAndId(String tenantId, String userId, String id);
 
     Page<TkRequest> findByTenantIdAndUserId(String tenantId, String userId, Pageable pageable);
@@ -118,4 +122,61 @@ public interface TkRequestRepository extends JpaRepository<TkRequest, String> {
             """)
     List<TkRequest> findActiveTouching(@Param("tenantId") String tenantId, @Param("userId") String userId,
             @Param("excludeId") String excludeId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** PENDING requests of the school touching {@code from..to} (ranges, or an explanation day). */
+    @Query("""
+            select count(r) from TkRequest r
+            where r.tenantId = :tenantId and r.schoolId = :schoolId
+              and r.status = com.erg.ergspringboot.timekeeping.RequestStatus.PENDING
+              and ((r.fromDate <= :to and r.toDate >= :from) or (r.workDate between :from and :to))
+            """)
+    long countPendingTouching(@Param("tenantId") String tenantId, @Param("schoolId") String schoolId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    @Query("""
+            select count(r) from TkRequest r
+            where r.tenantId = :tenantId and r.userId = :userId
+              and r.type = com.erg.ergspringboot.timekeeping.RequestType.EXPLANATION and r.status = com.erg.ergspringboot.timekeeping.RequestStatus.APPROVED
+              and r.workDate between :from and :to
+            """)
+    long countApprovedExplanations(@Param("tenantId") String tenantId, @Param("userId") String userId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /** PENDING/APPROVED leave of other people of the school overlapping {@code from..to}. */
+    @Query("""
+            select r from TkRequest r
+            where r.tenantId = :tenantId and r.schoolId = :schoolId and r.userId <> :userId
+              and r.type = com.erg.ergspringboot.timekeeping.RequestType.LEAVE
+              and r.status in (com.erg.ergspringboot.timekeeping.RequestStatus.PENDING, com.erg.ergspringboot.timekeeping.RequestStatus.APPROVED)
+              and r.fromDate <= :to and r.toDate >= :from
+            """)
+    List<TkRequest> findOthersLeaveOverlapping(@Param("tenantId") String tenantId, @Param("schoolId") String schoolId,
+            @Param("userId") String userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /**
+     * Approval inbox. {@code mine}: the user waits on the current step; {@code done}: the user acted on a step;
+     * neither: every submitted request. A false {@code *Filtered} flag disables that filter (its value is ignored).
+     */
+    @Query("""
+            select r from TkRequest r
+            where r.tenantId = :tenantId and r.status <> com.erg.ergspringboot.timekeeping.RequestStatus.DRAFT
+              and (:mine = false or (r.status = com.erg.ergspringboot.timekeeping.RequestStatus.PENDING and exists (
+                    select s.id from TkRequestStep s where s.tenantId = r.tenantId and s.requestId = r.id
+                      and s.stepNo = r.currentStep and s.status = com.erg.ergspringboot.timekeeping.StepStatus.WAITING and s.approverId = :userId)))
+              and (:done = false or exists (
+                    select s.id from TkRequestStep s where s.tenantId = r.tenantId and s.requestId = r.id
+                      and s.actedBy = :userId))
+              and (:typeFiltered = false or r.type = :type)
+              and (:schoolFiltered = false or r.schoolId = :schoolId)
+              and (:dueFiltered = false or (r.status = com.erg.ergspringboot.timekeeping.RequestStatus.PENDING and exists (
+                    select s.id from TkRequestStep s where s.tenantId = r.tenantId and s.requestId = r.id
+                      and s.stepNo = r.currentStep and s.status = com.erg.ergspringboot.timekeeping.StepStatus.WAITING
+                      and s.dueAt >= :dueFrom and s.dueAt < :dueTo)))
+            """)
+    Page<TkRequest> findInbox(@Param("tenantId") String tenantId, @Param("userId") String userId,
+            @Param("mine") boolean mine, @Param("done") boolean done,
+            @Param("typeFiltered") boolean typeFiltered, @Param("type") com.erg.ergspringboot.timekeeping.RequestType type,
+            @Param("schoolFiltered") boolean schoolFiltered, @Param("schoolId") String schoolId,
+            @Param("dueFiltered") boolean dueFiltered, @Param("dueFrom") Instant dueFrom, @Param("dueTo") Instant dueTo,
+            Pageable pageable);
 }

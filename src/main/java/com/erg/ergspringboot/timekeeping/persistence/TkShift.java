@@ -40,4 +40,7 @@ public class TkShift extends BaseEntity {
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "weekdays", nullable = false)
     private Integer[] weekdays;
+
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
 }

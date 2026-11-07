@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 575
+  route-count: 603
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -376,6 +376,38 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: DELETE /api/v1/timekeeping/admin/holidays/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.deleteHoliday
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 20
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: DELETE /api/v1/timekeeping/admin/remote-rules/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.deleteRemoteRule
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 20
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: DELETE /api/v1/timekeeping/admin/shifts/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.deleteShift
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: DELETE /api/v1/timekeeping/admin/sites/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.deleteSite
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: DELETE /api/v1/users/bulk => com.erg.ergspringboot.controller.users.UserController.bulkDelete
       classification: persistent-write
       statement-budget: 12
@@ -885,6 +917,78 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: required-for-collections
+    - route: GET /api/v1/timekeeping/admin/holidays => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.holidays
+      classification: persistent-read
+      statement-budget: 4
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/policies/{schoolId} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.policy
+      classification: persistent-read
+      statement-budget: 4
+      row-budget: 10
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/remote-rules => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.remoteRules
+      classification: persistent-read
+      statement-budget: 4
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/shifts => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.shifts
+      classification: persistent-read
+      statement-budget: 4
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/sites => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.sites
+      classification: persistent-read
+      statement-budget: 4
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/timesheet => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.timesheet
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 10000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/timekeeping/admin/today => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.today
+      classification: persistent-read
+      statement-budget: 20
+      row-budget: 5000
+      payload-budget-bytes: 524288
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/approvals => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.list
+      classification: persistent-read
+      statement-budget: 10
+      row-budget: 1000
+      payload-budget-bytes: 524288
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/timekeeping/approvals/{requestId} => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.detail
+      classification: persistent-read
+      statement-budget: 14
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: GET /api/v1/timekeeping/me/clock => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.clock
       classification: persistent-read
       statement-budget: 0
@@ -4168,6 +4272,94 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/timekeeping/admin/holidays => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.createHoliday
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 20
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/periods/{period}/lock => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.lock
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/periods/{period}/reopen => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.reopen
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/punches/{id}/review => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.review
+      classification: persistent-write
+      statement-budget: 24
+      row-budget: 200
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/remind => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.remind
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/remote-rules => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.createRemoteRule
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 600
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/shifts => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.createShift
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 100
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/sites => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.createSite
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/approvals/bulk-approve => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.bulkApprove
+      classification: persistent-write
+      statement-budget: 600
+      row-budget: 5000
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/approvals/{requestId}/approve => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.approve
+      classification: persistent-write
+      statement-budget: 40
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/approvals/{requestId}/reject => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.reject
+      classification: persistent-write
+      statement-budget: 16
+      row-budget: 200
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/timekeeping/me/face-consent => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.faceConsent
       classification: persistent-write
       statement-budget: 2
@@ -4566,6 +4758,38 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/timekeeping/admin/policies/{schoolId} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.savePolicy
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 20
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: PUT /api/v1/timekeeping/admin/remote-rules/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.updateRemoteRule
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 600
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: PUT /api/v1/timekeeping/admin/shifts/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.updateShift
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 100
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: PUT /api/v1/timekeeping/admin/sites/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.updateSite
+      classification: persistent-write
+      statement-budget: 6
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: PUT /api/v1/timekeeping/requests/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingRequestController.update
       classification: persistent-write
       statement-budget: 8

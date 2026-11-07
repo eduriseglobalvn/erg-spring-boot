@@ -1,6 +1,26 @@
 package com.erg.ergspringboot.timekeeping;
 
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ApprovalDetail;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ApprovalPage;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.BulkApproveResult;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PeriodLockView;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyVersions;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PunchReviewCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RecentPunch;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemindResult;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ShiftCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ShiftConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.Timesheet;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TodayDashboard;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.ExplanationContext;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.LeavePreview;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
@@ -13,6 +33,13 @@ import com.erg.ergspringboot.timekeeping.TimekeepingViews.PhotoFile;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.PunchCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.PunchResult;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.TodayView;
+import com.erg.ergspringboot.timekeeping.internal.admin.ApprovalInboxService;
+import com.erg.ergspringboot.timekeeping.internal.admin.PeriodLockService;
+import com.erg.ergspringboot.timekeeping.internal.admin.PunchReviewService;
+import com.erg.ergspringboot.timekeeping.internal.admin.SiteShiftConfigService;
+import com.erg.ergspringboot.timekeeping.internal.admin.TimekeepingConfigService;
+import com.erg.ergspringboot.timekeeping.internal.admin.TimesheetService;
+import com.erg.ergspringboot.timekeeping.internal.admin.TodayDashboardService;
 import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
 import com.erg.ergspringboot.timekeeping.internal.evidence.FaceConsentService;
 import com.erg.ergspringboot.timekeeping.internal.evidence.LocalPrivateObjectStorage;
@@ -23,6 +50,7 @@ import com.erg.ergspringboot.timekeeping.internal.request.RequestService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
 import java.time.format.DateTimeParseException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -44,10 +72,19 @@ public class TimekeepingOperations {
     private final RequestService requests;
     private final ApprovalService approvals;
     private final Clock clock;
+    private final Admin admin;
+
+    /** The admin (A01–A05) use cases, grouped so the facade constructor stays readable. */
+    record Admin(TodayDashboardService today, TimesheetService timesheet, PeriodLockService locks,
+            PunchReviewService reviews, SiteShiftConfigService sitesShifts, TimekeepingConfigService config,
+            ApprovalInboxService inbox) {}
 
     TimekeepingOperations(PunchService punches, SelfViewService views, DayAggregationService days,
             FaceConsentService consents, ObjectProvider<LocalPrivateObjectStorage> localPhotos, RequestService requests,
-            ApprovalService approvals, Clock clock) {
+            ApprovalService approvals, Clock clock, TodayDashboardService today, TimesheetService timesheet,
+            PeriodLockService locks, PunchReviewService reviews, SiteShiftConfigService sitesShifts,
+            TimekeepingConfigService config, ApprovalInboxService inbox) {
+        this.admin = new Admin(today, timesheet, locks, reviews, sitesShifts, config, inbox);
         this.punches = punches;
         this.views = views;
         this.days = days;
@@ -142,6 +179,113 @@ public class TimekeepingOperations {
 
     public void rejectStep(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment) {
         approvals.rejectStep(tenantId, requestId, actor, onBehalf, comment);
+    }
+
+    // ---- admin (timekeeping.manage); tenant and actor always from the verified principal
+
+    public TodayDashboard adminToday(ErgPrincipal p, String schoolId, LocalDate date) {
+        return admin.today().today(p.tenantId(), schoolId, date);
+    }
+
+    public RemindResult remind(ErgPrincipal p, List<String> userIds) {
+        return admin.today().remind(p.tenantId(), p.userId(), userIds);
+    }
+
+    public Timesheet timesheet(ErgPrincipal p, String schoolId, String period, String team, String q, int page,
+            int size) {
+        return admin.timesheet().timesheet(p.tenantId(), schoolId, period, team, q, page, size);
+    }
+
+    public PeriodLockView lockPeriod(ErgPrincipal p, String schoolId, String period) {
+        return admin.locks().lock(p.tenantId(), p.userId(), schoolId, period);
+    }
+
+    public PeriodLockView reopenPeriod(ErgPrincipal p, String schoolId, String period, String reason) {
+        return admin.locks().reopen(p.tenantId(), p.userId(), schoolId, period, reason);
+    }
+
+    public RecentPunch reviewPunch(ErgPrincipal p, String punchId, PunchReviewCommand command) {
+        return admin.reviews().review(p.tenantId(), p.userId(), punchId, command);
+    }
+
+    public List<SiteConfig> sites(ErgPrincipal p, String schoolId) {
+        return admin.sitesShifts().sites(p.tenantId(), schoolId);
+    }
+
+    /** {@code id} null = create. */
+    public SiteConfig saveSite(ErgPrincipal p, String id, SiteCommand command) {
+        return admin.sitesShifts().saveSite(p.tenantId(), p.userId(), id, command);
+    }
+
+    public void deleteSite(ErgPrincipal p, String id) {
+        admin.sitesShifts().deleteSite(p.tenantId(), p.userId(), id);
+    }
+
+    public List<ShiftConfig> shifts(ErgPrincipal p, String schoolId) {
+        return admin.sitesShifts().shifts(p.tenantId(), schoolId);
+    }
+
+    public ShiftConfig saveShift(ErgPrincipal p, String id, ShiftCommand command) {
+        return admin.sitesShifts().saveShift(p.tenantId(), p.userId(), id, command);
+    }
+
+    public void deleteShift(ErgPrincipal p, String id) {
+        admin.sitesShifts().deleteShift(p.tenantId(), p.userId(), id);
+    }
+
+    public PolicyVersions policy(ErgPrincipal p, String schoolId) {
+        return admin.config().policy(p.tenantId(), schoolId);
+    }
+
+    public PolicyConfig savePolicy(ErgPrincipal p, String schoolId, PolicyCommand command) {
+        return admin.config().savePolicy(p.tenantId(), p.userId(), schoolId, command);
+    }
+
+    public List<HolidayConfig> holidays(ErgPrincipal p, String schoolId, Integer year) {
+        return admin.config().holidays(p.tenantId(), schoolId, year);
+    }
+
+    public HolidayConfig createHoliday(ErgPrincipal p, HolidayCommand command) {
+        return admin.config().createHoliday(p.tenantId(), p.userId(), command);
+    }
+
+    public void deleteHoliday(ErgPrincipal p, String id) {
+        admin.config().deleteHoliday(p.tenantId(), p.userId(), id);
+    }
+
+    public List<RemoteRuleConfig> remoteRules(ErgPrincipal p, String schoolId) {
+        return admin.config().remoteRules(p.tenantId(), schoolId);
+    }
+
+    public RemoteRuleConfig saveRemoteRule(ErgPrincipal p, String id, RemoteRuleCommand command) {
+        return admin.config().saveRemoteRule(p.tenantId(), p.userId(), id, command);
+    }
+
+    public void deleteRemoteRule(ErgPrincipal p, String id) {
+        admin.config().deleteRemoteRule(p.tenantId(), p.userId(), id);
+    }
+
+    // ---- approval inbox (timekeeping.approve)
+
+    public ApprovalPage approvals(ErgPrincipal p, ApprovalBox box, RequestType type, String schoolId, DueFilter due,
+            int page, int size) {
+        return admin.inbox().list(p, box, type, schoolId, due, page, size);
+    }
+
+    public ApprovalDetail approval(ErgPrincipal p, String requestId) {
+        return admin.inbox().detail(p, requestId);
+    }
+
+    public RequestView approve(ErgPrincipal p, String requestId, String comment) {
+        return admin.inbox().approve(p, requestId, comment);
+    }
+
+    public RequestView reject(ErgPrincipal p, String requestId, String comment) {
+        return admin.inbox().reject(p, requestId, comment);
+    }
+
+    public BulkApproveResult bulkApprove(ErgPrincipal p, List<String> requestIds) {
+        return admin.inbox().bulkApprove(p, requestIds);
     }
 
     /**

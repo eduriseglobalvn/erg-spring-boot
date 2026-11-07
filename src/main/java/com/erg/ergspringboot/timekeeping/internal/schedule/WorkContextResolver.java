@@ -88,7 +88,7 @@ public class WorkContextResolver {
     }
 
     public List<TkShift> shiftsOf(String tenantId, String schoolId) {
-        return shifts.findByTenantIdAndSchoolIdOrderByStartTimeAsc(tenantId, schoolId);
+        return shifts.findByTenantIdAndSchoolIdAndActiveTrueOrderByStartTimeAsc(tenantId, schoolId);
     }
 
     /** The school's shift for the date's ISO weekday, from a list already loaded with {@link #shiftsOf}. */

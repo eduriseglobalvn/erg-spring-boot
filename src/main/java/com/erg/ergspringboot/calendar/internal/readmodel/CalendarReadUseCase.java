@@ -90,6 +90,12 @@ public class CalendarReadUseCase implements CalendarReadPort {
     }
 
     @Override
+    public java.util.Set<String> teachersWithPeriodStarting(
+            String tenantId, java.util.Collection<String> teacherUserIds, java.time.Instant from, java.time.Instant to) {
+        return teacherPeriods.teachersStarting(tenantId, teacherUserIds, from, to);
+    }
+
+    @Override
     public List<CalendarRoomOptionResponse> activeRooms(String tenantId, String schoolId) {
         return catalogQueries.activeRooms(tenantId, schoolId);
     }

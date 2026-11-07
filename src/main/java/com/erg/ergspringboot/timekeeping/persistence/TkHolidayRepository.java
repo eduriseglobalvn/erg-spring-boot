@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.timekeeping.persistence;
 
+import java.util.Optional;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,4 +19,11 @@ public interface TkHolidayRepository extends JpaRepository<TkHoliday, String> {
             """)
     List<TkHoliday> findForSchool(@Param("tenantId") String tenantId, @Param("schoolId") String schoolId,
             @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    Optional<TkHoliday> findByIdAndTenantId(String id, String tenantId);
+
+    List<TkHoliday> findByTenantIdAndHolidayDateBetweenOrderByHolidayDateAsc(String tenantId, LocalDate from, LocalDate to);
+
+    /** A null {@code schoolId} matches the tenant-wide row. */
+    boolean existsByTenantIdAndSchoolIdAndHolidayDate(String tenantId, String schoolId, LocalDate date);
 }

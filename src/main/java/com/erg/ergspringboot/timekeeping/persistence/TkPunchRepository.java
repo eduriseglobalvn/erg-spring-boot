@@ -68,4 +68,8 @@ public interface TkPunchRepository extends JpaRepository<TkPunch, String> {
             """)
     int markPhotoPurged(@Param("id") String id, @Param("tenantId") String tenantId,
             @Param("photoKey") String photoKey, @Param("now") Instant now);
+
+    boolean existsByTenantIdAndSiteId(String tenantId, String siteId);
+
+    boolean existsByTenantIdAndShiftId(String tenantId, String shiftId);
 }

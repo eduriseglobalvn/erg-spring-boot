@@ -7,7 +7,11 @@ import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.HashSet;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +50,12 @@ public final class CalendarTeacherPeriodsQueryUseCase {
                 .map(e -> new TeacherPeriod(e.getStartAt().toInstant(), e.getEndAt().toInstant(),
                         classNames.get(e.getAcademicClassId()), subjectNames.get(e.getSubjectId()), e.getRoomName()))
                 .toList();
+    }
+
+    public Set<String> teachersStarting(String tenantId, Collection<String> teacherUserIds, Instant from, Instant to) {
+        if (teacherUserIds.isEmpty()) return Set.of();
+        return new HashSet<>(events.findTeachersWithEventStarting(tenantId, teacherUserIds,
+                from.atOffset(ZoneOffset.UTC), to.atOffset(ZoneOffset.UTC), List.of("PUBLISHED")));
     }
 
     private static Set<String> ids(List<CalendarEvent> found, Function<CalendarEvent, String> id) {
