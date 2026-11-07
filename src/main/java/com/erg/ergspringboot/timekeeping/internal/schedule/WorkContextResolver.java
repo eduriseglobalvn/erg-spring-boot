@@ -64,10 +64,17 @@ public class WorkContextResolver {
     }
 
     public Optional<TkShift> shiftFor(String tenantId, String schoolId, LocalDate date) {
+        return shiftOn(shiftsOf(tenantId, schoolId), date);
+    }
+
+    public List<TkShift> shiftsOf(String tenantId, String schoolId) {
+        return shifts.findByTenantIdAndSchoolIdOrderByStartTimeAsc(tenantId, schoolId);
+    }
+
+    /** The school's shift for the date's ISO weekday, from a list already loaded with {@link #shiftsOf}. */
+    public static Optional<TkShift> shiftOn(List<TkShift> schoolShifts, LocalDate date) {
         int weekday = date.getDayOfWeek().getValue();
-        return shifts.findByTenantIdAndSchoolIdOrderByStartTimeAsc(tenantId, schoolId).stream()
-                .filter(shift -> Arrays.asList(shift.getWeekdays()).contains(weekday))
-                .findFirst();
+        return schoolShifts.stream().filter(shift -> Arrays.asList(shift.getWeekdays()).contains(weekday)).findFirst();
     }
 
     /** Falls back to the column defaults (tolerance 5, block 15, face required, ...) when nothing is configured. */

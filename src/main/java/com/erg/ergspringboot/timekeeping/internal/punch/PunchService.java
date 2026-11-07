@@ -21,7 +21,9 @@ import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunch;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkShift;
+import com.erg.ergspringboot.timekeeping.persistence.TkShiftRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkSite;
+import com.erg.ergspringboot.timekeeping.persistence.TkSiteRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -40,8 +42,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Records a punch at the server clock. Order: key, coordinates, replay of the same key, school/shift,
- * already-punched IN, period lock, punch window, face consent/photo, location verdict; only then the photo is
- * uploaded, the code drawn and the row saved. A REJECTED verdict is never stored.
+ * already-punched IN, period lock, punch window, face consent/photo, location verdict; only then the code is drawn
+ * (its counter row lock serialises writers of the tenant-day), the already-punched IN re-checked, the photo uploaded
+ * and the row saved. A REJECTED verdict is never stored.
  */
 @Service
 public class PunchService {
@@ -51,6 +54,8 @@ public class PunchService {
     private static final Duration OUT_CLOSES_AFTER_END = Duration.ofMinutes(60);
 
     private final TkPunchRepository punches;
+    private final TkSiteRepository sites;
+    private final TkShiftRepository shifts;
     private final WorkContextResolver context;
     private final PunchPhotoService photos;
     private final FaceConsentService consents;
@@ -59,10 +64,13 @@ public class PunchService {
     private final CalendarReadPort calendar;
     private final Clock clock;
 
-    PunchService(TkPunchRepository punches, WorkContextResolver context, PunchPhotoService photos,
+    PunchService(TkPunchRepository punches, TkSiteRepository sites, TkShiftRepository shifts,
+            WorkContextResolver context, PunchPhotoService photos,
             FaceConsentService consents, PunchCodeGenerator codes, DayAggregationService days,
             CalendarReadPort calendar, Clock clock) {
         this.punches = punches;
+        this.sites = sites;
+        this.shifts = shifts;
         this.context = context;
         this.photos = photos;
         this.consents = consents;
@@ -88,7 +96,7 @@ public class PunchService {
         List<TkPunch> today = punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date);
         if (cmd.direction() == PunchDirection.IN) {
             Optional<TkPunch> firstIn = DayAggregationService.firstIn(today);
-            if (firstIn.isPresent()) return result(firstIn.get(), true, shift);
+            if (firstIn.isPresent()) return result(firstIn.get(), true, null);
         }
         if (context.isLocked(tenantId, schoolId, date)) throw WorkContextResolver.periodLocked();
         requireInsideWindow(cmd.direction(), now, date, shift);
@@ -112,6 +120,13 @@ public class PunchService {
                                 policy.getAllowOutside()));
         if (check.verdict() == PunchStatus.REJECTED) throw unprocessable("PUNCH_REJECTED", check.messageVi());
 
+        String code = codes.next(tenantId, date);
+        if (cmd.direction() == PunchDirection.IN) {
+            // A concurrent IN with another key may have committed between the first check and the counter lock.
+            Optional<TkPunch> firstIn = DayAggregationService.firstIn(
+                    punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date));
+            if (firstIn.isPresent()) return result(firstIn.get(), true, null);
+        }
         TkPunch punch = new TkPunch();
         if (hasPhoto) punch.setPhotoKey(storePhotoDiscardedOnRollback(tenantId, userId, cmd.photo()));
         punch.setTenantId(tenantId);
@@ -135,10 +150,10 @@ public class PunchService {
         }
         punch.setReason(blankToNull(cmd.reason()));
         punch.setIdempotencyKey(key);
-        punch.setCode(codes.next(tenantId, date));
+        punch.setCode(code);
         TkPunch saved = punches.saveAndFlush(punch);
         days.recompute(tenantId, userId, date);
-        return result(saved, false, shift, site, check.messageVi());
+        return result(saved, false, check.messageVi());
     }
 
     /** Read-only replay for the facade after a concurrent insert of the same key lost the unique-constraint race. */
@@ -170,11 +185,11 @@ public class PunchService {
                 s.getLat().doubleValue(), s.getLng().doubleValue(), cmd.lat(), cmd.lng()))).orElseThrow();
     }
 
-    private PunchResult result(TkPunch punch, boolean alreadyPunched, TkShift shift) {
-        return result(punch, alreadyPunched, shift, null, null);
-    }
-
-    private PunchResult result(TkPunch punch, boolean alreadyPunched, TkShift shift, TkSite site, String messageVi) {
+    /** Always built from the stored row, so a replay or an already-punched answer equals the original response. */
+    private PunchResult result(TkPunch punch, boolean alreadyPunched, String messageVi) {
+        String siteName = punch.getSiteId() == null ? null
+                : sites.findById(punch.getSiteId()).map(TkSite::getName).orElse(null);
+        TkShift shift = punch.getShiftId() == null ? null : shifts.findById(punch.getShiftId()).orElse(null);
         Integer minutesVsShift = null;
         PeriodView next = null;
         if (shift != null) {
@@ -189,8 +204,8 @@ public class PunchService {
                     .map(p -> new PeriodView(p.start(), p.end(), p.className(), p.subject(), p.room()))
                     .orElse(null);
         }
-        return new PunchResult(punch.getStatus(), view(punch, site == null ? null : site.getName()), alreadyPunched,
-                minutesVsShift, next, messageVi);
+        return new PunchResult(punch.getStatus(), view(punch, siteName), alreadyPunched, minutesVsShift, next,
+                messageVi);
     }
 
     public static PunchView view(TkPunch p, String siteName) {

@@ -171,10 +171,11 @@ public class SelfViewService {
     private BigDecimal standardUnits(String tenantId, String schoolId, LocalDate from, LocalDate to) {
         Set<LocalDate> off = holidays.findForSchool(tenantId, schoolId, from, to).stream()
                 .map(TkHoliday::getHolidayDate).collect(Collectors.toSet());
+        List<TkShift> schoolShifts = context.shiftsOf(tenantId, schoolId);
         BigDecimal total = BigDecimal.ZERO;
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             if (off.contains(d)) continue;
-            Optional<TkShift> shift = context.shiftFor(tenantId, schoolId, d);
+            Optional<TkShift> shift = WorkContextResolver.shiftOn(schoolShifts, d);
             if (shift.isPresent()) total = total.add(shift.get().getWorkUnits());
         }
         return total;

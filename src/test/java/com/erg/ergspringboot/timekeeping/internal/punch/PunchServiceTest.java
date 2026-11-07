@@ -26,7 +26,9 @@ import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunch;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkShift;
+import com.erg.ergspringboot.timekeeping.persistence.TkShiftRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkSite;
+import com.erg.ergspringboot.timekeeping.persistence.TkSiteRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -56,6 +58,8 @@ class PunchServiceTest {
     private static final String PHOTO_KEY = "private/timekeeping/tenant-a/2026/11/p.jpg";
 
     private final TkPunchRepository punches = mock(TkPunchRepository.class);
+    private final TkSiteRepository sites = mock(TkSiteRepository.class);
+    private final TkShiftRepository shifts = mock(TkShiftRepository.class);
     private final WorkContextResolver context = mock(WorkContextResolver.class);
     private final PunchPhotoService photos = mock(PunchPhotoService.class);
     private final FaceConsentService consents = mock(FaceConsentService.class);
@@ -72,6 +76,8 @@ class PunchServiceTest {
         when(context.shiftFor(T, SCHOOL, DAY)).thenReturn(Optional.of(shift));
         when(context.policyFor(T, SCHOOL, DAY)).thenReturn(policy);
         when(context.activeSites(T, SCHOOL)).thenReturn(List.of(site()));
+        when(sites.findById("site-1")).thenReturn(Optional.of(site()));
+        when(shifts.findById("shift-1")).thenReturn(Optional.of(shift));
         when(punches.findByTenantIdAndUserIdAndIdempotencyKey(eq(T), eq(U), anyString())).thenReturn(Optional.empty());
         when(punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(T, U, DAY)).thenReturn(todays);
         when(punches.saveAndFlush(any(TkPunch.class))).thenAnswer(call -> {
@@ -121,12 +127,22 @@ class PunchServiceTest {
 
     @Test
     void sameIdempotencyKeyReturnsTheStoredPunchWithoutANewRow() {
-        TkPunch stored = punch("p-1", PunchDirection.IN, PunchStatus.VALID, "CC-121126-0007");
+        PunchResult original = service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
+        TkPunch stored = savedPunch();
         when(punches.findByTenantIdAndUserIdAndIdempotencyKey(T, U, "key-1")).thenReturn(Optional.of(stored));
+        org.mockito.Mockito.clearInvocations(punches, photos, codes);
 
-        PunchResult result = service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
+        PunchResult result = service(Instant.parse("2026-11-12T00:55:00Z"))
+                .punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
 
-        assertThat(result.punch().code()).isEqualTo("CC-121126-0007");
+        assertThat(result.punch()).isEqualTo(original.punch());
+        assertThat(result.punch().siteName()).isEqualTo("Cơ sở Cầu Giấy");
+        assertThat(result.minutesVsShift()).isEqualTo(original.minutesVsShift()).isEqualTo(10);
+        assertThat(result.nextPeriod()).isEqualTo(original.nextPeriod()).isNotNull();
+        assertThat(service(NOW).replay(T, U, "key-1")).hasValueSatisfying(r -> {
+            assertThat(r.punch()).isEqualTo(original.punch());
+            assertThat(r.minutesVsShift()).isEqualTo(10);
+        });
         verify(punches, never()).saveAndFlush(any());
         verifyNoInteractions(photos, codes);
     }
@@ -139,8 +155,27 @@ class PunchServiceTest {
 
         assertThat(result.alreadyPunched()).isTrue();
         assertThat(result.punch().code()).isEqualTo("CC-121126-0001");
+        assertThat(result.punch().siteName()).isEqualTo("Cơ sở Cầu Giấy");
+        assertThat(result.minutesVsShift()).isEqualTo(-5);
+        assertThat(result.nextPeriod().className()).isEqualTo("7A");
         verify(punches, never()).saveAndFlush(any());
         verifyNoInteractions(photos, codes);
+    }
+
+    @Test
+    void inThatAppearsBeforeTheCounterLockIsReturnedAsAlreadyPunchedWithoutUpload() {
+        when(codes.next(T, DAY)).thenAnswer(call -> {
+            todays.add(punch("p-race", PunchDirection.IN, PunchStatus.VALID, "CC-121126-0001"));
+            return "CC-121126-0002";
+        });
+
+        PunchResult result = service(NOW).punch(T, U, "key-2", in(21.0285, 105.8542, 20.0, null, PHOTO));
+
+        assertThat(result.alreadyPunched()).isTrue();
+        assertThat(result.punch().id()).isEqualTo("p-race");
+        verify(punches, never()).saveAndFlush(any());
+        verify(photos, never()).storePunchPhoto(any(), any(), any());
+        verify(days, never()).recompute(any(), any(), any());
     }
 
     @Test
@@ -302,7 +337,7 @@ class PunchServiceTest {
     }
 
     private PunchService service(Instant now) {
-        return new PunchService(punches, context, photos, consents, codes, days, calendar,
+        return new PunchService(punches, sites, shifts, context, photos, consents, codes, days, calendar,
                 Clock.fixed(now, ZoneOffset.UTC));
     }
 
@@ -353,6 +388,7 @@ class PunchServiceTest {
         p.setUserId(U);
         p.setSchoolId(SCHOOL);
         p.setShiftId("shift-1");
+        p.setSiteId("site-1");
         p.setWorkDate(DAY);
         p.setDirection(direction);
         p.setStatus(status);
