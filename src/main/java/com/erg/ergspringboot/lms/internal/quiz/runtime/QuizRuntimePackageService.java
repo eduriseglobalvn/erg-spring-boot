@@ -102,6 +102,9 @@ public class QuizRuntimePackageService {
         if (runtimeQuiz.get("settings") != null) {
             settings.put("settings", runtimeQuiz.get("settings"));
         }
+        if (runtimeQuiz.get("playerTemplate") != null) {
+            settings.put("playerTemplate", runtimeQuiz.get("playerTemplate"));
+        }
 
         QuizResponse quizResponse = new QuizResponse(
                 quizId,

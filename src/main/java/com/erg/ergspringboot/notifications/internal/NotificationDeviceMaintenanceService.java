@@ -80,4 +80,19 @@ public class NotificationDeviceMaintenanceService {
             if (previous == null) TenantContext.clear(); else TenantContext.set(previous);
         }
     }
+
+    /** The push service reported the subscription gone (Web Push 404/410): stop sending to this device. */
+    @Transactional
+    public boolean expireDevice(String tenantId, String deviceId) {
+        if (tenantId == null || deviceId == null) return false;
+        return deviceRepository.findById(deviceId)
+                .filter(device -> tenantId.equals(device.getTenantId()))
+                .map(device -> {
+                    device.setEnabled(false);
+                    device.setRevokedAt(OffsetDateTime.now());
+                    deviceRepository.save(device);
+                    return true;
+                })
+                .orElse(false);
+    }
 }

@@ -1,0 +1,512 @@
+package com.erg.ergspringboot.notifications.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.notifications.CampaignAudience;
+import com.erg.ergspringboot.notifications.CampaignStatus;
+import com.erg.ergspringboot.notifications.NotificationPriority;
+import com.erg.ergspringboot.notifications.internal.campaign.ScheduledCampaignDispatchJob;
+import com.erg.ergspringboot.notifications.persistence.NotificationCampaignEntity;
+import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
+import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
+import com.jayway.jsonpath.JsonPath;
+import jakarta.persistence.EntityManager;
+import java.time.OffsetDateTime;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.DockerClientFactory;
+
+@ActiveProfiles("test")
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+@EnabledIf("dockerAvailable")
+class NotificationCampaignControllerIT {
+
+    private static final String TENANT = "tenant-camp";
+    private static final String CLASS_ID = "class-camp";
+    private static final String BASE = "/api/v1/notification-campaigns";
+
+    @DynamicPropertySource
+    static void registerPostgres(DynamicPropertyRegistry registry) {
+        PostgreSqlTestDatabase.register(registry);
+    }
+
+    @Autowired private MockMvc mockMvc;
+    @Autowired private EntityManager entityManager;
+    @Autowired private NotificationCampaignRepository campaigns;
+    @Autowired private ScheduledCampaignDispatchJob job;
+
+    @BeforeEach
+    void seed() {
+        EducationUnit school = new EducationUnit();
+        school.setId("school-camp");
+        school.setTenantId(TENANT);
+        school.setName("Campaign School");
+        school.setType("school");
+        entityManager.persist(school);
+        entityManager.persist(user("gv-std"));
+        Classroom classroom = new Classroom();
+        classroom.setId(CLASS_ID);
+        classroom.setTenantId(TENANT);
+        classroom.setSchoolId("school-camp");
+        classroom.setName("7A");
+        classroom.setGrade("7");
+        classroom.setAcademicYear("2026");
+        classroom.setStatus("active");
+        classroom.setHomeroomTeacherId("gv-std");
+        entityManager.persist(classroom);
+        Classroom other = new Classroom();
+        other.setId("class-other");
+        other.setTenantId(TENANT);
+        other.setSchoolId("school-camp");
+        other.setName("8B");
+        other.setGrade("8");
+        other.setAcademicYear("2026");
+        other.setStatus("active");
+        entityManager.persist(other);
+        entityManager.persist(user("admin-1"));
+        for (String id : List.of("stu-1", "stu-2", "stu-3")) {
+            entityManager.persist(user(id));
+            Student student = new Student();
+            student.setId("s-" + id);
+            student.setTenantId(TENANT);
+            student.setSchoolId("school-camp");
+            student.setAcademicClassId(CLASS_ID);
+            student.setStudentCode("C-" + id);
+            student.setFullName(id);
+            student.setUsername(id);
+            student.setAuthUserId(id);
+            student.setStatus("active");
+            entityManager.persist(student);
+        }
+        entityManager.flush();
+    }
+
+    @Test
+    void teacherEstimateForAClassTheyDoNotTeachIsForbidden() throws Exception {
+        mockMvc.perform(as(post(BASE + "/estimate"), "teacher-1", "teacher").contentType("application/json")
+                        .content(classAudienceJson()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void platformSuperAdminHoldingTheWildcardActsAsAdmin() throws Exception {
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "root")
+                        .header("X-Roles", "system.super_admin").header("X-Permissions", "*")
+                        .contentType("application/json").content(classAudienceJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+    }
+
+    @Test
+    void withoutTheSendPermissionTheApiIsForbidden() throws Exception {
+        mockMvc.perform(get(BASE + "/summary").header("X-Tenant-ID", TENANT).header("X-User-ID", "teacher-1")
+                        .header("X-Roles", "teacher"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminSendsADraftThenSeesRecipientCountsAndCannotSendTwice() throws Exception {
+        String id = createDraft();
+        mockMvc.perform(as(post(BASE + "/estimate"), "admin-1", "admin").contentType("application/json")
+                        .content(classAudienceJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+
+        mockMvc.perform(as(post(BASE + "/" + id + "/send"), "admin-1", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SENT"));
+
+        mockMvc.perform(as(get(BASE + "/" + id), "admin-1", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recipientCount").value(3))
+                .andExpect(jsonPath("$.data.viewedCount").value(0))
+                .andExpect(jsonPath("$.data.resolvedCount").value(3));
+        mockMvc.perform(as(get(BASE + "/" + id + "/recipients").param("filter", "UNREAD"), "admin-1", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalItems").value(3))
+                .andExpect(jsonPath("$.data.items[0].displayName").value("stu-1"));
+        mockMvc.perform(as(get(BASE + "/summary"), "admin-1", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sentThisMonth").value(1))
+                .andExpect(jsonPath("$.data.avgViewedRate").value(0.0));
+        mockMvc.perform(as(get(BASE).param("box", "SENT"), "admin-1", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].id").value(id))
+                .andExpect(jsonPath("$.data.items[0].recipientCount").value(3));
+
+        mockMvc.perform(as(post(BASE + "/" + id + "/send"), "admin-1", "admin"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(as(post(BASE + "/" + id + "/cancel"), "admin-1", "admin"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void teacherCannotReadAnotherTeachersCampaign() throws Exception {
+        NotificationCampaignEntity other = campaigns.saveAndFlush(
+                campaign("teacher-2", CampaignStatus.DRAFT, null));
+
+        mockMvc.perform(as(get(BASE + "/" + other.getId()), "teacher-1", "teacher"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(as(get(BASE).param("box", "DRAFT").param("mine", "false"), "teacher-1", "teacher"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalItems").value(0));
+        mockMvc.perform(as(get(BASE + "/" + other.getId()), "admin-1", "admin"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void scheduleIsBoundedToTheNextThirtyDaysAndCanBeCancelled() throws Exception {
+        String id = createDraft();
+        mockMvc.perform(schedule(id, OffsetDateTime.now().minusMinutes(1))).andExpect(status().isBadRequest());
+        mockMvc.perform(schedule(id, OffsetDateTime.now().plusDays(31))).andExpect(status().isBadRequest());
+
+        mockMvc.perform(schedule(id, OffsetDateTime.now().plusDays(2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCHEDULED"));
+        mockMvc.perform(as(post(BASE + "/" + id + "/cancel"), "admin-1", "admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    void seededTeacherRoleWithItsRealPermissionsMayReachOnlyTheClassesItTeaches() throws Exception {
+        @SuppressWarnings("unchecked")
+        List<String> permissions = entityManager.createNativeQuery("""
+                select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
+                where rp.role_id = 'role_lms_teacher_standard'
+                """).getResultList();
+        assertThat(permissions).contains("notification.campaign.send");
+        String granted = String.join(",", permissions);
+
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "gv-std")
+                        .header("X-Roles", "lms_teacher_standard").header("X-Permissions", granted)
+                        .contentType("application/json").content(classAudienceJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "gv-std")
+                        .header("X-Roles", "lms_teacher_standard").header("X-Permissions", granted)
+                        .contentType("application/json")
+                        .content("{\"wholeTenant\":false,\"classIds\":[\"class-other\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void theJobFailsACampaignWhoseCreatorNoLongerHoldsTheSendPermission() {
+        // Read-only teacher role: still a teacher of 7A, but without notification.campaign.send.
+        entityManager.find(User.class, "gv-std").getRoles().add(entityManager.find(Role.class, "role_lms_teacher_readonly"));
+        NotificationCampaignEntity due = campaigns.save(
+                campaign("gv-std", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1)));
+        entityManager.flush();
+
+        job.dispatchDue();
+
+        entityManager.flush(); // what the dispatch transaction commit does
+        entityManager.clear();
+        assertThat(campaigns.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.FAILED);
+        assertThat(entityManager.createNativeQuery(
+                "select count(*) from notification_messages where campaign_id = :id")
+                .setParameter("id", due.getId()).getSingleResult()).isEqualTo(0L);
+    }
+
+    @Test
+    void theJobSendsOnlyDueCampaignsAndNeverTwice() {
+        // A real super admin (role system.super_admin holding '*') created both campaigns.
+        User creator = user("creator-1");
+        creator.getRoles().add(entityManager.find(Role.class, "role_super_admin"));
+        entityManager.persist(creator);
+        NotificationCampaignEntity due = campaigns.save(
+                campaign("creator-1", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1)));
+        NotificationCampaignEntity later = campaigns.save(
+                campaign("creator-1", CampaignStatus.SCHEDULED, OffsetDateTime.now().plusHours(1)));
+        entityManager.flush();
+
+        int firstPass = job.dispatchDue();
+        int secondPass = job.dispatchDue();
+
+        entityManager.clear();
+        assertThat(firstPass).isGreaterThanOrEqualTo(1);
+        assertThat(secondPass).isZero();
+        assertThat(campaigns.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.SENT);
+        assertThat(campaigns.findById(due.getId()).orElseThrow().getResolvedCount()).isEqualTo(3);
+        assertThat(campaigns.findById(later.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.SCHEDULED);
+    }
+
+    @Test
+    void tenantWideAdminsMaySendToTheWholeTenant() throws Exception {
+        mockMvc.perform(as(post(BASE + "/estimate"), "admin-1", "admin").contentType("application/json")
+                        .content("{\"wholeTenant\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").isNumber());
+        mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "root")
+                        .header("X-Roles", "system.super_admin").header("X-Permissions", "*")
+                        .contentType("application/json").content("{\"wholeTenant\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void seededLmsAdminReachesOnlyTheSchoolsItManages() throws Exception {
+        String granted = seedLmsAdmin("la-1");
+
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"schoolIds\":[\"school-camp\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted).content(classAudienceJson()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(3));
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"schoolIds\":[\"school-far\"]}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"classIds\":[\"class-far\"]}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted).content("{\"wholeTenant\":true}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"gradeIds\":[\"7\"]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void theJobAppliesTheSameUnitScopeToASeededLmsAdmin() {
+        seedLmsAdmin("la-1");
+        NotificationCampaignEntity own = campaign("la-1", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1));
+        own.setAudience(new CampaignAudience(false, List.of("school-camp"), null, null, null, null, null));
+        NotificationCampaignEntity foreign = campaign("la-1", CampaignStatus.SCHEDULED,
+                OffsetDateTime.now().minusMinutes(1));
+        foreign.setAudience(new CampaignAudience(false, List.of("school-far"), null, null, null, null, null));
+        campaigns.save(own);
+        campaigns.save(foreign);
+        entityManager.flush();
+
+        job.dispatchDue();
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(campaigns.findById(own.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.SENT);
+        assertThat(campaigns.findById(foreign.getId()).orElseThrow().getStatus()).isEqualTo(CampaignStatus.FAILED);
+    }
+
+    @Test
+    void theJobHonoursRolesHeldOnlyThroughActiveAssignments() {
+        seedFarSchool();
+        // lms.admin and a teacher role held ONLY through role assignments (no user_roles rows), like HTTP sees them.
+        entityManager.persist(user("la-asg"));
+        assign("la-asg", "role_lms_admin", "school-camp", null, null);
+        entityManager.persist(user("gv-asg"));
+        assign("gv-asg", "role_lms_teacher_standard", "school-camp", null, null);
+        Classroom taught = new Classroom();
+        taught.setId("class-asg");
+        taught.setTenantId(TENANT);
+        taught.setSchoolId("school-camp");
+        taught.setName("6C");
+        taught.setGrade("6");
+        taught.setAcademicYear("2026");
+        taught.setStatus("active");
+        taught.setHomeroomTeacherId("gv-asg");
+        entityManager.persist(taught);
+        entityManager.persist(user("stu-4"));
+        Student student = new Student();
+        student.setId("s-stu-4");
+        student.setTenantId(TENANT);
+        student.setSchoolId("school-camp");
+        student.setAcademicClassId("class-asg");
+        student.setStudentCode("C-stu-4");
+        student.setFullName("stu-4");
+        student.setUsername("stu-4");
+        student.setAuthUserId("stu-4");
+        student.setStatus("active");
+        entityManager.persist(student);
+        // Same roles, but the assignment is revoked or expired: nobody at dispatch.
+        entityManager.persist(user("la-revoked"));
+        assign("la-revoked", "role_lms_admin", "school-camp", OffsetDateTime.now().minusDays(1), null);
+        entityManager.persist(user("gv-expired"));
+        assign("gv-expired", "role_lms_teacher_standard", "school-camp", null, OffsetDateTime.now().minusDays(1));
+
+        NotificationCampaignEntity adminOwn = due("la-asg", schools("school-camp"));
+        NotificationCampaignEntity adminForeign = due("la-asg", schools("school-far"));
+        NotificationCampaignEntity teacherOwn = due("gv-asg", classesOf("class-asg"));
+        NotificationCampaignEntity teacherForeign = due("gv-asg", classesOf(CLASS_ID));
+        NotificationCampaignEntity revoked = due("la-revoked", schools("school-camp"));
+        NotificationCampaignEntity expired = due("gv-expired", classesOf("class-asg"));
+        entityManager.flush();
+
+        job.dispatchDue();
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(statusOf(adminOwn)).isEqualTo(CampaignStatus.SENT);
+        assertThat(statusOf(adminForeign)).isEqualTo(CampaignStatus.FAILED);
+        assertThat(statusOf(teacherOwn)).isEqualTo(CampaignStatus.SENT);
+        assertThat(statusOf(teacherForeign)).isEqualTo(CampaignStatus.FAILED);
+        assertThat(statusOf(revoked)).isEqualTo(CampaignStatus.FAILED);
+        assertThat(statusOf(expired)).isEqualTo(CampaignStatus.FAILED);
+    }
+
+    private NotificationCampaignEntity due(String createdBy, CampaignAudience audience) {
+        NotificationCampaignEntity campaign = campaign(createdBy, CampaignStatus.SCHEDULED,
+                OffsetDateTime.now().minusMinutes(1));
+        campaign.setAudience(audience);
+        return campaigns.save(campaign);
+    }
+
+    private CampaignStatus statusOf(NotificationCampaignEntity campaign) {
+        return campaigns.findById(campaign.getId()).orElseThrow().getStatus();
+    }
+
+    private static CampaignAudience schools(String... ids) {
+        return new CampaignAudience(false, List.of(ids), null, null, null, null, null);
+    }
+
+    private static CampaignAudience classesOf(String... ids) {
+        return new CampaignAudience(false, null, null, List.of(ids), null, null, null);
+    }
+
+    /** User holding the seeded lms.admin role, assigned to school-camp only; returns the role's real permissions. */
+    private String seedLmsAdmin(String userId) {
+        seedFarSchool();
+        User admin = user(userId);
+        admin.getRoles().add(entityManager.find(Role.class, "role_lms_admin"));
+        entityManager.persist(admin);
+        assign(userId, "role_lms_admin", "school-camp", null, null);
+        @SuppressWarnings("unchecked")
+        List<String> permissions = entityManager.createNativeQuery("""
+                select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
+                where rp.role_id = 'role_lms_admin'
+                """).getResultList();
+        assertThat(permissions).contains("notification.campaign.send");
+        return String.join(",", permissions);
+    }
+
+    private void assign(String userId, String roleId, String schoolId, OffsetDateTime revokedAt,
+            OffsetDateTime expiresAt) {
+        UserRoleAssignment assignment = new UserRoleAssignment();
+        assignment.setUserId(userId);
+        assignment.setRoleId(roleId);
+        assignment.setTenantId(TENANT);
+        assignment.setScopeType("SCHOOL");
+        assignment.setScopeId(schoolId);
+        assignment.setAssignedBy("admin-1");
+        assignment.setRevokedAt(revokedAt);
+        if (revokedAt != null) {
+            assignment.setRevokedBy("admin-1");
+        }
+        entityManager.persist(assignment);
+        if (expiresAt != null) {
+            // ck_user_role_assignments_expiry wants expires_at after created_at: backdate both together.
+            entityManager.flush();
+            entityManager.createNativeQuery("update user_role_assignments set created_at = cast(:at as timestamptz) - interval '1 day', "
+                    + "expires_at = cast(:at as timestamptz) where id = :id").setParameter("at", expiresAt)
+                    .setParameter("id", assignment.getId()).executeUpdate();
+        }
+        entityManager.flush();
+    }
+
+    private void seedFarSchool() {
+        EducationUnit far = new EducationUnit();
+        far.setId("school-far");
+        far.setTenantId(TENANT);
+        far.setName("Far School");
+        far.setType("school");
+        entityManager.persist(far);
+        Classroom farClass = new Classroom();
+        farClass.setId("class-far");
+        farClass.setTenantId(TENANT);
+        farClass.setSchoolId("school-far");
+        farClass.setName("9Z");
+        farClass.setGrade("9");
+        farClass.setAcademicYear("2026");
+        farClass.setStatus("active");
+        entityManager.persist(farClass);
+    }
+
+    private static MockHttpServletRequestBuilder asLmsAdmin(
+            MockHttpServletRequestBuilder request, String userId, String granted) {
+        return request.header("X-Tenant-ID", TENANT).header("X-User-ID", userId).header("X-Roles", "lms.admin")
+                .header("X-Permissions", granted).contentType("application/json");
+    }
+
+    private String createDraft() throws Exception {
+        String body = """
+                {"title":"Họp phụ huynh","body":"Tối thứ Sáu","priority":"IMPORTANT","requireReadAck":true,
+                 "audience":%s}
+                """.formatted(classAudienceJson());
+        String response = mockMvc.perform(as(post(BASE), "admin-1", "admin").contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.estimatedCount").value(3))
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(response, "$.data.id");
+    }
+
+    private MockHttpServletRequestBuilder schedule(String id, OffsetDateTime at) {
+        return as(post(BASE + "/" + id + "/schedule"), "admin-1", "admin").contentType("application/json")
+                .content("{\"scheduledAt\":\"" + at + "\"}");
+    }
+
+    private static MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder request, String userId, String role) {
+        return request.header("X-Tenant-ID", TENANT)
+                .header("X-User-ID", userId)
+                .header("X-Roles", role)
+                .header("X-Permissions", "notification.campaign.send");
+    }
+
+    private static String classAudienceJson() {
+        return "{\"wholeTenant\":false,\"classIds\":[\"" + CLASS_ID + "\"]}";
+    }
+
+    private static NotificationCampaignEntity campaign(String createdBy, CampaignStatus status, OffsetDateTime at) {
+        NotificationCampaignEntity campaign = new NotificationCampaignEntity();
+        campaign.setTenantId(TENANT);
+        campaign.setCreatedBy(createdBy);
+        campaign.setSenderRole("ADMIN");
+        campaign.setTitle("Lịch thi");
+        campaign.setBody("Nội dung");
+        campaign.setPriority(NotificationPriority.INFO);
+        campaign.setAudience(new CampaignAudience(false, null, null, List.of(CLASS_ID), null, null, null));
+        campaign.setStatus(status);
+        campaign.setScheduledAt(at);
+        return campaign;
+    }
+
+    private static User user(String id) {
+        User user = new User();
+        user.setId(id);
+        user.setTenantId(TENANT);
+        user.setEmail(id + "@example.test");
+        user.setFullName(id);
+        user.setStatus("ACTIVE");
+        user.setAccountType("student");
+        user.setMustChangePassword(false);
+        user.setIsProfileCompleted(true);
+        user.setRecoveryEmailVerified(false);
+        return user;
+    }
+
+    static boolean dockerAvailable() {
+        return DockerClientFactory.instance().isDockerAvailable();
+    }
+}

@@ -53,6 +53,13 @@ class CalendarPublishedScenarioTest {
     @MockitoBean com.erg.ergspringboot.notifications.internal.NotificationDeviceMaintenanceService notificationDeviceMaintenance;
     @MockitoBean com.erg.ergspringboot.notifications.internal.NotificationOutboxRetentionJob notificationOutboxRetention;
     @MockitoBean com.erg.ergspringboot.notifications.internal.NotificationMetrics notificationMetrics;
+    // Campaign beans need lms/users ports that the standalone slice does not load.
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.AudienceScopeGuard audienceGuard;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationAudienceResolver audienceResolver;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.RecipientLookupService recipientLookup;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationCampaignService campaigns;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationCampaignQueryService campaignQueries;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.ScheduledCampaignDispatchJob campaignJob;
 
     @Test
     void publishedEventEventuallyEnqueuesOneIdempotentNotification(Scenario scenario) {

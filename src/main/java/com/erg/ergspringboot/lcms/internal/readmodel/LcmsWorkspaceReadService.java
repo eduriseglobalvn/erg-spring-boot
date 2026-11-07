@@ -2,6 +2,7 @@ package com.erg.ergspringboot.lcms.internal.readmodel;
 
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.EffectivePermissionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.AccessManagementWorkspaceResponse;
+import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankQuizOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.RoleOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.ScopeOptionResponse;
@@ -14,12 +15,15 @@ import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.projection.QuizDraftSettingsProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionUsageCountProjection;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,6 +51,7 @@ public class LcmsWorkspaceReadService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserAccessScopeRepository userAccessScopeRepository;
+    private final QuizDraftRepository quizDraftRepository;
 
     public LcmsWorkspaceReadService(
             QuestionRepository questionRepository,
@@ -57,7 +62,8 @@ public class LcmsWorkspaceReadService {
             QuizQuestionRepository quizQuestionRepository,
             UserRepository userRepository,
             RoleRepository roleRepository,
-            UserAccessScopeRepository userAccessScopeRepository
+            UserAccessScopeRepository userAccessScopeRepository,
+            QuizDraftRepository quizDraftRepository
     ) {
         this.questionRepository = questionRepository;
         this.subjectRepository = subjectRepository;
@@ -68,6 +74,7 @@ public class LcmsWorkspaceReadService {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.userAccessScopeRepository = userAccessScopeRepository;
+        this.quizDraftRepository = quizDraftRepository;
     }
 
     @Cacheable(
@@ -132,18 +139,18 @@ public class LcmsWorkspaceReadService {
                 topicOptions.stream()
                         .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
                         .toList(),
-                quizOptions(
+                quizOptionResponses(
                         normalizedTenantId,
-                        normalizedSearch,
-                        normalizedSubjectId,
-                        normalizedLevelId,
-                        normalizedTopicId,
-                        normalizedStatus,
-                        normalizedQuizKind
+                        quizOptions(
+                                normalizedTenantId,
+                                normalizedSearch,
+                                normalizedSubjectId,
+                                normalizedLevelId,
+                                normalizedTopicId,
+                                normalizedStatus,
+                                normalizedQuizKind
+                        )
                 )
-                        .stream()
-                        .map(LcmsWorkspaceResponseMapper::toQuizOption)
-                        .toList()
         );
     }
 
@@ -175,6 +182,35 @@ public class LcmsWorkspaceReadService {
                 status,
                 pageRequest
         );
+    }
+
+    /** One query for every listed quiz's draft settings, so the time column shows the real limit. */
+    private List<QuestionBankQuizOptionResponse> quizOptionResponses(
+            String tenantId,
+            List<QuestionBankQuizOptionProjection> quizzes
+    ) {
+        Map<String, QuizDraftSettingsProjection> latestDraftByQuizId = quizzes.isEmpty()
+                ? Map.of()
+                : quizDraftRepository.findSettingsByTenantIdAndQuizIds(
+                                tenantId,
+                                quizzes.stream().map(QuestionBankQuizOptionProjection::id).toList()
+                        ).stream()
+                        .filter(draft -> draft.settings() != null)
+                        .collect(Collectors.toMap(
+                                QuizDraftSettingsProjection::quizId,
+                                draft -> draft,
+                                (left, right) -> isAfter(right.updatedAt(), left.updatedAt()) ? right : left
+                        ));
+        return quizzes.stream()
+                .map(quiz -> {
+                    QuizDraftSettingsProjection draft = latestDraftByQuizId.get(quiz.id());
+                    return LcmsWorkspaceResponseMapper.toQuizOption(quiz, draft == null ? null : draft.settings());
+                })
+                .toList();
+    }
+
+    private static boolean isAfter(OffsetDateTime candidate, OffsetDateTime current) {
+        return candidate != null && (current == null || candidate.isAfter(current));
     }
 
     private List<QuestionBankQuizOptionProjection> quizOptions(

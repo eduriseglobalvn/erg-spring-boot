@@ -132,7 +132,7 @@ final class LcmsWorkspaceResponseMapper {
         return scopeId == null ? "ERG" : scopeId;
     }
 
-    static QuestionBankQuizOptionResponse toQuizOption(QuestionBankQuizOptionProjection option) {
+    static QuestionBankQuizOptionResponse toQuizOption(QuestionBankQuizOptionProjection option, Map<String, Object> draftSettings) {
         List<String> questionIds = cleanStrings(option.questionIds());
         return new QuestionBankQuizOptionResponse(
                 option.id(),
@@ -144,12 +144,32 @@ final class LcmsWorkspaceResponseMapper {
                 option.categoryId(),
                 questionIds,
                 questionIds.size(),
-                durationLabel(questionIds.size(), option.kind()),
+                durationLabel(draftSettings, questionIds.size(), option.kind()),
                 "Toan cong ty",
                 sourceMode(option.kind()),
                 blankToDefault(option.ownerUserId(), "Academic team"),
                 option.updatedAt() == null ? null : option.updatedAt().toString()
         );
+    }
+
+    /** The draft's own time limit; the per-question estimate only for a quiz without a draft. */
+    static String durationLabel(Map<String, Object> draftSettings, int questionCount, String kind) {
+        if (draftSettings != null && draftSettings.get("settings") instanceof Map<?, ?> settings) {
+            int minutes = minutesOf(settings.get("timeLimit"));
+            return Boolean.TRUE.equals(settings.get("enableTimeLimit")) && minutes > 0 ? minutes + " phut" : "Khong gioi han";
+        }
+        return durationLabel(questionCount, kind);
+    }
+
+    private static int minutesOf(Object timeLimit) {
+        if (!(timeLimit instanceof String text)) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(text.split(":", 2)[0].trim());
+        } catch (NumberFormatException invalid) {
+            return 0;
+        }
     }
 
     private static String durationLabel(int questionCount, String kind) {

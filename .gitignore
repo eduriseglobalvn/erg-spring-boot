@@ -47,3 +47,4 @@ load/results/**
 backups/
 .codex-runtime/
 tmp-*.log
+.erg-private/

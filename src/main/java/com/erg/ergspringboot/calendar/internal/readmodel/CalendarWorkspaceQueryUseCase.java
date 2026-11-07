@@ -32,7 +32,8 @@ public final class CalendarWorkspaceQueryUseCase {
     private static final ZoneId VIETNAM_ZONE = CalendarExpansionService.VIETNAM_ZONE;
     private static final List<String> DEFAULT_STATUSES = List.of("DRAFT", "PUBLISHED");
     private static final String FILTER_SENTINEL = "__none__";
-    private static final int MAX_WORKSPACE_DAYS = 31;
+    // Month view fetches the whole 6-week grid (42 days) shown by the frontend.
+    private static final int MAX_WORKSPACE_DAYS = 42;
     private static final int MAX_FILTER_VALUES = 100;
 
     private final CalendarEventRepository events;

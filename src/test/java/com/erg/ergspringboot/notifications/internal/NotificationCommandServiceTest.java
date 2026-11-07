@@ -51,6 +51,18 @@ class NotificationCommandServiceTest {
     private NotificationPreferenceRepository preferenceRepository;
 
     @Test
+    void campaignBodyPreviewNeverSplitsAnEmojiAtTheLimit() {
+        String emojiAcrossTheLimit = "a".repeat(499) + "😀" + "tail";
+
+        String preview = NotificationCommandService.bodyPreview(emojiAcrossTheLimit);
+
+        assertThat(preview).isEqualTo("a".repeat(499));
+        assertThat(NotificationCommandService.bodyPreview("a".repeat(498) + "😀" + "tail"))
+                .hasSize(500).endsWith("😀");
+        assertThat(NotificationCommandService.bodyPreview("ngắn")).isEqualTo("ngắn");
+    }
+
+    @Test
     void enqueueRejectsTopicOutsideTenantNamespace() {
         NotificationCommandService service = service();
         NotificationCommand command = command(List.of(), "t_tenant_b_portal_lms", Map.of("kind", "schedule"));
@@ -146,6 +158,30 @@ class NotificationCommandServiceTest {
                 .satisfies(outbox -> assertThat(outbox.getPayload()).containsEntry("deviceRegistrationId", "device-inbox-off"));
         assertThat(result.recipientCount()).isEqualTo(1);
         assertThat(result.outboxCount()).isEqualTo(1);
+    }
+
+    @Test
+    void webPushDevicesAreRoutedToTheVapidAdapterByDeviceIdAndFcmDevicesStayOnFirebase() {
+        when(messageRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            NotificationMessageEntity message = invocation.getArgument(0);
+            message.setId("notification-1");
+            return message;
+        });
+        NotificationDeviceRegistrationEntity browser = device("device-web", "user-1");
+        browser.setTransport("WEB_PUSH");
+        when(deviceRepository.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq("tenant_a"), any(), eq("lms")))
+                .thenReturn(List.of(browser, device("device-fcm", "user-1")));
+
+        service().enqueue(command(List.of("user-1"), null, Map.of()));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<NotificationOutboxEntity>> outboxes = ArgumentCaptor.forClass(List.class);
+        verify(outboxRepository).saveAll(outboxes.capture());
+        assertThat(outboxes.getValue()).extracting(NotificationOutboxEntity::getTargetKind,
+                        NotificationOutboxEntity::getProvider, NotificationOutboxEntity::getTargetRef)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("web_push", "vapid", "device-web"),
+                        org.assertj.core.groups.Tuple.tuple("registration_token", "firebase", "token-device-fcm"));
     }
 
     private NotificationPreferenceEntity preference(String userId, boolean inbox, boolean push) {

@@ -11,7 +11,9 @@ import com.erg.ergspringboot.notifications.NotificationSecuritySupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.WebPushConfigResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -81,6 +83,13 @@ public class NotificationDeviceController {
         String verifiedPortal = security.verifiedPortal(principal, portal);
         notifications.revokeDevice(principal.tenantId(), principal.userId(), verifiedPortal, deviceId);
         return ok("Notification device revoked", Map.of("revoked", true), request);
+    }
+
+    /** VAPID public key for PushManager.subscribe({applicationServerKey}); enabled=false when unconfigured. */
+    @GetMapping("/web-push-config")
+    public ApiResponse<WebPushConfigResponse> webPushConfig(HttpServletRequest request) {
+        security.principal();
+        return ok("Web push configuration loaded", notifications.webPushConfig(), request);
     }
 
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {

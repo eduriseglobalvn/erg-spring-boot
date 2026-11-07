@@ -1,0 +1,19 @@
+[Unit]
+Description=ERG Telegram ops bot
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=erg
+Group=docker
+EnvironmentFile=/opt/erg/bot/bot.env
+ExecStart=/opt/erg/bot/erg-ops-bot
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

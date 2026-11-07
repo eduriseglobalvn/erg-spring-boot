@@ -72,6 +72,17 @@ public interface UserRepository extends JpaRepository<User, String> {
             @Param("tenantId") String tenantId,
             @Param("ids") Collection<String> ids);
 
+    @Query("""
+            select u.id from User u
+            where u.tenantId = :tenantId
+              and (u.status is null or lower(u.status) = 'active')
+              and exists (
+                  select 1 from EmployeeProfile e
+                  where e.tenantId = :tenantId and e.userId = u.id and e.terminatedAt is null)
+            order by u.fullName asc, u.id asc
+            """)
+    List<String> findActiveStaffUserIds(@Param("tenantId") String tenantId, Pageable pageable);
+
     @Query("select u from User u where u.tenantId = :tenantId and u.id in :ids")
     List<User> findByTenantIdAndIdInAnyStatus(
             @Param("tenantId") String tenantId,
@@ -289,4 +300,54 @@ public interface UserRepository extends JpaRepository<User, String> {
     List<UserEffectivePermissionProjection> findOverrideEffectivePermissionsByUserIds(
             @Param("userIds") Collection<String> userIds
     );
+
+    /**
+     * Ids of ACTIVE users of the tenant who hold {@code permission} through a direct role, an active scoped role
+     * assignment or an unexpired grant override, and have no unexpired deny/revoke override for it. Mirrors
+     * EffectivePermissionResolver for one permission (a deny wins); the {@code *} wildcard is not expanded.
+     * Users whose employee profile says they had left before {@code date} or join after it are excluded; users
+     * without a profile are kept.
+     */
+    @Query(value = """
+            select u.id from users u
+            where u.tenant_id = :tenantId and upper(u.status) = 'ACTIVE'
+              and (exists (select 1 from user_roles ur
+                           join role_permissions rp on rp.role_id = ur.role_id
+                           join permissions p on p.id = rp.permission_id
+                           where ur.user_id = u.id and lower(p.name) = lower(:permission))
+                or exists (select 1 from user_role_assignments a
+                           join role_permissions rp on rp.role_id = a.role_id
+                           join permissions p on p.id = rp.permission_id
+                           where a.user_id = u.id and a.tenant_id = u.tenant_id and a.revoked_at is null
+                             and (a.expires_at is null or a.expires_at > now())
+                             and lower(p.name) = lower(:permission))
+                or exists (select 1 from user_permissions o
+                           where o.user_id = u.id and lower(trim(o.permission)) = lower(:permission)
+                             and (o.expires_at is null or o.expires_at > now())
+                             and lower(trim(coalesce(o.grant_type, ''))) in ('', 'grant', 'allow')))
+              and not exists (select 1 from user_permissions o
+                              where o.user_id = u.id and lower(trim(o.permission)) = lower(:permission)
+                                and (o.expires_at is null or o.expires_at > now())
+                                and lower(trim(coalesce(o.grant_type, ''))) not in ('', 'grant', 'allow'))
+              and not exists (select 1 from employee_profiles ep
+                              where ep.user_id = u.id and ep.tenant_id = u.tenant_id
+                                and (ep.terminated_at < :date or ep.joined_at > :date))
+            order by u.id
+            """, nativeQuery = true)
+    List<String> findActiveUserIdsHoldingPermission(@Param("tenantId") String tenantId,
+            @Param("permission") String permission, @Param("date") java.time.LocalDate date);
+
+    /** Ids of ACTIVE users of the tenant holding the role named {@code roleName} directly or by an active assignment. */
+    @Query(value = """
+            select u.id from users u
+            where u.tenant_id = :tenantId and upper(u.status) = 'ACTIVE'
+              and (exists (select 1 from user_roles ur join roles r on r.id = ur.role_id
+                           where ur.user_id = u.id and lower(r.name) = lower(:roleName))
+                or exists (select 1 from user_role_assignments a join roles r on r.id = a.role_id
+                           where a.user_id = u.id and a.tenant_id = u.tenant_id and a.revoked_at is null
+                             and (a.expires_at is null or a.expires_at > now())
+                             and lower(r.name) = lower(:roleName)))
+            order by u.id
+            """, nativeQuery = true)
+    List<String> findActiveUserIdsHoldingRole(@Param("tenantId") String tenantId, @Param("roleName") String roleName);
 }

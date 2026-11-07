@@ -39,6 +39,7 @@ public class CorsConfig implements WebMvcConfigurer {
             "X-Request-ID",
             "X-Trace-ID",
             "X-Idempotency-Key",
+            "Idempotency-Key",
             "X-Portal"
     };
 
@@ -48,6 +49,7 @@ public class CorsConfig implements WebMvcConfigurer {
             "X-Request-ID",
             "X-Trace-ID",
             "X-Idempotency-Key",
+            "Idempotency-Key",
             "X-XSRF-TOKEN"
     };
 

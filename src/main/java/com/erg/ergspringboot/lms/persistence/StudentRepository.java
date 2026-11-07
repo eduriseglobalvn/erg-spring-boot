@@ -28,6 +28,50 @@ public interface StudentRepository extends JpaRepository<Student, String> {
 
     List<Student> findByTenantIdAndAcademicClassIdOrderByFullNameAsc(String tenantId, String academicClassId);
 
+    /** Notification audiences: students with a login who are still on the roll (status vocabulary as in the risk query below). */
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId
+              and student.academicClassId in :academicClassIds
+              and student.authUserId is not null
+              and (student.status is null or lower(student.status) in ('active', 'enrolled'))
+            order by student.fullName asc
+            """)
+    List<Student> findAudienceStudentsInClasses(
+            String tenantId, Collection<String> academicClassIds, Pageable pageable);
+
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId
+              and student.authUserId is not null
+              and (student.status is null or lower(student.status) in ('active', 'enrolled'))
+            order by student.fullName asc
+            """)
+    List<Student> findAudienceStudents(String tenantId, Pageable pageable);
+
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId
+              and student.academicClassId in :academicClassIds
+              and student.authUserId in :authUserIds
+              and (student.status is null or lower(student.status) in ('active', 'enrolled'))
+            """)
+    List<Student> findAudienceStudentsInClassesAmong(
+            String tenantId, Collection<String> academicClassIds, Collection<String> authUserIds);
+
+    /** Lookup by code (upper-case), email (lower-case) or phone with spaces/dots/dashes removed. */
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId
+              and student.authUserId is not null
+              and (student.status is null or lower(student.status) in ('active', 'enrolled'))
+              and (upper(student.studentCode) in :codes
+                   or lower(student.email) in :emails
+                   or replace(replace(replace(student.phone, ' ', ''), '.', ''), '-', '') in :phones)
+            """)
+    List<Student> findAudienceStudentsByKeys(
+            String tenantId, Collection<String> codes, Collection<String> emails, Collection<String> phones);
+
     Optional<Student> findFirstByTenantIdAndAuthUserId(String tenantId, String authUserId);
 
     @Query(

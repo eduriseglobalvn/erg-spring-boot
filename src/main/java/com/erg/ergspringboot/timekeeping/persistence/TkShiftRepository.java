@@ -1,0 +1,34 @@
+package com.erg.ergspringboot.timekeeping.persistence;
+
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface TkShiftRepository extends JpaRepository<TkShift, String> {
+
+    List<TkShift> findByTenantIdAndSchoolIdOrderByStartTimeAsc(String tenantId, String schoolId);
+
+    List<TkShift> findByTenantIdAndSchoolIdAndActiveTrueOrderByStartTimeAsc(String tenantId, String schoolId);
+
+    Optional<TkShift> findByIdAndTenantId(String id, String tenantId);
+
+    boolean existsByTenantIdAndSchoolId(String tenantId, String schoolId);
+
+    List<TkShift> findByTenantId(String tenantId);
+
+    /** Tenants that configured at least one shift (read under maintenance by the daily close). */
+    @Query("select distinct s.tenantId from TkShift s order by s.tenantId")
+    List<String> findTenantIds();
+
+    /** Shifts of every tenant running on ISO weekday {@code weekday} whose end is in ({@code after}, {@code upTo}]. */
+    @Query(value = """
+            select * from tk_shifts
+            where active and :weekday = any(weekdays) and end_time > :after and end_time <= :upTo
+            order by tenant_id, id
+            """, nativeQuery = true)
+    List<TkShift> findEndingBetween(
+            @Param("weekday") int weekday, @Param("after") LocalTime after, @Param("upTo") LocalTime upTo);
+}

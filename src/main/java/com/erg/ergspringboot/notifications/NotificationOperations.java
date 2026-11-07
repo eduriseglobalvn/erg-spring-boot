@@ -30,6 +30,8 @@ public class NotificationOperations {
     public NotificationItemResponse detail(String tenant, String user, String portal, String id) { return notifications.detail(tenant, user, portal, id); }
     public MarkReadResponse markAllRead(String tenant, String user, String portal) { return notifications.markAllRead(tenant, user, portal); }
     public MarkReadResponse markRead(String tenant, String user, String portal, String id) { return notifications.markRead(tenant, user, portal, id); }
+    public AckResponse ack(String tenant, String user, String portal, String id) { return notifications.ack(tenant, user, portal, id); }
+    public WebPushConfigResponse webPushConfig() { return devices.webPushConfig(); }
     public ArchiveResponse archive(String tenant, String user, String portal, String id) { return notifications.archive(tenant, user, portal, id); }
     public List<NotificationPreferenceResponse> preferences(String tenant, String user, String portal) { return notifications.preferences(tenant, user, portal); }
     public List<NotificationPreferenceResponse> updatePreferences(String tenant, String user, String portal, List<PreferenceUpdateItemRequest> preferences) {

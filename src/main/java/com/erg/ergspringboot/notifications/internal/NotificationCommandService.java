@@ -36,6 +36,12 @@ public class NotificationCommandService {
             "deviceRegistrationId"
     );
 
+    public static final String CAMPAIGN_EVENT_TYPE = "CAMPAIGN";
+    public static final String CAMPAIGN_PORTAL = "lms";
+    /** Outbox payload marker: URGENT campaigns are pushed even to users who opted out of campaign pushes. */
+    public static final String BYPASS_PREFERENCES_KEY = "bypassPreferences";
+    private static final int BODY_PREVIEW_MAX = 500;
+
     private final NotificationMessageRepository messageRepository;
     private final NotificationRecipientRepository recipientRepository;
     private final NotificationDeviceRegistrationRepository deviceRepository;
@@ -159,6 +165,86 @@ public class NotificationCommandService {
         return new NotificationCommandResult(savedMessage.getId(), recipientCount, outboxCount);
     }
 
+    /** At most {@value #BODY_PREVIEW_MAX} chars, never cutting a surrogate pair (emoji) in half. */
+    static String bodyPreview(String body) {
+        if (body.length() <= BODY_PREVIEW_MAX) {
+            return body;
+        }
+        int end = Character.isHighSurrogate(body.charAt(BODY_PREVIEW_MAX - 1)) ? BODY_PREVIEW_MAX - 1 : BODY_PREVIEW_MAX;
+        return body.substring(0, end);
+    }
+
+    /** Campaign send: inbox is always on; push honours per-user opt-outs unless the campaign is URGENT. */
+    @Transactional
+    public NotificationCommandResult enqueueCampaign(CampaignDelivery delivery) {
+        boolean urgent = delivery.priority() == com.erg.ergspringboot.notifications.NotificationPriority.URGENT;
+        Map<String, String> data = new java.util.LinkedHashMap<>();
+        data.put("campaignId", delivery.campaignId());
+        data.put("priority", delivery.priority().name());
+        if (urgent) data.put(BYPASS_PREFERENCES_KEY, "true");
+        String preview = bodyPreview(delivery.body());
+        NotificationCommand command = new NotificationCommand(delivery.tenantId(), delivery.createdBy(), null,
+                CAMPAIGN_EVENT_TYPE, "notification_campaign", delivery.campaignId(), delivery.title(), preview,
+                null, delivery.priority().name(), CAMPAIGN_PORTAL, delivery.userIds(), null, data);
+        Set<String> userIds = normalizedUserIds(delivery.userIds());
+        Map<String, NotificationMessageEntity> messages = new java.util.LinkedHashMap<>();
+        for (String userId : userIds) {
+            NotificationMessageEntity message = new NotificationMessageEntity();
+            message.setTenantId(delivery.tenantId());
+            message.setEventType(CAMPAIGN_EVENT_TYPE);
+            message.setSourceType(command.sourceType());
+            message.setSourceId(delivery.campaignId());
+            message.setCampaignId(delivery.campaignId());
+            message.setTitle(delivery.title());
+            message.setBodyPreview(preview);
+            message.setPriority(delivery.priority().name());
+            message.setChannel(delivery.pushEnabled() ? "push" : "inbox");
+            message.setVisibility("private");
+            message.setCreatedBy(trimToNull(delivery.createdBy()));
+            message.setPayloadData(data);
+            messages.put(userId, message);
+        }
+        // Persist (not merge): ids are assigned by @PrePersist, so recipients are linked after saving.
+        messageRepository.saveAll(messages.values());
+        List<NotificationRecipientEntity> recipients = new ArrayList<>();
+        messages.forEach((userId, message) -> {
+            NotificationRecipientEntity recipient = new NotificationRecipientEntity();
+            recipient.setTenantId(delivery.tenantId());
+            recipient.setNotificationId(message.getId());
+            recipient.setUserId(userId);
+            recipient.setPortal(CAMPAIGN_PORTAL);
+            recipients.add(recipient);
+        });
+        recipientRepository.saveAll(recipients);
+
+        List<NotificationOutboxEntity> outboxes = new ArrayList<>();
+        if (delivery.pushEnabled() && !userIds.isEmpty()) {
+            // Devices register under the portal of the session that enabled push (students: elearning, teachers:
+            // lms, ...), so look across portals and honour the opt-out stored for that same portal.
+            Set<String> pushDisabled = new java.util.HashSet<>();
+            if (!urgent) {
+                preferenceRepository.findByTenantIdAndEventTypeAndUserIdIn(
+                                delivery.tenantId(), CAMPAIGN_EVENT_TYPE, userIds).stream()
+                        .filter(preference -> Boolean.FALSE.equals(preference.getPushEnabled()))
+                        .forEach(preference -> pushDisabled.add(preference.getUserId() + "|" + preference.getPortal()));
+            }
+            for (NotificationDeviceRegistrationEntity device : deviceRepository
+                    .findByTenantIdAndUserIdInAndEnabledTrue(delivery.tenantId(), userIds)) {
+                NotificationMessageEntity message = messages.get(device.getUserId());
+                if (message == null || pushDisabled.contains(device.getUserId() + "|" + device.getPortal())) continue;
+                NotificationCommand devicePortal = new NotificationCommand(command.tenantId(), command.createdBy(), null,
+                        command.eventType(), command.sourceType(), command.sourceId(), command.title(),
+                        command.bodyPreview(), null, command.priority(), device.getPortal(), command.userIds(), null,
+                        command.data());
+                NotificationOutboxEntity outbox = outboxForDevice(message, devicePortal, device);
+                if (outbox != null) outboxes.add(outbox);
+            }
+            if (!outboxes.isEmpty()) outboxRepository.saveAll(outboxes);
+        }
+        metrics.created(CAMPAIGN_EVENT_TYPE, CAMPAIGN_PORTAL, recipients.size(), outboxes.size());
+        return new NotificationCommandResult(delivery.campaignId(), recipients.size(), outboxes.size());
+    }
+
     private void validateTargets(Set<String> userIds, String topicName) {
         if (userIds.isEmpty() && topicName == null) {
             throw new BadRequestException("At least one notification userId or tenant-scoped topicName is required.");
@@ -220,28 +306,33 @@ public class NotificationCommandService {
         if (token == null && fid == null) {
             return null;
         }
+        Map<String, String> payload = payload(message, command, Map.of("deviceRegistrationId", device.getId()));
+        if ("WEB_PUSH".equals(device.getTransport())) {
+            // Endpoint and keys stay encrypted on the device row; the adapter loads them by device id.
+            return outbox(message, "web_push", device.getId(), payload, "vapid");
+        }
         String targetKind = token == null ? "fid" : "registration_token";
         String targetRef = token == null ? fid : tokenCipher.encrypt(token);
-        Map<String, String> payload = payload(message, command, Map.of("deviceRegistrationId", device.getId()));
-        return outbox(message, targetKind, targetRef, payload);
+        return outbox(message, targetKind, targetRef, payload, "firebase");
     }
 
     private NotificationOutboxEntity outboxForTopic(NotificationMessageEntity message, NotificationCommand command, String topicName) {
-        return outbox(message, "topic", topicName, payload(message, command, Map.of()));
+        return outbox(message, "topic", topicName, payload(message, command, Map.of()), "firebase");
     }
 
     private NotificationOutboxEntity outbox(
             NotificationMessageEntity message,
             String targetKind,
             String targetRef,
-            Map<String, String> payload
+            Map<String, String> payload,
+            String provider
     ) {
         NotificationOutboxEntity outbox = new NotificationOutboxEntity();
         outbox.setTenantId(message.getTenantId());
         outbox.setNotificationId(message.getId());
         outbox.setTargetKind(targetKind);
         outbox.setTargetRef(targetRef);
-        outbox.setProvider("firebase");
+        outbox.setProvider(provider);
         outbox.setPayload(payload);
         outbox.setStatus("pending");
         outbox.setAttemptCount(0);

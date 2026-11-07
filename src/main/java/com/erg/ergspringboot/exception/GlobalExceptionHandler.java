@@ -194,10 +194,14 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    private static final java.util.regex.Pattern IDEMPOTENCY_CONSTRAINT =
+            java.util.regex.Pattern.compile("constraint \"?[A-Za-z0-9_]*idempotency[A-Za-z0-9_]*\"?", java.util.regex.Pattern.CASE_INSENSITIVE);
+
     private boolean mentionsIdempotencyConstraint(Throwable exception) {
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
             String message = cause.getMessage();
-            if (message != null && message.toLowerCase(java.util.Locale.ROOT).contains("idempotency")) {
+            // The constraint's own name only: the failed INSERT text also lists an idempotency_key column, which is not a retry.
+            if (message != null && IDEMPOTENCY_CONSTRAINT.matcher(message).find()) {
                 return true;
             }
             if (cause.getCause() == cause) {

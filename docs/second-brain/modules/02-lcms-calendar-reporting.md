@@ -260,7 +260,8 @@ GraphQL controller lặp lại quyền bằng `accessSupport.assertPermission(..
 | POST | `/api/v1/lcms/quizzes/{quizId}/validate` | `:108` | LcmsQuizUpdate | Validate trước publish |
 | POST | `/api/v1/lcms/quizzes/{quizId}/publish` | `:118` | LcmsQuizPublish | Publish |
 | POST | `/api/v1/lcms/quizzes/{quizId}/versions/{versionId}/fork` | `:134` | LcmsQuizCreate | Fork version |
-| DELETE | `/api/v1/lcms/quizzes/{quizId}` | `:145` | LcmsQuizDelete | Xoá quiz |
+| PATCH | `/api/v1/lcms/quizzes/{quizId}` | `:147` | LcmsQuizUpdate | Đổi tên / loại (`title`, `kind`) |
+| DELETE | `/api/v1/lcms/quizzes/{quizId}` | `:158` | LcmsQuizDelete | Xoá quiz |
 | POST/PUT/DELETE | `/api/v1/lcms/questions[/{id}]` | `LcmsQuestionBankAuthoringController.java:29,43,58` | LcmsQuestion* | Tạo/sửa/archive câu hỏi |
 | POST | `/api/v1/lcms/media/presign` | `LcmsMediaController.java:56` | LcmsMediaWrite | Presign |
 | PUT | `/api/v1/lcms/media/upload/quiz-media/{tenantId}/{prefix}/{filename}` | `:35` | `@ReviewedPublicEndpoint` (URL ký) | Upload local |
