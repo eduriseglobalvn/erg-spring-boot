@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS tk_days (
     in_punch_id varchar(36) REFERENCES tk_punches(id),
     out_punch_id varchar(36) REFERENCES tk_punches(id),
     missing varchar(3) CHECK (missing IN ('IN', 'OUT')),
+    leave_kind varchar(20) CHECK (leave_kind IN ('ANNUAL', 'SICK', 'PAID_PERSONAL', 'UNPAID')),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT uq_tk_days_user_date UNIQUE (tenant_id, user_id, work_date)

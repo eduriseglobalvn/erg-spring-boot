@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 public interface TkHolidayRepository extends JpaRepository<TkHoliday, String> {
 
     /** Tenant-wide holidays (no school) plus the holidays of this school. */
+    List<TkHoliday> findByTenantIdAndHolidayDate(String tenantId, LocalDate holidayDate);
+
     @Query("""
             select h from TkHoliday h
             where h.tenantId = :tenantId and (h.schoolId is null or h.schoolId = :schoolId)

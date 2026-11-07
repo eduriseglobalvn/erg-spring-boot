@@ -289,4 +289,35 @@ public interface UserRepository extends JpaRepository<User, String> {
     List<UserEffectivePermissionProjection> findOverrideEffectivePermissionsByUserIds(
             @Param("userIds") Collection<String> userIds
     );
+
+    /**
+     * Ids of ACTIVE users of the tenant who hold {@code permission} through a direct role, an active scoped role
+     * assignment or an unexpired grant override, and have no unexpired deny/revoke override for it. Mirrors
+     * EffectivePermissionResolver for one permission (a deny wins); the {@code *} wildcard is not expanded.
+     */
+    @Query(value = """
+            select u.id from users u
+            where u.tenant_id = :tenantId and upper(u.status) = 'ACTIVE'
+              and (exists (select 1 from user_roles ur
+                           join role_permissions rp on rp.role_id = ur.role_id
+                           join permissions p on p.id = rp.permission_id
+                           where ur.user_id = u.id and lower(p.name) = lower(:permission))
+                or exists (select 1 from user_role_assignments a
+                           join role_permissions rp on rp.role_id = a.role_id
+                           join permissions p on p.id = rp.permission_id
+                           where a.user_id = u.id and a.tenant_id = u.tenant_id and a.revoked_at is null
+                             and (a.expires_at is null or a.expires_at > now())
+                             and lower(p.name) = lower(:permission))
+                or exists (select 1 from user_permissions o
+                           where o.user_id = u.id and lower(trim(o.permission)) = lower(:permission)
+                             and (o.expires_at is null or o.expires_at > now())
+                             and lower(trim(coalesce(o.grant_type, ''))) in ('', 'grant', 'allow')))
+              and not exists (select 1 from user_permissions o
+                              where o.user_id = u.id and lower(trim(o.permission)) = lower(:permission)
+                                and (o.expires_at is null or o.expires_at > now())
+                                and lower(trim(coalesce(o.grant_type, ''))) not in ('', 'grant', 'allow'))
+            order by u.id
+            """, nativeQuery = true)
+    List<String> findActiveUserIdsHoldingPermission(@Param("tenantId") String tenantId,
+            @Param("permission") String permission);
 }

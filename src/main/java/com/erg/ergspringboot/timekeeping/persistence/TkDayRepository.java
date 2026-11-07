@@ -9,6 +9,8 @@ public interface TkDayRepository extends JpaRepository<TkDay, String> {
 
     Optional<TkDay> findByTenantIdAndUserIdAndWorkDate(String tenantId, String userId, LocalDate workDate);
 
+    List<TkDay> findByTenantIdAndWorkDate(String tenantId, LocalDate workDate);
+
     List<TkDay> findByTenantIdAndUserIdAndWorkDateBetweenOrderByWorkDateAsc(
             String tenantId, String userId, LocalDate from, LocalDate to);
 }

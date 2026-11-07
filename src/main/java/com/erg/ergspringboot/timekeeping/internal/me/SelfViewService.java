@@ -15,6 +15,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingViews.ShiftView;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.SiteView;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.TodayView;
 import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
+import com.erg.ergspringboot.timekeeping.internal.request.LeaveBalanceService;
 import com.erg.ergspringboot.timekeeping.internal.evidence.FaceConsentService;
 import com.erg.ergspringboot.timekeeping.internal.evidence.PunchPhotoService;
 import com.erg.ergspringboot.timekeeping.internal.punch.PunchService;
@@ -65,11 +66,12 @@ public class SelfViewService {
     private final FaceConsentService consents;
     private final PunchPhotoService photos;
     private final CalendarReadPort calendar;
+    private final LeaveBalanceService leaveBalance;
     private final Clock clock;
 
     SelfViewService(WorkContextResolver context, TkPunchRepository punches, TkDayRepository days, TkSiteRepository sites,
             TkHolidayRepository holidays, TkRequestRepository requests, FaceConsentService consents,
-            PunchPhotoService photos, CalendarReadPort calendar, Clock clock) {
+            PunchPhotoService photos, CalendarReadPort calendar, LeaveBalanceService leaveBalance, Clock clock) {
         this.context = context;
         this.punches = punches;
         this.days = days;
@@ -79,6 +81,7 @@ public class SelfViewService {
         this.consents = consents;
         this.photos = photos;
         this.calendar = calendar;
+        this.leaveBalance = leaveBalance;
         this.clock = clock;
     }
 
@@ -124,10 +127,7 @@ public class SelfViewService {
         Optional<String> school = context.schoolOf(tenantId, userId);
         TkPolicy policy = context.policyFor(tenantId, school.orElse(""), from);
         BigDecimal standard = school.map(s -> standardUnits(tenantId, s, from, to)).orElse(BigDecimal.ZERO);
-        BigDecimal usedLeave = requests.sumApprovedAnnualLeaveDays(tenantId, userId,
-                LocalDate.of(period.getYear(), 1, 1), LocalDate.of(period.getYear(), 12, 31));
-        // shortcut: no seniority bonus yet, the leave balance service (T5) adds +1 per seniority step.
-        BigDecimal leaveRemaining = BigDecimal.valueOf(policy.getAnnualLeaveDays()).subtract(usedLeave);
+        BigDecimal leaveRemaining = leaveBalance.annualBalance(tenantId, userId, period.getYear());
         int lockDay = Math.min(policy.getLockDayOfMonth(), period.plusMonths(1).lengthOfMonth());
         return new MonthView(period.toString(), actual.setScale(1), standard.setScale(1), lateCount, lateMinutes,
                 leaveRemaining, requests.countByTenantIdAndUserIdAndStatus(tenantId, userId, RequestStatus.PENDING),

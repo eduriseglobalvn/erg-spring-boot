@@ -6,6 +6,8 @@ import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.notifications.NotificationAdminOperations;
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
+import com.erg.ergspringboot.users.persistence.EmployeeProfileRepository;
+import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,8 @@ class TimekeepingModuleTest {
     @MockitoBean UserAccessScopeRepository accessScopes;
     @MockitoBean ClusterJobLock jobLock;
     @MockitoBean ErgPolicyService policy;
+    @MockitoBean UserRepository users;
+    @MockitoBean EmployeeProfileRepository profiles;
 
     @Autowired
     private ApplicationContext context;

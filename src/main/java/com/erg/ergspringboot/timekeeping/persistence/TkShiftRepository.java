@@ -12,6 +12,12 @@ public interface TkShiftRepository extends JpaRepository<TkShift, String> {
 
     boolean existsByTenantIdAndSchoolId(String tenantId, String schoolId);
 
+    List<TkShift> findByTenantId(String tenantId);
+
+    /** Tenants that configured at least one shift (read under maintenance by the daily close). */
+    @Query("select distinct s.tenantId from TkShift s order by s.tenantId")
+    List<String> findTenantIds();
+
     /** Shifts of every tenant running on ISO weekday {@code weekday} whose end is in ({@code after}, {@code upTo}]. */
     @Query(value = """
             select * from tk_shifts

@@ -17,8 +17,13 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -61,6 +66,21 @@ public class WorkContextResolver {
                 .filter(unit -> shifts.existsByTenantIdAndSchoolId(tenantId, unit)
                         || sites.existsByTenantIdAndSchoolIdAndActiveTrue(tenantId, unit))
                 .findFirst();
+    }
+
+    /** {@link #schoolOf} for many people in three queries (daily close); people without a school are left out. */
+    public Map<String, String> schoolsOf(String tenantId, Collection<String> userIds) {
+        if (userIds.isEmpty()) return Map.of();
+        Set<String> configured = new HashSet<>();
+        shifts.findByTenantId(tenantId).forEach(shift -> configured.add(shift.getSchoolId()));
+        sites.findByTenantIdAndActiveTrue(tenantId).forEach(site -> configured.add(site.getSchoolId()));
+        Map<String, String> schools = new HashMap<>();
+        for (UserAccessScope scope : scopes.findByUserIdInOrderByCreatedAtAsc(userIds)) {
+            if (configured.contains(scope.getEducationUnitId())) {
+                schools.putIfAbsent(scope.getUserId(), scope.getEducationUnitId());
+            }
+        }
+        return schools;
     }
 
     public Optional<TkShift> shiftFor(String tenantId, String schoolId, LocalDate date) {

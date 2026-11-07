@@ -27,6 +27,8 @@ public interface TkPunchRepository extends JpaRepository<TkPunch, String> {
     List<TkPunch> findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(
             String tenantId, String userId, LocalDate workDate);
 
+    List<TkPunch> findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(String tenantId, LocalDate workDate);
+
     List<TkPunch> findByTenantIdAndUserIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(
             String tenantId, String userId, LocalDate from, LocalDate to);
 

@@ -2,6 +2,7 @@ package com.erg.ergspringboot.timekeeping.persistence;
 
 import com.erg.ergspringboot.model.BaseEntity;
 import com.erg.ergspringboot.timekeeping.DayStatus;
+import com.erg.ergspringboot.timekeeping.LeaveKind;
 import com.erg.ergspringboot.timekeeping.Missing;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -67,4 +68,9 @@ public class TkDay extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "missing")
     private Missing missing;
+
+    /** Kind of the approved leave behind LEAVE / SICK / HALF (paid vs unpaid on the sheet); null otherwise. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "leave_kind")
+    private LeaveKind leaveKind;
 }
