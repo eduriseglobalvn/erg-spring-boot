@@ -63,6 +63,7 @@ that the declared count is exact, and that all GraphQL fields are owned below.
 | `com.erg.ergspringboot.controller.sessions` | `auth` | `canonical` | authenticated; session owner or admin |
 | `com.erg.ergspringboot.controller.trending` | `platform-trending` | `prototype` | authenticated/admin; process-local state disabled in production |
 | `com.erg.ergspringboot.controller.users` | `users` | `canonical` | authenticated; tenant and scoped-role policy |
+| `com.erg.ergspringboot.timekeeping.web` | `timekeeping` | `canonical` | authenticated + timekeeping.self/approve/manage; tenant/school scope; server clock only; idempotency on punches |
 
 ## Status and persistence policy
 

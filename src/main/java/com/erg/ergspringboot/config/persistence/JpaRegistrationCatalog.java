@@ -31,6 +31,7 @@ public final class JpaRegistrationCatalog {
             owned("outbox", "auth", 1, 1),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
+            owned("timekeeping", 14, 14),
             owned("users", 19, 17)
     );
 
