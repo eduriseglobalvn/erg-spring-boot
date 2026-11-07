@@ -101,6 +101,11 @@ spring:
           starttls:
             enable: ${SPRING_MAIL_STARTTLS_ENABLED:${SMTP__STARTTLS:true}}
             required: ${SPRING_MAIL_STARTTLS_REQUIRED:false}
+  servlet:
+    multipart:
+      # A punch selfie may be 2 MB (PunchPhotoService.MAX_BYTES); the request adds a few small form fields.
+      max-file-size: 2MB
+      max-request-size: 3MB
   task:
     scheduling:
       pool:
@@ -348,6 +353,25 @@ erg:
     bucket-name: ${R2__BUCKET_NAME:}
     public-domain: ${R2__PUBLIC_DOMAIN:}
     region: ${R2__REGION:auto}
+  timekeeping:
+    photos:
+      # Punch selfies (private). Separate bucket from erg.r2 (that one is publicly served); no public domain.
+      # Must differ from erg.r2.bucket-name (startup check). Defence in depth: add an R2 lifecycle rule that
+      # expires objects under private/timekeeping/ after 61+ days, in case the purge job stops running.
+      r2:
+        enabled: ${TK_PHOTOS_R2__ENABLED:false}
+        endpoint: ${TK_PHOTOS_R2__ENDPOINT:}
+        access-key-id: ${SECRET_TK_PHOTOS_R2__ACCESS_KEY_ID:}
+        secret-key: ${SECRET_TK_PHOTOS_R2__SECRET_KEY:}
+        bucket-name: ${TK_PHOTOS_R2__BUCKET_NAME:}
+        region: ${TK_PHOTOS_R2__REGION:auto}
+      # Local/dev store when R2 is off. Blank secret = random per process (URLs die on restart, single instance only).
+      local-root: ${ERG_TK_PHOTOS_LOCAL_ROOT:.erg-private}
+      signing-secret: ${SECRET_TK_PHOTO_URL_SIGNING_KEY:}
+      retention-days: ${TK_PHOTOS_RETENTION_DAYS:60}
+      purge-cron: ${TK_PHOTOS_PURGE_CRON:0 30 3 * * *}
+    # Punch-out reminder sweep (Asia/Ho_Chi_Minh); reminds 10 minutes before a shift ends, deduped per person/day.
+    reminder-cron: ${TK_REMINDER_CRON:0 */5 * * * *}
   logging:
     mask-sensitive: ${ERG_LOGGING_MASK_SENSITIVE:true}
   graphql:
@@ -501,6 +525,11 @@ erg:
       credentials:
         # Production refuses to store FCM registration tokens in clear text.
         registration-token-encryption-required: ${NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_REQUIRED:true}
+  timekeeping:
+    photos:
+      r2:
+        # Selfies must live in the private bucket in production; missing TK_PHOTOS_R2__* fails startup.
+        enabled: ${TK_PHOTOS_R2__ENABLED:true}
 
 springdoc:
   api-docs:

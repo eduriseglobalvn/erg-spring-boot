@@ -12,6 +12,8 @@ public interface UserAccessScopeRepository extends JpaRepository<UserAccessScope
 
     List<UserAccessScope> findByUserIdOrderByCreatedAtAsc(String userId);
 
+    List<UserAccessScope> findByUserIdInOrderByCreatedAtAsc(java.util.Collection<String> userIds);
+
     @Query("""
             select distinct new com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection(
                 e.id,

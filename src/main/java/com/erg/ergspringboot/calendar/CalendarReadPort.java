@@ -7,7 +7,11 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOptionResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarWorkspaceResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /** Public read boundary for the Calendar Modulith module. */
 public interface CalendarReadPort {
@@ -57,5 +61,17 @@ public interface CalendarReadPort {
             String tenantId, String schoolId, String status, Integer page, Integer size);
 
     CalendarBatchDetailResponse teachingScheduleBatch(String tenantId, String batchId);
+
+    /**
+     * Published periods taught by {@code teacherUserId} on the Asia/Ho_Chi_Minh days {@code from}..{@code to}
+     * (inclusive), ordered by start. No principal: the caller has already decided the teacher may be read.
+     */
+    List<TeacherPeriod> teacherPeriods(String tenantId, String teacherUserId, LocalDate from, LocalDate to);
+
+    /**
+     * Which of {@code teacherUserIds} teach a published period starting in [{@code from}, {@code to}) — one query for
+     * a whole roster. No principal: the caller has already decided the teachers may be read.
+     */
+    Set<String> teachersWithPeriodStarting(String tenantId, Collection<String> teacherUserIds, Instant from, Instant to);
 
 }
