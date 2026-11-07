@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS tk_shifts (
     end_time time NOT NULL,
     work_units numeric(3,1) NOT NULL DEFAULT 1 CHECK (work_units > 0),
     weekdays integer[] NOT NULL CHECK (cardinality(weekdays) > 0 AND weekdays <@ ARRAY[1,2,3,4,5,6,7]),
-    -- false = retired (a shift already used by punches/days is deactivated, never deleted)
+    -- retired shifts (already used by punches/days) are deactivated, never deleted: active = false and
+    -- deactivated_at set; a shift applies to a day from its creation date until the day before deactivation
     active boolean NOT NULL DEFAULT true,
+    deactivated_at timestamp with time zone,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT ck_tk_shifts_time_order CHECK (end_time > start_time)

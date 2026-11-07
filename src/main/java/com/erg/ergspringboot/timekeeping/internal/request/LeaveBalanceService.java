@@ -15,7 +15,10 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Period;
-import java.util.Arrays;
+import com.erg.ergspringboot.timekeeping.persistence.TkShift;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -66,13 +69,14 @@ public class LeaveBalanceService {
         return annualBalance(tenantId, userId, year).subtract(pending);
     }
 
-    /** Leave days in {@code from..to} at the school: its shift weekdays minus its holidays (half a day for AM/PM). */
+    /** Leave days in {@code from..to} at the school: days with a shift in effect, minus holidays (half for AM/PM). */
     public BigDecimal countDays(String tenantId, String schoolId, LocalDate from, LocalDate to, DayPart part) {
-        Set<DayOfWeek> workdays = context.shiftsOf(tenantId, schoolId).stream()
-                .flatMap(shift -> Arrays.stream(shift.getWeekdays())).map(DayOfWeek::of).collect(Collectors.toSet());
-        Set<LocalDate> holidayDates = holidays.findForSchool(tenantId, schoolId, from, to).stream()
-                .map(TkHoliday::getHolidayDate).collect(Collectors.toSet());
-        return LeaveDayCounter.count(from, to, part, workdays, holidayDates);
+        List<TkShift> shifts = context.shiftsOf(tenantId, schoolId);
+        Set<LocalDate> offDays = holidays.findForSchool(tenantId, schoolId, from, to).stream()
+                .map(TkHoliday::getHolidayDate).collect(Collectors.toCollection(HashSet::new));
+        from.datesUntil(to.plusDays(1)).filter(d -> WorkContextResolver.shiftOn(shifts, d).isEmpty())
+                .forEach(offDays::add);
+        return LeaveDayCounter.count(from, to, part, EnumSet.allOf(DayOfWeek.class), offDays);
     }
 
     public BigDecimal entitlement(String tenantId, String userId, int year) {

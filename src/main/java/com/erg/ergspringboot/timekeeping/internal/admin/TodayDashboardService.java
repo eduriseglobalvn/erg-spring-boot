@@ -112,9 +112,11 @@ public class TodayDashboardService {
                         Collectors.toSet())));
         Set<String> onLeave = away.getOrDefault(RequestType.LEAVE, Set.of());
         Set<String> onBusiness = away.getOrDefault(RequestType.BUSINESS, Set.of());
-        // WFH people still punch (remotely), so only leave and business trips excuse a missing IN
+        // WFH people still punch (remotely), so only leave, business trips and a day without a shift excuse it
+        Set<String> working = schoolsWithShift(tenantId, schools, day);
         Set<String> notPunched = roster.stream()
-                .filter(u -> !presentAt.containsKey(u) && !onLeave.contains(u) && !onBusiness.contains(u))
+                .filter(u -> !presentAt.containsKey(u) && !onLeave.contains(u) && !onBusiness.contains(u)
+                        && working.contains(schoolOf.get(u)))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> periodSoon = periodSoon(tenantId, notPunched, day, now);
 
@@ -174,9 +176,13 @@ public class TodayDashboardService {
         Set<String> punchedIn = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, day).stream()
                 .filter(p -> p.getDirection() == PunchDirection.IN && p.getStatus() != PunchStatus.REJECTED)
                 .map(TkPunch::getUserId).collect(Collectors.toSet());
+        Map<String, String> schoolOf = context.schoolsOf(tenantId, known);
+        Set<String> working = schoolsWithShift(tenantId, new HashSet<>(schoolOf.values()), day);
         int sent = 0;
         for (String userId : wanted) {
-            if (!known.contains(userId) || punchedIn.contains(userId)) continue;
+            if (!known.contains(userId) || punchedIn.contains(userId) || !working.contains(schoolOf.get(userId))) {
+                continue;
+            }
             try {
                 notifications.send(tenantId, actorId, new AdminSendRequest("tk-remind:" + userId + ":" + day,
                         "TIMEKEEPING_PUNCH_REMINDER", "timekeeping_day", userId, "Nhắc chấm công",
@@ -194,6 +200,11 @@ public class TodayDashboardService {
         return new RecentPunch(p.getId(), p.getCode(), p.getUserId(), userName, p.getSchoolId(), siteName,
                 p.getServerTime(), p.getDirection(), p.getStatus(), Boolean.TRUE.equals(p.getRemote()),
                 p.getPhotoKey() != null);
+    }
+
+    /** Schools of {@code schools} with a shift in effect on {@code day} (one shift query per school). */
+    private Set<String> schoolsWithShift(String tenantId, Set<String> schools, LocalDate day) {
+        return schools.stream().filter(s -> context.shiftFor(tenantId, s, day).isPresent()).collect(Collectors.toSet());
     }
 
     private Set<String> configuredSchools(String tenantId) {

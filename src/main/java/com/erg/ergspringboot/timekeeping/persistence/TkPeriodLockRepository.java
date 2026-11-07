@@ -8,5 +8,7 @@ public interface TkPeriodLockRepository extends JpaRepository<TkPeriodLock, Stri
     /** A lock counts until an admin reopens it. */
     boolean existsByTenantIdAndSchoolIdAndPeriodAndReopenedAtIsNull(String tenantId, String schoolId, String period);
 
+    boolean existsByTenantIdAndPeriodAndReopenedAtIsNull(String tenantId, String period);
+
     Optional<TkPeriodLock> findByTenantIdAndSchoolIdAndPeriod(String tenantId, String schoolId, String period);
 }

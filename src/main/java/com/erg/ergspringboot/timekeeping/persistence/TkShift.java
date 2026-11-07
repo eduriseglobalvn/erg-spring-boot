@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -43,4 +44,7 @@ public class TkShift extends BaseEntity {
 
     @Column(name = "active", nullable = false)
     private Boolean active = true;
+
+    @Column(name = "deactivated_at")
+    private Instant deactivatedAt;
 }

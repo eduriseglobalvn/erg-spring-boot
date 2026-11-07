@@ -63,7 +63,11 @@ class PeriodLockServiceIT extends AdminITBase {
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
         assertThatThrownBy(() -> locks.lock(T, "admin", f.school(), "2026-1"))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-        assertThatThrownBy(() -> locks.lock(T, "admin", "school-of-another-tenant", "2026-10"))
+        jdbc.update("insert into education_units (id, tenant_id, name, slug, type, status, created_at, updated_at)"
+                + " values ('sch_lock_other', 'tk-lock-other', 'Khác', 'sch_lock_other', 'school', 'active', now(), now())");
+        assertThatThrownBy(() -> locks.lock(T, "admin", "sch_lock_other", "2026-10"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> locks.reopen(T, "admin", "sch_lock_other", "2026-10", "Lý do"))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 }

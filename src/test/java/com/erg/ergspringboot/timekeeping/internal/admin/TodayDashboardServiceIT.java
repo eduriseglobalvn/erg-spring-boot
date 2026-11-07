@@ -34,8 +34,9 @@ class TodayDashboardServiceIT extends AdminITBase {
     void seed() {
         jdbc.update("insert into education_units (id, tenant_id, name, slug, type, status, created_at, updated_at)"
                 + " values (?, ?, 'Cơ sở A', ?, 'school', 'active', now(), now())", SCHOOL, T, SCHOOL);
-        jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays)"
-                + " values ('shift_today', ?, ?, 'Ca sáng', '07:30', '11:30', 1.0, '{1,2,3,4,5}')", T, SCHOOL);
+        jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays,"
+                + " created_at) values ('shift_today', ?, ?, 'Ca sáng', '07:30', '11:30', 1.0, '{1,2,3,4,5}',"
+                + " '2020-01-01')", T, SCHOOL);
         for (int i = 0; i < 130; i++) teacher(T, u(i), SCHOOL, "Giáo viên " + i);
         for (int i = 0; i < 112; i++) { // IN at 07:mm with mm = i % 60
             String id = punch(T, SCHOOL, u(i), "IN", SEVEN_LOCAL.plusSeconds(60L * (i % 60)), i == 0 ? "FLAGGED" : "VALID");
@@ -80,6 +81,18 @@ class TodayDashboardServiceIT extends AdminITBase {
         assertThat(jdbc.queryForObject("select count(*) from tk_audit_log where tenant_id = ? and action = 'REVIEW_PUNCH'",
                 Integer.class, T)).isEqualTo(1);
         assertThat(dashboard.today(T, SCHOOL, TODAY).present()).isEqualTo(111);
+    }
+
+    @Test
+    void remindSkipsPeopleOfAnotherTenantUnknownIdsAndThoseWhoPunched() {
+        jdbc.update("insert into users (id, tenant_id, email, full_name, status, created_at, updated_at)"
+                + " values ('td_other', 'tk-today-other', 'td_other@example.test', 'Khác', 'active', now(), now())");
+
+        var result = dashboard.remind(T, "admin", java.util.List.of(u(115), u(3), "td_other", "nobody"));
+
+        assertThat(result.sent()).isEqualTo(1); // only u(115) has not punched in
+        assertThat(result.skipped()).isEqualTo(3);
+        org.mockito.Mockito.verify(notifications).send(eq(T), eq("admin"), any());
     }
 
     private static String u(int i) {

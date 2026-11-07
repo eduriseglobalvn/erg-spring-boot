@@ -4,7 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.exception.ApiException;
+import com.erg.ergspringboot.timekeeping.PunchStatus;
+import com.erg.ergspringboot.timekeeping.ReviewDecision;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PunchReviewCommand;
+import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
+import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ShiftCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteCommand;
 import com.erg.ergspringboot.timekeeping.internal.request.RequestServiceIT.Fixture;
@@ -25,6 +31,9 @@ class TimekeepingConfigServiceIT extends AdminITBase {
 
     @Autowired TimekeepingConfigService config;
     @Autowired SiteShiftConfigService sitesShifts;
+    @Autowired PunchReviewService reviews;
+    @Autowired DayAggregationService aggregation;
+    @Autowired WorkContextResolver context;
 
     private Fixture f;
 
@@ -77,6 +86,55 @@ class TimekeepingConfigServiceIT extends AdminITBase {
         assertThat(jdbc.queryForObject("select active from tk_shifts where id = ?", Boolean.class, saturday.id())).isFalse();
         assertThat(jdbc.queryForObject("select count(*) from tk_audit_log where tenant_id = ? and action = 'DEACTIVATE_SHIFT'",
                 Integer.class, T)).isEqualTo(1);
+    }
+
+    @Test
+    void aDeactivatedShiftStillRebuildsItsPastDaysButAppliesToNoLaterDay() {
+        LocalDate mon = LocalDate.of(2026, 11, 9);
+        String shiftId = "shift_" + f.school();
+        String punchId = punch(T, f.school(), f.teacher(), "IN", Instant.parse("2026-11-09T00:25:00Z"), "FLAGGED");
+        jdbc.update("update tk_punches set shift_id = ? where id = ?", shiftId, punchId);
+        aggregation.recompute(T, f.teacher(), mon);
+        flush();
+        Map<String, Object> before = dayRow(mon);
+        assertThat(before.get("status")).isNotEqualTo("OFF");
+
+        sitesShifts.deleteShift(T, "admin", shiftId); // used by the punch: deactivated on 12/11, not deleted
+        var accepted = reviews.review(T, "admin", punchId, new PunchReviewCommand(ReviewDecision.ACCEPT, null));
+        flush();
+
+        assertThat(accepted.status()).isEqualTo(PunchStatus.VALID);
+        assertThat(dayRow(mon)).isEqualTo(before); // the rebuilt past day keeps its shift
+        assertThat(context.shiftFor(T, f.school(), LocalDate.of(2026, 11, 11))).isPresent();
+        assertThat(context.shiftFor(T, f.school(), LocalDate.of(2026, 11, 12))).isEmpty();
+        assertThat(context.shiftFor(T, f.school(), LocalDate.of(2026, 11, 13))).isEmpty();
+        // a reviewed punch cannot be reviewed again
+        assertConflict(() -> reviews.review(T, "admin", punchId, new PunchReviewCommand(ReviewDecision.ACCEPT, null)));
+    }
+
+    @Test
+    void holidaysRespectLocksOfEverySchoolAndRebuildStoredDays() {
+        jdbc.update("insert into tk_period_locks (id, tenant_id, school_id, period, locked_at, locked_by)"
+                + " values ('lock-cf', ?, ?, '2026-10', now(), 'admin')", T, f.school());
+        LocalDate oct5 = LocalDate.of(2026, 10, 5);
+        assertConflict(() -> config.createHoliday(T, "admin", new HolidayCommand(f.school(), oct5, "Lễ")));
+        assertConflict(() -> config.createHoliday(T, "admin", new HolidayCommand(null, oct5, "Lễ"))); // tenant-wide
+
+        LocalDate tue = LocalDate.of(2026, 11, 10);
+        day(T, f.school(), f.teacher(), tue, "ABSENT_UNPAID", "0", 0, null);
+        config.createHoliday(T, "admin", new HolidayCommand(null, tue, "Nghỉ bù"));
+        flush();
+        assertThat(dayRow(tue).get("status")).isEqualTo("HOLIDAY");
+    }
+
+    private Map<String, Object> dayRow(LocalDate date) {
+        return jdbc.queryForMap("select status, work_units from tk_days where tenant_id = ? and user_id = ?"
+                + " and work_date = ?", T, f.teacher(), date);
+    }
+
+    private static void assertConflict(Runnable call) {
+        assertThatThrownBy(call::run)
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
     }
 
     private SiteCommand site(int radius) {

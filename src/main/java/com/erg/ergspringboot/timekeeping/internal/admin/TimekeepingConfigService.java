@@ -10,7 +10,11 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyVersions;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleConfig;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
+import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
+import com.erg.ergspringboot.timekeeping.persistence.TkDay;
+import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
+import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLockRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkHolidayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicyRepository;
@@ -47,9 +51,16 @@ public class TimekeepingConfigService {
     private final UserRepository users;
     private final WorkContextResolver context;
     private final AdminSupport support;
+    private final TkPeriodLockRepository locks;
+    private final TkDayRepository dayRows;
+    private final DayAggregationService aggregation;
 
     TimekeepingConfigService(TkShiftRepository shifts, TkPolicyRepository policies, TkHolidayRepository holidays,
-            TkRemoteRuleRepository remoteRules, UserRepository users, WorkContextResolver context, AdminSupport support) {
+            TkRemoteRuleRepository remoteRules, UserRepository users, WorkContextResolver context, AdminSupport support,
+            TkPeriodLockRepository locks, TkDayRepository dayRows, DayAggregationService aggregation) {
+        this.locks = locks;
+        this.dayRows = dayRows;
+        this.aggregation = aggregation;
         this.shifts = shifts;
         this.policies = policies;
         this.holidays = holidays;
@@ -124,10 +135,8 @@ public class TimekeepingConfigService {
         if (c == null || c.date() == null) throw AdminSupport.bad("DATE_REQUIRED", "Chọn ngày lễ");
         String name = AdminSupport.text(c.name(), 255, "NAME_REQUIRED", "Nhập tên ngày lễ");
         String schoolId = c.schoolId() == null || c.schoolId().isBlank() ? null : c.schoolId();
-        if (schoolId != null) {
-            support.requireSchool(tenantId, schoolId);
-            context.requireOpen(tenantId, schoolId, c.date());
-        }
+        if (schoolId != null) support.requireSchool(tenantId, schoolId);
+        requireOpen(tenantId, schoolId, c.date());
         if (holidays.existsByTenantIdAndSchoolIdAndHolidayDate(tenantId, schoolId, c.date())) {
             throw AdminSupport.conflict("HOLIDAY_EXISTS", "Ngày lễ này đã có");
         }
@@ -136,9 +145,10 @@ public class TimekeepingConfigService {
         row.setSchoolId(schoolId);
         row.setHolidayDate(c.date());
         row.setName(name);
-        HolidayConfig saved = holiday(holidays.save(row));
+        HolidayConfig saved = holiday(holidays.saveAndFlush(row));
         support.auditChange(tenantId, actorId, "CREATE_HOLIDAY", "HOLIDAY", saved.id(), null,
                 AdminSupport.summary(saved));
+        recomputeStoredDays(tenantId, schoolId, c.date());
         return saved;
     }
 
@@ -146,10 +156,30 @@ public class TimekeepingConfigService {
     public void deleteHoliday(String tenantId, String actorId, String id) {
         TkHoliday row = holidays.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> AdminSupport.notFound("Không tìm thấy ngày lễ"));
-        if (row.getSchoolId() != null) context.requireOpen(tenantId, row.getSchoolId(), row.getHolidayDate());
+        requireOpen(tenantId, row.getSchoolId(), row.getHolidayDate());
         holidays.delete(row);
+        holidays.flush();
+        recomputeStoredDays(tenantId, row.getSchoolId(), row.getHolidayDate());
         support.auditChange(tenantId, actorId, "DELETE_HOLIDAY", "HOLIDAY", id, AdminSupport.summary(holiday(row)),
                 null);
+    }
+
+    /** 409 PERIOD_LOCKED when the month is locked for the school, or (tenant-wide holiday) for any school. */
+    private void requireOpen(String tenantId, String schoolId, LocalDate date) {
+        if (schoolId != null) {
+            context.requireOpen(tenantId, schoolId, date);
+        } else if (locks.existsByTenantIdAndPeriodAndReopenedAtIsNull(tenantId, YearMonth.from(date).toString())) {
+            throw WorkContextResolver.periodLocked();
+        }
+    }
+
+    /** A holiday on a past or current day rebuilds the stored day rows it touches (the school, or every school). */
+    private void recomputeStoredDays(String tenantId, String schoolId, LocalDate date) {
+        if (date.isAfter(support.today())) return;
+        dayRows.findByTenantIdAndWorkDate(tenantId, date).stream()
+                .filter(d -> schoolId == null || schoolId.equals(d.getSchoolId()))
+                .map(TkDay::getUserId).distinct().toList()
+                .forEach(userId -> aggregation.recompute(tenantId, userId, date));
     }
 
     // ---- remote-work rules

@@ -121,7 +121,7 @@ class TimekeepingSelfControllerIT {
                 + " values ('scope_tk_it', ?, ?, 'lms.instructor', now(), now()) on conflict do nothing", TEACHER, SCHOOL);
         jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays,"
                 + " created_at, updated_at) values ('shift-tk-it', ?, ?, 'Ca sáng', '07:30', '11:30', 1.0,"
-                + " '{1,2,3,4,5}', now(), now())", TENANT, SCHOOL);
+                + " '{1,2,3,4,5}', '2020-01-01', now())", TENANT, SCHOOL);
         jdbc.update("insert into tk_sites (id, tenant_id, school_id, name, lat, lng, radius_m, active, created_at,"
                 + " updated_at) values ('site-tk-it', ?, ?, 'Cơ sở Cầu Giấy', 21.0285, 105.8542, 150, true, now(), now())",
                 TENANT, SCHOOL);

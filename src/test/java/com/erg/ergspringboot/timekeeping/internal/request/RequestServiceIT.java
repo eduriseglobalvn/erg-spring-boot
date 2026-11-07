@@ -570,8 +570,8 @@ public class RequestServiceIT {
                 jdbc.update("insert into user_roles (user_id, role_id) values (?, 'role_school_vice_principal')", vp);
             }
             jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays,"
-                    + " created_at, updated_at) values (?, ?, ?, 'Ca sáng', '07:30', '11:30', 1.0, '{1,2,3,4,5}', now(),"
-                    + " now())", "shift_" + f.school, tenant, f.school);
+                    + " created_at, updated_at) values (?, ?, ?, 'Ca sáng', '07:30', '11:30', 1.0, '{1,2,3,4,5}',"
+                    + " '2020-01-01', now())", "shift_" + f.school, tenant, f.school);
             return f;
         }
 

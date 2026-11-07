@@ -87,14 +87,28 @@ public class WorkContextResolver {
         return shiftOn(shiftsOf(tenantId, schoolId), date);
     }
 
+    /** Every shift of the school, retired ones included: resolve a day's shift with {@link #shiftOn}. */
     public List<TkShift> shiftsOf(String tenantId, String schoolId) {
-        return shifts.findByTenantIdAndSchoolIdAndActiveTrueOrderByStartTimeAsc(tenantId, schoolId);
+        return shifts.findByTenantIdAndSchoolIdOrderByStartTimeAsc(tenantId, schoolId);
     }
 
-    /** The school's shift for the date's ISO weekday, from a list already loaded with {@link #shiftsOf}. */
+    /**
+     * The school's shift in effect on {@code date}, from a list loaded with {@link #shiftsOf}: it runs on the date's
+     * ISO weekday, was created on or before the date and was not deactivated on or before it (Vietnam dates). So a
+     * retired shift still rebuilds its past days, and stops applying from its deactivation day.
+     */
     public static Optional<TkShift> shiftOn(List<TkShift> schoolShifts, LocalDate date) {
         int weekday = date.getDayOfWeek().getValue();
-        return schoolShifts.stream().filter(shift -> Arrays.asList(shift.getWeekdays()).contains(weekday)).findFirst();
+        return schoolShifts.stream().filter(shift -> inEffect(shift, date)
+                && Arrays.asList(shift.getWeekdays()).contains(weekday)).findFirst();
+    }
+
+    static boolean inEffect(TkShift shift, LocalDate date) {
+        boolean started = shift.getCreatedAt() == null
+                || !shift.getCreatedAt().atZoneSameInstant(ZONE).toLocalDate().isAfter(date);
+        boolean retired = shift.getDeactivatedAt() != null
+                && !date.isBefore(LocalDate.ofInstant(shift.getDeactivatedAt(), ZONE));
+        return started && !retired;
     }
 
     /** Falls back to the column defaults (tolerance 5, block 15, face required, ...) when nothing is configured. */

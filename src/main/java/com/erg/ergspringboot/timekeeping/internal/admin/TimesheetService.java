@@ -154,9 +154,9 @@ public class TimesheetService {
             work = work.add(day.getWorkUnits());
             periods += day.getPeriods();
             deduct += day.getDeductMinutes();
+            if (day.getLateMinutes() > 0) late++; // same rule as the today dashboard
             boolean unpaid = day.getLeaveKind() == LeaveKind.UNPAID;
             switch (day.getStatus()) {
-                case LATE_EARLY -> late++;
                 case LEAVE -> {
                     if (unpaid) kpKc = kpKc.add(BigDecimal.ONE);
                     else leave = leave.add(BigDecimal.ONE);

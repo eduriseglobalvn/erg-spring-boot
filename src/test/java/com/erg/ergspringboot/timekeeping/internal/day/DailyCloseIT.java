@@ -81,7 +81,7 @@ class DailyCloseIT {
                 + " values (?, ?, 'Trường chốt', 'truong-chot', 'school', 'active', now(), now())", SCHOOL, TENANT);
         jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays,"
                 + " created_at, updated_at) values ('shift-tk-close', ?, ?, 'Ca sáng', '07:30', '11:30', 1.0,"
-                + " '{1,2,3,4,5}', now(), now())", TENANT, SCHOOL);
+                + " '{1,2,3,4,5}', '2020-01-01', now())", TENANT, SCHOOL);
         staff("usr_tkc_a", "active", true);   // IN only
         staff("usr_tkc_b", "ACTIVE", false);  // role through a scoped assignment, nothing that day
         jdbc.update("insert into user_role_assignments (id, user_id, role_id, tenant_id, scope_type, assigned_by)"

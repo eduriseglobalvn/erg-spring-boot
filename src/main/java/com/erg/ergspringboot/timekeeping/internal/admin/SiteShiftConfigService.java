@@ -13,6 +13,7 @@ import com.erg.ergspringboot.timekeeping.persistence.TkSite;
 import com.erg.ergspringboot.timekeeping.persistence.TkSiteRepository;
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -147,11 +148,12 @@ public class SiteShiftConfigService {
         row.setEndTime(c.endTime());
         row.setWorkUnits(units.setScale(1));
         row.setWeekdays(weekdays);
-        row.setActive(active);
+        // a new shift is in effect from today (server clock), never retroactively
+        if (id == null) row.setCreatedAt(support.clock().instant().atOffset(ZoneOffset.UTC));
+        retire(row, !active);
         ShiftConfig saved = shift(shifts.save(row));
         support.auditChange(tenantId, actorId, id == null ? "CREATE_SHIFT" : "UPDATE_SHIFT", "SHIFT", saved.id(),
-                before,
-                AdminSupport.summary(saved));
+                before, AdminSupport.summary(saved));
         return saved;
     }
 
@@ -161,12 +163,19 @@ public class SiteShiftConfigService {
         boolean used = punches.existsByTenantIdAndShiftId(tenantId, id) || days.existsByTenantIdAndShiftId(tenantId, id)
                 || remoteRules.existsByTenantIdAndShiftId(tenantId, id);
         if (used) {
-            row.setActive(false);
+            retire(row, true);
         } else {
             shifts.delete(row);
         }
         support.auditChange(tenantId, actorId, used ? "DEACTIVATE_SHIFT" : "DELETE_SHIFT", "SHIFT", id,
                 AdminSupport.summary(shift(row)), null);
+    }
+
+    /** A retired shift keeps rebuilding the days before its deactivation day and applies to none after it. */
+    private void retire(TkShift row, boolean retired) {
+        if (retired && row.getDeactivatedAt() == null) row.setDeactivatedAt(support.clock().instant());
+        if (!retired) row.setDeactivatedAt(null);
+        row.setActive(!retired);
     }
 
     private static SiteConfig site(TkSite s) {
