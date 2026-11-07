@@ -356,6 +356,8 @@ erg:
       signing-secret: ${SECRET_TK_PHOTO_URL_SIGNING_KEY:}
       retention-days: ${TK_PHOTOS_RETENTION_DAYS:60}
       purge-cron: ${TK_PHOTOS_PURGE_CRON:0 30 3 * * *}
+    # Punch-out reminder sweep (Asia/Ho_Chi_Minh); reminds 10 minutes before a shift ends, deduped per person/day.
+    reminder-cron: ${TK_REMINDER_CRON:0 */5 * * * *}
   logging:
     mask-sensitive: ${ERG_LOGGING_MASK_SENSITIVE:true}
   graphql:

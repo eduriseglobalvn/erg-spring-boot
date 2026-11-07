@@ -7,6 +7,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOptionResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarWorkspaceResponse;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import java.time.LocalDate;
 import java.util.List;
 
 /** Public read boundary for the Calendar Modulith module. */
@@ -57,5 +58,11 @@ public interface CalendarReadPort {
             String tenantId, String schoolId, String status, Integer page, Integer size);
 
     CalendarBatchDetailResponse teachingScheduleBatch(String tenantId, String batchId);
+
+    /**
+     * Published periods taught by {@code teacherUserId} on the Asia/Ho_Chi_Minh days {@code from}..{@code to}
+     * (inclusive), ordered by start. No principal: the caller has already decided the teacher may be read.
+     */
+    List<TeacherPeriod> teacherPeriods(String tenantId, String teacherUserId, LocalDate from, LocalDate to);
 
 }

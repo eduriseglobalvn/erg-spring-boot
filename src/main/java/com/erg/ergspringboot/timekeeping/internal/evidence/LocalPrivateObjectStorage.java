@@ -7,6 +7,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.GeneralSecurityException;
@@ -15,6 +16,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.Optional;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
@@ -100,6 +102,27 @@ public final class LocalPrivateObjectStorage implements PrivateObjectStorage {
         return MessageDigest.isEqual(sign(key, exp).getBytes(StandardCharsets.US_ASCII),
                 sig.getBytes(StandardCharsets.US_ASCII));
     }
+
+    /**
+     * Bytes and content type of a stored photo, or empty when it does not exist. Call only after {@link #verify}.
+     * Refuses symlinks anywhere on the path: the real path must still sit under the real root.
+     */
+    public Optional<StoredPhoto> read(String key) {
+        Path target = resolve(key);
+        try {
+            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();
+            if (Files.isSymbolicLink(target) || !target.toRealPath().startsWith(root.toRealPath())) {
+                throw new IllegalArgumentException("invalid punch photo key");
+            }
+            String contentType = key.endsWith(".webp") ? "image/webp" : "image/jpeg";
+            return Optional.of(new StoredPhoto(Files.readAllBytes(target), contentType));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("cannot read punch photo", exception);
+        }
+    }
+
+    /** The extension was chosen from the image's magic bytes at upload, so it is the stored type. */
+    public record StoredPhoto(byte[] bytes, String contentType) {}
 
     private Path resolve(String key) {
         if (key == null || !key.startsWith(KEY_PREFIX) || key.contains("..") || key.contains("\\")

@@ -44,6 +44,38 @@ class LocalPrivateObjectStorageTest {
     }
 
     @Test
+    void readReturnsTheBytesWithTheTypeOfTheStoredExtension() {
+        LocalPrivateObjectStorage storage = storage(NOW);
+        storage.put(KEY, new byte[] {1, 2, 3}, "image/jpeg");
+        storage.put("private/timekeeping/tenant-a/2026/11/abc.webp", new byte[] {4}, "image/webp");
+
+        assertThat(storage.read(KEY)).hasValueSatisfying(photo -> {
+            assertThat(photo.bytes()).containsExactly(1, 2, 3);
+            assertThat(photo.contentType()).isEqualTo("image/jpeg");
+        });
+        assertThat(storage.read("private/timekeeping/tenant-a/2026/11/abc.webp").orElseThrow().contentType())
+                .isEqualTo("image/webp");
+        assertThat(storage.read("private/timekeeping/tenant-a/2026/11/missing.jpg")).isEmpty();
+        assertThatThrownBy(() -> storage.read("private/timekeeping/../../secret.jpg"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void readRefusesASymlinkThatLeavesTheRoot(@TempDir Path outside) throws Exception {
+        Path secret = Files.writeString(outside.resolve("secret.jpg"), "secret");
+        Path link = root.resolve("private/timekeeping/tenant-a/2026/11/link.jpg");
+        Files.createDirectories(link.getParent());
+        try {
+            Files.createSymbolicLink(link, secret);
+        } catch (UnsupportedOperationException | java.io.IOException | SecurityException noSymlinks) {
+            org.junit.jupiter.api.Assumptions.abort("symlinks are not available here: " + noSymlinks);
+        }
+
+        assertThatThrownBy(() -> storage(NOW).read("private/timekeeping/tenant-a/2026/11/link.jpg"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void traversalAbsoluteAndBackslashKeysAreRejected() {
         LocalPrivateObjectStorage storage = storage(NOW);
         for (String bad : new String[] {

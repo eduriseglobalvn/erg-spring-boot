@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.timekeeping.persistence;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,6 +21,28 @@ public interface TkPunchRepository extends JpaRepository<TkPunch, String> {
     }
 
     Optional<TkPunch> findByIdAndTenantId(String id, String tenantId);
+
+    Optional<TkPunch> findByTenantIdAndUserIdAndIdempotencyKey(String tenantId, String userId, String idempotencyKey);
+
+    List<TkPunch> findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(
+            String tenantId, String userId, LocalDate workDate);
+
+    List<TkPunch> findByTenantIdAndUserIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(
+            String tenantId, String userId, LocalDate from, LocalDate to);
+
+    /** People of one shift and day who have a non-rejected IN but no non-rejected OUT yet. */
+    @Query(value = """
+            select distinct p.user_id from tk_punches p
+            where p.tenant_id = :tenantId and p.shift_id = :shiftId and p.work_date = :workDate
+              and p.direction = 'IN' and p.status <> 'REJECTED'
+              and not exists (
+                  select 1 from tk_punches o
+                  where o.tenant_id = p.tenant_id and o.user_id = p.user_id and o.work_date = p.work_date
+                    and o.direction = 'OUT' and o.status <> 'REJECTED')
+            order by p.user_id
+            """, nativeQuery = true)
+    List<String> findUsersInWithoutOut(@Param("tenantId") String tenantId, @Param("shiftId") String shiftId,
+            @Param("workDate") LocalDate workDate);
 
     /** Punches holding a photo taken before {@code cutoff}, keyset-paged by id so a backlog loads in bounded batches. */
     @Query(value = """

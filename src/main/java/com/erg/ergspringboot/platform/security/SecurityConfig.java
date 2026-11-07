@@ -182,6 +182,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/crm/**")
                         .access((auth, context) -> permissions.require("crm.deal.manage", auth, context))
                         .requestMatchers(HttpMethod.PUT, "/api/v1/lcms/media/upload/quiz-media/**").permitAll()
+                        // Dev punch-photo file: the HMAC-signed, 5-minute URL is the authorisation (no session).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/timekeeping/photos/file").permitAll()
                         .requestMatchers("/api/v1/ai-content/keys/**")
                         .access((auth, context) -> permissions.require("api-keys.manage", auth, context))
                         .requestMatchers("/api/v1/ai-content/**")

@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 559
+  route-count: 566
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -885,6 +885,46 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: required-for-collections
+    - route: GET /api/v1/timekeeping/me/clock => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.clock
+      classification: persistent-read
+      statement-budget: 0
+      row-budget: 1
+      payload-budget-bytes: 4096
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/me/days/{date} => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.day
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 200
+      payload-budget-bytes: 262144
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/me/month => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.month
+      classification: persistent-read
+      statement-budget: 20
+      row-budget: 1000
+      payload-budget-bytes: 524288
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/me/today => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.today
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 200
+      payload-budget-bytes: 262144
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/photos/file => com.erg.ergspringboot.timekeeping.web.TimekeepingPhotoFileController.photo
+      classification: external-io
+      statement-budget: 0
+      row-budget: 1
+      payload-budget-bytes: 2097152
+      state-owner: configured-media-storage
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/learning-outcomes/attainments => com.erg.ergspringboot.controller.learningoutcomes.LearningOutcomesController.recordAttainment
       classification: persistent-write
       statement-budget: 12
@@ -4096,6 +4136,22 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: POST /api/v1/timekeeping/me/face-consent => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.faceConsent
+      classification: persistent-write
+      statement-budget: 2
+      row-budget: 1
+      payload-budget-bytes: 4096
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/me/punches => com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.punch
+      classification: persistent-write
+      statement-budget: 30
+      row-budget: 200
+      payload-budget-bytes: 3145728
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/trending/discover => com.erg.ergspringboot.controller.trending.TrendingBotController.trendingJob
       classification: process-local-stub
       disposition: disable-in-prod

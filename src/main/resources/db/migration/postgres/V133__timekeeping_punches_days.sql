@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS tk_punches (
     reason varchar(500),
     photo_key varchar(512),
     photo_purged_at timestamp with time zone,
-    idempotency_key varchar(64) NOT NULL,
+    idempotency_key varchar(100) NOT NULL,
     review_decision varchar(10) CHECK (review_decision IN ('ACCEPT', 'REJECT')),
     reviewed_by varchar(36),
     reviewed_at timestamp with time zone,

@@ -1183,6 +1183,32 @@
         },
         "type": "object"
       },
+      "ApiResponseClockView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ClockView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseCommandResult": {
         "properties": {
           "data": {
@@ -1707,6 +1733,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/CurriculumTreeResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseDayDetailView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DayDetailView"
           },
           "errors": {},
           "message": {
@@ -3110,6 +3162,32 @@
         },
         "type": "object"
       },
+      "ApiResponseMonthView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MonthView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNotificationItemResponse": {
         "properties": {
           "data": {
@@ -3504,6 +3582,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PublishResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePunchResult": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PunchResult"
           },
           "errors": {},
           "message": {
@@ -4150,6 +4254,32 @@
         },
         "type": "object"
       },
+      "ApiResponseTodayView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TodayView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseTokenResponse": {
         "properties": {
           "data": {
@@ -4206,6 +4336,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/UnreadCountResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseUpdateQuizResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UpdateQuizResponse"
           },
           "errors": {},
           "message": {
@@ -6201,6 +6357,15 @@
         },
         "type": "object"
       },
+      "ClockView": {
+        "properties": {
+          "serverTime": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CommandResult": {
         "properties": {
           "id": {
@@ -7997,6 +8162,102 @@
         },
         "type": "object"
       },
+      "DayDetailView": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "earlyMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "explanationsRemaining": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "in": {
+            "$ref": "#/components/schemas/DayPunchView"
+          },
+          "lateMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "missing": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "missingReason": {
+            "type": "string"
+          },
+          "out": {
+            "$ref": "#/components/schemas/DayPunchView"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodView"
+            },
+            "type": "array"
+          },
+          "punches": {
+            "items": {
+              "$ref": "#/components/schemas/DayPunchView"
+            },
+            "type": "array"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/ShiftView"
+          },
+          "status": {
+            "enum": [
+              "FULL",
+              "LATE_EARLY",
+              "HALF",
+              "LEAVE",
+              "SICK",
+              "BUSINESS",
+              "MISSING_PUNCH",
+              "ABSENT_UNPAID",
+              "HOLIDAY",
+              "OFF"
+            ],
+            "type": "string"
+          },
+          "suggestedOut": {
+            "type": "string"
+          },
+          "units": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "DayPunchView": {
+        "properties": {
+          "photoPurged": {
+            "type": "boolean"
+          },
+          "photoUrl": {
+            "type": "string"
+          },
+          "punch": {
+            "$ref": "#/components/schemas/PunchView"
+          }
+        },
+        "type": "object"
+      },
       "DeadLetterReplayResponse": {
         "properties": {
           "requeued": {
@@ -9625,6 +9886,85 @@
         },
         "type": "object"
       },
+      "MonthDayView": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "FULL",
+              "LATE_EARLY",
+              "HALF",
+              "LEAVE",
+              "SICK",
+              "BUSINESS",
+              "MISSING_PUNCH",
+              "ABSENT_UNPAID",
+              "HOLIDAY",
+              "OFF"
+            ],
+            "type": "string"
+          },
+          "units": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "MonthView": {
+        "properties": {
+          "actualUnits": {
+            "type": "number"
+          },
+          "annualLeaveRemaining": {
+            "type": "number"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/MonthDayView"
+            },
+            "type": "array"
+          },
+          "lateCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lateMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "pendingRequests": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "period": {
+            "type": "string"
+          },
+          "periods": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "reviewUntil": {
+            "format": "date",
+            "type": "string"
+          },
+          "standardUnits": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "NotificationItemResponse": {
         "properties": {
           "actionUrl": {
@@ -10024,6 +10364,28 @@
         },
         "type": "object"
       },
+      "PeriodView": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "room": {
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PermissionBindingResponse": {
         "properties": {
           "description": {
@@ -10379,6 +10741,83 @@
           "versionNumber": {
             "format": "int32",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PunchResult": {
+        "properties": {
+          "alreadyPunched": {
+            "type": "boolean"
+          },
+          "messageVi": {
+            "type": "string"
+          },
+          "minutesVsShift": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "nextPeriod": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "punch": {
+            "$ref": "#/components/schemas/PunchView"
+          },
+          "verdict": {
+            "enum": [
+              "VALID",
+              "FLAGGED",
+              "PENDING_REVIEW",
+              "REJECTED"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PunchView": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "distanceM": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "serverTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "VALID",
+              "FLAGGED",
+              "PENDING_REVIEW",
+              "REJECTED"
+            ],
+            "type": "string"
           }
         },
         "type": "object"
@@ -11730,6 +12169,26 @@
         },
         "type": "object"
       },
+      "ShiftView": {
+        "properties": {
+          "end": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "workUnits": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "SignatureBlock": {
         "properties": {
           "algorithm": {
@@ -11743,6 +12202,29 @@
           },
           "signature": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SiteView": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lat": {
+            "format": "double",
+            "type": "number"
+          },
+          "lng": {
+            "format": "double",
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "radiusM": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -12209,6 +12691,62 @@
         },
         "type": "object"
       },
+      "TodayView": {
+        "properties": {
+          "allowOutside": {
+            "type": "boolean"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "expectedOut": {
+            "type": "string"
+          },
+          "faceConsented": {
+            "type": "boolean"
+          },
+          "in": {
+            "$ref": "#/components/schemas/PunchView"
+          },
+          "maxAccuracyM": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "out": {
+            "$ref": "#/components/schemas/PunchView"
+          },
+          "periodLocked": {
+            "type": "boolean"
+          },
+          "periods": {
+            "items": {
+              "$ref": "#/components/schemas/PeriodView"
+            },
+            "type": "array"
+          },
+          "remote": {
+            "type": "boolean"
+          },
+          "requireFace": {
+            "type": "boolean"
+          },
+          "serverTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "shift": {
+            "$ref": "#/components/schemas/ShiftView"
+          },
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/SiteView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "TokenResponse": {
         "properties": {
           "accessToken": {
@@ -12645,6 +13183,35 @@
             "type": "object"
           },
           "teaching_philosophy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateQuizRequest": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateQuizResponse": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "quizId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -17947,6 +18514,44 @@
         "tags": [
           "lcms-quiz-authoring-controller"
         ]
+      },
+      "patch": {
+        "operationId": "update_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quizId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateQuizRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUpdateQuizResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lcms-quiz-authoring-controller"
+        ]
       }
     },
     "/api/v1/lcms/quizzes/{quizId}/bundle": {
@@ -22343,6 +22948,277 @@
         },
         "tags": [
           "session-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/clock": {
+      "get": {
+        "operationId": "clock",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseClockView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/days/{date}": {
+      "get": {
+        "operationId": "day",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDayDetailView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/face-consent": {
+      "post": {
+        "operationId": "faceConsent",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/month": {
+      "get": {
+        "operationId": "month",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMonthView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/punches": {
+      "post": {
+        "operationId": "punch",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": true,
+            "schema": {
+              "enum": [
+                "IN",
+                "OUT"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lat",
+            "required": false,
+            "schema": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lng",
+            "required": false,
+            "schema": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accuracyM",
+            "required": false,
+            "schema": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mockReported",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "photo": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePunchResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/today": {
+      "get": {
+        "operationId": "today",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTodayView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/photos/file": {
+      "get": {
+        "operationId": "photo",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exp",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sig",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [],
+        "tags": [
+          "timekeeping-photo-file-controller"
         ]
       }
     },
