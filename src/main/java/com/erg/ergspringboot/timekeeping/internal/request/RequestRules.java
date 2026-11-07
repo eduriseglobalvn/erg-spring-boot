@@ -4,6 +4,7 @@ import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.DayStatus;
 import com.erg.ergspringboot.timekeeping.ExplanationReason;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
+import com.erg.ergspringboot.timekeeping.Missing;
 import com.erg.ergspringboot.timekeeping.RequestType;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
@@ -175,13 +176,20 @@ class RequestRules {
         TkDay day = days.findByTenantIdAndUserIdAndWorkDate(r.getTenantId(), r.getUserId(), date)
                 .filter(d -> d.getStatus() == DayStatus.MISSING_PUNCH)
                 .orElseThrow(() -> unprocessable("NOT_MISSING_PUNCH", "Ngày này không thiếu chấm công"));
+        // An approved explanation can only stand in for a missing OUT (proposed_out); a missing IN is never repaired.
+        if (day.getMissing() != Missing.OUT) {
+            throw unprocessable("MISSING_IN_NOT_EXPLAINABLE", "Ngày này thiếu chấm vào nên không giải trình được."
+                    + " Hãy gửi đơn nghỉ phép hoặc đơn công tác (làm việc bên ngoài) cho ngày này");
+        }
         YearMonth month = YearMonth.from(date);
         long used = requests.countActiveExplanations(r.getTenantId(), r.getUserId(), month.atDay(1), month.atEndOfMonth());
         if (used >= policy.getExplanationsPerMonth()) {
             throw unprocessable("EXPLANATION_LIMIT",
                     "Đã dùng hết " + policy.getExplanationsPerMonth() + " lượt giải trình tháng này");
         }
-        if (r.getProposedOut() != null) checkProposedOut(r, day);
+        // every reason needs the OUT time, else approval would change nothing and still use up a monthly explanation
+        if (r.getProposedOut() == null) throw unprocessable("PROPOSED_OUT_REQUIRED", "Chọn giờ ra đề nghị");
+        checkProposedOut(r, day);
     }
 
     /** Inside the OUT punch window (shift start .. shift end + 60 min) and after the IN punch. */

@@ -113,6 +113,28 @@ class TimekeepingConfigServiceIT extends AdminITBase {
     }
 
     @Test
+    void editingTheHoursOfAShiftUsedByDaysRetiresItAndCreatesANewRowFromToday() {
+        String shiftId = "shift_" + f.school();
+        LocalDate mon = LocalDate.of(2026, 11, 9);
+        day(T, f.school(), f.teacher(), mon, "FULL", "1.0", 0, null);
+        jdbc.update("update tk_days set shift_id = ? where tenant_id = ?", shiftId, T);
+
+        var edited = sitesShifts.saveShift(T, "admin", shiftId, new ShiftCommand(f.school(), "Ca sáng",
+                LocalTime.of(8, 0), LocalTime.of(11, 30), BigDecimal.ONE, List.of(1, 2, 3, 4, 5), true));
+        flush();
+
+        assertThat(edited.id()).isNotEqualTo(shiftId);
+        assertThat(context.shiftFor(T, f.school(), mon)).get().extracting(s -> s.getStartTime())
+                .isEqualTo(LocalTime.of(7, 30)); // past days keep the old hours
+        assertThat(context.shiftFor(T, f.school(), LocalDate.of(2026, 11, 13))).get().extracting(s -> s.getId())
+                .isEqualTo(edited.id());
+        // the new row is not used by any day yet, so editing it again stays in place
+        assertThat(sitesShifts.saveShift(T, "admin", edited.id(), new ShiftCommand(f.school(), "Ca chính",
+                LocalTime.of(8, 0), LocalTime.of(11, 30), BigDecimal.ONE, List.of(1, 2, 3, 4, 5), true)).id())
+                .isEqualTo(edited.id());
+    }
+
+    @Test
     void holidaysRespectLocksOfEverySchoolAndRebuildStoredDays() {
         jdbc.update("insert into tk_period_locks (id, tenant_id, school_id, period, locked_at, locked_by)"
                 + " values ('lock-cf', ?, ?, '2026-10', now(), 'admin')", T, f.school());

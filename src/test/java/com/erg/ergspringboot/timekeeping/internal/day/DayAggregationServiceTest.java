@@ -85,6 +85,15 @@ class DayAggregationServiceTest {
     }
 
     @Test
+    void recomputeTakesThePerUserDayLockBeforeReadingAnything() {
+        recompute();
+
+        var order = org.mockito.Mockito.inOrder(requests, punches);
+        order.verify(requests).lockSubmitsOf("tk-day:" + T + ":" + U + ":" + DAY);
+        order.verify(punches).findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(T, U, DAY);
+    }
+
+    @Test
     void approvedUnpaidLeaveIsLeaveNotAbsent() {
         approved(leave(LeaveKind.UNPAID, DayPart.FULL));
 

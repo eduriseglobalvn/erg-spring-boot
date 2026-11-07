@@ -1,9 +1,9 @@
 package com.erg.ergspringboot.timekeeping.internal.evidence;
 
-import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunch;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
 import java.net.URI;
@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -51,10 +52,10 @@ public class PunchPhotoService {
 
     /** Returns the private key; the type comes from the bytes, never from a client header. */
     public String storePunchPhoto(String tenantId, String userId, byte[] photo) {
-        if (photo == null || photo.length == 0) throw new BadRequestException("Ảnh không hợp lệ");
-        if (photo.length > MAX_BYTES) throw new BadRequestException("Ảnh tối đa 2 MB");
+        if (photo == null || photo.length == 0) throw invalidPhoto("Ảnh không hợp lệ");
+        if (photo.length > MAX_BYTES) throw invalidPhoto("Ảnh tối đa 2 MB");
         String extension = isJpeg(photo) ? "jpg" : isWebp(photo) ? "webp" : null;
-        if (extension == null) throw new BadRequestException("Ảnh không hợp lệ");
+        if (extension == null) throw invalidPhoto("Ảnh không hợp lệ");
         if (tenantId == null || !SAFE_TENANT.matcher(tenantId).matches()) {
             throw new IllegalArgumentException("tenant id is not usable in a storage key");
         }
@@ -92,6 +93,10 @@ public class PunchPhotoService {
         }
         if (punch.getPhotoKey() == null) return Optional.empty();
         return Optional.of(storage.presignGet(punch.getPhotoKey(), URL_TTL));
+    }
+
+    private static TimekeepingException invalidPhoto(String messageVi) {
+        return new TimekeepingException(HttpStatus.BAD_REQUEST, "INVALID_PHOTO", messageVi);
     }
 
     private static boolean isJpeg(byte[] b) {

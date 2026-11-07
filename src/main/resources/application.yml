@@ -101,6 +101,11 @@ spring:
           starttls:
             enable: ${SPRING_MAIL_STARTTLS_ENABLED:${SMTP__STARTTLS:true}}
             required: ${SPRING_MAIL_STARTTLS_REQUIRED:false}
+  servlet:
+    multipart:
+      # A punch selfie may be 2 MB (PunchPhotoService.MAX_BYTES); the request adds a few small form fields.
+      max-file-size: 2MB
+      max-request-size: 3MB
   task:
     scheduling:
       pool:

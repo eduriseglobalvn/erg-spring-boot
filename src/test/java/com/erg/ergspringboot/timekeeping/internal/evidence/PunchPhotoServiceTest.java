@@ -12,10 +12,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunch;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
 import java.net.URI;
@@ -45,7 +45,7 @@ class PunchPhotoServiceTest {
         byte[] big = jpeg((int) (2.5 * 1024 * 1024));
 
         assertThatThrownBy(() -> service.storePunchPhoto(TENANT, "u1", big))
-                .isInstanceOf(BadRequestException.class)
+                .isInstanceOf(TimekeepingException.class)
                 .hasMessage("Ảnh tối đa 2 MB");
         verify(storage, never()).put(anyString(), any(), anyString());
     }
@@ -54,7 +54,7 @@ class PunchPhotoServiceTest {
     void exactlyTwoMegabytesIsAcceptedAndOneMoreByteIsRejected() {
         assertThat(service.storePunchPhoto(TENANT, "u1", jpeg(TWO_MB))).endsWith(".jpg");
         assertThatThrownBy(() -> service.storePunchPhoto(TENANT, "u1", jpeg(TWO_MB + 1)))
-                .isInstanceOf(BadRequestException.class)
+                .isInstanceOf(TimekeepingException.class)
                 .hasMessage("Ảnh tối đa 2 MB");
     }
 
@@ -84,13 +84,14 @@ class PunchPhotoServiceTest {
         byte[] text = "not really a jpg".getBytes(StandardCharsets.UTF_8);
 
         assertThatThrownBy(() -> service.storePunchPhoto(TENANT, "u1", png))
-                .isInstanceOf(BadRequestException.class).hasMessage("Ảnh không hợp lệ");
+                .isInstanceOfSatisfying(TimekeepingException.class, e -> assertThat(e.getCode()).isEqualTo("INVALID_PHOTO"))
+                .hasMessage("Ảnh không hợp lệ");
         assertThatThrownBy(() -> service.storePunchPhoto(TENANT, "u1", text))
-                .isInstanceOf(BadRequestException.class).hasMessage("Ảnh không hợp lệ");
+                .isInstanceOf(TimekeepingException.class).hasMessage("Ảnh không hợp lệ");
         assertThatThrownBy(() -> service.storePunchPhoto(TENANT, "u1", new byte[0]))
-                .isInstanceOf(BadRequestException.class);
+                .isInstanceOf(TimekeepingException.class);
         assertThatThrownBy(() -> service.storePunchPhoto(TENANT, "u1", null))
-                .isInstanceOf(BadRequestException.class);
+                .isInstanceOf(TimekeepingException.class);
         verify(storage, never()).put(anyString(), any(), anyString());
     }
 

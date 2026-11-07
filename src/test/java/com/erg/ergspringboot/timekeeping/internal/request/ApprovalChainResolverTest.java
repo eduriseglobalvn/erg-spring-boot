@@ -51,10 +51,9 @@ class ApprovalChainResolverTest {
         manager("lead-1");
         when(users.findActiveUserIdsHoldingRole(T, "school.vice_principal")).thenReturn(List.of("vp-1"));
         when(users.findActiveUserIdsHoldingPermission(eq(T), eq("timekeeping.approve"), any()))
-                .thenReturn(List.of("approver-other-school", "approver-1"));
+                .thenReturn(List.of("approver-other-school", "approver-1", "lead-1", "vp-1", "vp-2"));
         when(users.findActiveUserIdsHoldingPermission(eq(T), eq("timekeeping.manage"), any()))
                 .thenReturn(List.of("admin-1"));
-        inSchool("lead-1", SCHOOL);
         inSchool("vp-1", SCHOOL);
         inSchool("approver-1", SCHOOL);
         inSchool("approver-other-school", "school-2");
@@ -88,7 +87,16 @@ class ApprovalChainResolverTest {
         manager(null);
 
         assertThat(resolver.resolve(T, SCHOOL, REQUESTER, RequestType.WFH, BigDecimal.ONE))
-                .containsExactly(new ChainStep(1, "MANAGER", List.of("approver-1"), false));
+                .containsExactly(new ChainStep(1, "MANAGER", List.of("approver-1", "vp-1"), false));
+    }
+
+    @Test
+    void aManagerWithoutTheApprovePermissionFallsBackToTheSchoolsApproveHolders() {
+        manager("lead-no-approve");
+        inSchool("lead-no-approve", SCHOOL);
+
+        assertThat(resolver.resolve(T, SCHOOL, REQUESTER, RequestType.WFH, BigDecimal.ONE))
+                .containsExactly(new ChainStep(1, "MANAGER", List.of("approver-1", "vp-1"), false));
     }
 
     @Test
@@ -97,7 +105,7 @@ class ApprovalChainResolverTest {
         inSchool("gone-1", SCHOOL);
 
         assertThat(resolver.resolve(T, SCHOOL, REQUESTER, RequestType.WFH, BigDecimal.ONE).get(0).approverIds())
-                .containsExactly("approver-1");
+                .containsExactly("approver-1", "vp-1");
     }
 
     @Test
@@ -115,7 +123,7 @@ class ApprovalChainResolverTest {
 
         assertThat(resolver.resolve(T, SCHOOL, REQUESTER, RequestType.WFH, BigDecimal.ONE)).containsExactly(
                 new ChainStep(1, "MANAGER", List.of(), true),
-                new ChainStep(2, "ESCALATION", List.of("approver-1"), false));
+                new ChainStep(2, "ESCALATION", List.of("approver-1", "vp-1"), false));
 
         when(users.findActiveUserIdsHoldingPermission(eq(T), eq("timekeeping.approve"), any())).thenReturn(List.of(REQUESTER));
         inSchool(REQUESTER, SCHOOL);
@@ -137,7 +145,7 @@ class ApprovalChainResolverTest {
 
         when(users.findActiveUserIdsHoldingRole(T, "school.vice_principal")).thenReturn(List.of());
         assertThat(resolver.resolve(T, SCHOOL, REQUESTER, RequestType.BUSINESS, BigDecimal.ONE).get(1).approverIds())
-                .containsExactly("approver-1");
+                .containsExactly("approver-1", "vp-1", "vp-2");
     }
 
     @Test

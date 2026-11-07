@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +29,8 @@ import tools.jackson.databind.ObjectMapper;
  * ({@code {"LEAVE":[{"minDays":0,"steps":["MANAGER"]},...]}}: the entry with the greatest {@code minDays} not above
  * the requested days), else the built-in defaults. {@code MANAGER} = the requester's {@code EmployeeProfile.managerId}
  * when that user is active; {@code SCHOOL_ROLE:X} = active holders of role {@code school.x} in the school (all of them
- * hold the step). A step with nobody falls back to the school's {@code timekeeping.approve} holders. The requester never
+ * hold the step). Only holders of {@code timekeeping.approve} in the tenant are kept, since nobody else can call the
+ * approval API. A step with nobody falls back to the school's {@code timekeeping.approve} holders. The requester never
  * approves their own request: such a step is SKIPPED. When every step is skipped, one ESCALATION step goes to another
  * approve holder of the school, else to the tenant's {@code timekeeping.manage} holders; if still nobody, every step
  * stays skipped and the caller refuses the request.
@@ -94,7 +96,8 @@ public class ApprovalChainResolver {
         List<ChainStep> steps = new ArrayList<>();
         int stepNo = 1;
         for (String resolver : resolvers(context.policyFor(tenantId, schoolId, today).getApprovalChains(), type, days)) {
-            List<String> candidates = candidates(tenantId, schoolId, requesterId, resolver);
+            List<String> candidates =
+                    holders.canApprove(candidates(tenantId, schoolId, requesterId, resolver), requesterId);
             List<String> approvers = without(candidates.isEmpty() ? holders.approve() : candidates, requesterId);
             steps.add(new ChainStep(stepNo++, resolver, approvers, approvers.isEmpty()));
         }
@@ -175,6 +178,7 @@ public class ApprovalChainResolver {
         private final String schoolId;
         private final LocalDate today;
         private List<String> approve;
+        private Set<String> tenantApprove;
 
         Holders(String tenantId, String schoolId, LocalDate today) {
             this.tenantId = tenantId;
@@ -183,10 +187,21 @@ public class ApprovalChainResolver {
         }
 
         List<String> approve() {
-            if (approve == null) {
-                approve = inSchool(users.findActiveUserIdsHoldingPermission(tenantId, APPROVE, today), schoolId);
-            }
+            if (approve == null) approve = inSchool(List.copyOf(tenantApprove()), schoolId);
             return approve;
+        }
+
+        /** The ids that hold approve anywhere in the tenant; the requester is kept so their own step is skipped. */
+        List<String> canApprove(List<String> ids, String requesterId) {
+            if (ids.isEmpty()) return ids;
+            return ids.stream().filter(id -> id.equals(requesterId) || tenantApprove().contains(id)).toList();
+        }
+
+        private Set<String> tenantApprove() {
+            if (tenantApprove == null) {
+                tenantApprove = new LinkedHashSet<>(users.findActiveUserIdsHoldingPermission(tenantId, APPROVE, today));
+            }
+            return tenantApprove;
         }
     }
 

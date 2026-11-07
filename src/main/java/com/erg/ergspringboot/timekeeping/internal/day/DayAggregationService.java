@@ -27,6 +27,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -111,6 +112,7 @@ public class DayAggregationService {
     /** @param evenIfLocked true only for an explicit admin recompute of a reopened or locked period (T6). */
     @Transactional
     public void recompute(String tenantId, String userId, LocalDate date, boolean evenIfLocked) {
+        lockDay(tenantId, userId, date);
         List<TkPunch> dayPunches = punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date);
         String schoolId = schoolOf(dayPunches).or(() -> context.schoolOf(tenantId, userId)).orElse(null);
         if (schoolId == null) return;
@@ -136,6 +138,29 @@ public class DayAggregationService {
      * person is logged and skipped. Re-running gives the same rows. Returns the number of rows written.
      */
     public int closeDay(String tenantId, LocalDate date) {
+        return closeDay(tenantId, date, null);
+    }
+
+    /**
+     * Closes every day of {@code month} for one school, before its period lock (I1): the nightly close may not have
+     * reached the last day yet, or may have missed a night. The caller locks only afterwards, so nothing is skipped.
+     */
+    public void closeMonth(String tenantId, String schoolId, YearMonth month) {
+        for (LocalDate date = month.atDay(1); !date.isAfter(month.atEndOfMonth()); date = date.plusDays(1)) {
+            closeDay(tenantId, date, schoolId);
+        }
+    }
+
+    /**
+     * Serialises recomputes of one (user, day) until commit, so a stale snapshot never overwrites a newer one (M1).
+     * shortcut: closeDay does not take it (one lock per person per day would exhaust the lock table for a month
+     * close); take it there too, or upsert, if the 00:30 close is seen racing approvals.
+     */
+    private void lockDay(String tenantId, String userId, LocalDate date) {
+        requests.lockSubmitsOf("tk-day:" + tenantId + ":" + userId + ":" + date);
+    }
+
+    private int closeDay(String tenantId, LocalDate date, String onlySchoolId) {
         Map<String, List<TkPunch>> punchesByUser = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, date)
                 .stream().collect(Collectors.groupingBy(TkPunch::getUserId, LinkedHashMap::new, Collectors.toList()));
         Set<String> people = new LinkedHashSet<>(users.findActiveUserIdsHoldingPermission(tenantId, SELF_PERMISSION, date));
@@ -153,7 +178,7 @@ public class DayAggregationService {
             try {
                 List<TkPunch> dayPunches = punchesByUser.getOrDefault(userId, List.of());
                 String schoolId = schoolOf(dayPunches).orElse(schoolOf.get(userId));
-                if (schoolId == null) continue;
+                if (schoolId == null || (onlySchoolId != null && !onlySchoolId.equals(schoolId))) continue;
                 SchoolDay school = schools.computeIfAbsent(schoolId, id -> schoolDay(tenantId, id, date,
                         dayHolidays.stream().filter(h -> h.getSchoolId() == null || h.getSchoolId().equals(id)).toList()));
                 if (school.locked()) continue;

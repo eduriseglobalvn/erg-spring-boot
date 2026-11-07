@@ -116,8 +116,8 @@ public class SiteShiftConfigService {
     @Transactional
     public ShiftConfig saveShift(String tenantId, String actorId, String id, ShiftCommand c) {
         if (c == null) throw AdminSupport.bad("BODY_REQUIRED", "Thiếu dữ liệu");
-        TkShift row = id == null ? new TkShift() : shifts.findByIdAndTenantId(id, tenantId).orElseThrow(shiftNotFound());
-        Map<String, Object> before = id == null ? null : AdminSupport.summary(shift(row));
+        TkShift existing = id == null ? null : shifts.findByIdAndTenantId(id, tenantId).orElseThrow(shiftNotFound());
+        Map<String, Object> before = existing == null ? null : AdminSupport.summary(shift(existing));
         support.requireSchool(tenantId, c.schoolId());
         String name = AdminSupport.text(c.name(), 255, "NAME_REQUIRED", "Nhập tên ca");
         if (c.startTime() == null || c.endTime() == null || c.startTime().isBefore(EARLIEST_START)
@@ -134,10 +134,21 @@ public class SiteShiftConfigService {
         }
         Integer[] weekdays = c.weekdays().stream().distinct().sorted().toArray(Integer[]::new);
         boolean active = c.active() == null || c.active();
+        TkShift row = existing == null ? new TkShift() : existing;
+        boolean revives = existing != null && active && existing.getDeactivatedAt() != null;
+        if (revives || (existing != null && rewritesHistory(existing, c, units, weekdays)
+                && days.existsByTenantIdAndShiftId(tenantId, existing.getId()))) {
+            // days built on this row keep it, and a retired row never comes back (it would cover its retired days):
+            // the edit becomes a new row in effect from today
+            retire(existing, true);
+            shifts.save(existing);
+            row = new TkShift();
+        }
+        String rowId = row.getId();
         if (active) {
             List<Integer> mine = Arrays.asList(weekdays);
             boolean overlaps = shifts.findByTenantIdAndSchoolIdAndActiveTrueOrderByStartTimeAsc(tenantId, c.schoolId())
-                    .stream().filter(s -> !s.getId().equals(row.getId()))
+                    .stream().filter(s -> !s.getId().equals(rowId))
                     .anyMatch(s -> Arrays.stream(s.getWeekdays()).anyMatch(mine::contains));
             if (overlaps) throw AdminSupport.conflict("SHIFT_OVERLAP", "Mỗi ngày trong tuần chỉ có một ca");
         }
@@ -149,11 +160,11 @@ public class SiteShiftConfigService {
         row.setWorkUnits(units.setScale(1));
         row.setWeekdays(weekdays);
         // a new shift is in effect from today (server clock), never retroactively
-        if (id == null) row.setCreatedAt(support.clock().instant().atOffset(ZoneOffset.UTC));
+        if (row != existing) row.setCreatedAt(support.clock().instant().atOffset(ZoneOffset.UTC));
         retire(row, !active);
         ShiftConfig saved = shift(shifts.save(row));
-        support.auditChange(tenantId, actorId, id == null ? "CREATE_SHIFT" : "UPDATE_SHIFT", "SHIFT", saved.id(),
-                before, AdminSupport.summary(saved));
+        String action = existing == null ? "CREATE_SHIFT" : row == existing ? "UPDATE_SHIFT" : "REPLACE_SHIFT";
+        support.auditChange(tenantId, actorId, action, "SHIFT", saved.id(), before, AdminSupport.summary(saved));
         return saved;
     }
 
@@ -169,6 +180,13 @@ public class SiteShiftConfigService {
         }
         support.auditChange(tenantId, actorId, used ? "DEACTIVATE_SHIFT" : "DELETE_SHIFT", "SHIFT", id,
                 AdminSupport.summary(shift(row)), null);
+    }
+
+    /** Anything but the name changes how the row's past days are rebuilt. */
+    private static boolean rewritesHistory(TkShift row, ShiftCommand c, BigDecimal units, Integer[] weekdays) {
+        return !c.schoolId().equals(row.getSchoolId()) || !c.startTime().equals(row.getStartTime())
+                || !c.endTime().equals(row.getEndTime()) || units.compareTo(row.getWorkUnits()) != 0
+                || !Arrays.equals(weekdays, row.getWeekdays());
     }
 
     /** A retired shift keeps rebuilding the days before its deactivation day and applies to none after it. */

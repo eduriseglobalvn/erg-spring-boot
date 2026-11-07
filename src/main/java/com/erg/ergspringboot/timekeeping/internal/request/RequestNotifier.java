@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class RequestNotifier {
 
     static final String REQUESTER_URL = "/teacher/timekeeping/requests?id=";
-    static final String APPROVER_URL = "/admin/employees/teacher-absence?id=";
+    static final String APPROVER_URL = "/teacher/timekeeping/approvals?id=";
     private static final Logger log = LoggerFactory.getLogger(RequestNotifier.class);
 
     private final NotificationAdminOperations notifications;

@@ -2,6 +2,7 @@ package com.erg.ergspringboot.timekeeping.internal.admin;
 
 import com.erg.ergspringboot.timekeeping.PeriodStage;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PeriodLockView;
+import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLock;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLockRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
@@ -13,8 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Locks / reopens a school's month. Locking needs the month to be over and no PENDING request touching it (409
- * "Còn n đơn chưa duyệt trong kỳ"); locking twice is a no-op. Reopening needs a reason and is audited; once
- * reopened, punches, approvals and recomputes reach the month again (they all check the open lock row).
+ * "Còn n đơn chưa duyệt trong kỳ"); locking twice is a no-op. Before the lock row is written every day of the month
+ * is closed for the school, so no provisional row (IN without OUT, no row for an absence) is frozen. Reopening
+ * needs a reason and is audited; once reopened, punches, approvals and recomputes reach the month again (they all check the open lock row).
  */
 @Service
 public class PeriodLockService {
@@ -22,11 +24,14 @@ public class PeriodLockService {
     private final TkPeriodLockRepository locks;
     private final TkRequestRepository requests;
     private final AdminSupport support;
+    private final DayAggregationService days;
 
-    PeriodLockService(TkPeriodLockRepository locks, TkRequestRepository requests, AdminSupport support) {
+    PeriodLockService(TkPeriodLockRepository locks, TkRequestRepository requests, AdminSupport support,
+            DayAggregationService days) {
         this.locks = locks;
         this.requests = requests;
         this.support = support;
+        this.days = days;
     }
 
     @Transactional
@@ -42,6 +47,7 @@ public class PeriodLockService {
         if (pending > 0) {
             throw AdminSupport.conflict("PENDING_REQUESTS", "Còn " + pending + " đơn chưa duyệt trong kỳ");
         }
+        days.closeMonth(tenantId, schoolId, month);
         if (row == null) {
             row = new TkPeriodLock();
             row.setTenantId(tenantId);

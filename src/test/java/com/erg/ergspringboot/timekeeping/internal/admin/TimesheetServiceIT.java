@@ -78,7 +78,7 @@ class TimesheetServiceIT extends AdminITBase {
 
     @Test
     void theRosterHoldsSelfHoldersOfTheSchoolPlusAnyoneWithRows() {
-        assertThat(sheets.timesheet(T, f.school(), "2026-11", null, null, 0, 50).total()).isEqualTo(3); // 2 VPs + teacher
+        assertThat(sheets.timesheet(T, f.school(), "2026-11", null, null, 0, 50).total()).isEqualTo(4); // 2 VPs + lead + teacher
     }
 
     private static LocalDate nov(int d) {

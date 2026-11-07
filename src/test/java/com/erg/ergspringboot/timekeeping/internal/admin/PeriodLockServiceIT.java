@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.erg.ergspringboot.exception.ApiException;
 import com.erg.ergspringboot.timekeeping.PeriodStage;
 import com.erg.ergspringboot.timekeeping.internal.request.RequestServiceIT.Fixture;
+import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,20 @@ class PeriodLockServiceIT extends AdminITBase {
                 + " 'REOPEN_PERIOD'", String.class, T)).isEqualTo("Sửa công của cô Lan");
         assertThat(jdbc.queryForObject("select count(*) from tk_period_locks where tenant_id = ? and reopened_at is null",
                 Integer.class, T)).isZero();
+    }
+
+    @Test
+    void lockingClosesTheMonthFirstSoAnInWithoutOutIsFrozenAsAMissingPunch() {
+        String in = punch(T, f.school(), f.teacher(), "IN", Instant.parse("2026-10-30T00:25:00Z"), "VALID");
+        day(T, f.school(), f.teacher(), LocalDate.of(2026, 10, 30), "FULL", "1.0", 0, null); // provisional row
+        jdbc.update("update tk_days set in_punch_id = ? where tenant_id = ?", in, T);
+
+        locks.lock(T, "admin", f.school(), "2026-10");
+        flush();
+
+        assertThat(jdbc.queryForMap("select status, missing from tk_days where tenant_id = ? and user_id = ?"
+                + " and work_date = ?", T, f.teacher(), LocalDate.of(2026, 10, 30)))
+                .containsEntry("status", "MISSING_PUNCH").containsEntry("missing", "OUT");
     }
 
     @Test

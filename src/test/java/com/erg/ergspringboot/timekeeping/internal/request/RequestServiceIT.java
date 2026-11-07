@@ -225,6 +225,22 @@ public class RequestServiceIT {
     }
 
     @Test
+    void aDayMissingItsInCannotBeExplainedAndEveryReasonNeedsTheProposedOut() {
+        LocalDate yesterday = LocalDate.of(2026, 11, 11);
+        missingOut(yesterday);
+        jdbc.update("update tk_days set missing = 'IN' where tenant_id = ? and work_date = ?", TENANT, yesterday);
+
+        assertError(() -> submit(explain(yesterday, LocalTime.of(11, 30))), HttpStatus.UNPROCESSABLE_CONTENT,
+                "Ngày này thiếu chấm vào nên không giải trình được. Hãy gửi đơn nghỉ phép hoặc đơn công tác"
+                        + " (làm việc bên ngoài) cho ngày này");
+
+        LocalDate twoDaysAgo = LocalDate.of(2026, 11, 10); // missing OUT
+        missingOut(twoDaysAgo);
+        assertError(() -> submit(new RequestCommand(RequestType.EXPLANATION, null, null, null, null, twoDaysAgo, null,
+                ExplanationReason.OUTSIDE, "Họp ở sở")), HttpStatus.UNPROCESSABLE_CONTENT, "Chọn giờ ra đề nghị");
+    }
+
+    @Test
     void approvingTheLastStepApprovesRecomputesEachDayAndAnotherApprovalConflicts() {
         RequestView sent = submit(leave(LeaveKind.ANNUAL, MON, TUE, DayPart.FULL));
 
@@ -367,7 +383,7 @@ public class RequestServiceIT {
     void nobodyToApproveIsRefused() {
         Fixture lonely = Fixture.seed(jdbc, TENANT, "x");
         jdbc.update("update employee_profiles set manager_id = null where user_id = ?", lonely.teacher);
-        jdbc.update("delete from user_roles where user_id in (?, ?)", lonely.vp, lonely.vp2);
+        jdbc.update("delete from user_roles where user_id in (?, ?, ?)", lonely.lead, lonely.vp, lonely.vp2);
 
         assertError(() -> requests.submit(TENANT, lonely.teacher, requests.create(TENANT, lonely.teacher,
                 leave(LeaveKind.SICK, MON, MON, DayPart.FULL)).id()), HttpStatus.UNPROCESSABLE_CONTENT,
@@ -551,7 +567,7 @@ public class RequestServiceIT {
         }
     }
 
-    /** A school with a Mon–Fri shift, a teacher (manager = lead, joined 01/08/2016) and two vice principals. */
+    /** A school with a Mon–Fri shift, a teacher (manager = lead, a teacher lead, joined 01/08/2016) and two vice principals. */
     public record Fixture(String school, String teacher, String lead, String vp, String vp2) {
 
         public static Fixture seed(JdbcTemplate jdbc, String tenant, String sfx) {
@@ -566,6 +582,8 @@ public class RequestServiceIT {
             }
             jdbc.update("insert into employee_profiles (id, tenant_id, user_id, employee_code, joined_at, manager_id)"
                     + " values (?, ?, ?, ?, '2016-08-01', ?)", "ep_" + f.teacher, tenant, f.teacher, "E" + f.teacher, f.lead);
+            // the manager must hold timekeeping.approve to be given the MANAGER step (teacher lead role)
+            jdbc.update("insert into user_roles (user_id, role_id) values (?, 'role_lms_teacher_lead')", f.lead);
             for (String vp : List.of(f.vp, f.vp2)) {
                 jdbc.update("insert into user_roles (user_id, role_id) values (?, 'role_school_vice_principal')", vp);
             }
