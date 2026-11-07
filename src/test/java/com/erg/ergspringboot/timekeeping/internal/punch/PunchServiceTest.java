@@ -163,7 +163,7 @@ class PunchServiceTest {
     }
 
     @Test
-    void inThatAppearsBeforeTheCounterLockIsReturnedAsAlreadyPunchedWithoutUpload() {
+    void inThatAppearsBeforeTheCounterLockDiscardsTheUploadedPhotoAndIsAlreadyPunched() {
         when(codes.next(T, DAY)).thenAnswer(call -> {
             todays.add(punch("p-race", PunchDirection.IN, PunchStatus.VALID, "CC-121126-0001"));
             return "CC-121126-0002";
@@ -174,8 +174,19 @@ class PunchServiceTest {
         assertThat(result.alreadyPunched()).isTrue();
         assertThat(result.punch().id()).isEqualTo("p-race");
         verify(punches, never()).saveAndFlush(any());
-        verify(photos, never()).storePunchPhoto(any(), any(), any());
+        verify(photos).discardPhoto(PHOTO_KEY);
         verify(days, never()).recompute(any(), any(), any());
+    }
+
+    @Test
+    void photoIsUploadedBeforeTheCounterLockIsTaken() {
+        service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(photos, codes, punches);
+        order.verify(photos).storePunchPhoto(T, U, PHOTO);
+        order.verify(codes).next(T, DAY);
+        order.verify(punches).saveAndFlush(any());
+        verify(photos, never()).discardPhoto(anyString());
     }
 
     @Test

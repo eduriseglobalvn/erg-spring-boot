@@ -42,9 +42,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Records a punch at the server clock. Order: key, coordinates, replay of the same key, school/shift,
- * already-punched IN, period lock, punch window, face consent/photo, location verdict; only then the code is drawn
- * (its counter row lock serialises writers of the tenant-day), the already-punched IN re-checked, the photo uploaded
- * and the row saved. A REJECTED verdict is never stored.
+ * already-punched IN, period lock, punch window, face consent/photo, location verdict; then the photo is uploaded
+ * (network I/O, outside the counter lock), the code drawn (its counter row lock serialises writers of the tenant-day
+ * until commit), the already-punched IN re-checked and the row saved. A REJECTED verdict is never stored.
  */
 @Service
 public class PunchService {
@@ -120,15 +120,19 @@ public class PunchService {
                                 policy.getAllowOutside()));
         if (check.verdict() == PunchStatus.REJECTED) throw unprocessable("PUNCH_REJECTED", check.messageVi());
 
+        String photoKey = hasPhoto ? storePhotoDiscardedOnRollback(tenantId, userId, cmd.photo()) : null;
         String code = codes.next(tenantId, date);
         if (cmd.direction() == PunchDirection.IN) {
             // A concurrent IN with another key may have committed between the first check and the counter lock.
             Optional<TkPunch> firstIn = DayAggregationService.firstIn(
                     punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date));
-            if (firstIn.isPresent()) return result(firstIn.get(), true, null);
+            if (firstIn.isPresent()) {
+                if (photoKey != null) photos.discardPhoto(photoKey);
+                return result(firstIn.get(), true, null);
+            }
         }
         TkPunch punch = new TkPunch();
-        if (hasPhoto) punch.setPhotoKey(storePhotoDiscardedOnRollback(tenantId, userId, cmd.photo()));
+        punch.setPhotoKey(photoKey);
         punch.setTenantId(tenantId);
         punch.setSchoolId(schoolId);
         punch.setUserId(userId);
