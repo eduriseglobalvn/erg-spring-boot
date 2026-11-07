@@ -43,7 +43,7 @@ final class QuizDraftCompiler {
                 questionSetSettings.put(link.getQuestionId(), link.getSettings());
             }
         });
-        return compileService.compile(draft.getSettings(), draft.getTree(), questionSettings, questionSetSettings);
+        return compileService.compile(draft.getSettings(), draft.getTree(), questionSettings, questionSetSettings, draft.getPlayerTemplate());
     }
 
     private List<String> extractBankQuestionIds(Object tree) {
