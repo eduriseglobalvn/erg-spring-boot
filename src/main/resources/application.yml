@@ -342,6 +342,8 @@ erg:
   timekeeping:
     photos:
       # Punch selfies (private). Separate bucket from erg.r2 (that one is publicly served); no public domain.
+      # Must differ from erg.r2.bucket-name (startup check). Defence in depth: add an R2 lifecycle rule that
+      # expires objects under private/timekeeping/ after 61+ days, in case the purge job stops running.
       r2:
         enabled: ${TK_PHOTOS_R2__ENABLED:false}
         endpoint: ${TK_PHOTOS_R2__ENDPOINT:}
@@ -507,6 +509,11 @@ erg:
       credentials:
         # Production refuses to store FCM registration tokens in clear text.
         registration-token-encryption-required: ${NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_REQUIRED:true}
+  timekeeping:
+    photos:
+      r2:
+        # Selfies must live in the private bucket in production; missing TK_PHOTOS_R2__* fails startup.
+        enabled: ${TK_PHOTOS_R2__ENABLED:true}
 
 springdoc:
   api-docs:

@@ -44,11 +44,13 @@ public class PunchPhotoRetentionJob {
         this.storage = storage;
         this.clock = clock;
         this.jobLock = jobLock;
+        // A zero/negative retention would purge every photo at once: refuse to start instead.
+        if (retentionDays < 1) throw new IllegalArgumentException("erg.timekeeping.photos.retention-days must be >= 1");
         this.retention = Duration.ofDays(retentionDays);
         this.batchSize = Math.max(1, batchSize);
     }
 
-    @Scheduled(cron = "${erg.timekeeping.photos.purge-cron:0 30 3 * * *}")
+    @Scheduled(cron = "${erg.timekeeping.photos.purge-cron:0 30 3 * * *}", zone = "Asia/Ho_Chi_Minh")
     public void purge() {
         jobLock.callExclusively(JOB_NAME, () -> purgeOlderThan(retention));
     }

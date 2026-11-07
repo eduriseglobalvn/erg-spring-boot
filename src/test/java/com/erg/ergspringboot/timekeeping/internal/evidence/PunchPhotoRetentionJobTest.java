@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.timekeeping.internal.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -84,9 +85,26 @@ class PunchPhotoRetentionJobTest {
 
     @Test
     void lockHeldElsewhereSkipsTheRun() {
-        job(200).purge();
+        // A real ClusterJobLock that loses the advisory lock: callExclusively returns null without running the task.
+        ClusterJobLock heldElsewhere = new ClusterJobLock(null) {
+            @Override
+            public <T> T callExclusively(String jobName, Supplier<T> task) {
+                return null;
+            }
+        };
+
+        new PunchPhotoRetentionJob(punches, storage, clock, heldElsewhere, 60, 200).purge();
 
         verify(punches, never()).findPhotoPurgeCandidates(any(), any(), anyInt());
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void retentionBelowOneDayRefusesToStart() {
+        assertThatThrownBy(() -> new PunchPhotoRetentionJob(punches, storage, clock, lock, 0, 200))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PunchPhotoRetentionJob(punches, storage, clock, lock, -5, 200))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private PunchPhotoRetentionJob job(int batchSize) {

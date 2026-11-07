@@ -51,6 +51,18 @@ class ProductionConfigurationSafetyTest {
     }
 
     @Test
+    void productionKeepsPunchSelfiesInThePrivateBucket() throws Exception {
+        // Timekeeping T3: prod defaults the private R2 photo bucket on, so missing TK_PHOTOS_R2__* fails startup
+        // instead of silently writing selfies to local disk (the local bean also refuses the prod profile).
+        String common = Files.readString(Path.of("src/main/resources/application.yml")).replace("\r\n", "\n");
+        String prodSection = common.substring(common.indexOf("on-profile: prod"));
+        prodSection = prodSection.substring(0, prodSection.indexOf("\n---"));
+
+        assertThat(prodSection).contains("enabled: ${TK_PHOTOS_R2__ENABLED:true}");
+        assertThat(common).contains("enabled: ${TK_PHOTOS_R2__ENABLED:false}");
+    }
+
+    @Test
     void localConvenienceIsExplicitlyOptIn() throws Exception {
         String local = Files.readString(Path.of("src/main/resources/application-local.yml"));
 

@@ -57,11 +57,15 @@ public final class LocalPrivateObjectStorage implements PrivateObjectStorage {
         try {
             Files.createDirectories(target.getParent());
             Path temporary = Files.createTempFile(target.getParent(), ".upload-", ".tmp");
-            Files.write(temporary, bytes);
             try {
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException unsupported) {
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                Files.write(temporary, bytes);
+                try {
+                    Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                } catch (AtomicMoveNotSupportedException unsupported) {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(temporary);
             }
         } catch (IOException exception) {
             throw new UncheckedIOException("cannot store punch photo", exception);

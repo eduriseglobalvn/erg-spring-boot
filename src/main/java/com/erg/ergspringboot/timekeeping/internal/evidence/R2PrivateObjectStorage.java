@@ -34,6 +34,10 @@ final class R2PrivateObjectStorage implements PrivateObjectStorage, AutoCloseabl
     }
 
     static R2PrivateObjectStorage create(String endpoint, String accessKey, String secretKey, String region, String bucket) {
+        requireText(endpoint, "erg.timekeeping.photos.r2.endpoint");
+        requireText(accessKey, "erg.timekeeping.photos.r2.access-key-id");
+        requireText(secretKey, "erg.timekeeping.photos.r2.secret-key");
+        requireText(bucket, "erg.timekeeping.photos.r2.bucket-name");
         var credentials = StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
         var pathStyle = S3Configuration.builder().pathStyleAccessEnabled(true).build();
         // Same bounds as the lcms R2 client: an unreachable bucket must not hold a punch request or the purge job forever.
@@ -66,7 +70,10 @@ final class R2PrivateObjectStorage implements PrivateObjectStorage, AutoCloseabl
     public URI presignGet(String key, Duration ttl) {
         var request = GetObjectPresignRequest.builder()
                 .signatureDuration(ttl)
-                .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(key).build())
+                .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(key)
+                        .responseCacheControl("private, no-store")
+                        .responseContentDisposition("inline")
+                        .build())
                 .build();
         try {
             return presigner.presignGetObject(request).url().toURI();
@@ -78,6 +85,12 @@ final class R2PrivateObjectStorage implements PrivateObjectStorage, AutoCloseabl
     @Override
     public void delete(String key) {
         client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+    }
+
+    private static void requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(name + " is required when timekeeping photo R2 is enabled");
+        }
     }
 
     @Override

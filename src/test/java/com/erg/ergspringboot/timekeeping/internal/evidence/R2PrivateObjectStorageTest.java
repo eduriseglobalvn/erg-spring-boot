@@ -41,6 +41,17 @@ class R2PrivateObjectStorageTest {
         assertThat(request.getValue().signatureDuration()).isEqualTo(Duration.ofMinutes(5));
         assertThat(request.getValue().getObjectRequest().bucket()).isEqualTo("erg-private");
         assertThat(request.getValue().getObjectRequest().key()).isEqualTo(KEY);
+        assertThat(request.getValue().getObjectRequest().responseCacheControl()).isEqualTo("private, no-store");
+    }
+
+    @Test
+    void missingBucketSettingsFailAtConstruction() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> R2PrivateObjectStorage.create("", "ak", "sk", "auto", "erg-private"))
+                .isInstanceOf(IllegalStateException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> R2PrivateObjectStorage.create("https://r2.example", "ak", "sk", "auto", " "))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

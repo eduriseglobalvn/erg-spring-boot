@@ -35,6 +35,9 @@ class LocalPrivateObjectStorageTest {
         storage.put(KEY, new byte[] {1, 2, 3}, "image/jpeg");
 
         assertThat(Files.readAllBytes(root.resolve(KEY))).containsExactly(1, 2, 3);
+        try (var leftovers = Files.list(root.resolve(KEY).getParent())) {
+            assertThat(leftovers.map(Path::getFileName).map(Path::toString)).containsExactly("abc.jpg");
+        }
         storage.delete(KEY);
         assertThat(root.resolve(KEY)).doesNotExist();
         storage.delete(KEY);
