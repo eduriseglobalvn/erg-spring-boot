@@ -4,7 +4,6 @@ import static com.erg.ergspringboot.lcms.quiz.publish.AnswerGrading.*;
 import static com.erg.ergspringboot.lcms.quiz.publish.AnswerKeySources.*;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -390,24 +389,5 @@ public enum QuestionKindStrategy {
     private static void stripChoiceCorrectness(Map<String, Object> body) {
         stripListItems(body, "options", "correct", "isCorrect");
         stripListItems(body, "choices", "correct", "isCorrect");
-    }
-
-    /** Replaces a list field with copies of its map items minus the given markers; non-map items drop out. */
-    @SuppressWarnings("unchecked")
-    private static void stripListItems(Map<String, Object> body, String field, String... markers) {
-        Object value = body.get(field);
-        if (value instanceof List<?> list) {
-            List<Map<String, Object>> stripped = new ArrayList<>();
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> map) {
-                    Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) map);
-                    for (String marker : markers) {
-                        copy.remove(marker);
-                    }
-                    stripped.add(copy);
-                }
-            }
-            body.put(field, stripped);
-        }
     }
 }

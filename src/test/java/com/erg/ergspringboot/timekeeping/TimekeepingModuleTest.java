@@ -8,6 +8,7 @@ import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.users.persistence.EmployeeProfileRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ class TimekeepingModuleTest {
     // Collaborators from other modules and from platform (not a module), outside the standalone slice.
     @MockitoBean CalendarReadPort calendar;
     @MockitoBean NotificationAdminOperations notifications;
+    @MockitoBean EducationUnitRepository educationUnits;
     @MockitoBean UserAccessScopeRepository accessScopes;
     @MockitoBean ClusterJobLock jobLock;
     @MockitoBean ErgPolicyService policy;

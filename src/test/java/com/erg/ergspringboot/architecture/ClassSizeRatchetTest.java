@@ -21,7 +21,7 @@ class ClassSizeRatchetTest {
     private static final Map<String, Integer> REVIEWED_CEILINGS = Map.of(
             "com/erg/ergspringboot/lms/persistence/AssignmentRepository.java", 573,
             "com/erg/ergspringboot/lms/persistence/AttemptRepository.java", 479,
-            "com/erg/ergspringboot/lcms/quiz/publish/QuestionKindStrategy.java", 412);
+            "com/erg/ergspringboot/lcms/quiz/publish/QuestionKindStrategy.java", 394);
 
     @Test
     void noProductionClassGrowsPastTheLimit() throws IOException {
