@@ -22,12 +22,21 @@ class PunchPhotoStorageConfigTest {
         prod.setActiveProfiles("prod");
 
         assertThatThrownBy(() -> new PunchPhotoStorageConfig()
-                .timekeepingLocalPhotoStorage(root.toString(), SECRET, Clock.systemUTC(), prod))
+                .timekeepingLocalPhotoStorage(root.toString(), SECRET, false, Clock.systemUTC(), prod))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("TK_PHOTOS_R2__ENABLED");
         assertThat(new PunchPhotoStorageConfig()
-                .timekeepingLocalPhotoStorage(root.toString(), SECRET, Clock.systemUTC(), new MockEnvironment()))
+                .timekeepingLocalPhotoStorage(root.toString(), SECRET, false, Clock.systemUTC(), new MockEnvironment()))
                 .isNotNull();
+    }
+
+    @Test
+    void temporaryOptInAllowsLocalDiskUnderProdProfile() {
+        MockEnvironment prod = new MockEnvironment();
+        prod.setActiveProfiles("prod");
+
+        assertThat(new PunchPhotoStorageConfig()
+                .timekeepingLocalPhotoStorage(root.toString(), SECRET, true, Clock.systemUTC(), prod)).isNotNull();
     }
 
     @Test
