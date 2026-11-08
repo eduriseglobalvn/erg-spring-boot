@@ -1,0 +1,107 @@
+package com.erg.ergspringboot.timekeeping.internal.request;
+
+import com.erg.ergspringboot.timekeeping.DayPart;
+import com.erg.ergspringboot.timekeeping.RequestStatus;
+import com.erg.ergspringboot.timekeeping.internal.rules.LeaveDayCounter;
+import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
+import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
+import com.erg.ergspringboot.timekeeping.persistence.TkHolidayRepository;
+import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
+import com.erg.ergspringboot.timekeeping.persistence.TkRequest;
+import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
+import com.erg.ergspringboot.users.persistence.EmployeeProfile;
+import com.erg.ergspringboot.users.persistence.EmployeeProfileRepository;
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.Period;
+import com.erg.ergspringboot.timekeeping.persistence.TkShift;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+
+/**
+ * Annual leave: entitlement = policy {@code annual_leave_days} + one day per full {@code seniority_step_years},
+ * the years counted whole from the join date ({@code EmployeeProfile.joinedAt}) to 31/12 of the year, so a join on
+ * 01/08/2016 gives 14 for 2026. No join date: base days only; joined after that 31/12: 0 (no proration).
+ * Used = APPROVED ANNUAL leave inside the year; a leave across year-end is recounted per year on its overlap
+ * (school workdays, holidays). The policy is the one in force on 31/12 of the year.
+ */
+@Service
+public class LeaveBalanceService {
+
+    private final TkRequestRepository requests;
+    private final TkHolidayRepository holidays;
+    private final WorkContextResolver context;
+    private final EmployeeProfileRepository profiles;
+
+    LeaveBalanceService(TkRequestRepository requests, TkHolidayRepository holidays, WorkContextResolver context,
+            EmployeeProfileRepository profiles) {
+        this.requests = requests;
+        this.holidays = holidays;
+        this.context = context;
+        this.profiles = profiles;
+    }
+
+    public BigDecimal annualBalance(String tenantId, String userId, int year) {
+        LocalDate first = LocalDate.of(year, 1, 1);
+        LocalDate last = LocalDate.of(year, 12, 31);
+        BigDecimal used = requests.findApprovedAnnualLeaveOverlapping(tenantId, userId, first, last).stream()
+                .map(r -> daysInside(r, first, last))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return entitlement(tenantId, userId, year).subtract(used);
+    }
+
+    /**
+     * The balance once other PENDING annual leave is also taken out, so two pending requests cannot overdraw it.
+     * {@code excludeRequestId} (nullable) is the request being checked.
+     */
+    public BigDecimal availableAnnual(String tenantId, String userId, int year, String excludeRequestId) {
+        LocalDate first = LocalDate.of(year, 1, 1);
+        LocalDate last = LocalDate.of(year, 12, 31);
+        BigDecimal pending = requests.findAnnualLeaveOverlapping(tenantId, userId, RequestStatus.PENDING, first, last)
+                .stream().filter(r -> !r.getId().equals(excludeRequestId))
+                .map(r -> daysInside(r, first, last))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return annualBalance(tenantId, userId, year).subtract(pending);
+    }
+
+    /** Leave days in {@code from..to} at the school: days with a shift in effect, minus holidays (half for AM/PM). */
+    public BigDecimal countDays(String tenantId, String schoolId, LocalDate from, LocalDate to, DayPart part) {
+        List<TkShift> shifts = context.shiftsOf(tenantId, schoolId);
+        Set<LocalDate> offDays = holidays.findForSchool(tenantId, schoolId, from, to).stream()
+                .map(TkHoliday::getHolidayDate).collect(Collectors.toCollection(HashSet::new));
+        from.datesUntil(to.plusDays(1)).filter(d -> WorkContextResolver.shiftOn(shifts, d).isEmpty())
+                .forEach(offDays::add);
+        return LeaveDayCounter.count(from, to, part, EnumSet.allOf(DayOfWeek.class), offDays);
+    }
+
+    public BigDecimal entitlement(String tenantId, String userId, int year) {
+        TkPolicy policy = context.policyFor(tenantId, context.schoolOf(tenantId, userId).orElse(""),
+                LocalDate.of(year, 12, 31));
+        LocalDate joinedAt = profiles.findByUserIdAndTenantId(userId, tenantId).map(EmployeeProfile::getJoinedAt)
+                .orElse(null);
+        return BigDecimal.valueOf(entitlement(policy.getAnnualLeaveDays(), policy.getSeniorityStepYears(), joinedAt, year));
+    }
+
+    static int entitlement(int baseDays, int stepYears, LocalDate joinedAt, int year) {
+        LocalDate yearEnd = LocalDate.of(year, 12, 31);
+        if (joinedAt == null) return baseDays;
+        if (joinedAt.isAfter(yearEnd)) return 0;
+        int completedYears = Period.between(joinedAt, yearEnd).getYears();
+        return baseDays + (stepYears > 0 ? completedYears / stepYears : 0);
+    }
+
+    private BigDecimal daysInside(TkRequest leave, LocalDate first, LocalDate last) {
+        if (!leave.getFromDate().isBefore(first) && !leave.getToDate().isAfter(last) && leave.getDays() != null) {
+            return leave.getDays();
+        }
+        LocalDate from = leave.getFromDate().isBefore(first) ? first : leave.getFromDate();
+        LocalDate to = leave.getToDate().isAfter(last) ? last : leave.getToDate();
+        DayPart part = from.equals(to) ? leave.getPart() : DayPart.FULL;
+        return countDays(leave.getTenantId(), leave.getSchoolId(), from, to, part);
+    }
+}

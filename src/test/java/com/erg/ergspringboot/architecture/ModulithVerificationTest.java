@@ -35,6 +35,7 @@ class ModulithVerificationTest {
         assertThat(modules.getModuleByName("audit")).isPresent();
         assertThat(modules.getModuleByName("learningoutcomes")).isPresent();
         assertThat(modules.getModuleByName("learningstandards")).isPresent();
+        assertThat(modules.getModuleByName("timekeeping")).isPresent();
         modules.verify();
     }
 }

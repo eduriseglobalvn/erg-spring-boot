@@ -32,6 +32,7 @@ public class LcmsOperations {
     public ValidationResultResponse validateQuiz(String tenantId, String quizId) { return commands.validateQuiz(tenantId, quizId); }
     public PublishResponse publishQuiz(String tenantId, String quizId, String userId, String idempotencyKey, PublishRequest request) { return commands.publishQuiz(tenantId, quizId, userId, idempotencyKey, request); }
     public ForkResponse forkQuizVersion(String tenantId, String quizId, String versionId, String userId) { return commands.forkQuizVersion(tenantId, quizId, versionId, userId); }
+    public UpdateQuizResponse updateQuiz(String tenantId, String quizId, UpdateQuizRequest request) { return commands.updateQuiz(tenantId, quizId, request); }
     public DeleteQuizResponse deleteQuiz(String tenantId, String quizId) { return commands.deleteQuiz(tenantId, quizId); }
     public MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request) { return commands.presignMedia(tenantId, userId, request); }
     public long maxMediaUploadBytes() { return commands.maxMediaUploadBytes(); }

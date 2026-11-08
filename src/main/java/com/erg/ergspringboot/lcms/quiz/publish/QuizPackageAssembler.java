@@ -74,12 +74,39 @@ final class QuizPackageAssembler {
         packageJson.put("quizId", quizId);
         packageJson.put("version", versionLabel);
         packageJson.put("gradingMode", gradingMode);
-        packageJson.put("quiz", bundledAssets.runtimeQuiz());
+        boolean clientFirst = MODE_CLIENT_FIRST.equals(gradingMode);
+        packageJson.put("quiz", clientFirst ? bundledAssets.runtimeQuiz() : withoutQuestionFeedback(bundledAssets.runtimeQuiz()));
         packageJson.put("assetsManifest", bundledAssets.assetsManifest());
-        if (MODE_CLIENT_FIRST.equals(gradingMode)) {
+        if (clientFirst) {
             packageJson.put("answerKey", compiled.answerKey());
         }
         return packageJson;
+    }
+
+    /**
+     * A graded (server-authoritative) quiz must not hand out the teacher's per-question feedback texts before the
+     * learner answers: "Correct, it is X" would be the answer key in words. The keys stay so players read empty text.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> withoutQuestionFeedback(Map<String, Object> quiz) {
+        Map<String, Object> copy = new LinkedHashMap<>(quiz);
+        if (!(quiz.get("sections") instanceof Collection<?> sections)) {
+            return copy;
+        }
+        copy.put("sections", sections.stream().map(section -> {
+            Map<String, Object> sectionCopy = new LinkedHashMap<>((Map<String, Object>) section);
+            if (sectionCopy.get("questions") instanceof Collection<?> questions) {
+                sectionCopy.put("questions", questions.stream().map(question -> {
+                    Map<String, Object> questionCopy = new LinkedHashMap<>((Map<String, Object>) question);
+                    if (questionCopy.containsKey("feedback")) {
+                        questionCopy.put("feedback", Map.of("correct", "", "partial", "", "incorrect", ""));
+                    }
+                    return questionCopy;
+                }).toList());
+            }
+            return sectionCopy;
+        }).toList());
+        return copy;
     }
 
     // Stable serialization for hashing/signing: keys are ordered so the same content always hashes equal.

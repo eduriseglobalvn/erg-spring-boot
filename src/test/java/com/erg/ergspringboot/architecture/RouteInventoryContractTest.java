@@ -20,7 +20,7 @@ class RouteInventoryContractTest {
     private static final Path REST_CATALOG =
             Path.of("src/test/resources/performance/api-performance-catalog.yaml");
     private static final Pattern OWNER_ROW = Pattern.compile(
-            "\\| `(?<prefix>com\\.erg\\.ergspringboot\\.controller[^`]*)` \\| `(?<owner>[^`]+)` \\|");
+            "\\| `(?<prefix>com\\.erg\\.ergspringboot\\.(?:controller|timekeeping\\.web)[^`]*)` \\| `(?<owner>[^`]+)` \\|");
 
     @Test
     void everyCatalogedRestHandlerHasAnExplicitModuleOwnerAndStatusPolicy() throws IOException {

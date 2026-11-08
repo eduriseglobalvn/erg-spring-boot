@@ -53,6 +53,16 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("levelFiltered") boolean levelFiltered,
             @Param("levelIds") Collection<String> levelIds);
 
+    @Query("SELECT DISTINCT et.teacherUserId FROM CalendarEvent e JOIN CalendarEventTeacher et ON e.id = et.eventId " +
+           "WHERE e.tenantId = :tenantId AND et.teacherUserId IN :teacherUserIds " +
+           "AND e.startAt >= :from AND e.startAt < :to AND e.status IN :statuses")
+    List<String> findTeachersWithEventStarting(
+            @Param("tenantId") String tenantId,
+            @Param("teacherUserIds") Collection<String> teacherUserIds,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to,
+            @Param("statuses") List<String> statuses);
+
     @Query("SELECT e FROM CalendarEvent e JOIN CalendarEventTeacher et ON e.id = et.eventId " +
            "WHERE e.tenantId = :tenantId AND et.teacherUserId = :teacherUserId " +
            "AND e.startAt < :to AND e.endAt > :from AND e.status IN :statuses " +

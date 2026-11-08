@@ -53,6 +53,11 @@ public final class UserDirectoryAdapter implements UserDirectoryPort {
         return map(users.findByTenantIdAndIdInAnyStatus(tenantId, ids), tenantId);
     }
 
+    @Override
+    public List<String> findActiveStaffUserIds(String tenantId, Pageable pageable) {
+        return users.findActiveStaffUserIds(tenantId, pageable);
+    }
+
     private List<UserAccountProjection> map(List<User> values, String tenantId) {
         if (values == null || values.isEmpty()) {
             return List.of();

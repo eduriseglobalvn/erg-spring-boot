@@ -50,6 +50,14 @@ public final class QuizAuthoringResponses {
     ) {
     }
 
+    public record UpdateQuizResponse(
+            String quizId,
+            String title,
+            String kind,
+            java.time.OffsetDateTime updatedAt
+    ) {
+    }
+
     public record DeleteQuizResponse(
             String quizId,
             boolean deleted

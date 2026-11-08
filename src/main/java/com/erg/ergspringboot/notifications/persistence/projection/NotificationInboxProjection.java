@@ -21,6 +21,10 @@ public record NotificationInboxProjection(
         String priority,
         String channel,
         Map<String, String> payloadData,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        String campaignId,
+        OffsetDateTime ackedAt,
+        Boolean campaignRequiresAck,
+        String campaignCreatedBy
 ) {
 }

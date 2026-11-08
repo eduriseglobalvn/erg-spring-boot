@@ -161,6 +161,21 @@ class GlobalExceptionHandlerTest {
                 .contains("idempotency key");
     }
 
+    @Test
+    void otherConstraintOnAnInsertThatListsAnIdempotencyColumnIsNotAnIdempotencyConflict() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/lcms/quizzes/q1/publish");
+        var exception = new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException(
+                        "Batch entry 0 insert into quiz_versions (id,idempotency_key,is_active) values (...) was aborted: "
+                                + "ERROR: duplicate key value violates unique constraint \"uq_quiz_versions_active\""));
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleDataIntegrity(
+                exception, new ServletWebRequest(request));
+
+        assertThat(errorCode(response)).isEqualTo("DATA_CONFLICT");
+    }
+
     @org.springframework.web.bind.annotation.RestController
     static class ProbeController {
         @org.springframework.web.bind.annotation.PostMapping(value = "/probe", consumes = "application/json")

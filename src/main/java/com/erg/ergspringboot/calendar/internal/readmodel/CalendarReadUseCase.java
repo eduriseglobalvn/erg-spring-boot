@@ -16,6 +16,8 @@ import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.users.UserDirectoryPort;
+import com.erg.ergspringboot.calendar.TeacherPeriod;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Primary;
@@ -36,6 +38,7 @@ public class CalendarReadUseCase implements CalendarReadPort {
     private final CalendarWorkspaceQueryUseCase workspaceQueries;
     private final CalendarReferenceMapsQueryUseCase referenceQueries;
     private final CalendarEventDetailQueryUseCase eventDetails;
+    private final CalendarTeacherPeriodsQueryUseCase teacherPeriods;
 
     public CalendarReadUseCase(
             CalendarEventRepository eventRepository,
@@ -59,6 +62,8 @@ public class CalendarReadUseCase implements CalendarReadPort {
         this.referenceQueries = new CalendarReferenceMapsQueryUseCase(
                 educationUnitRepository, classroomRepository, subjectRepository,
                 levelRepository, legacyUserRepository);
+        this.teacherPeriods = new CalendarTeacherPeriodsQueryUseCase(
+                eventRepository, classroomRepository, subjectRepository);
         this.eventDetails = new CalendarEventDetailQueryUseCase(
                 eventRepository, eventTeacherRepository, referenceQueries, eventResponses);
         CalendarFullCatalogQueryUseCase fullCatalogQueries = new CalendarFullCatalogQueryUseCase(
@@ -77,6 +82,17 @@ public class CalendarReadUseCase implements CalendarReadPort {
     @Override
     public CalendarEventResponse eventDetail(String tenantId, String eventId) {
         return eventDetails.detail(tenantId, eventId);
+    }
+
+    @Override
+    public List<TeacherPeriod> teacherPeriods(String tenantId, String teacherUserId, LocalDate from, LocalDate to) {
+        return teacherPeriods.teacherPeriods(tenantId, teacherUserId, from, to);
+    }
+
+    @Override
+    public java.util.Set<String> teachersWithPeriodStarting(
+            String tenantId, java.util.Collection<String> teacherUserIds, java.time.Instant from, java.time.Instant to) {
+        return teacherPeriods.teachersStarting(tenantId, teacherUserIds, from, to);
     }
 
     @Override

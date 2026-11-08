@@ -5,6 +5,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.PublishRequest;
+import com.erg.ergspringboot.common.request.quiz.QuizAuthoringRequests.UpdateQuizRequest;
+import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.UpdateQuizResponse;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.DeleteQuizResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizAuthoringResponses.ForkResponse;
@@ -117,6 +119,18 @@ class LcmsQuizAuthoringControllerTest {
 
         assertThat(response.data()).isSameAs(deleted);
         verify(lcms).deleteQuiz("tenant-a", "quiz-1");
+    }
+
+    @Test
+    void updatePassesPrincipalTenant() {
+        UpdateQuizRequest body = new UpdateQuizRequest("Renamed", "test");
+        UpdateQuizResponse updated = new UpdateQuizResponse("quiz-1", "Renamed", "test", java.time.OffsetDateTime.now());
+        when(lcms.updateQuiz("tenant-a", "quiz-1", body)).thenReturn(updated);
+
+        ApiResponse<UpdateQuizResponse> response = controller.update("quiz-1", body, request("/api/v1/lcms/quizzes/quiz-1"));
+
+        assertThat(response.data()).isSameAs(updated);
+        verify(lcms).updateQuiz("tenant-a", "quiz-1", body);
     }
 
     private MockHttpServletRequest request(String path) {

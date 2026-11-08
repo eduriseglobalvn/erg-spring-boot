@@ -33,6 +33,8 @@ public interface ClassroomRepository extends JpaRepository<Classroom, String> {
     List<Classroom> findByTenantIdAndSchoolIdInOrderByNameAsc(
             String tenantId, Collection<String> schoolIds, Pageable pageable);
 
+    List<Classroom> findByTenantIdAndGradeInOrderByNameAsc(String tenantId, Collection<String> grades);
+
     List<Classroom> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
     java.util.Optional<Classroom> findByTenantIdAndId(String tenantId, String id);

@@ -84,4 +84,16 @@ public class NotificationDeviceRegistrationEntity extends BaseEntity {
 
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
+
+    /** FCM or WEB_PUSH; WEB_PUSH rows keep the push endpoint in registrationToken (encrypted). */
+    @Column(length = 16, nullable = false)
+    private String transport = "FCM";
+
+    /** Web Push subscription public key, encrypted by NotificationTokenCipher. */
+    @Column(columnDefinition = "text")
+    private String p256dh;
+
+    /** Web Push subscription auth secret, encrypted by NotificationTokenCipher. */
+    @Column(columnDefinition = "text")
+    private String auth;
 }

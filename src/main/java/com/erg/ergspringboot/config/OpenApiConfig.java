@@ -44,7 +44,8 @@ public class OpenApiConfig {
                     "/api/v1/recruitment/jobs/**", "/api/v1/reviews", "/api/v1/reviews/stats",
                     "/api/v1/public-disclosure/**", "/api/v1/trending/**"),
             AccessRule.publicFor("POST", "/api/v1/recruitment/apply", "/api/v1/reviews", "/api/v1/reviews/*/helpful"),
-            AccessRule.publicFor("PUT", "/api/v1/lcms/media/upload/quiz-media/**")
+            AccessRule.publicFor("PUT", "/api/v1/lcms/media/upload/quiz-media/**"),
+            AccessRule.publicFor("GET", "/api/v1/timekeeping/photos/file")
     );
 
     /** Unversioned duplicates of the v1 content/curriculum API, kept only for compatibility. */

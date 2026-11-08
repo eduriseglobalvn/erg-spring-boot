@@ -77,4 +77,10 @@ public class NotificationMessageEntity extends BaseEntity {
 
     @Column(name = "expires_at")
     private OffsetDateTime expiresAt;
+
+    @Column(name = "campaign_id", length = 36)
+    private String campaignId;
+
+    @Column(name = "acked_at")
+    private OffsetDateTime ackedAt;
 }

@@ -22,6 +22,7 @@ public interface LcmsCommandPort {
     ValidationResultResponse validateQuiz(String tenantId, String quizId);
     PublishResponse publishQuiz(String tenantId, String quizId, String userId, String idempotencyKey, PublishRequest request);
     ForkResponse forkQuizVersion(String tenantId, String quizId, String versionId, String userId);
+    UpdateQuizResponse updateQuiz(String tenantId, String quizId, UpdateQuizRequest request);
     DeleteQuizResponse deleteQuiz(String tenantId, String quizId);
     MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request);
     long maxMediaUploadBytes();

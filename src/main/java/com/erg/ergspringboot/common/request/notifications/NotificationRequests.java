@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.common.request.notifications;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +29,16 @@ public final class NotificationRequests {
             String permissionState,
             String locale,
             String timezone,
-            DeviceClientRequest client
+            DeviceClientRequest client,
+            @io.swagger.v3.oas.annotations.media.Schema(description = "FCM (default) or WEB_PUSH")
+            String transport,
+            @io.swagger.v3.oas.annotations.media.Schema(description = "PushSubscription.toJSON().keys; required for WEB_PUSH")
+            WebPushKeysRequest keys
     ) {
+    }
+
+    /** Keys of a browser PushSubscription (base64url), as PushSubscription.toJSON() returns them. */
+    public record WebPushKeysRequest(String p256dh, String auth) {
     }
 
     public record UnregisterDeviceRequest(
@@ -77,5 +86,8 @@ public final class NotificationRequests {
             String topicName,
             Map<String, String> data
     ) {
+    }
+
+    public record ResolvePeopleRequest(@NotNull List<String> lines) {
     }
 }

@@ -17,6 +17,7 @@ import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizQuestionRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection;
@@ -27,6 +28,7 @@ import com.erg.ergspringboot.users.persistence.organization.projection.ScopeOpti
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,6 +68,9 @@ class LcmsWorkspaceReadServiceTest {
     @Mock
     private UserAccessScopeRepository userAccessScopeRepository;
 
+    @Mock
+    private QuizDraftRepository quizDraftRepository;
+
     private LcmsWorkspaceReadService service;
 
     @BeforeEach
@@ -79,8 +84,20 @@ class LcmsWorkspaceReadServiceTest {
                 quizQuestionRepository,
                 userRepository,
                 roleRepository,
-                userAccessScopeRepository
+                userAccessScopeRepository,
+                quizDraftRepository
         );
+    }
+
+    @Test
+    void quizDurationComesFromTheDraftTimeLimit() {
+        assertThat(LcmsWorkspaceResponseMapper.durationLabel(
+                Map.of("settings", Map.of("enableTimeLimit", true, "timeLimit", "15:00")), 3, "train")).isEqualTo("15 phut");
+        assertThat(LcmsWorkspaceResponseMapper.durationLabel(
+                Map.of("settings", Map.of("enableTimeLimit", false, "timeLimit", "15:00")), 3, "train")).isEqualTo("Khong gioi han");
+        assertThat(LcmsWorkspaceResponseMapper.durationLabel(
+                Map.of("settings", Map.of("enableTimeLimit", true, "timeLimit", "bad")), 3, "train")).isEqualTo("Khong gioi han");
+        assertThat(LcmsWorkspaceResponseMapper.durationLabel(null, 3, "train")).isEqualTo("9 phut");
     }
 
     @Test

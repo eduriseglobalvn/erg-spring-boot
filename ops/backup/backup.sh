@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ops/backup/backup.sh
-# Scheduled via cron on ERG Server (daily at 03:00)
+# Scheduled via cron on ERG Server (daily at 03:00 Asia/Ho_Chi_Minh = 20:00 UTC)
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -21,6 +21,13 @@ fi
 
 POSTGRES_USER="${POSTGRES_USER:-erg}"
 REDIS_STATE_PASSWORD="${REDIS_STATE_PASSWORD:-erg-local-redis-state}"
+
+# Telegram notice; the token goes through curl's stdin config so it never shows in `ps`.
+notify() {
+  [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]] || return 0
+  curl -fsS -m 15 -o /dev/null -K - --data-urlencode "chat_id=$TELEGRAM_CHAT_ID"     --data-urlencode "text=$1" <<<"url = \"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\"" || true
+}
+trap 'notify "❌ Backup DB lỗi lúc $(date -Iseconds) (dòng $LINENO). Xem /backups trên bot hoặc backup.log."' ERR
 
 mkdir -p "$BACKUP_DIR"
 
@@ -60,4 +67,5 @@ printf 'erg_backup_last_success_timestamp_seconds %s\nerg_backup_postgres_bytes 
 chmod 644 "$METRICS_DIR/erg_backup.prom.tmp" && mv "$METRICS_DIR/erg_backup.prom.tmp" "$METRICS_DIR/erg_backup.prom"
 
 echo "=== [$(date -Iseconds)] Backup Completed Successfully ==="
+notify "💾 Backup DB xong: pg_full_$DATE.sql.gz ($(du -h "$BACKUP_DIR/pg_full_$DATE.sql.gz" | cut -f1)), giữ $RETENTION_DAYS ngày."
 ls -lh "$BACKUP_DIR"
