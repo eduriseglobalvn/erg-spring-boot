@@ -32,11 +32,13 @@ class PunchPhotoStorageConfig {
     LocalPrivateObjectStorage timekeepingLocalPhotoStorage(
             @Value("${erg.timekeeping.photos.local-root:.erg-private}") String localRoot,
             @Value("${erg.timekeeping.photos.signing-secret:}") String signingSecret,
+            @Value("${erg.timekeeping.photos.local-allowed-in-prod:false}") boolean localAllowedInProd,
             Clock clock,
             Environment environment) {
-        if (Arrays.asList(environment.getActiveProfiles()).contains("prod")) {
+        if (Arrays.asList(environment.getActiveProfiles()).contains("prod") && !localAllowedInProd) {
             throw new IllegalStateException("Punch photos need the private R2 bucket in prod: "
-                    + "set TK_PHOTOS_R2__ENABLED=true and TK_PHOTOS_R2__* (local disk storage is dev-only)");
+                    + "set TK_PHOTOS_R2__ENABLED=true and TK_PHOTOS_R2__* (local disk storage is dev-only; "
+                    + "TK_PHOTOS_LOCAL_ALLOWED_IN_PROD=true is a temporary opt-in)");
         }
         return new LocalPrivateObjectStorage(Path.of(localRoot), signingSecret, clock);
     }

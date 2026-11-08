@@ -367,6 +367,8 @@ erg:
         region: ${TK_PHOTOS_R2__REGION:auto}
       # Local/dev store when R2 is off. Blank secret = random per process (URLs die on restart, single instance only).
       local-root: ${ERG_TK_PHOTOS_LOCAL_ROOT:.erg-private}
+      # Temporary opt-in: lets prod keep selfies on the container disk (lost on redeploy) until the private R2 bucket exists.
+      local-allowed-in-prod: ${TK_PHOTOS_LOCAL_ALLOWED_IN_PROD:false}
       signing-secret: ${SECRET_TK_PHOTO_URL_SIGNING_KEY:}
       retention-days: ${TK_PHOTOS_RETENTION_DAYS:60}
       purge-cron: ${TK_PHOTOS_PURGE_CRON:0 30 3 * * *}
