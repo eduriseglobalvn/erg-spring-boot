@@ -59,7 +59,9 @@ public final class PostgreSqlTestDatabase {
             container = new PostgreSQLContainer(postgresImage())
                     .withDatabaseName("erg_test")
                     .withUsername("erg_test")
-                    .withPassword("erg_test");
+                    .withPassword("erg_test")
+                    // Every cached Spring context holds its own pools; the 100-connection default runs dry once ~25 contexts are alive.
+                    .withCommand("postgres", "-c", "max_connections=400");
             container.start();
         }
         return container;
