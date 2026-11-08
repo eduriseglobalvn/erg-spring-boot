@@ -211,4 +211,24 @@ final class AnswerKeySources {
 
     static boolean boolValue(Object value) {
         return value instanceof Boolean bool && bool;
-    }}
+    }
+
+    /** Replaces a list field with copies of its map items minus the given markers; non-map items drop out. */
+    @SuppressWarnings("unchecked")
+    static void stripListItems(Map<String, Object> body, String field, String... markers) {
+        Object value = body.get(field);
+        if (value instanceof List<?> list) {
+            List<Map<String, Object>> stripped = new ArrayList<>();
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) map);
+                    for (String marker : markers) {
+                        copy.remove(marker);
+                    }
+                    stripped.add(copy);
+                }
+            }
+            body.put(field, stripped);
+        }
+    }
+}
