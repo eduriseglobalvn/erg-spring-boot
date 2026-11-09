@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.config.persistence;
 
+import javax.sql.DataSource;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import com.erg.ergspringboot.platform.security.TenantGucApplier;
 import jakarta.persistence.EntityManager;
@@ -32,6 +33,16 @@ public class TenantAwareJpaTransactionManager extends JpaTransactionManager {
 
     public TenantAwareJpaTransactionManager(EntityManagerFactory entityManagerFactory) {
         super(entityManagerFactory);
+    }
+
+    /**
+     * The EMF hands over its TenantGucDataSource wrapper, but JdbcTemplate uses the pool itself. Bind the
+     * transaction's connection under the pool, as Spring does for TransactionAwareDataSourceProxy, so JDBC writes
+     * join the JPA transaction (and its tenant) instead of running uncommitted on a side connection.
+     */
+    @Override
+    public void setDataSource(DataSource dataSource) {
+        super.setDataSource(dataSource instanceof TenantGucDataSource wrapper ? wrapper.getTargetDataSource() : dataSource);
     }
 
     @Override

@@ -6,8 +6,12 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -177,6 +181,24 @@ public class CorsConfig implements WebMvcConfigurer {
                 .exposedHeaders(exposedHeaders)
                 .allowCredentials(allowCredentials)
                 .maxAge(maxAge);
+    }
+
+    /**
+     * The same rules for Spring Security, so its own 401/403 carry the CORS headers too. Without them the browser
+     * hides the status ("Failed to fetch") and the frontend never sees the 401 that should trigger a token refresh.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        config.setAllowedMethods(Arrays.asList(allowedMethods));
+        config.setAllowedHeaders(Arrays.asList(allowedHeaders));
+        config.setExposedHeaders(Arrays.asList(exposedHeaders));
+        config.setAllowCredentials(allowCredentials);
+        config.setMaxAge(maxAge);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     private String[] csv(String value) {
