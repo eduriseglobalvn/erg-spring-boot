@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.erg.ergspringboot.auth.internal.login.AuthLoginUseCase;
 import com.erg.ergspringboot.auth.internal.refresh.AuthRefreshUseCase;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import java.util.concurrent.atomic.AtomicReference;
@@ -22,6 +23,21 @@ class AuthOperationsRefreshScopeTest {
         });
 
         new AuthOperations(null, refreshFlow, null, null, null).refresh(null, null);
+
+        assertThat(seen.get().isMaintenance()).isTrue();
+        assertThat(TenantContext.current()).isNull();
+    }
+
+    @Test
+    void loginRunsInTheSystemScopeSoScopedRoleAssignmentsAreVisible() {
+        AuthLoginUseCase loginFlow = mock(AuthLoginUseCase.class);
+        AtomicReference<TenantContext> seen = new AtomicReference<>();
+        when(loginFlow.login(any(), any())).thenAnswer(call -> {
+            seen.set(TenantContext.current());
+            return null;
+        });
+
+        new AuthOperations(loginFlow, null, null, null, null).login(null, null);
 
         assertThat(seen.get().isMaintenance()).isTrue();
         assertThat(TenantContext.current()).isNull();
