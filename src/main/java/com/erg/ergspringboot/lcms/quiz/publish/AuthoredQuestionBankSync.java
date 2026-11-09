@@ -66,7 +66,8 @@ final class AuthoredQuestionBankSync {
         metadata.put("slideId", compiled.sourceSlideId());
         question.setMetadata(metadata);
         question.setSettings(Map.of());
-        Question saved = questions.save(question);
+        // Flush now: quiz_version_questions.bank_question_id is a real FK and Hibernate may order that insert first.
+        Question saved = questions.saveAndFlush(question);
         return (saved == null ? question : saved).getId();
     }
 
