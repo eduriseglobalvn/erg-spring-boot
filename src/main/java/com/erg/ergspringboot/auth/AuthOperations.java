@@ -14,6 +14,7 @@ import com.erg.ergspringboot.auth.internal.login.AuthLoginUseCase;
 import com.erg.ergspringboot.auth.internal.refresh.AuthRefreshUseCase;
 import com.erg.ergspringboot.auth.internal.security.AuthSecurityQueryUseCase;
 import com.erg.ergspringboot.auth.internal.session.AuthSessionLifecycleUseCase;
+import com.erg.ergspringboot.platform.security.TenantContext;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -59,7 +60,11 @@ public class AuthOperations {
     }
 
     public TokenResponse refresh(RefreshRequest request, AuthClientContext context) {
-        return refreshFlow.refresh(request, context);
+        // The access token has usually expired, so no tenant is known yet: the token hash finds the session across
+        // tenants and refresh_token_history's RLS policy rejects writes without one. Same system scope as the jobs.
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.maintenance())) {
+            return refreshFlow.refresh(request, context);
+        }
     }
 
     public void logout(String userId, String tenantId, String sessionId) {
