@@ -160,7 +160,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.categoryId,
                 q.questionIds,
                 q.ownerUserId,
-                q.updatedAt
+                q.updatedAt,
+                (select count(v) from QuizVersionQuestion v, QuizVersion qv
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -194,7 +196,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.categoryId,
                 q.questionIds,
                 q.ownerUserId,
-                q.updatedAt
+                q.updatedAt,
+                (select count(v) from QuizVersionQuestion v, QuizVersion qv
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -226,7 +230,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.categoryId,
                 q.questionIds,
                 q.ownerUserId,
-                q.updatedAt
+                q.updatedAt,
+                (select count(v) from QuizVersionQuestion v, QuizVersion qv
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -258,7 +264,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.categoryId,
                 q.questionIds,
                 q.ownerUserId,
-                q.updatedAt
+                q.updatedAt,
+                (select count(v) from QuizVersionQuestion v, QuizVersion qv
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
             )
             from Quiz q
             where q.tenantId = :tenantId
