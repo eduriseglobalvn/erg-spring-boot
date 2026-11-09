@@ -68,7 +68,7 @@ class LcmsQuizPackageSettingsHttpContractTest {
         assertThat(workspaceReadService.questionBankWorkspace("erg", null, null, null, null, null, null, false, 0, 50).quizzes())
                 .filteredOn(quiz -> quiz.id().equals(quizId))
                 .singleElement()
-                .satisfies(quiz -> assertThat(quiz.durationLabel()).isEqualTo("15 phut"));
+                .satisfies(quiz -> assertThat(quiz.durationLabel()).isEqualTo("15 phút"));
 
         mockMvc.perform(as(patch("/api/v1/lcms/quizzes/{quizId}", quizId)).content("{\"title\":\"  Renamed  \",\"kind\":\"TEST\"}"))
                 .andExpect(status().isOk())

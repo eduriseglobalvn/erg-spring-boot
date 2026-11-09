@@ -118,7 +118,7 @@ final class LcmsWorkspaceResponseMapper {
                 option.subjectId(),
                 option.levelId(),
                 blankToDefault(option.description(), option.label()),
-                "Toan cong ty",
+                "Toàn công ty",
                 categoryIds,
                 questionCount
         );
@@ -138,7 +138,7 @@ final class LcmsWorkspaceResponseMapper {
         if (schoolId != null) {
             return schoolId;
         }
-        return "global".equalsIgnoreCase(type) ? "Toan cong ty" : type;
+        return "global".equalsIgnoreCase(type) ? "Toàn công ty" : type;
     }
 
     private static String recommendedCluster(QuestionBankQuestionProjection question) {
@@ -148,6 +148,8 @@ final class LcmsWorkspaceResponseMapper {
 
     static QuestionBankQuizOptionResponse toQuizOption(QuestionBankQuizOptionProjection option, Map<String, Object> draftSettings) {
         List<String> questionIds = cleanStrings(option.questionIds());
+        long published = option.publishedQuestionCount() == null ? 0 : option.publishedQuestionCount();
+        int questionCount = (int) Math.max(questionIds.size(), published);
         return new QuestionBankQuizOptionResponse(
                 option.id(),
                 blankToDefault(option.title(), option.id()),
@@ -157,9 +159,9 @@ final class LcmsWorkspaceResponseMapper {
                 option.levelId(),
                 option.categoryId(),
                 questionIds,
-                questionIds.size(),
-                durationLabel(draftSettings, questionIds.size(), option.kind()),
-                "Toan cong ty",
+                questionCount,
+                durationLabel(draftSettings, questionCount, option.kind()),
+                "Toàn công ty",
                 sourceMode(option.kind()),
                 blankToDefault(option.ownerUserId(), "Academic team"),
                 option.updatedAt() == null ? null : option.updatedAt().toString()
@@ -170,7 +172,7 @@ final class LcmsWorkspaceResponseMapper {
     static String durationLabel(Map<String, Object> draftSettings, int questionCount, String kind) {
         if (draftSettings != null && draftSettings.get("settings") instanceof Map<?, ?> settings) {
             int minutes = minutesOf(settings.get("timeLimit"));
-            return Boolean.TRUE.equals(settings.get("enableTimeLimit")) && minutes > 0 ? minutes + " phut" : "Khong gioi han";
+            return Boolean.TRUE.equals(settings.get("enableTimeLimit")) && minutes > 0 ? minutes + " phút" : "Không giới hạn";
         }
         return durationLabel(questionCount, kind);
     }
@@ -188,7 +190,7 @@ final class LcmsWorkspaceResponseMapper {
 
     private static String durationLabel(int questionCount, String kind) {
         int minutesPerQuestion = "test".equalsIgnoreCase(blankToNull(kind)) ? 2 : 3;
-        return Math.max(5, questionCount * minutesPerQuestion) + " phut";
+        return Math.max(5, questionCount * minutesPerQuestion) + " phút";
     }
 
     private static String sourceMode(String kind) {

@@ -92,12 +92,12 @@ class LcmsWorkspaceReadServiceTest {
     @Test
     void quizDurationComesFromTheDraftTimeLimit() {
         assertThat(LcmsWorkspaceResponseMapper.durationLabel(
-                Map.of("settings", Map.of("enableTimeLimit", true, "timeLimit", "15:00")), 3, "train")).isEqualTo("15 phut");
+                Map.of("settings", Map.of("enableTimeLimit", true, "timeLimit", "15:00")), 3, "train")).isEqualTo("15 phút");
         assertThat(LcmsWorkspaceResponseMapper.durationLabel(
-                Map.of("settings", Map.of("enableTimeLimit", false, "timeLimit", "15:00")), 3, "train")).isEqualTo("Khong gioi han");
+                Map.of("settings", Map.of("enableTimeLimit", false, "timeLimit", "15:00")), 3, "train")).isEqualTo("Không giới hạn");
         assertThat(LcmsWorkspaceResponseMapper.durationLabel(
-                Map.of("settings", Map.of("enableTimeLimit", true, "timeLimit", "bad")), 3, "train")).isEqualTo("Khong gioi han");
-        assertThat(LcmsWorkspaceResponseMapper.durationLabel(null, 3, "train")).isEqualTo("9 phut");
+                Map.of("settings", Map.of("enableTimeLimit", true, "timeLimit", "bad")), 3, "train")).isEqualTo("Không giới hạn");
+        assertThat(LcmsWorkspaceResponseMapper.durationLabel(null, 3, "train")).isEqualTo("9 phút");
     }
 
     @Test
@@ -200,13 +200,13 @@ class LcmsWorkspaceReadServiceTest {
         assertThat(response.questions().items().getFirst().usageCount()).isEqualTo(3L);
         assertThat(response.questions().items().getFirst().schoolsUsing()).isEqualTo(4);
         assertThat(response.questions().items().getFirst().scopeType()).isEqualTo("global");
-        assertThat(response.questions().items().getFirst().scopeLabel()).isEqualTo("Toan cong ty");
+        assertThat(response.questions().items().getFirst().scopeLabel()).isEqualTo("Toàn công ty");
         assertThat(response.questions().items().getFirst().subjectLabel()).isEqualTo("Toan");
         assertThat(response.questions().items().getFirst().gradeLabel()).isEqualTo("Toan");
         assertThat(response.questions().items().getFirst().recommendedCluster()).isEqualTo("ERG");
-        assertThat(response.subjects()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("math", "Toan", null, null, "Toan", "Toan cong ty", List.of(), null));
-        assertThat(response.levels()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("level-1", "Grade 10", "math", null, "Grade 10", "Toan cong ty", List.of("topic-1"), null));
-        assertThat(response.topics()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("topic-1", "Polynomial", null, "level-1", "Polynomial", "Toan cong ty", List.of(), 3));
+        assertThat(response.subjects()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("math", "Toan", null, null, "Toan", "Toàn công ty", List.of(), null));
+        assertThat(response.levels()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("level-1", "Grade 10", "math", null, "Grade 10", "Toàn công ty", List.of("topic-1"), null));
+        assertThat(response.topics()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("topic-1", "Polynomial", null, "level-1", "Polynomial", "Toàn công ty", List.of(), 3));
         assertThat(response.quizzes()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankQuizOptionResponse(
                 "quiz-1",
                 "Midterm",
@@ -217,8 +217,8 @@ class LcmsWorkspaceReadServiceTest {
                 "topic-1",
                 List.of("q-1"),
                 1,
-                "5 phut",
-                "Toan cong ty",
+                "5 phút",
+                "Toàn công ty",
                 "manual",
                 "author-1",
                 null
