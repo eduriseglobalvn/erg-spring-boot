@@ -65,6 +65,7 @@ public class QuizPublishService {
     private final AssessmentCurriculumBridge assessmentCurriculumBridge;
     private final ContentLifecyclePort lifecycle;
     private final QuizDraftCompiler draftCompiler;
+    private final AuthoredQuestionBankSync authoredBankSync;
     private final QuizPackageAssembler packageAssembler;
     private final QuizPublishCacheEvictor cacheEvictor;
 
@@ -97,6 +98,7 @@ public class QuizPublishService {
         this.assessmentCurriculumBridge = assessmentCurriculumBridge;
         this.lifecycle = lifecycle;
         this.draftCompiler = new QuizDraftCompiler(bankQuestionRepository, quizQuestionRepository, compileService);
+        this.authoredBankSync = new AuthoredQuestionBankSync(bankQuestionRepository);
         this.packageAssembler = new QuizPackageAssembler(packageSigner, objectMapper);
         this.cacheEvictor = new QuizPublishCacheEvictor(cacheManager);
     }
@@ -179,7 +181,7 @@ public class QuizPublishService {
         version.setIdempotencyKey(key);
         QuizVersion savedVersion = quizVersionRepository.save(version);
 
-        persistSections(tenantId, savedVersion.getId(), compiled);
+        persistSections(tenantId, savedVersion.getId(), compiled, quiz, userId, previousBankLinks(tenantId, quiz.getCurrentVersionId()));
 
         QuizPackage pkg = packageAssembler.buildPackage(
                 tenantId,
@@ -235,7 +237,19 @@ public class QuizPublishService {
         return new ForkResponse(savedDraft.getId(), 0L, version.getVersionLabel());
     }
 
-    private void persistSections(String tenantId, String versionId, CompiledQuiz compiled) {
+    /** slide id -> bank question the previous version of this quiz mirrored it to (empty for a first publish). */
+    private Map<String, String> previousBankLinks(String tenantId, String previousVersionId) {
+        Map<String, String> links = new LinkedHashMap<>();
+        if (previousVersionId == null) return links;
+        for (QuizVersionQuestion previous : versionQuestionRepository.findByQuizVersionIdOrderByOrderIndexAsc(previousVersionId)) {
+            if (previous.getSourceSlideId() != null && previous.getBankQuestionId() != null && !previous.getBankQuestionId().isBlank()) {
+                links.put(previous.getSourceSlideId(), previous.getBankQuestionId());
+            }
+        }
+        return links;
+    }
+
+    private void persistSections(String tenantId, String versionId, CompiledQuiz compiled, Quiz quiz, String userId, Map<String, String> previousBankLinks) {
         Map<String, String> sectionIdMap = new LinkedHashMap<>();
         for (CompiledSection section : compiled.sections()) {
             QuizVersionSection entity = new QuizVersionSection();
@@ -253,7 +267,11 @@ public class QuizPublishService {
             entity.setTenantId(tenantId);
             entity.setRuntimeQuestionId(question.runtimeQuestionId());
             entity.setSourceSlideId(question.sourceSlideId());
-            entity.setBankQuestionId(question.bankQuestionId());
+            String bankQuestionId = question.bankQuestionId();
+            if (bankQuestionId == null || bankQuestionId.isBlank()) {
+                bankQuestionId = authoredBankSync.upsert(tenantId, userId, quiz, question, previousBankLinks.get(question.sourceSlideId()));
+            }
+            entity.setBankQuestionId(bankQuestionId);
             entity.setKind(question.kind());
             entity.setAuthoringType(question.authoringType());
             entity.setPoints(question.points());

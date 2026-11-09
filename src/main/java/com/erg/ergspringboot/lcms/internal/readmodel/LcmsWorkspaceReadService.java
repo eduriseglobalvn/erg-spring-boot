@@ -113,6 +113,7 @@ public class LcmsWorkspaceReadService {
                         QuestionBankOptionProjection::levelId,
                         Collectors.mapping(QuestionBankOptionProjection::id, Collectors.toList())
                 ));
+        Map<String, Integer> topicQuestionCounts = topicQuestionCounts(normalizedTenantId, topicOptions);
         Page<QuestionBankQuestionProjection> questions = shouldIncludeQuestions
                 ? questionPage(
                         normalizedTenantId,
@@ -137,7 +138,7 @@ public class LcmsWorkspaceReadService {
                         .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, topicIdsByLevelId.getOrDefault(option.id(), List.of())))
                         .toList(),
                 topicOptions.stream()
-                        .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
+                        .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of(), topicQuestionCounts.getOrDefault(option.id(), 0)))
                         .toList(),
                 quizOptionResponses(
                         normalizedTenantId,
@@ -152,6 +153,13 @@ public class LcmsWorkspaceReadService {
                         )
                 )
         );
+    }
+
+    private Map<String, Integer> topicQuestionCounts(String tenantId, List<QuestionBankOptionProjection> topics) {
+        List<String> topicIds = topics.stream().map(QuestionBankOptionProjection::id).toList();
+        if (topicIds.isEmpty()) return Map.of();
+        return questionRepository.countActiveByTopic(tenantId, topicIds).stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> ((Number) row[1]).intValue()));
     }
 
     private Page<QuestionBankQuestionProjection> questionPage(

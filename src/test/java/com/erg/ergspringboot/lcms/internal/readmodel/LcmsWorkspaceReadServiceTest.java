@@ -166,6 +166,8 @@ class LcmsWorkspaceReadServiceTest {
                 )));
         when(quizQuestionRepository.countUsageByQuestionIds("tenant-a", List.of("q-1")))
                 .thenReturn(List.of(questionUsageCount("q-1", 3L)));
+        when(questionRepository.countActiveByTopic("tenant-a", List.of("topic-1")))
+                .thenReturn(List.<Object[]>of(new Object[] {"topic-1", 3L}));
 
         QuestionBankWorkspaceResponse response = service.questionBankWorkspace(
                 " tenant-a ",
@@ -201,9 +203,9 @@ class LcmsWorkspaceReadServiceTest {
         assertThat(response.questions().items().getFirst().subjectLabel()).isEqualTo("Toan");
         assertThat(response.questions().items().getFirst().gradeLabel()).isEqualTo("Toan");
         assertThat(response.questions().items().getFirst().recommendedCluster()).isEqualTo("ERG");
-        assertThat(response.subjects()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("math", "Toan", null, null, "Toan", "Toan cong ty", List.of()));
-        assertThat(response.levels()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("level-1", "Grade 10", "math", null, "Grade 10", "Toan cong ty", List.of("topic-1")));
-        assertThat(response.topics()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("topic-1", "Polynomial", null, "level-1", "Polynomial", "Toan cong ty", List.of()));
+        assertThat(response.subjects()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("math", "Toan", null, null, "Toan", "Toan cong ty", List.of(), null));
+        assertThat(response.levels()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("level-1", "Grade 10", "math", null, "Grade 10", "Toan cong ty", List.of("topic-1"), null));
+        assertThat(response.topics()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankOptionResponse("topic-1", "Polynomial", null, "level-1", "Polynomial", "Toan cong ty", List.of(), 3));
         assertThat(response.quizzes()).containsExactly(new com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankQuizOptionResponse(
                 "quiz-1",
                 "Midterm",
@@ -222,6 +224,7 @@ class LcmsWorkspaceReadServiceTest {
         ));
 
         verify(questionRepository).findQuestionBankQuestions("tenant-a", "algebra", "math", null, null, "active", pageRequest);
+        verify(questionRepository).countActiveByTopic("tenant-a", List.of("topic-1"));
         verify(subjectRepository).findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500));
         verify(levelRepository).findAssessmentOptions("tenant-a", "math", "active", PageRequest.of(0, 500));
         verify(topicRepository).findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500));

@@ -60,7 +60,7 @@ public class LmsResourceQueryUseCase {
                 throw new ForbiddenException("quiz is not assigned to the authenticated learner");
             }
             QuizPackageResponse published = packages.activePackage(tenant, quiz.getId()).orElse(null);
-            return published != null ? QuizRuntimePackageService.withoutAnswerKey(published) : legacy(quiz);
+            return published != null ? learnerView(published, false) : legacy(quiz);
         }
         Assignment assignment = policy.assignment(tenant, assignmentId);
         var assigned = policy.assignedQuiz(assignment, quiz.getId())
@@ -73,7 +73,30 @@ public class LmsResourceQueryUseCase {
                 ? packages.activePackage(tenant, quiz.getId())
                 : packages.packageForVersion(tenant, quiz.getId(), assigned.quizVersionId())).orElse(null);
         if (published == null) return legacy(quiz);
-        return assignment.isOfflineAllowed() ? published : QuizRuntimePackageService.withoutAnswerKey(published);
+        return learnerView(published, assignment.isOfflineAllowed());
+    }
+
+    /**
+     * Practice (non-test) quizzes grade and explain each answer in the browser, so they need the key; the final
+     * score is still recomputed on the server at submit. Test-mode quizzes only get the key when the assignment
+     * explicitly allows offline grading.
+     */
+    private QuizPackageResponse learnerView(QuizPackageResponse published, boolean offlineAllowed) {
+        return offlineAllowed || isPractice(published) ? published : QuizRuntimePackageService.withoutAnswerKey(published);
+    }
+
+    /** Mirrors the player: anything that is not explicitly "test"/"testing" runs as practice. */
+    static boolean isPractice(QuizPackageResponse published) {
+        Object mode = null;
+        Map<String, Object> settings = published.quiz() == null ? null : published.quiz().settings();
+        if (settings != null) {
+            Object nested = settings.get("settings");
+            Map<?, ?> source = nested instanceof Map<?, ?> m ? m : settings;
+            mode = source.get("mode");
+        }
+        if (mode == null && published.quiz() != null && published.quiz().quiz() != null) mode = published.quiz().quiz().kind();
+        String value = mode == null ? "" : mode.toString().trim().toLowerCase();
+        return !value.equals("test") && !value.equals("testing");
     }
 
     private QuizPackageResponse legacy(Quiz quiz) {

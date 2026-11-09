@@ -400,7 +400,8 @@ class LmsReadModelServiceTest {
                 "teacher-1",
                 "CLASS",
                 now.minusDays(1),
-                now
+                now,
+                null
         );
         PageRequest clampedPage = PageRequest.of(
                 2,
@@ -523,7 +524,8 @@ class LmsReadModelServiceTest {
                         "teacher-1",
                         "CLASS",
                         now.minusDays(2),
-                        now
+                        now,
+                        null
                 ),
                 new AssignmentCardProjection(
                         "assignment-2",
@@ -535,7 +537,8 @@ class LmsReadModelServiceTest {
                         "teacher-1",
                         "CLASS",
                         now.minusDays(1),
-                        now
+                        now,
+                        null
                 )
         );
         when(assignmentRepository.findClassAssignmentCards("erg", "class-1", null, assignmentPage))
@@ -690,7 +693,8 @@ class LmsReadModelServiceTest {
                 "teacher-1",
                 "CLASS",
                 now.minusDays(1),
-                now
+                now,
+                null
         );
         when(assignmentRepository.findTeacherAssignmentCards("erg", "teacher-1", "active", clampedPage))
                 .thenReturn(new PageImpl<>(List.of(assignment), clampedPage, 101));
