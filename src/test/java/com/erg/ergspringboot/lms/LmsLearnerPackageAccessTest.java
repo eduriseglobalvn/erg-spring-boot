@@ -57,6 +57,8 @@ class LmsLearnerPackageAccessTest {
         QuizPackageResponse response = resources.getQuizPackage("quiz-1", "asg-1", learner);
 
         assertThat(response.answerKey()).isEmpty();
+        // The client echoes this id back when it starts an attempt; stripping the key must not drop it.
+        assertThat(response.id()).isEqualTo("pkg-1");
     }
 
     @Test
@@ -90,6 +92,6 @@ class LmsLearnerPackageAccessTest {
         QuizResponse quiz = new QuizResponse("quiz-1", new ContentScope(null, null), "Quiz", null, null, null,
                 List.of(), List.of(), "published", 1, "hash", null, null);
         return new QuizPackageResponse(1, "hash", "hash", "sig", "client-first",
-                new QuizDetailResponse(quiz, List.of(), Map.of(), Map.of(), Map.of()), Map.of("q1", Map.of("correctChoiceId", "a")));
+                new QuizDetailResponse(quiz, List.of(), Map.of(), Map.of(), Map.of()), Map.of("q1", Map.of("correctChoiceId", "a")), "pkg-1");
     }
 }

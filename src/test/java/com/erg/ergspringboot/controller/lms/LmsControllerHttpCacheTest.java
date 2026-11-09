@@ -92,6 +92,7 @@ class LmsControllerHttpCacheTest {
                 "signature",
                 "server-authoritative",
                 new QuizDetailResponse(quiz, List.of(), Map.of(), Map.of(), Map.of()),
-                Map.of());
+                Map.of(),
+                "pkg-1");
     }
 }

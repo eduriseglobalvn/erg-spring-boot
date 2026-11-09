@@ -84,7 +84,7 @@ public class LmsResourceQueryUseCase {
                 quiz.getPackageHash(), quiz.getCreatedAt(), quiz.getUpdatedAt());
         QuizDetailResponse detail = new QuizDetailResponse(response, list(quiz.getSlides()), map(quiz.getSettings()),
                 map(quiz.getResult()), map(quiz.getTheme()));
-        return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail, Map.of());
+        return new QuizPackageResponse(response.version(), response.packageHash(), response.packageHash(), "local", "async", detail, Map.of(), null);
     }
 
     private String tenant(String value) { return AuthenticatedTenant.require(value); }

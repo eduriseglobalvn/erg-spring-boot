@@ -81,7 +81,7 @@ public class QuizRuntimePackageService {
     public static QuizPackageResponse withoutAnswerKey(QuizPackageResponse response) {
         if (response == null || response.answerKey() == null || response.answerKey().isEmpty()) return response;
         return new QuizPackageResponse(response.version(), response.packageHash(), response.contentHash(),
-                response.signature(), response.gradingMode(), response.quiz(), Map.of());
+                response.signature(), response.gradingMode(), response.quiz(), Map.of(), response.id());
     }
 
     @SuppressWarnings("unchecked")
@@ -145,7 +145,8 @@ public class QuizRuntimePackageService {
                 pkg.getSignature(),
                 pkg.getGradingMode(),
                 detail,
-                answerKey
+                answerKey,
+                pkg.getId()
         );
     }
 
