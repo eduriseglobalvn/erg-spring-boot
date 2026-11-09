@@ -94,8 +94,8 @@ class QuestionBankWorkspaceQueryCountIntegrationTest {
         long prepareStatementCount = statistics.getPrepareStatementCount();
         long entityLoadCount = statistics.getEntityLoadCount();
         assertThat(prepareStatementCount)
-                .as("questionBankWorkspace should use bounded question page/count/options/quiz/usage/draft-settings queries")
-                .isLessThanOrEqualTo(8);
+                .as("questionBankWorkspace should use bounded question page/count/options/quiz/usage/draft-settings/topic-count queries")
+                .isLessThanOrEqualTo(9);
         assertThat(entityLoadCount)
                 .as("projection read should not materialize question/quiz/taxonomy graphs")
                 .isZero();
