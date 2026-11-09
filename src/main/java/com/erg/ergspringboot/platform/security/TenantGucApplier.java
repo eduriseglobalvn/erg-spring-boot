@@ -49,6 +49,29 @@ public final class TenantGucApplier {
         }
     }
 
+    /**
+     * Session-level variant for a connection just taken from the pool: sets the context, or clears what a previous
+     * borrower left (no context = unset, as on a fresh connection), so queries Hibernate runs outside a Spring
+     * transaction are scoped too. Commits when auto-commit is off, so the setting outlives the implicit transaction.
+     */
+    public static void applySession(Connection connection, TenantContext context) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "select set_config(?, ?, false), set_config(?, ?, false), set_config(?, ?, false), set_config(?, ?, false)")) {
+            statement.setString(1, TENANT_GUC);
+            statement.setString(2, context == null ? "" : normalize(context.tenantId()));
+            statement.setString(3, USER_GUC);
+            statement.setString(4, context == null ? "" : normalize(context.userId()));
+            statement.setString(5, PORTAL_GUC);
+            statement.setString(6, context == null ? "" : normalize(context.portal()));
+            statement.setString(7, MAINTENANCE_GUC);
+            statement.setString(8, context == null ? "" : Boolean.toString(context.isMaintenance()));
+            statement.execute();
+        }
+        if (!connection.getAutoCommit()) {
+            connection.commit();
+        }
+    }
+
     private static String normalize(String value) {
         return value == null ? "" : value;
     }

@@ -140,6 +140,7 @@ class LcmsWorkspaceReadServiceTest {
                         82.0,
                         2,
                         4,
+                        null,
                         null
                 )),
                 pageRequest,

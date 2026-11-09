@@ -42,24 +42,24 @@ public class CurriculumOperations {
         return treeQueries.tree(status, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumSubjectResponse createSubject(
             CurriculumNodeRequest request, UserAccessContext access) {
         return commands.createSubject(request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumSubjectResponse updateSubject(
             String id, CurriculumNodeRequest request, UserAccessContext access) {
         return commands.updateSubject(id, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumSubjectResponse archiveSubject(String id, UserAccessContext access) {
         return commands.archiveSubject(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumHardDeleteResponse hardDeleteSubject(String id, UserAccessContext access) {
         return commands.hardDeleteSubject(id, access);
     }
@@ -68,24 +68,24 @@ public class CurriculumOperations {
         return impactQueries.subjectImpact(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumLevelResponse createLevel(
             String subjectId, CurriculumNodeRequest request, UserAccessContext access) {
         return commands.createLevel(subjectId, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumLevelResponse updateLevel(
             String id, CurriculumNodeRequest request, UserAccessContext access) {
         return commands.updateLevel(id, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumLevelResponse archiveLevel(String id, UserAccessContext access) {
         return commands.archiveLevel(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumHardDeleteResponse hardDeleteLevel(String id, UserAccessContext access) {
         return commands.hardDeleteLevel(id, access);
     }
@@ -94,24 +94,24 @@ public class CurriculumOperations {
         return impactQueries.levelImpact(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumTopicResponse createTopic(
             String levelId, CurriculumNodeRequest request, UserAccessContext access) {
         return commands.createTopic(levelId, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumTopicResponse updateTopic(
             String id, CurriculumNodeRequest request, UserAccessContext access) {
         return commands.updateTopic(id, request, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumTopicResponse archiveTopic(String id, UserAccessContext access) {
         return commands.archiveTopic(id, access);
     }
 
-    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary"}, allEntries = true)
+    @CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public CurriculumHardDeleteResponse hardDeleteTopic(String id, UserAccessContext access) {
         return commands.hardDeleteTopic(id, access);
     }

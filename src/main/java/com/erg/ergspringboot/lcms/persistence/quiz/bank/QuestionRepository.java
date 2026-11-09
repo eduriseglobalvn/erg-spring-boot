@@ -78,7 +78,8 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
                         q.masteryRate,
                         q.usageCount,
                         q.schoolsUsing,
-                        q.updatedAt
+                        q.updatedAt,
+                        q.content
                     )
                     from Question q
                     left join Subject s on s.tenantId = q.tenantId and s.id = q.subjectId
@@ -139,7 +140,8 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
                         q.masteryRate,
                         q.usageCount,
                         q.schoolsUsing,
-                        q.updatedAt
+                        q.updatedAt,
+                        q.content
                     )
                     from Question q
                     left join Subject s on s.tenantId = q.tenantId and s.id = q.subjectId

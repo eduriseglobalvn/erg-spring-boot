@@ -75,6 +75,7 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
 
     @Override
     @Transactional(value = "postgresTransactionManager")
+    @org.springframework.cache.annotation.CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public LifecycleResponse transition(
             UserAccessContext access,
             LifecycleResourceKind kind,

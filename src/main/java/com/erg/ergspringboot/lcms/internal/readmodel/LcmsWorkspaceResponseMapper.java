@@ -14,11 +14,19 @@ import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
+import tools.jackson.databind.ObjectMapper;
 
 /** Maps LCMS workspace read projections to the published workspace response rows. */
 final class LcmsWorkspaceResponseMapper {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private LcmsWorkspaceResponseMapper() {
+    }
+
+    private static String runtimeQuestionJson(Map<String, Object> content) {
+        Object runtime = content == null ? null : content.get("runtimeQuestion");
+        return runtime == null ? null : JSON.writeValueAsString(runtime);
     }
 
     static PageResponse<QuestionBankQuestionRowResponse> toQuestionPage(
@@ -58,7 +66,8 @@ final class LcmsWorkspaceResponseMapper {
                         question.updatedAt() == null ? null : question.updatedAt().toString(),
                         recommendedCluster(question),
                         null,
-                        question.updatedAt() == null ? null : question.updatedAt().toString()
+                        question.updatedAt() == null ? null : question.updatedAt().toString(),
+                        runtimeQuestionJson(question.content())
                 ))
                 .toList();
         return new PageResponse<>(

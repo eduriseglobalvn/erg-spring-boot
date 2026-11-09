@@ -763,6 +763,8 @@ type QuestionBankQuestionRow {
   recommendedCluster: String
   rationale: String
   updatedAt: String
+  "JSON of the editor question this row mirrors; null for questions typed into the bank."
+  runtimeQuestion: String
 }
 
 type QuestionBankChoice {

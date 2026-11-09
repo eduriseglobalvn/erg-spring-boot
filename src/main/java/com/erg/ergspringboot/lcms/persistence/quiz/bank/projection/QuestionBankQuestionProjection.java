@@ -4,6 +4,7 @@ import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 public record QuestionBankQuestionProjection(
         String id,
@@ -25,6 +26,7 @@ public record QuestionBankQuestionProjection(
         Double masteryRate,
         Integer usageCount,
         Integer schoolsUsing,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        Map<String, Object> content
 ) {
 }
