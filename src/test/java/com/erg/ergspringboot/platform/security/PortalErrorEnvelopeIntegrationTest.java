@@ -51,6 +51,16 @@ class PortalErrorEnvelopeIntegrationTest {
     }
 
     @org.junit.jupiter.api.Test
+    void authenticationErrorsCarryCorsSoTheBrowserCanSeeThe401() throws Exception {
+        // Without the header the browser reports "Failed to fetch" and the app never refreshes its expired token.
+        mockMvc.perform(post("/api/v1/lcms/quizzes").header("Origin", "http://localhost:3001")
+                        .header("Authorization", "Bearer expired.token.value"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3001"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @org.junit.jupiter.api.Test
     void publicAuthValidationUsesTheSameStableEnvelope() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                         .header("X-Request-ID", "req-validation")
