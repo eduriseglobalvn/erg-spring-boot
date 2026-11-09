@@ -8736,6 +8736,11 @@
             "minLength": 0,
             "type": "string"
           },
+          "password": {
+            "maxLength": 128,
+            "minLength": 6,
+            "type": "string"
+          },
           "phone": {
             "maxLength": 64,
             "minLength": 0,
@@ -12513,6 +12518,9 @@
             "type": "string"
           },
           "gradingMode": {
+            "type": "string"
+          },
+          "id": {
             "type": "string"
           },
           "packageHash": {
