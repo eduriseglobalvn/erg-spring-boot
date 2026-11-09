@@ -9,10 +9,8 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
-import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
@@ -51,6 +49,7 @@ public class LmsOperationalCommandService {
     private final UserActivityRepository activities;
     private final UserRepository users;
     private final LmsOperationalScopeGuard guard;
+    private final StudentAccountProvisioner accounts;
 
 
     public LmsOperationalCommandService(
@@ -61,6 +60,20 @@ public class LmsOperationalCommandService {
             EducationUnitRepository schools,
             UserActivityRepository activities,
             UserRepository users) {
+        this(classrooms, students, subjects, enrollments, schools, activities, users, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    LmsOperationalCommandService(
+            ClassroomRepository classrooms,
+            StudentRepository students,
+            SubjectRepository subjects,
+            StudentEnrollmentRepository enrollments,
+            EducationUnitRepository schools,
+            UserActivityRepository activities,
+            UserRepository users,
+            StudentAccountProvisioner accounts) {
+        this.accounts = accounts;
         this.users = users;
         this.classrooms = classrooms;
         this.students = students;
@@ -153,6 +166,7 @@ public class LmsOperationalCommandService {
         student.setAcademicClassId(classroom == null ? null : classroom.getId());
         applyStudent(student, request);
         linkAuthUser(access, student, request.authUserId());
+        provisionAccount(access, schoolId, student, request);
         student.setStudentCode(code);
         student.setFullName(required(request.fullName(), "Student name"));
         student.setStatus(status(request.status(), "ENROLLED"));
@@ -211,11 +225,22 @@ public class LmsOperationalCommandService {
         int replayed = 0;
         for (CreateStudentRequest item : request.items()) {
             var existing = students.findByTenantIdAndStudentCodeIgnoreCase(access.tenantId(), item.studentCode().trim());
+            if (existing.isPresent()
+                    && !normalize(existing.get().getFullName()).equals(normalize(item.fullName()))) {
+                throw new ConflictException("Import student code belongs to a different student.");
+            }
+            // An account import for a student already on the roster (same class + name, imported earlier without
+            // a login) gives that student its account instead of creating a duplicate.
+            if (existing.isEmpty() && trim(item.password()) != null) {
+                existing = unlinkedClassmate(schoolId, item, access);
+            }
             if (existing.isPresent()) {
-                if (!normalize(existing.get().getFullName()).equals(normalize(item.fullName()))) {
-                    throw new ConflictException("Import student code belongs to a different student.");
+                Student student = existing.get();
+                if (trim(item.password()) != null && student.getAuthUserId() == null) {
+                    result.add(studentResponse(attachAccount(access, schoolId, student, item)));
+                    continue;
                 }
-                result.add(studentResponse(existing.get()));
+                result.add(studentResponse(student));
                 replayed++;
                 continue;
             }
@@ -223,61 +248,6 @@ public class LmsOperationalCommandService {
         }
         audit(access, "LMS_STUDENT_IMPORT", schoolId, Map.of("requested", request.items().size(), "idempotencyKey", key == null ? "none" : key));
         return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayed, replayed, result);
-    }
-
-    @Transactional
-    @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
-    public SubjectResponse createSubject(CreateSubjectRequest request, UserAccessContext access) {
-        String schoolId = trim(request.schoolId());
-        if (schoolId != null) {
-            guard.assertSchool(access, schoolId);
-            guard.school(access, schoolId);
-        }
-        String code = required(request.code(), "Subject code");
-        if (subjects.findByTenantIdAndCodeIgnoreCase(access.tenantId(), code).isPresent()) {
-            throw new ConflictException("Subject code already exists in this tenant.");
-        }
-        Subject subject = new Subject();
-        subject.setId(IdGenerator.newId());
-        subject.setTenantId(access.tenantId());
-        subject.setScope(new ContentScope(schoolId == null ? "tenant" : "school", schoolId));
-        subject.setName(required(request.name(), "Subject name"));
-        subject.setCode(code);
-        subject.setStatus(status(request.status(), "ACTIVE"));
-        Subject saved = subjects.save(subject);
-        audit(access, "LMS_SUBJECT_CREATED", saved.getId(), Map.of("schoolId", schoolId == null ? "tenant" : schoolId));
-        return subjectResponse(saved);
-    }
-
-    @Transactional
-    @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
-    public SubjectResponse updateSubject(String subjectId, UpdateSubjectRequest request, UserAccessContext access) {
-        Subject subject = guard.subject(access, subjectId);
-        guard.assertSubjectScope(access, subject);
-        assertVersion(request.version(), subject.getRecordVersion(), "Subject");
-        if (request.code() != null && !normalize(request.code()).equals(normalize(subject.getCode()))) {
-            subjects.findByTenantIdAndCodeIgnoreCase(access.tenantId(), request.code().trim())
-                    .filter(existing -> !existing.getId().equals(subjectId))
-                    .ifPresent(existing -> { throw new ConflictException("Subject code already exists in this tenant."); });
-            subject.setCode(required(request.code(), "Subject code"));
-        }
-        if (request.name() != null) subject.setName(required(request.name(), "Subject name"));
-        if (request.status() != null) subject.setStatus(status(request.status(), subject.getStatus()));
-        Subject saved = subjects.save(subject);
-        audit(access, "LMS_SUBJECT_UPDATED", saved.getId(), Map.of("scope", "tenant"));
-        return subjectResponse(saved);
-    }
-
-    @Transactional
-    @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
-    public SubjectResponse archiveSubject(String subjectId, Long version, UserAccessContext access) {
-        Subject subject = guard.subject(access, subjectId);
-        guard.assertSubjectScope(access, subject);
-        assertVersion(version, subject.getRecordVersion(), "Subject");
-        subject.setStatus("ARCHIVED");
-        Subject saved = subjects.save(subject);
-        audit(access, "LMS_SUBJECT_ARCHIVED", saved.getId(), Map.of("scope", "tenant"));
-        return subjectResponse(saved);
     }
 
     @Transactional
@@ -354,6 +324,32 @@ public class LmsOperationalCommandService {
                 .filter(existing -> !existing.getId().equals(student.getId()))
                 .ifPresent(existing -> { throw new ConflictException("Login account is already linked to another student."); });
         student.setAuthUserId(authUserId);
+    }
+
+    private java.util.Optional<Student> unlinkedClassmate(String schoolId, CreateStudentRequest item, UserAccessContext access) {
+        String classId = trim(item.academicClassId());
+        if (classId == null) return java.util.Optional.empty();
+        return students.findByTenantIdAndAcademicClassIdOrderByFullNameAsc(access.tenantId(), classId).stream()
+                .filter(student -> schoolId.equals(student.getSchoolId()) && student.getAuthUserId() == null)
+                .filter(student -> normalize(student.getFullName()).equals(normalize(item.fullName())))
+                .findFirst();
+    }
+
+    private Student attachAccount(UserAccessContext access, String schoolId, Student student, CreateStudentRequest item) {
+        if (accounts == null) throw new BadRequestException("Student account creation is not available.");
+        student.setAuthUserId(accounts.provision(access, schoolId, trim(item.username()), trim(item.email()),
+                student.getFullName(), trim(item.phone()), item.password()));
+        if (trim(student.getUsername()) == null) student.setUsername(trim(item.username()));
+        Student saved = students.save(student);
+        audit(access, "LMS_STUDENT_ACCOUNT_CREATED", saved.getId(), Map.of("schoolId", schoolId));
+        return saved;
+    }
+
+    private void provisionAccount(UserAccessContext access, String schoolId, Student student, CreateStudentRequest request) {
+        if (trim(request.password()) == null || student.getAuthUserId() != null) return;
+        if (accounts == null) throw new BadRequestException("Student account creation is not available.");
+        student.setAuthUserId(accounts.provision(access, schoolId, trim(request.username()), trim(request.email()),
+                trim(request.fullName()), trim(request.phone()), request.password()));
     }
 
     private void applyStudent(Student student, CreateStudentRequest request) {

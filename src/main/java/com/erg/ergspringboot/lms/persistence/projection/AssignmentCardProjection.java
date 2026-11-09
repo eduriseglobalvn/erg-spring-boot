@@ -12,6 +12,7 @@ public record AssignmentCardProjection(
         String assignedBy,
         String recipientMode,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        String title
 ) {
 }

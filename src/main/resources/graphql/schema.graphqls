@@ -508,6 +508,7 @@ type HomeworkAssignmentCard {
   resources: [AssignmentResource!]!
   createdAt: String
   updatedAt: String
+  title: String
 }
 
 type ClassOption {
@@ -778,6 +779,7 @@ type QuestionBankOption {
   description: String
   scopeLabel: String
   categoryIds: [String!]!
+  questionCount: Int
 }
 
 type QuestionBankQuizOption {

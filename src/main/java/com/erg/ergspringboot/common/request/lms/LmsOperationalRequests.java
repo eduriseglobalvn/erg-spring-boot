@@ -47,14 +47,16 @@ public final class LmsOperationalRequests {
             @Size(max = 1000) String note,
             @Size(max = 32) String status,
             /** Links the LMS student to its login account; validated against the caller's tenant. */
-            @Size(max = 36) String authUserId
+            @Size(max = 36) String authUserId,
+            /** When set (and no authUserId), the import also creates the student's login account with this password. */
+            @Size(min = 6, max = 128) String password
     ) {
         public CreateStudentRequest(String studentCode, String fullName, String academicClassId, String email,
                 String username, String gender, OffsetDateTime birthday, String phone, String address,
                 String parentName, String parentPhone, String parentEmail, String parentRelationship,
                 OffsetDateTime enrollmentDate, String note, String status) {
             this(studentCode, fullName, academicClassId, email, username, gender, birthday, phone, address,
-                    parentName, parentPhone, parentEmail, parentRelationship, enrollmentDate, note, status, null);
+                    parentName, parentPhone, parentEmail, parentRelationship, enrollmentDate, note, status, null, null);
         }
     }
 

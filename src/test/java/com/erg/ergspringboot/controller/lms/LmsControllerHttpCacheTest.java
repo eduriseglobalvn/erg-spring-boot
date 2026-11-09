@@ -56,7 +56,7 @@ class LmsControllerHttpCacheTest {
         String eTag = mockMvc.perform(get("/api/v1/lms/quizzes/quiz-1/package")
                         .header("X-Request-ID", "req-cache-1"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("ETag", "\"hash-1\""))
+                .andExpect(header().string("ETag", "\"hash-1|pkg-1\""))
                 .andExpect(header().string("Cache-Control", containsString("max-age=300")))
                 .andExpect(header().string("Cache-Control", containsString("private")))
                 .andExpect(jsonPath("$.data.contentHash", notNullValue()))
@@ -67,7 +67,7 @@ class LmsControllerHttpCacheTest {
         mockMvc.perform(get("/api/v1/lms/quizzes/quiz-1/package")
                         .header("If-None-Match", eTag))
                 .andExpect(status().isNotModified())
-                .andExpect(header().string("ETag", "\"hash-1\""));
+                .andExpect(header().string("ETag", "\"hash-1|pkg-1\""));
     }
 
     private QuizPackageResponse packageResponse() {
@@ -92,6 +92,7 @@ class LmsControllerHttpCacheTest {
                 "signature",
                 "server-authoritative",
                 new QuizDetailResponse(quiz, List.of(), Map.of(), Map.of(), Map.of()),
-                Map.of());
+                Map.of(),
+                "pkg-1");
     }
 }

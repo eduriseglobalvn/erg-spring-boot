@@ -99,6 +99,10 @@ final class LcmsWorkspaceResponseMapper {
     }
 
     static QuestionBankOptionResponse toQuestionBankOption(QuestionBankOptionProjection option, List<String> categoryIds) {
+        return toQuestionBankOption(option, categoryIds, null);
+    }
+
+    static QuestionBankOptionResponse toQuestionBankOption(QuestionBankOptionProjection option, List<String> categoryIds, Integer questionCount) {
         return new QuestionBankOptionResponse(
                 option.id(),
                 option.label(),
@@ -106,7 +110,8 @@ final class LcmsWorkspaceResponseMapper {
                 option.levelId(),
                 blankToDefault(option.description(), option.label()),
                 "Toan cong ty",
-                categoryIds
+                categoryIds,
+                questionCount
         );
     }
 
