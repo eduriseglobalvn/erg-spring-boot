@@ -56,7 +56,12 @@ public class AuthOperations {
     }
 
     public AuthResponse login(LoginRequest request, AuthClientContext context) {
-        return loginFlow.login(request, context);
+        // No tenant is known before the user is found, and user_role_assignments' RLS policy hides every row without
+        // one: a student, whose only grant is a school-scoped lms.learner assignment, got no permissions or portals
+        // back and was refused the student workspace. Same system scope as refresh; every query is keyed by user.
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.maintenance())) {
+            return loginFlow.login(request, context);
+        }
     }
 
     public TokenResponse refresh(RefreshRequest request, AuthClientContext context) {
