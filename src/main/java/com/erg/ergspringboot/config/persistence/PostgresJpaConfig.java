@@ -90,7 +90,7 @@ public class PostgresJpaConfig {
     ) {
         return JpaPersistenceSupport.entityManagerFactory(
                 "postgres",
-                dataSource,
+                new TenantGucDataSource(dataSource),
                 jpaProperties,
                 managedTypes
         );
