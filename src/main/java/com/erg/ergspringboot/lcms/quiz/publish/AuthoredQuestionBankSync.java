@@ -17,12 +17,12 @@ import java.util.Set;
  * show up under "Ngân hàng câu hỏi". Re-publishing updates the same bank row (the link is the previous version's
  * {@code bank_question_id} for the same source slide); a bank row someone archived is never resurrected.
  *
- * <p>shortcut: only single choice, multiple response, true/false and short answer are mirrored; matching, sequence,
- * fill-in and the rest keep living in the quiz alone until their bank {@code content} shape is mapped.
+ * Every question kind is mirrored: choice kinds also fill {@code choices}/{@code answer}, and every row keeps the
+ * editor's runtimeQuestion in {@code content.runtimeQuestion} so a package built from the bank gets the whole question.
  */
 final class AuthoredQuestionBankSync {
 
-    private static final Set<String> MIRRORED_KINDS = Set.of("single_choice", "multiple_response", "true_false", "short_answer");
+    private static final Set<String> CHOICE_KINDS = Set.of("single_choice", "multiple_response", "true_false");
     private static final int SCHEMA_VERSION = 1;
 
     private final QuestionRepository questions;
@@ -33,9 +33,9 @@ final class AuthoredQuestionBankSync {
 
     /** The bank question this compiled question maps to, or {@code null} when it is not mirrored. */
     String upsert(String tenantId, String userId, Quiz quiz, CompiledQuestion compiled, String previousBankQuestionId) {
-        if (!MIRRORED_KINDS.contains(compiled.kind())) return null;
         if (blank(quiz.getSubjectId()) || blank(quiz.getLevelId()) || blank(quiz.getCategoryId())) return null;
         String stem = text(compiled.body() == null ? null : compiled.body().get("title"));
+        if (stem == null && compiled.authoredQuestion() != null) stem = text(compiled.authoredQuestion().get("title"));
         if (stem == null) return null;
 
         Question question = blank(previousBankQuestionId) ? null
@@ -71,13 +71,30 @@ final class AuthoredQuestionBankSync {
         return (saved == null ? question : saved).getId();
     }
 
+    /** Retires bank rows the previous version mirrored from slides this version no longer has. */
+    void retireUnused(String tenantId, java.util.Collection<String> previous, java.util.Collection<String> kept) {
+        for (String id : previous) {
+            if (blank(id) || kept.contains(id)) continue;
+            questions.findByIdAndTenantId(id, tenantId)
+                    .filter(row -> row.getArchivedAt() == null && row.getMetadata() != null
+                            && "quiz-editor".equals(row.getMetadata().get("source")))
+                    .ifPresent(row -> {
+                        row.setArchivedAt(java.time.OffsetDateTime.now());
+                        questions.save(row);
+                    });
+        }
+    }
+
     private void fillAnswer(Question question, CompiledQuestion compiled) {
         Map<String, Object> key = compiled.answerKey() == null ? Map.of() : compiled.answerKey();
-        if (compiled.kind().equals("short_answer")) {
-            List<String> accepted = acceptedAnswers(key);
+        Map<String, Object> content = new LinkedHashMap<>();
+        if (compiled.authoredQuestion() != null) content.put("runtimeQuestion", compiled.authoredQuestion());
+        question.setContent(content);
+        if (!CHOICE_KINDS.contains(compiled.kind())) {
+            List<String> accepted = compiled.kind().equals("short_answer") ? acceptedAnswers(key) : List.of();
             question.setChoices(List.of());
             question.setAnswer(accepted.isEmpty() ? null : accepted.get(0));
-            question.setContent(Map.of("acceptedAnswers", accepted));
+            if (!accepted.isEmpty()) content.put("acceptedAnswers", accepted);
             return;
         }
         Set<String> correctIds = new java.util.LinkedHashSet<>();
@@ -98,7 +115,6 @@ final class AuthoredQuestionBankSync {
         }
         question.setChoices(choices);
         question.setAnswer(compiled.kind().equals("multiple_response") ? correctLabels : correctLabels.isEmpty() ? null : correctLabels.get(0));
-        question.setContent(Map.of());
     }
 
     private List<String> acceptedAnswers(Map<String, Object> key) {

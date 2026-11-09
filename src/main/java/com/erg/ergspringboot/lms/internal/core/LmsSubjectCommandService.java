@@ -46,7 +46,7 @@ public class LmsSubjectCommandService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public SubjectResponse createSubject(CreateSubjectRequest request, UserAccessContext access) {
         String schoolId = trim(request.schoolId());
         if (schoolId != null) {
@@ -70,7 +70,7 @@ public class LmsSubjectCommandService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public SubjectResponse updateSubject(String subjectId, UpdateSubjectRequest request, UserAccessContext access) {
         Subject subject = guard.subject(access, subjectId);
         guard.assertSubjectScope(access, subject);
@@ -89,7 +89,7 @@ public class LmsSubjectCommandService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsSchoolSubjects", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public SubjectResponse archiveSubject(String subjectId, Long version, UserAccessContext access) {
         Subject subject = guard.subject(access, subjectId);
         guard.assertSubjectScope(access, subject);

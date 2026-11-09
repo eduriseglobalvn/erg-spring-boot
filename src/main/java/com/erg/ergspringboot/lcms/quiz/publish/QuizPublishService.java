@@ -260,6 +260,7 @@ public class QuizPublishService {
             QuizVersionSection saved = sectionRepository.save(entity);
             sectionIdMap.put(section.sectionId(), saved.getId());
         }
+        java.util.Set<String> keptBankIds = new java.util.HashSet<>();
         for (CompiledQuestion question : compiled.questions()) {
             QuizVersionQuestion entity = new QuizVersionQuestion();
             entity.setQuizVersionId(versionId);
@@ -272,6 +273,7 @@ public class QuizPublishService {
                 bankQuestionId = authoredBankSync.upsert(tenantId, userId, quiz, question, previousBankLinks.get(question.sourceSlideId()));
             }
             entity.setBankQuestionId(bankQuestionId);
+            if (bankQuestionId != null) keptBankIds.add(bankQuestionId);
             entity.setKind(question.kind());
             entity.setAuthoringType(question.authoringType());
             entity.setPoints(question.points());
@@ -282,6 +284,7 @@ public class QuizPublishService {
             entity.setAnswerKey(question.answerKey().isEmpty() ? null : question.answerKey());
             versionQuestionRepository.save(entity);
         }
+        authoredBankSync.retireUnused(tenantId, previousBankLinks.values(), keptBankIds);
     }
 
     private Map<String, Object> snapshot(QuizDraft draft, Map<String, Object> curriculumSnapshot) {

@@ -104,7 +104,8 @@ public class QuizCompileService {
                         mapping.gradingPolicy(),
                         questionOrder++,
                         body,
-                        key
+                        key,
+                        slide.get("runtimeQuestion") instanceof Map<?, ?> authored ? (Map<String, Object>) authored : null
                 ));
             }
         }
@@ -196,7 +197,7 @@ public class QuizCompileService {
             BigDecimal points = q.points() != null ? q.points() : splitPoints(remainingCents, unsetIndex++, unsetCount);
             result.add(new CompiledQuestion(q.runtimeQuestionId(), q.sourceSlideId(), q.sectionId(), q.bankQuestionId(),
                     q.kind(), q.authoringType(), points, q.autoGradable(), q.gradingPolicy(), q.orderIndex(),
-                    q.body(), q.answerKey()));
+                    q.body(), q.answerKey(), q.authoredQuestion()));
         }
         return result;
     }

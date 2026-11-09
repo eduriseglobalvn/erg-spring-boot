@@ -34,7 +34,15 @@ public record CompiledQuiz(
             String gradingPolicy,
             int orderIndex,
             Map<String, Object> body,
-            Map<String, Object> answerKey
+            Map<String, Object> answerKey,
+            /** The editor's runtimeQuestion with its answers; only the question-bank mirror reads it, never the player. */
+            Map<String, Object> authoredQuestion
     ) {
+        public CompiledQuestion(String runtimeQuestionId, String sourceSlideId, String sectionId, String bankQuestionId,
+                String kind, String authoringType, java.math.BigDecimal points, boolean autoGradable, String gradingPolicy,
+                int orderIndex, Map<String, Object> body, Map<String, Object> answerKey) {
+            this(runtimeQuestionId, sourceSlideId, sectionId, bankQuestionId, kind, authoringType, points, autoGradable,
+                    gradingPolicy, orderIndex, body, answerKey, null);
+        }
     }
 }

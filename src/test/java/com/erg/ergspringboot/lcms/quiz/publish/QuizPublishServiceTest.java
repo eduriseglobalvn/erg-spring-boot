@@ -211,7 +211,7 @@ class QuizPublishServiceTest {
         assertThat(response.contentHash()).isEqualTo("sha256:abcdef1234567890");
         verify(packageSigner).contentHash("canonical-package-json");
         verify(packageSigner).sign("canonical-package-json");
-        verify(runtimeCache).evict("tenant-a:quiz-1");
+        verify(runtimeCache).clear();
         verify(quizRepository).save(quiz);
         verify(lifecycle).recordPublishedSnapshot("tenant-a", "quiz-1", "author-1", "publish-key-1");
         assertThat(statusSeenByLifecycle.get()).isNotEqualTo("unset").isNotEqualTo("published");

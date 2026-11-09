@@ -71,11 +71,39 @@ class AuthoredQuestionBankSyncTest {
     }
 
     @Test
-    void kindsWithoutAMappedBankShapeAndQuizzesWithoutPlacementAreSkipped() {
+    void everyKindIsMirroredWithTheEditorQuestion() {
+        when(repository.saveAndFlush(any(Question.class))).thenAnswer(call -> call.getArgument(0));
+        Map<String, Object> authored = Map.of("title", "Ghép cặp", "matching", List.of(Map.of("prompt", "CPU", "response", "Xử lý")));
         CompiledQuestion matching = new CompiledQuestion("q", "slide-1", "s", null, "matching", "matching", BigDecimal.TEN, true, "auto", 0,
-                Map.of("title", "Ghép cặp"), Map.of());
-        assertThat(sync.upsert("erg", "usr-1", quiz(), matching, null)).isNull();
+                Map.of("title", "Ghép cặp"), Map.of(), authored);
 
+        sync.upsert("erg", "usr-1", quiz(), matching, null);
+
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        verify(repository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getType()).isEqualTo("matching");
+        assertThat(captor.getValue().getChoices()).isEmpty();
+        assertThat(captor.getValue().getContent()).containsEntry("runtimeQuestion", authored);
+    }
+
+    @Test
+    void retiresOnlyRowsThisQuizMirroredThatTheNewVersionDropped() {
+        Question dropped = new Question();
+        dropped.setMetadata(Map.of("source", "quiz-editor"));
+        Question typedIntoBank = new Question();
+        typedIntoBank.setMetadata(Map.of());
+        when(repository.findByIdAndTenantId("old", "erg")).thenReturn(Optional.of(dropped));
+        when(repository.findByIdAndTenantId("manual", "erg")).thenReturn(Optional.of(typedIntoBank));
+
+        sync.retireUnused("erg", List.of("old", "kept", "manual"), java.util.Set.of("kept"));
+
+        assertThat(dropped.getArchivedAt()).isNotNull();
+        assertThat(typedIntoBank.getArchivedAt()).isNull();
+        verify(repository, never()).findByIdAndTenantId("kept", "erg");
+    }
+
+    @Test
+    void quizzesWithoutPlacementAreSkipped() {
         Quiz unplaced = new Quiz();
         assertThat(sync.upsert("erg", "usr-1", unplaced, single(), null)).isNull();
         verify(repository, never()).saveAndFlush(any());

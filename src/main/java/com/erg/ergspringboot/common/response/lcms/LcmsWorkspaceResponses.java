@@ -44,7 +44,9 @@ public final class LcmsWorkspaceResponses {
             String lastUsedAt,
             String recommendedCluster,
             String rationale,
-            String updatedAt
+            String updatedAt,
+            /** JSON of the editor question this row mirrors (any kind), so a package built from the bank gets all of it. */
+            String runtimeQuestion
     ) {
     }
 
