@@ -19,11 +19,12 @@ public final class AuthorizationCapabilityPolicy {
         if (requestedPortal == null || requestedPortal.isBlank()) {
             return true;
         }
+        List<String> workspaces = WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                principal.roles(), principal.permissions(), principal.deniedPermissions());
         return WorkspaceCapabilityMapper.fromLegacyPortal(requestedPortal)
-                .map(capability -> WorkspaceCapabilityMapper
-                        .canonicalWorkspacesFromVerifiedGrants(
-                                principal.roles(), principal.permissions(), principal.deniedPermissions())
-                        .contains(capability.name()))
+                .map(capability -> workspaces.contains(capability.name())
+                        // Learners play quizzes and submit attempts under /api/v1/lms; each endpoint still checks its permission.
+                        || (capability == WorkspaceCapability.TEACHER && workspaces.contains(WorkspaceCapability.STUDENT.name())))
                 .orElse(false);
     }
 

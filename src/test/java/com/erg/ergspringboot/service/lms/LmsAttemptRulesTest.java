@@ -162,7 +162,40 @@ class LmsAttemptRulesTest {
     }
 
     @Test
-    void runtimeDraftAnswerAndSyncDoNotPersistBeforeSubmit() {
+    void draftStoresAnswersOnTheOpenAttemptWithoutTouchingReadCaches() {
+        Attempt attempt = attempt();
+        when(fixture.attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
+        when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));
+        when(fixture.attempts.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.saveDraft(
+                "attempt-1",
+                new AttemptDraftRequest(Map.of("question-1", "A"), "hash-1", "1", List.of(), Map.of()),
+                access());
+
+        assertThat(response.answers()).containsKey("question-1");
+        assertThat(response.answers().get("question-1").answer()).isEqualTo("A");
+        assertThat(attempt.getStatus()).isEqualTo("in_progress");
+        verify(fixture.attempts).save(attempt);
+        verifyNoInteractions(fixture.events);
+        verifyAttemptReadCachesNotCleared();
+    }
+
+    @Test
+    void draftForAnotherPackageIsRejected() {
+        when(fixture.attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt()));
+        when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));
+
+        assertThatThrownBy(() -> service.saveDraft(
+                "attempt-1",
+                new AttemptDraftRequest(Map.of("question-1", "A"), "other-hash", "1", List.of(), Map.of()),
+                access()))
+                .hasMessageContaining("package_hash");
+        verify(fixture.attempts, never()).save(any());
+    }
+
+    @Test
+    void runtimeAnswerAndSyncDoNotPersistBeforeSubmit() {
         Attempt attempt = attempt();
         when(fixture.attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
         when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));
@@ -171,10 +204,6 @@ class LmsAttemptRulesTest {
                 "attempt-1",
                 "question-1",
                 new SaveAnswerRequest("A", Map.of(), OffsetDateTime.now(ZoneOffset.UTC)),
-                access());
-        service.saveDraft(
-                "attempt-1",
-                new AttemptDraftRequest(Map.of("question-1", "A"), "hash-1", "1", List.of(), Map.of()),
                 access());
         var sync = service.sync(
                 "attempt-1",

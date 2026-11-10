@@ -67,7 +67,9 @@ final class StudentDashboardCards {
                 projection.quizId(),
                 first(projection.title(), projection.subjectName(), projection.subjectId(), "Untitled assignment"),
                 assignmentStatus(projection),
-                projection.dueAt()
+                projection.dueAt(),
+                projection.handedInPercent(),
+                projection.handedInAt()
         );
     }
 

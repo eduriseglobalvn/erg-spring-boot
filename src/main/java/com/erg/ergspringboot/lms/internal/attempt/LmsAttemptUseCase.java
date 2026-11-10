@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Transactional attempt command boundary. It owns idempotency, attempt rules and grading orchestration. */
 @Service
 public class LmsAttemptUseCase {
+    private static final int MAX_DRAFT_ANSWERS = 500; // bounds one draft write; a quiz has far fewer questions
     private static final Logger log = LoggerFactory.getLogger(LmsAttemptUseCase.class);
     private final LmsAssignmentAccessPolicy policy;
     private final LmsQuizService quizzes;
@@ -140,16 +141,24 @@ public class LmsAttemptUseCase {
         return result;
     }
 
-    /**
-     * Legacy compatibility endpoint. Learner drafts stay in browser storage until submit, so this
-     * deliberately validates access without writing an attempt, event, sync receipt, or cache.
-     */
-    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    /** Keeps answers so far on the open attempt for resume (start returns them); submit merges and grades them. */
+    @Transactional("postgresTransactionManager")
     public AttemptResponse saveDraft(String id, AttemptDraftRequest request, UserAccessContext access) {
-        log.info("EXAM_ATTEMPT_DRAFT studentId={} attemptId={}", access.userId(), id);
         Attempt attempt = mutable(id, access).attempt();
         editable(attempt);
-        return response(attempt);
+        if (request == null || request.answers() == null || request.answers().isEmpty()) return response(attempt);
+        boolean otherPackage = request.packageHash() != null && !Objects.equals(attempt.getPackageHash(), request.packageHash());
+        if (otherPackage) throw new BadRequestException("package_hash conflict");
+        if (request.answers().size() > MAX_DRAFT_ANSWERS) throw new BadRequestException("too many answers in draft");
+        OffsetDateTime now = now();
+        Map<String, AttemptAnswer> answers = new LinkedHashMap<>(map(attempt.getAnswers()));
+        request.answers().forEach((questionId, value) -> {
+            if (questionId == null || questionId.isBlank() || questionId.matches(".*[.$].*")) throw new BadRequestException("invalid question id");
+            if (value == null) answers.remove(questionId); else answers.put(questionId, answer(questionId, value, Map.of(), now));
+        });
+        attempt.setAnswers(answers);
+        attempt.setLastActiveAt(now);
+        return response(attempts.save(attempt));
     }
 
     /** Legacy compatibility endpoint. Answers are accepted only in the final submit payload. */

@@ -124,6 +124,7 @@ class AssignmentRepositoryReadModelContractTest {
                 String.class,
                 String.class,
                 String.class,
+                java.util.Collection.class,
                 Pageable.class
         );
         Method activeCount = AssignmentRepository.class.getMethod(
