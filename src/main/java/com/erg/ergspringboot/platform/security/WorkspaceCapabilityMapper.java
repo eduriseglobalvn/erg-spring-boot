@@ -139,6 +139,17 @@ public final class WorkspaceCapabilityMapper {
     }
 
 
+    /**
+     * The learner role and the grants it holds share the {@code lms.} prefix with teacher grants
+     * (V4, V116); they mean the student workspace, never the teacher one.
+     */
+    private static boolean isLearnerLmsToken(String normalized) {
+        return normalized.equals("lms.learner")
+                || normalized.equals("lms.quiz.play")
+                || normalized.equals("lms.assignment.submit")
+                || (normalized.startsWith("lms.") && normalized.endsWith("_self"));
+    }
+
     private static Optional<WorkspaceCapability> fromCapabilityToken(String value) {
         if (value == null || value.isBlank()) return Optional.empty();
         String normalized = value.trim().toLowerCase(Locale.ROOT).replace('-', '_');
@@ -155,7 +166,7 @@ public final class WorkspaceCapabilityMapper {
                 if (normalized.startsWith("crm.")) {
                     yield Optional.of(WorkspaceCapability.CRM);
                 }
-                if (normalized.startsWith("elearning.") || normalized.startsWith("student.")) {
+                if (normalized.startsWith("elearning.") || normalized.startsWith("student.") || isLearnerLmsToken(normalized)) {
                     yield Optional.of(WorkspaceCapability.STUDENT);
                 }
                 if (normalized.startsWith("lms.") || normalized.startsWith("teacher.") || normalized.startsWith("instructor.")) {
@@ -183,7 +194,7 @@ public final class WorkspaceCapabilityMapper {
                     yield Optional.of(WorkspaceCapability.ADMIN);
                 }
                 if (normalized.startsWith("crm.")) yield Optional.of(WorkspaceCapability.CRM);
-                if (normalized.startsWith("elearning.") || normalized.startsWith("student.")) {
+                if (normalized.startsWith("elearning.") || normalized.startsWith("student.") || isLearnerLmsToken(normalized)) {
                     yield Optional.of(WorkspaceCapability.STUDENT);
                 }
                 if (normalized.startsWith("lms.") || normalized.startsWith("teacher.")
