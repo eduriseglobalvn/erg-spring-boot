@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackageRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
@@ -20,7 +21,7 @@ class QuizRuntimePackageServiceTest {
 
     private final QuizPackageRepository packages = mock(QuizPackageRepository.class);
     private final QuizVersionRepository versions = mock(QuizVersionRepository.class);
-    private final QuizRuntimePackageService service = new QuizRuntimePackageService(packages, versions);
+    private final QuizRuntimePackageService service = new QuizRuntimePackageService(packages, versions, mock(QuizRepository.class));
 
     private QuizPackageResponse activePackageWith(Map<String, Object> runtimeQuizExtras) {
         Map<String, Object> runtimeQuiz = new LinkedHashMap<>(Map.of(
