@@ -57,7 +57,9 @@ public final class LmsRuntimeDtos {
             String signature,
             String gradingMode,
             QuizDetailResponse quiz,
-            Map<String, Object> answerKey
+            Map<String, Object> answerKey,
+            /** The stored package id; starting an attempt must echo it back (packageId) with the hash. */
+            String id
     ) {
     }
 

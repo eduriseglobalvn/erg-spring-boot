@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ContentScope;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizResponse;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackageRepository;
@@ -32,13 +33,16 @@ public class QuizRuntimePackageService {
 
     private final QuizPackageRepository packageRepository;
     private final QuizVersionRepository quizVersionRepository;
+    private final QuizRepository quizRepository;
 
     public QuizRuntimePackageService(
             QuizPackageRepository packageRepository,
-            QuizVersionRepository quizVersionRepository
+            QuizVersionRepository quizVersionRepository,
+            QuizRepository quizRepository
     ) {
         this.packageRepository = packageRepository;
         this.quizVersionRepository = quizVersionRepository;
+        this.quizRepository = quizRepository;
     }
 
     /** Resolves the active published package for a quiz, or empty when none is published yet. */
@@ -81,7 +85,28 @@ public class QuizRuntimePackageService {
     public static QuizPackageResponse withoutAnswerKey(QuizPackageResponse response) {
         if (response == null || response.answerKey() == null || response.answerKey().isEmpty()) return response;
         return new QuizPackageResponse(response.version(), response.packageHash(), response.contentHash(),
-                response.signature(), response.gradingMode(), response.quiz(), Map.of());
+                response.signature(), response.gradingMode(), response.quiz(), Map.of(), response.id());
+    }
+
+    /**
+     * The editor's runtime settings carry no player mode, so the player treated every quiz as practice: a test got
+     * per-question feedback and no countdown. The mode comes from the quiz kind, the one the attempt uses
+     * ({@code AttemptFactory}); an explicit mode in the settings still wins.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> playerSettings(Object runtimeSettings, String quizKind) {
+        Map<String, Object> result = runtimeSettings instanceof Map<?, ?> map
+                ? new java.util.LinkedHashMap<>((Map<String, Object>) map)
+                : new java.util.LinkedHashMap<>();
+        if (quizKind != null && !quizKind.isBlank()) {
+            String kind = quizKind.trim().toLowerCase(java.util.Locale.ROOT);
+            result.putIfAbsent("mode", kind.equals("test") || kind.equals("testing") ? "testing" : "training");
+        }
+        return result;
+    }
+
+    private String quizKind(String quizId, QuizVersion version) {
+        return quizRepository.findByIdAndTenantId(quizId, version.getTenantId()).map(quiz -> quiz.getKind()).orElse(null);
     }
 
     @SuppressWarnings("unchecked")
@@ -99,9 +124,7 @@ public class QuizRuntimePackageService {
         if (runtimeQuiz.get("theme") != null) {
             settings.put("theme", runtimeQuiz.get("theme"));
         }
-        if (runtimeQuiz.get("settings") != null) {
-            settings.put("settings", runtimeQuiz.get("settings"));
-        }
+        settings.put("settings", playerSettings(runtimeQuiz.get("settings"), quizKind(quizId, version)));
 
         QuizResponse quizResponse = new QuizResponse(
                 quizId,
@@ -142,7 +165,8 @@ public class QuizRuntimePackageService {
                 pkg.getSignature(),
                 pkg.getGradingMode(),
                 detail,
-                answerKey
+                answerKey,
+                pkg.getId()
         );
     }
 

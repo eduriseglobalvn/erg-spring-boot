@@ -45,6 +45,17 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
             """)
     long countImpactByTenantAndTopic(@Param("tenantId") String tenantId, @Param("topicId") String topicId);
 
+    @Query("""
+            select q.topicId, count(q.id)
+            from Question q
+            where q.tenantId = :tenantId
+              and q.topicId in :topicIds
+              and q.archivedAt is null
+              and q.deletedAt is null
+            group by q.topicId
+            """)
+    List<Object[]> countActiveByTopic(@Param("tenantId") String tenantId, @Param("topicIds") List<String> topicIds);
+
     @Query(
             value = """
                     select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection(

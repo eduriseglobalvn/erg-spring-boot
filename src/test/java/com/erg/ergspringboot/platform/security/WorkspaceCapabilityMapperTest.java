@@ -50,6 +50,19 @@ class WorkspaceCapabilityMapperTest {
     }
 
     @Test
+    void learnerRoleAndGrantsProjectOnlyTheStudentWorkspace() {
+        java.util.List<String> roles = java.util.List.of("lms.learner");
+        java.util.List<String> permissions = java.util.List.of(
+                "lms.assignment.read_self", "lms.assignment.submit", "lms.quiz.play", "elearning.dashboard.read");
+        assertEquals(java.util.List.of("STUDENT"), WorkspaceCapabilityMapper.canonicalWorkspaces(java.util.List.of(), roles, permissions));
+        assertEquals(java.util.List.of("STUDENT"),
+                WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(roles, permissions, java.util.List.of()));
+        // A teacher keeps the teacher workspace through its own lms grants.
+        assertEquals(java.util.List.of("STUDENT", "TEACHER"), WorkspaceCapabilityMapper.canonicalWorkspaces(
+                java.util.List.of(), java.util.List.of("lms.instructor"), java.util.List.of("lms.class.read", "lms.quiz.play")));
+    }
+
+    @Test
     void wildcardProjectsEveryWorkspaceOnlyForAPlatformWidePrincipal() {
         assertEquals(
                 java.util.List.of("ADMIN", "CRM", "STUDENT", "TEACHER"),

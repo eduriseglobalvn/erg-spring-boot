@@ -4,9 +4,11 @@ import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptEvent;
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptEventRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +41,7 @@ public class AttemptEventRecorder {
             Map<String, Object> result,
             OffsetDateTime clientCreatedAt
     ) {
-        String id = eventId == null || eventId.isBlank() ? IdGenerator.newId() : eventId.trim();
+        String id = storableId(attemptId, eventId);
         if (attemptEventRepository.existsById(id)) {
             return;
         }
@@ -57,6 +59,13 @@ public class AttemptEventRecorder {
         event.setCreatedAt(clientCreatedAt == null ? now : clientCreatedAt);
         event.setReceivedAt(now);
         attemptEventRepository.save(event);
+    }
+
+    /** attempt_events.id is varchar(36) but clients send "evt_" + uuid (40 chars): map those to a stable uuid so replays stay idempotent. */
+    static String storableId(String attemptId, String eventId) {
+        if (eventId == null || eventId.isBlank()) return IdGenerator.newId();
+        String id = eventId.trim();
+        return id.length() <= 36 ? id : UUID.nameUUIDFromBytes((attemptId + ":" + id).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     /** Records a batch of client events (from a draft/sync payload), each idempotent by its own id. */

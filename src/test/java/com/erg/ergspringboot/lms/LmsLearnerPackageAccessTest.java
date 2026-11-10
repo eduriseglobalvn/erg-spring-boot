@@ -52,11 +52,27 @@ class LmsLearnerPackageAccessTest {
         resource.setQuizId("quiz-1");
         resource.setQuizVersionId("ver-1");
         when(fixture.resources.findByTenantIdAndAssignmentIdAndQuizId("erg", "asg-1", "quiz-1")).thenReturn(Optional.of(resource));
-        when(fixture.packages.packageForVersion("erg", "quiz-1", "ver-1")).thenReturn(Optional.of(packageWithKey()));
+        when(fixture.packages.packageForVersion("erg", "quiz-1", "ver-1")).thenReturn(Optional.of(packageWithKey("test")));
 
         QuizPackageResponse response = resources.getQuizPackage("quiz-1", "asg-1", learner);
 
         assertThat(response.answerKey()).isEmpty();
+        // The client echoes this id back when it starts an attempt; stripping the key must not drop it.
+        assertThat(response.id()).isEqualTo("pkg-1");
+    }
+
+    @Test
+    void practiceQuizKeepsTheAnswerKeySoTheBrowserCanGradeEachStep() {
+        when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment(false)));
+        AssignmentResource resource = new AssignmentResource();
+        resource.setAssignmentId("asg-1");
+        resource.setQuizId("quiz-1");
+        resource.setQuizVersionId("ver-1");
+        when(fixture.resources.findByTenantIdAndAssignmentIdAndQuizId("erg", "asg-1", "quiz-1")).thenReturn(Optional.of(resource));
+        // kind == null is what an unlabelled package carries; the player runs it as practice, so the key must be present.
+        when(fixture.packages.packageForVersion("erg", "quiz-1", "ver-1")).thenReturn(Optional.of(packageWithKey(null)));
+
+        assertThat(resources.getQuizPackage("quiz-1", "asg-1", learner).answerKey()).containsKey("q1");
     }
 
     @Test
@@ -87,9 +103,13 @@ class LmsLearnerPackageAccessTest {
     }
 
     private QuizPackageResponse packageWithKey() {
-        QuizResponse quiz = new QuizResponse("quiz-1", new ContentScope(null, null), "Quiz", null, null, null,
+        return packageWithKey("test");
+    }
+
+    private QuizPackageResponse packageWithKey(String kind) {
+        QuizResponse quiz = new QuizResponse("quiz-1", new ContentScope(null, null), "Quiz", kind, null, null,
                 List.of(), List.of(), "published", 1, "hash", null, null);
         return new QuizPackageResponse(1, "hash", "hash", "sig", "client-first",
-                new QuizDetailResponse(quiz, List.of(), Map.of(), Map.of(), Map.of()), Map.of("q1", Map.of("correctChoiceId", "a")));
+                new QuizDetailResponse(quiz, List.of(), Map.of(), Map.of(), Map.of()), Map.of("q1", Map.of("correctChoiceId", "a")), "pkg-1");
     }
 }

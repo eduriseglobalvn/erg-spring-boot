@@ -298,7 +298,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                         assignment.assignedBy,
                         assignment.recipientMode,
                         assignment.createdAt,
-                        assignment.updatedAt
+                        assignment.updatedAt,
+                        assignment.title
                     )
                     from Assignment assignment
                     where assignment.tenantId = :tenantId
@@ -333,7 +334,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                         assignment.assignedBy,
                         assignment.recipientMode,
                         assignment.createdAt,
-                        assignment.updatedAt
+                        assignment.updatedAt,
+                        assignment.title
                     )
                     from Assignment assignment
                     where assignment.tenantId = :tenantId
@@ -381,7 +383,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                 assignment.quizId,
                 assignment.subjectId,
                 subject.name,
-                coalesce(quiz.title, assignment.subjectId, assignment.id),
+                coalesce(nullif(assignment.title, ''), quiz.title, assignment.subjectId, assignment.id),
                 assignment.dueAt,
                 assignment.status,
                 assignment.updatedAt,

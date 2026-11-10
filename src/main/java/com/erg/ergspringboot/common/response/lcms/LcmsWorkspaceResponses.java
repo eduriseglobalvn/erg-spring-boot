@@ -62,7 +62,8 @@ public final class LcmsWorkspaceResponses {
             String levelId,
             String description,
             String scopeLabel,
-            List<String> categoryIds
+            List<String> categoryIds,
+            Integer questionCount
     ) {
     }
 

@@ -51,6 +51,7 @@ public class LmsOperationalCommandService {
     private final UserActivityRepository activities;
     private final UserRepository users;
     private final LmsOperationalScopeGuard guard;
+    private final StudentAccountProvisioner accounts;
 
 
     public LmsOperationalCommandService(
@@ -61,6 +62,20 @@ public class LmsOperationalCommandService {
             EducationUnitRepository schools,
             UserActivityRepository activities,
             UserRepository users) {
+        this(classrooms, students, subjects, enrollments, schools, activities, users, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    LmsOperationalCommandService(
+            ClassroomRepository classrooms,
+            StudentRepository students,
+            SubjectRepository subjects,
+            StudentEnrollmentRepository enrollments,
+            EducationUnitRepository schools,
+            UserActivityRepository activities,
+            UserRepository users,
+            StudentAccountProvisioner accounts) {
+        this.accounts = accounts;
         this.users = users;
         this.classrooms = classrooms;
         this.students = students;
@@ -153,6 +168,7 @@ public class LmsOperationalCommandService {
         student.setAcademicClassId(classroom == null ? null : classroom.getId());
         applyStudent(student, request);
         linkAuthUser(access, student, request.authUserId());
+        provisionAccount(access, schoolId, student, request);
         student.setStudentCode(code);
         student.setFullName(required(request.fullName(), "Student name"));
         student.setStatus(status(request.status(), "ENROLLED"));
@@ -211,11 +227,22 @@ public class LmsOperationalCommandService {
         int replayed = 0;
         for (CreateStudentRequest item : request.items()) {
             var existing = students.findByTenantIdAndStudentCodeIgnoreCase(access.tenantId(), item.studentCode().trim());
+            if (existing.isPresent()
+                    && !normalize(existing.get().getFullName()).equals(normalize(item.fullName()))) {
+                throw new ConflictException("Import student code belongs to a different student.");
+            }
+            // An account import for a student already on the roster (same class + name, imported earlier without
+            // a login) gives that student its account instead of creating a duplicate.
+            if (existing.isEmpty() && trim(item.password()) != null) {
+                existing = unlinkedClassmate(schoolId, item, access);
+            }
             if (existing.isPresent()) {
-                if (!normalize(existing.get().getFullName()).equals(normalize(item.fullName()))) {
-                    throw new ConflictException("Import student code belongs to a different student.");
+                Student student = existing.get();
+                if (trim(item.password()) != null && student.getAuthUserId() == null) {
+                    result.add(studentResponse(attachAccount(access, schoolId, student, item)));
+                    continue;
                 }
-                result.add(studentResponse(existing.get()));
+                result.add(studentResponse(student));
                 replayed++;
                 continue;
             }
@@ -354,6 +381,32 @@ public class LmsOperationalCommandService {
                 .filter(existing -> !existing.getId().equals(student.getId()))
                 .ifPresent(existing -> { throw new ConflictException("Login account is already linked to another student."); });
         student.setAuthUserId(authUserId);
+    }
+
+    private java.util.Optional<Student> unlinkedClassmate(String schoolId, CreateStudentRequest item, UserAccessContext access) {
+        String classId = trim(item.academicClassId());
+        if (classId == null) return java.util.Optional.empty();
+        return students.findByTenantIdAndAcademicClassIdOrderByFullNameAsc(access.tenantId(), classId).stream()
+                .filter(student -> schoolId.equals(student.getSchoolId()) && student.getAuthUserId() == null)
+                .filter(student -> normalize(student.getFullName()).equals(normalize(item.fullName())))
+                .findFirst();
+    }
+
+    private Student attachAccount(UserAccessContext access, String schoolId, Student student, CreateStudentRequest item) {
+        if (accounts == null) throw new BadRequestException("Student account creation is not available.");
+        student.setAuthUserId(accounts.provision(access, schoolId, trim(item.username()), trim(item.email()),
+                student.getFullName(), trim(item.phone()), item.password()));
+        if (trim(student.getUsername()) == null) student.setUsername(trim(item.username()));
+        Student saved = students.save(student);
+        audit(access, "LMS_STUDENT_ACCOUNT_CREATED", saved.getId(), Map.of("schoolId", schoolId));
+        return saved;
+    }
+
+    private void provisionAccount(UserAccessContext access, String schoolId, Student student, CreateStudentRequest request) {
+        if (trim(request.password()) == null || student.getAuthUserId() != null) return;
+        if (accounts == null) throw new BadRequestException("Student account creation is not available.");
+        student.setAuthUserId(accounts.provision(access, schoolId, trim(request.username()), trim(request.email()),
+                trim(request.fullName()), trim(request.phone()), request.password()));
     }
 
     private void applyStudent(Student student, CreateStudentRequest request) {

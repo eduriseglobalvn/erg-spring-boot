@@ -267,6 +267,10 @@ public class LmsController {
         String value = data == null || data.contentHash() == null || data.contentHash().isBlank()
                 ? "empty"
                 : data.contentHash();
+        // The id is part of the validator: bodies cached before the id existed must not be revalidated (304) into a stale copy.
+        if (data != null && data.id() != null && !data.id().isBlank()) {
+            value = value + "|" + data.id();
+        }
         return "\"" + value.replace("\"", "") + "\"";
     }
 

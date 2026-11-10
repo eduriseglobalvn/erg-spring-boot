@@ -227,7 +227,8 @@ public class LcmsQuizWorkspaceReadService {
                         option.levelId(),
                         blankToDefault(option.description(), option.label()),
                         "Toan cong ty",
-                        categoryIdsByOptionId.getOrDefault(option.id(), List.of())
+                        categoryIdsByOptionId.getOrDefault(option.id(), List.of()),
+                        null
                 ))
                 .toList();
     }
