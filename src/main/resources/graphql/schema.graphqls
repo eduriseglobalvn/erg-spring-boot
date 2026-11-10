@@ -299,6 +299,9 @@ type StudentDashboardAssignmentCard {
   title: String!
   status: String
   dueAt: String
+  "Latest handed-in attempt, 0-100; null until one is handed in"
+  scorePercent: Float
+  submittedAt: String
 }
 
 type StudentDashboardNextAction {

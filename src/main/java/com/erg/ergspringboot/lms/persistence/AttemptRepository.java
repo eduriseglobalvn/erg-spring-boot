@@ -465,7 +465,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
                   or (attempt.classId is null and assignment.academicClassId = :academicClassId)
               )
               and lower(attempt.status) in :completedStates
-            """)
+            """ + LatestHandedInAttempt.OF_ATTEMPT)
     StudentDashboardScoreSummaryProjection summarizeStudentDashboardScores(String tenantId,
             String studentId,
             String academicClassId, java.util.Collection<String> completedStates);

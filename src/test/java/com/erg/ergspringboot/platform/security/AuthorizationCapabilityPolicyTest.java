@@ -30,6 +30,19 @@ class AuthorizationCapabilityPolicyTest {
     }
 
     @Test
+    void learnerReachesLmsApisWithoutBecomingATeacher() {
+        ErgPrincipal learner = principal(
+                List.of("lms.learner"), List.of("lms.quiz.play", "lms.assignment.submit"), List.of(), List.of()
+        );
+
+        assertThat(WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                learner.roles(), learner.permissions(), learner.deniedPermissions()))
+                .containsExactly("STUDENT");
+        assertThat(policy.hasWorkspace(learner, "lms")).isTrue();
+        assertThat(policy.hasWorkspace(learner, "admin")).isFalse();
+    }
+
+    @Test
     void legacyPortalListCannotGrantAWorkspace() {
         ErgPrincipal principal = principal(
                 List.of("auditor"), List.of("reports.read"), List.of(), List.of("*")
