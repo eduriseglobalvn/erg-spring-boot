@@ -40,6 +40,37 @@ class AuthorizationCapabilityPolicyTest {
     }
 
     @Test
+    void learnerReachesTheLmsApiWhileHoldingOnlyTheStudentWorkspace() {
+        // The grants role_lms_student holds (V4, V17, V84, V116, V136).
+        ErgPrincipal learner = principal(
+                List.of("lms.learner"),
+                List.of("lms.assignment.read_self", "lms.assignment.submit", "lms.schedule.read_self", "lms.quiz.play",
+                        "elearning.assignment.read_self", "elearning.dashboard.read"),
+                List.of(), List.of()
+        );
+
+        assertThat(WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                learner.roles(), learner.permissions(), learner.deniedPermissions()))
+                .containsExactly("STUDENT");
+        // A learner's assignments, quiz packages and attempts are served under /api/v1/lms.
+        assertThat(policy.hasWorkspace(learner, "lms")).isTrue();
+        assertThat(policy.hasWorkspace(learner, "elearning")).isTrue();
+        assertThat(policy.hasWorkspace(learner, "admin")).isFalse();
+        assertThat(policy.hasWorkspace(learner, "lcms")).isFalse();
+        assertThat(policy.hasWorkspace(learner, "crm")).isFalse();
+    }
+
+    @Test
+    void teacherDoesNotGainTheStudentApiFromTheSharedLmsApi() {
+        ErgPrincipal teacher = principal(
+                List.of("lms.instructor"), List.of("lms.class.read"), List.of(), List.of()
+        );
+
+        assertThat(policy.hasWorkspace(teacher, "lms")).isTrue();
+        assertThat(policy.hasWorkspace(teacher, "elearning")).isFalse();
+    }
+
+    @Test
     void wildcardRequiresVerifiedSystemRoleAndExplicitDenyWins() {
         ErgPrincipal system = principal(
                 List.of("system.super_admin"), List.of("*"), List.of(), List.of()

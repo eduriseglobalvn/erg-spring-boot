@@ -19,13 +19,16 @@ public final class AuthorizationCapabilityPolicy {
         if (requestedPortal == null || requestedPortal.isBlank()) {
             return true;
         }
+        List<String> held = WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                principal.roles(), principal.permissions(), principal.deniedPermissions());
         return WorkspaceCapabilityMapper.fromLegacyPortal(requestedPortal)
-                .map(capability -> WorkspaceCapabilityMapper
-                        .canonicalWorkspacesFromVerifiedGrants(
-                                principal.roles(), principal.permissions(), principal.deniedPermissions())
-                        .contains(capability.name()))
+                .map(capability -> held.contains(capability.name())
+                        || (capability == WorkspaceCapability.TEACHER && held.contains(WorkspaceCapability.STUDENT.name())))
                 .orElse(false);
     }
+    // Why STUDENT passes for the lms portal: a learner's own assignments, quiz packages and attempts are served
+    // under /api/v1/lms, and a learner holds only the STUDENT workspace. This check only opens the API family;
+    // what a learner may call inside it is decided by the permission on each endpoint (lms.*_self, lms.quiz.play).
 
     public boolean tenantMatches(ErgPrincipal principal, String requestedTenant) {
         if (principal == null || principal.tenantId() == null || principal.tenantId().isBlank()) {
