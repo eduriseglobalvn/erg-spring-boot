@@ -37,6 +37,7 @@ type Bot struct {
 	httpc  *http.Client
 	totp   *TOTP
 	audit  *Audit
+	out    *outbox
 
 	mu      sync.Mutex
 	pending map[int64]*Action
@@ -58,6 +59,7 @@ var commandHelp = [][2]string{
 	{"backups", "Danh sách và tình trạng backup"},
 	{"disk", "Dung lượng ổ đĩa và Docker"},
 	{"report", "Báo cáo tổng hợp 24 giờ"},
+	{"testalert", "Bắn một alert thử qua Alertmanager để kiểm đường báo"},
 	{"backup", "⚠️ Chạy backup DB ngay"},
 	{"restart", "⚠️ Restart một service: /restart backend"},
 	{"rollback", "⚠️ Đưa backend về image trước"},
@@ -71,12 +73,13 @@ func NewBot(cfg Config) *Bot {
 	b := &Bot{
 		cfg: cfg, tg: NewTG(cfg.Token), docker: Docker{cfg.Project},
 		prom: Prom{cfg.PromURL, httpc}, httpc: httpc, totp: NewTOTP(cfg.TOTPSecret),
-		audit: &Audit{path: cfg.AuditLog}, pending: map[int64]*Action{},
+		audit: &Audit{path: cfg.AuditLog}, out: newOutbox(), pending: map[int64]*Action{},
 	}
 	b.readers = map[string]func(context.Context, []string) (Reply, error){
 		"status": b.cmdStatus, "services": b.cmdServices, "service": b.cmdService, "logs": b.cmdLogs,
 		"errors": b.cmdErrors, "top": b.cmdTop, "db": b.cmdDB, "alerts": b.cmdAlerts,
 		"backups": b.cmdBackups, "disk": b.cmdDisk, "report": b.cmdReport, "help": b.cmdHelp, "start": b.cmdHelp,
+		"testalert": b.cmdTestAlert,
 	}
 	b.actions = map[string]func(context.Context, []string) (*Action, error){
 		"restart": b.actRestart, "backup": b.actBackup, "rollback": b.actRollback, "prune": b.actPrune,
@@ -88,7 +91,10 @@ func (b *Bot) Run(ctx context.Context) {
 	if err := b.tg.SetCommands(ctx, commandHelp); err != nil {
 		log.Printf("setMyCommands: %v", err)
 	}
-	b.notify(ctx, "🤖 <b>Bot vận hành đã khởi động.</b> Gõ /help để xem lệnh.")
+	// Read the last-alive stamp before alive() overwrites it.
+	b.notify(ctx, bootMessage(time.Now(), lastAlive(b.cfg.AliveFile), hostUptime(), b.cfg.Location))
+	go b.sendLoop(ctx)
+	go b.alive(ctx)
 	go b.watchdog(ctx)
 	go b.dailyReport(ctx)
 	var offset int64
@@ -104,15 +110,6 @@ func (b *Bot) Run(ctx context.Context) {
 			log.Printf("update %d (message=%t callback=%t)", u.UpdateID, u.Message != nil, u.CallbackQuery != nil)
 			go b.handle(ctx, u)
 		}
-	}
-}
-
-func (b *Bot) notify(ctx context.Context, html string) {
-	if b.cfg.NotifyChatID == 0 {
-		return
-	}
-	if err := b.tg.Send(ctx, b.cfg.NotifyChatID, html, nil); err != nil {
-		log.Printf("notify: %v", err)
 	}
 }
 

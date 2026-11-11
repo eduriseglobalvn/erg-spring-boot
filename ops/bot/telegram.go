@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"time"
 )
+
+// errTransient marks a Telegram failure worth retrying: no connection, a 429 or a 5xx.
+var errTransient = errors.New("tạm thời")
 
 type TG struct {
 	base string
@@ -68,9 +72,12 @@ func (t *TG) do(req *http.Request, method string, out any) error {
 	resp, err := t.http.Do(req)
 	if err != nil {
 		// The URL holds the token; never let it reach logs.
-		return fmt.Errorf("telegram %s: request failed", method)
+		return fmt.Errorf("telegram %s: request failed: %w", method, errTransient)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		return fmt.Errorf("telegram %s: HTTP %d: %w", method, resp.StatusCode, errTransient)
+	}
 	var env struct {
 		OK          bool            `json:"ok"`
 		Description string          `json:"description"`

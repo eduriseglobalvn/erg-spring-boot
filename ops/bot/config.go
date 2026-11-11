@@ -25,6 +25,19 @@ type Config struct {
 	AuditLog     string
 	Location     *time.Location
 	ReportHour   int
+
+	HeartbeatURL   string   // outside dead-man's switch, pinged every minute; empty disables it
+	AliveFile      string   // last-alive stamp, read at start to say how long the bot was silent
+	ProbeLocalURL  string   // backend /ready through nginx; "off" disables both probes
+	ProbePublicURL string   // the same through the public name and the tunnel; "off" disables it
+	Required       []string // compose services that must exist even if the bot never saw them
+}
+
+func offIsEmpty(v string) string {
+	if v == "off" {
+		return ""
+	}
+	return v
 }
 
 func env(key, def string) string {
@@ -47,6 +60,12 @@ func LoadConfig() (Config, error) {
 		BackupLog:    env("BOT_BACKUP_LOG", "/opt/erg/ops/backup/backup.log"),
 		BackupDirs:   strings.Split(env("BOT_BACKUP_DIRS", "/opt/erg/ops/backup/data,/opt/erg/backups"), ","),
 		AuditLog:     env("BOT_AUDIT_LOG", "/opt/erg/bot/audit.log"),
+
+		HeartbeatURL:   env("BOT_HEARTBEAT_URL", ""),
+		AliveFile:      env("BOT_ALIVE_FILE", "/opt/erg/bot/last-alive"),
+		ProbeLocalURL:  offIsEmpty(env("BOT_PROBE_LOCAL_URL", "http://127.0.0.1:8080/ready")),
+		ProbePublicURL: offIsEmpty(env("BOT_PROBE_PUBLIC_URL", "https://api.erg.edu.vn/ready")),
+		Required:       strings.Split(env("BOT_REQUIRED_SERVICES", "backend,nginx,postgres,redis-state,redis-cache"), ","),
 	}
 	c.EnvFile = env("BOT_ENV_FILE", c.DockerDir+"/.env.production")
 	if c.Token == "" {

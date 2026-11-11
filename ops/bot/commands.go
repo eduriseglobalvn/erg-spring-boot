@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -397,6 +400,35 @@ func (b *Bot) cmdAlerts(ctx context.Context, _ []string) (Reply, error) {
 		fmt.Fprintf(&s, "• <b>%s</b> (%s) từ %s trước\n  %s\n", esc(a.Name), esc(a.Severity), durH(time.Since(a.Since)), esc(a.Summary))
 	}
 	return Reply{HTML: s.String()}, nil
+}
+
+// cmdTestAlert pushes a fake alert into Alertmanager. It is the only way to see that Alertmanager's own
+// Telegram route works without waiting for a real incident.
+func (b *Bot) cmdTestAlert(ctx context.Context, _ []string) (Reply, error) {
+	now := time.Now().UTC()
+	body, _ := json.Marshal([]map[string]any{{
+		"labels": map[string]string{"alertname": "BotTestAlert", "severity": "info"},
+		"annotations": map[string]string{
+			"summary":     "Tin thử từ lệnh /testalert",
+			"description": "Không có sự cố. Tin này chứng minh Alertmanager gửi được Telegram.",
+		},
+		"startsAt": now.Format(time.RFC3339), "endsAt": now.Add(2 * time.Minute).Format(time.RFC3339),
+	}})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.cfg.AMURL+"/api/v2/alerts", bytes.NewReader(body))
+	if err != nil {
+		return Reply{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := b.httpc.Do(req)
+	if err != nil {
+		return Reply{}, fmt.Errorf("alertmanager: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return Reply{}, fmt.Errorf("alertmanager: HTTP %d", resp.StatusCode)
+	}
+	return Reply{HTML: "Đã đẩy alert thử vào Alertmanager. Trong khoảng 1 phút phải có tin 🔴 <b>BotTestAlert</b> ở nhóm thông báo, " +
+		"vài phút sau có tin ✅ resolved. Không thấy tin 🔴 nghĩa là đường Alertmanager → Telegram đang hỏng."}, nil
 }
 
 type fileInfo struct {

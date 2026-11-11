@@ -13,7 +13,28 @@ DOCKER_DIR=$ROOT/ops/docker
 ENV_FILE=$DOCKER_DIR/.env.production
 IMAGE=erg-spring:$SHA-jvm
 C="docker compose --env-file $ENV_FILE -f $DOCKER_DIR/compose.yml -f $DOCKER_DIR/compose.native.yml -f $DOCKER_DIR/compose.monitor.yml"
-log() { echo "=== [$(date -u +%H:%M:%S)] $*"; }
+STEP=start SWITCHED=0
+log() { STEP=$*; echo "=== [$(date -u +%H:%M:%S)] $*"; }
+
+# Telegram notice to the ops chat, with the alert bot's token. The token goes through curl's stdin config so it
+# never shows in `ps`. Without a token this does nothing, and a failed send never fails the deploy.
+envval() { grep -E "^$1=" "$ENV_FILE" | tail -n1 | cut -d= -f2- || true; }
+notify() {
+  local token chat
+  token=$(envval TELEGRAM_BOT_TOKEN); chat=$(envval TELEGRAM_CHAT_ID)
+  [ -n "$token" ] && [ -n "$chat" ] || return 0
+  curl -fsS -m 15 -o /dev/null -K - --data-urlencode "chat_id=$chat" --data-urlencode "text=$1" \
+    <<<"url = \"https://api.telegram.org/bot$token/sendMessage\"" || true
+}
+on_error() {
+  [ "$BASHPID" = "$$" ] || return 0 # a failure inside $(...) is reported once, by the main shell
+  trap - ERR
+  local state="Production chưa bị đụng, vẫn chạy bản cũ."
+  [ "$SWITCHED" = 1 ] && state="Production ĐÃ bắt đầu chuyển sang bản mới và chưa ổn: xem /logs backend, cân nhắc /rollback."
+  notify "❌ Deploy ${SHA:0:7} lỗi ở bước \"$STEP\" (dòng $1) sau $((SECONDS / 60)) phút. $state"
+}
+trap 'on_error $LINENO' ERR
+notify "🚀 Bắt đầu deploy ${SHA:0:7}. Backend sẽ ngắt khoảng 1 phút lúc đổi bản."
 
 log "unpack $SHA"
 rm -rf "$ROOT/src" && mkdir -p "$ROOT/src" && tar xf - -C "$ROOT/src"
@@ -83,6 +104,7 @@ cleanup; trap - EXIT
 
 log "switch production to $IMAGE"
 PREVIOUS=$(docker inspect -f '{{.Config.Image}}' erg-backend-1 2>/dev/null || true)
+SWITCHED=1 # from here .env.production names the new image, even if the container is not replaced yet
 sed -i "s|^ERG_APP_IMAGE=.*|ERG_APP_IMAGE=$IMAGE|" "$ENV_FILE"
 [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$IMAGE" ] && sed -i "s|^ERG_ROLLBACK_IMAGE=.*|ERG_ROLLBACK_IMAGE=$PREVIOUS|" "$ENV_FILE"
 $C config --quiet
@@ -93,3 +115,4 @@ $C up -d --no-deps --force-recreate nginx alertmanager prometheus grafana node-e
 wait_healthy erg-nginx-1
 docker logs erg-backend-1 2>&1 | grep -E 'Successfully applied|is up to date' | cut -c1-200
 log "deployed $SHA (previous image: ${PREVIOUS:-none}, backup: $DUMP)"
+notify "✅ Deploy ${SHA:0:7} xong sau $((SECONDS / 60)) phút, backend và nginx đã healthy. Bản trước: ${PREVIOUS:-không có} (quay lại bằng /rollback)."
