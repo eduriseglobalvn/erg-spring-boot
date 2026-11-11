@@ -112,7 +112,10 @@ public final class StudentDashboardResponses {
             String quizId,
             String title,
             String status,
-            OffsetDateTime dueAt
+            OffsetDateTime dueAt,
+            /** Latest handed-in attempt, 0-100; null until the student hands one in. */
+            Double scorePercent,
+            OffsetDateTime submittedAt
     ) {
     }
 

@@ -61,7 +61,7 @@ class StudentDashboardQueryCountIntegrationTest {
         ));
 
         assertThat(response.profile().studentId()).isEqualTo("student-row-sdq");
-        assertThat(response.assignments()).hasSize(8);
+        assertThat(response.assignments()).hasSize(12);
         assertThat(response.nextActions()).hasSizeLessThanOrEqualTo(5);
         assertThat(response.summary().activeAssignmentCount()).isEqualTo(12);
         assertThat(response.summary().scoreSummary()).isNotNull();

@@ -45,7 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentDashboardReadService {
 
     private static final String DASHBOARD_PERMISSION = "elearning.assignment.read_self";
-    private static final int FIRST_SLICE_LIMIT = 8;
+    // The student's whole assignment list (tabs Cần làm / Đã nộp / Quá hạn) comes from this slice, oldest due first.
+    private static final int FIRST_SLICE_LIMIT = 50;
     private static final int ANNOUNCEMENT_LIMIT = 5;
 
     private final AssignmentRepository assignmentRepository;
