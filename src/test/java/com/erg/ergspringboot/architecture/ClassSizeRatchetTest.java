@@ -19,7 +19,7 @@ class ClassSizeRatchetTest {
     private static final int LIMIT = 400;
     private static final Path ROOT = Path.of("src/main/java");
     private static final Map<String, Integer> REVIEWED_CEILINGS = Map.of(
-            "com/erg/ergspringboot/lms/persistence/AssignmentRepository.java", 573,
+            "com/erg/ergspringboot/lms/persistence/AssignmentRepository.java", 522,
             "com/erg/ergspringboot/lms/persistence/AttemptRepository.java", 479,
             "com/erg/ergspringboot/lcms/quiz/publish/QuestionKindStrategy.java", 394);
 
