@@ -174,7 +174,9 @@ class StudentDashboardReadServiceTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                85D,
+                now.minusDays(1)
         );
         when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
                 .thenReturn(true);
@@ -184,7 +186,7 @@ class StudentDashboardReadServiceTest {
                 "tenant-a",
                 "class-1",
                 "student-row-1",
-                PageRequest.of(0, 8)
+                PageRequest.of(0, 50)
         )).thenReturn(List.of(math, science));
         when(assignmentRepository.summarizeStudentDashboardAssignments("tenant-a", "class-1", "student-row-1"))
                 .thenReturn(new StudentDashboardAssignmentCountProjection(12L, 3L));
@@ -230,6 +232,10 @@ class StudentDashboardReadServiceTest {
         assertThat(response.assignments())
                 .extracting("title")
                 .containsExactly("Algebra practice", "Energy review");
+        // The card carries the latest handed-in score; none until the student hands one in.
+        assertThat(response.assignments())
+                .extracting("scorePercent")
+                .containsExactly(null, 85D);
         assertThat(response.courses())
                 .extracting("id")
                 .containsExactly("math", "science");
@@ -259,7 +265,7 @@ class StudentDashboardReadServiceTest {
                 "tenant-a",
                 "class-1",
                 "student-row-1",
-                PageRequest.of(0, 8)
+                PageRequest.of(0, 50)
         );
         verify(assignmentRepository).summarizeStudentDashboardAssignments("tenant-a", "class-1", "student-row-1");
         verify(attemptRepository).summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-1");
@@ -298,7 +304,7 @@ class StudentDashboardReadServiceTest {
                 "tenant-a",
                 null,
                 "student-row-1",
-                PageRequest.of(0, 8)
+                PageRequest.of(0, 50)
         )).thenReturn(List.of(assignment));
         when(assignmentRepository.summarizeStudentDashboardAssignments("tenant-a", null, "student-row-1"))
                 .thenReturn(new StudentDashboardAssignmentCountProjection(1L, 1L));
@@ -350,7 +356,7 @@ class StudentDashboardReadServiceTest {
         when(classroomRepository.findByTenantIdAndIdIn(eq("tenant-a"), any()))
                 .thenReturn(List.of(classA, classB));
         when(assignmentRepository.findStudentDashboardAssignments(
-                "tenant-a", "class-b", "student-row-1", PageRequest.of(0, 8)))
+                "tenant-a", "class-b", "student-row-1", PageRequest.of(0, 50)))
                 .thenReturn(List.of());
         when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-b"))
                 .thenReturn(new StudentDashboardScoreSummaryProjection(1L, 1L, 1L, 88D, 88D));
