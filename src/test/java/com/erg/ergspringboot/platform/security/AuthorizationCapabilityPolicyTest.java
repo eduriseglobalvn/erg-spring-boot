@@ -30,6 +30,19 @@ class AuthorizationCapabilityPolicyTest {
     }
 
     @Test
+    void learnerReachesLmsApisWithoutBecomingATeacher() {
+        ErgPrincipal learner = principal(
+                List.of("lms.learner"), List.of("lms.quiz.play", "lms.assignment.submit"), List.of(), List.of()
+        );
+
+        assertThat(WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                learner.roles(), learner.permissions(), learner.deniedPermissions()))
+                .containsExactly("STUDENT");
+        assertThat(policy.hasWorkspace(learner, "lms")).isTrue();
+        assertThat(policy.hasWorkspace(learner, "admin")).isFalse();
+    }
+
+    @Test
     void legacyPortalListCannotGrantAWorkspace() {
         ErgPrincipal principal = principal(
                 List.of("auditor"), List.of("reports.read"), List.of(), List.of("*")
@@ -37,6 +50,16 @@ class AuthorizationCapabilityPolicyTest {
 
         assertThat(policy.hasWorkspace(principal, "admin")).isFalse();
         assertThat(policy.hasWorkspace(principal, "lms")).isFalse();
+    }
+
+    @Test
+    void teacherDoesNotGainTheStudentApiFromTheSharedLmsApi() {
+        ErgPrincipal teacher = principal(
+                List.of("lms.instructor"), List.of("lms.class.read"), List.of(), List.of()
+        );
+
+        assertThat(policy.hasWorkspace(teacher, "lms")).isTrue();
+        assertThat(policy.hasWorkspace(teacher, "elearning")).isFalse();
     }
 
     @Test
