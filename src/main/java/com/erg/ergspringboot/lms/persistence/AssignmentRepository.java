@@ -298,7 +298,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                         assignment.assignedBy,
                         assignment.recipientMode,
                         assignment.createdAt,
-                        assignment.updatedAt, assignment.title
+                        assignment.updatedAt,
+                        assignment.title
                     )
                     from Assignment assignment
                     where assignment.tenantId = :tenantId
@@ -333,7 +334,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                         assignment.assignedBy,
                         assignment.recipientMode,
                         assignment.createdAt,
-                        assignment.updatedAt, assignment.title
+                        assignment.updatedAt,
+                        assignment.title
                     )
                     from Assignment assignment
                     where assignment.tenantId = :tenantId
@@ -389,7 +391,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                 latestAttempt.status,
                 latestAttempt.percent,
                 latestAttempt.submittedAt,
-                latestAttempt.updatedAt
+                latestAttempt.updatedAt,
+                handedIn.percent,
+                handedIn.submittedAt
             )
             from Assignment assignment
             left join Quiz quiz
@@ -409,6 +413,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                       and attempt.assignmentId = assignment.id
                       and attempt.studentId = :studentId
                 )
+            left join Attempt handedIn on handedIn.tenantId = assignment.tenantId and handedIn.assignmentId = assignment.id
+                and handedIn.studentId = :studentId and lower(handedIn.status) in :completedStates
+            """ + LatestHandedInAttempt.OF_HANDED_IN + """
             left join AssignmentRecipient recipient
                 on recipient.tenantId = assignment.tenantId
                 and recipient.assignmentId = assignment.id
@@ -440,8 +447,16 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             String tenantId,
             String academicClassId,
             String studentId,
+            java.util.Collection<String> completedStates,
             Pageable pageable
     );
+
+    /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
+    default List<StudentDashboardAssignmentProjection> findStudentDashboardAssignments(
+            String tenantId, String academicClassId, String studentId, Pageable pageable) {
+        return findStudentDashboardAssignments(tenantId, academicClassId, studentId,
+                com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates(), pageable);
+    }
 
     @Query("""
             select new com.erg.ergspringboot.lms.persistence.projection.StudentDashboardAssignmentCountProjection(
