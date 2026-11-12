@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.auth.internal.login;
 
+import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.AuthResponse;
 import com.erg.ergspringboot.exception.auth.AuthFailure;
@@ -76,8 +77,9 @@ final class SessionIssuer {
         // The requested portal is a compatibility/audit hint only. Shared Auth must issue one
         // session before workspace selection; authorization is evaluated later from the verified
         // server-side grants, never from a hostname, query parameter, or login hint.
-        List<String> portals = LoginResponseMapper.entitledPortals(
-                permissions, LoginResponseMapper.roles(user.getRoles()));
+        // Same projection as the session bootstrap: a learner's lms.* grants stay in the student workspace, not "lms".
+        List<String> portals = WorkspaceCapabilityMapper.legacyPortalsFor(
+                List.of(), LoginResponseMapper.roles(user.getRoles()), permissions);
         String accessToken = tokens.newToken();
         String refreshToken = tokens.newToken();
         OffsetDateTime now = now();
