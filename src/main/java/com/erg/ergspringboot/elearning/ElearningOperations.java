@@ -2,6 +2,8 @@ package com.erg.ergspringboot.elearning;
 
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.ClassLeaderboardResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.LeaderboardClassResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
@@ -12,10 +14,12 @@ import com.erg.ergspringboot.elearning.api.ElearningCommands.CreateDiscussionCom
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DashboardReadQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionModerator;
+import com.erg.ergspringboot.elearning.api.ElearningCommands.LeaderboardManager;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.MarkAnnouncementReadCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.ReplyCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.SetReactionCommand;
 import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
+import com.erg.ergspringboot.elearning.internal.engagement.ClassLeaderboardService;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentDiscussionModerationService;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService;
 import com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardReadService;
@@ -31,15 +35,18 @@ public class ElearningOperations {
     private final StudentDashboardReadService dashboard;
     private final StudentEngagementService engagement;
     private final StudentDiscussionModerationService moderation;
+    private final ClassLeaderboardService leaderboard;
 
     public ElearningOperations(
             StudentDashboardReadService dashboard,
             StudentEngagementService engagement,
-            StudentDiscussionModerationService moderation
+            StudentDiscussionModerationService moderation,
+            ClassLeaderboardService leaderboard
     ) {
         this.dashboard = dashboard;
         this.engagement = engagement;
         this.moderation = moderation;
+        this.leaderboard = leaderboard;
     }
 
     public StudentDashboardResponse studentDashboard(DashboardReadQuery query) {
@@ -91,6 +98,26 @@ public class ElearningOperations {
     public AnnouncementReadResponse markAnnouncementRead(MarkAnnouncementReadCommand command) {
         return engagement.markAnnouncementRead(new StudentEngagementService.MarkAnnouncementReadCommand(
                 command.tenantId(), command.actorUserId(), command.announcementId()));
+    }
+
+    public ClassLeaderboardResponse studentClassLeaderboard(String tenantId, String userId, String classId) {
+        return leaderboard.forStudent(tenantId, userId, classId);
+    }
+
+    public java.util.List<LeaderboardClassResponse> leaderboardClasses(LeaderboardManager manager) {
+        return leaderboard.classes(manager(manager));
+    }
+
+    public ClassLeaderboardResponse classLeaderboard(LeaderboardManager manager, String classId) {
+        return leaderboard.forManager(manager(manager), classId);
+    }
+
+    public LeaderboardClassResponse setClassLeaderboardEnabled(LeaderboardManager manager, String classId, boolean enabled) {
+        return leaderboard.setEnabled(manager(manager), classId, enabled);
+    }
+
+    private ClassLeaderboardService.Manager manager(LeaderboardManager manager) {
+        return new ClassLeaderboardService.Manager(manager.tenantId(), manager.userId(), manager.tenantWide());
     }
 
     private StudentDiscussionModerationService.Moderator moderator(DiscussionModerator moderator) {

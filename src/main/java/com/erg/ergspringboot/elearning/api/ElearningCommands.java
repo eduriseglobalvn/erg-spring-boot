@@ -61,6 +61,10 @@ public final class ElearningCommands {
     public record DiscussionModerator(String tenantId, String userId, boolean tenantWide) {
     }
 
+    /** Teacher or admin managing class leaderboards; {@code tenantWide} opens every class of the tenant. */
+    public record LeaderboardManager(String tenantId, String userId, boolean tenantWide) {
+    }
+
     public record MarkAnnouncementReadCommand(
             String tenantId,
             String actorUserId,

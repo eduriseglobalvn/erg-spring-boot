@@ -74,6 +74,19 @@ public final class StudentEngagementResponses {
     public record StudentDiscussionModerationResponse(String targetType, String targetId, boolean hidden, boolean deleted) {
     }
 
+    /** {@code enabled == false} for a student means the teacher switched the leaderboard off: entries are empty. */
+    public record ClassLeaderboardResponse(String classId, String className, boolean enabled,
+                                           List<ClassLeaderboardEntryResponse> entries) {
+    }
+
+    /** {@code rank} and {@code averagePercent} are null for a student with no handed-in work (listed last). */
+    public record ClassLeaderboardEntryResponse(Integer rank, String studentId, String studentName,
+                                                Double averagePercent, long completedCount, boolean isViewer) {
+    }
+
+    public record LeaderboardClassResponse(String id, String name, boolean leaderboardEnabled) {
+    }
+
     public record AnnouncementReadResponse(String announcementId, boolean read, OffsetDateTime readAt) {
     }
 }

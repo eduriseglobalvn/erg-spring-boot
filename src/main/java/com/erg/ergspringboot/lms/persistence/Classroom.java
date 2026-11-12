@@ -44,6 +44,10 @@ public class Classroom extends BaseEntity {
     @Column(name = "homeroom_teacher_id")
     private String homeroomTeacherId;
 
+    /** Class leaderboard ("Xếp hạng") shown to the students of this class; teachers switch it per class. */
+    @Column(name = "leaderboard_enabled", nullable = false)
+    private boolean leaderboardEnabled = true;
+
     @Version
     @Column(name = "record_version", nullable = false)
     private Long recordVersion;

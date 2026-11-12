@@ -222,7 +222,19 @@ type ElearningQuery {
   discussionFeed(input: StudentDiscussionFeedInput): StudentDiscussionFeed!
   discussionModerationClasses(tenantId: String): [StudentDiscussionModerationClass!]!
   discussionModerationFeed(input: StudentDiscussionModerationFeedInput!): StudentDiscussionFeed!
+  studentClassLeaderboard(input: StudentClassLeaderboardInput): ClassLeaderboard!
+  leaderboardClasses(tenantId: String): [LeaderboardClass!]!
+  classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
 }
+
+input StudentClassLeaderboardInput { tenantId: String, classId: String }
+input ClassLeaderboardInput { tenantId: String, classId: String! }
+
+"""enabled = false for a student: the teacher switched the leaderboard off, entries are empty."""
+type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, entries: [ClassLeaderboardEntry!]! }
+"""rank and averagePercent are null for a student with no handed-in work (listed last)."""
+type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, averagePercent: Float, completedCount: Int!, isViewer: Boolean! }
+type LeaderboardClass { id: String!, name: String, leaderboardEnabled: Boolean! }
 
 input StudentDashboardInput {
   tenantId: String
@@ -269,6 +281,7 @@ type StudentDashboardProfile {
   academicClassId: String
   status: String
   updatedAt: String
+  leaderboardEnabled: Boolean!
 }
 
 type StudentDashboardSummary {
@@ -964,6 +977,7 @@ type Mutation {
   markStudentAnnouncementRead(input: MarkStudentAnnouncementReadInput!): StudentAnnouncementReadPayload!
   setStudentDiscussionHidden(input: SetStudentDiscussionHiddenInput!): StudentDiscussionModerationPayload!
   deleteStudentDiscussionItem(input: DeleteStudentDiscussionItemInput!): StudentDiscussionModerationPayload!
+  setClassLeaderboardEnabled(input: SetClassLeaderboardEnabledInput!): LeaderboardClass!
   previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
   createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
@@ -993,6 +1007,7 @@ input SetStudentDiscussionReactionInput { tenantId: String, targetType: String!,
 input MarkStudentAnnouncementReadInput { tenantId: String, announcementId: String! }
 input StudentDiscussionModerationFeedInput { tenantId: String, classId: String!, page: Int, size: Int }
 input SetStudentDiscussionHiddenInput { tenantId: String, targetType: String!, targetId: String!, hidden: Boolean! }
+input SetClassLeaderboardEnabledInput { tenantId: String, classId: String!, enabled: Boolean! }
 input DeleteStudentDiscussionItemInput { tenantId: String, targetType: String!, targetId: String! }
 
 type StudentDiscussionFeed { items: [StudentDiscussionPost!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }

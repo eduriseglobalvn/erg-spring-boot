@@ -22,6 +22,7 @@ import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.ClassLeaderboardRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollmentRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
@@ -57,6 +58,7 @@ public class StudentDashboardReadService {
     private final UserRepository userRepository;
     private final ErgPolicyService policyService;
     private final StudentDashboardAnnouncementReadPort announcementReadPort;
+    private final ClassLeaderboardRepository leaderboardRepository;
 
     @Autowired
     public StudentDashboardReadService(
@@ -67,7 +69,8 @@ public class StudentDashboardReadService {
             ErgPolicyService policyService,
             StudentDashboardAnnouncementReadPort announcementReadPort,
             StudentEnrollmentRepository studentEnrollmentRepository,
-            ClassroomRepository classroomRepository
+            ClassroomRepository classroomRepository,
+            ClassLeaderboardRepository leaderboardRepository
     ) {
         this.assignmentRepository = assignmentRepository;
         this.attemptRepository = attemptRepository;
@@ -77,6 +80,21 @@ public class StudentDashboardReadService {
         this.announcementReadPort = announcementReadPort;
         this.studentEnrollmentRepository = studentEnrollmentRepository;
         this.classroomRepository = classroomRepository;
+        this.leaderboardRepository = leaderboardRepository;
+    }
+
+    public StudentDashboardReadService(
+            AssignmentRepository assignmentRepository,
+            AttemptRepository attemptRepository,
+            StudentRepository studentRepository,
+            UserRepository userRepository,
+            ErgPolicyService policyService,
+            StudentDashboardAnnouncementReadPort announcementReadPort,
+            StudentEnrollmentRepository studentEnrollmentRepository,
+            ClassroomRepository classroomRepository
+    ) {
+        this(assignmentRepository, attemptRepository, studentRepository, userRepository, policyService,
+                announcementReadPort, studentEnrollmentRepository, classroomRepository, null);
     }
 
     public StudentDashboardReadService(
@@ -133,7 +151,10 @@ public class StudentDashboardReadService {
         String studentId = student == null ? null : blankToNull(student.getId());
         List<StudentDashboardClassMembershipResponse> classMemberships = classMemberships(safeScope, student);
         String academicClassId = selectedClassId(safeScope, student, classMemberships);
-        StudentDashboardProfileResponse profile = toProfile(safeScope, user, student, academicClassId);
+        // The student menu shows "Xếp hạng" only while the teacher keeps the class leaderboard on.
+        boolean leaderboardEnabled = academicClassId != null && leaderboardRepository != null
+                && leaderboardRepository.findLeaderboardEnabled(safeScope.tenantId(), academicClassId).orElse(false);
+        StudentDashboardProfileResponse profile = toProfile(safeScope, user, student, academicClassId, leaderboardEnabled);
         List<StudentDashboardAssignmentProjection> assignmentSlice = studentId == null
                 ? List.of()
                 : assignmentRepository.findStudentDashboardAssignments(

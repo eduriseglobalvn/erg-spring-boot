@@ -122,7 +122,7 @@ class StudentDashboardGraphQlControllerTest {
         return new StudentDashboardResponse(
                 tenantId,
                 new StudentDashboardViewerResponse(userId, tenantId, "student", "self"),
-                new StudentDashboardProfileResponse(userId, null, null, null, null, null, null, null, null),
+                new StudentDashboardProfileResponse(userId, null, null, null, null, null, null, null, null, false),
                 new StudentDashboardSummaryResponse(
                         0,
                         0,

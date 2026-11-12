@@ -1,6 +1,8 @@
 package com.erg.ergspringboot.controller.elearning.graphql;
 
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.ClassLeaderboardResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.LeaderboardClassResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
@@ -11,6 +13,7 @@ import com.erg.ergspringboot.elearning.ElearningOperations;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.CreateDiscussionCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionModerator;
+import com.erg.ergspringboot.elearning.api.ElearningCommands.LeaderboardManager;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.MarkAnnouncementReadCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.ReplyCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.SetReactionCommand;
@@ -18,6 +21,7 @@ import com.erg.ergspringboot.elearning.authorization.ElearningAnnouncementReadSe
 import com.erg.ergspringboot.elearning.authorization.ElearningDashboardRead;
 import com.erg.ergspringboot.elearning.authorization.ElearningDiscussionModerate;
 import com.erg.ergspringboot.elearning.authorization.ElearningDiscussionWriteSelf;
+import com.erg.ergspringboot.elearning.authorization.ElearningLeaderboardManage;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
@@ -114,9 +118,47 @@ public class StudentEngagementGraphQlController {
         return service.deleteDiscussionItem(moderator(input.tenantId()), input.targetType(), input.targetId());
     }
 
-    /** Tenant-wide admins (ADMIN workspace role or platform-wide principal) moderate every class; others only classes taught. */
+    /** Class leaderboard ("Xếp hạng") of the student's own class; no entries once the teacher switched it off. */
+    @SchemaMapping(typeName = "ElearningQuery", field = "studentClassLeaderboard")
+    @ElearningDashboardRead
+    public ClassLeaderboardResponse studentClassLeaderboard(@Argument StudentClassLeaderboardInput input) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        StudentClassLeaderboardInput safe = input == null ? new StudentClassLeaderboardInput(null, null) : input;
+        return service.studentClassLeaderboard(
+                accessSupport.verifiedTenantId(principal, safe.tenantId()), principal.userId(), safe.classId());
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "leaderboardClasses")
+    @ElearningLeaderboardManage
+    public List<LeaderboardClassResponse> leaderboardClasses(@Argument String tenantId) {
+        return service.leaderboardClasses(manager(tenantId));
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "classLeaderboard")
+    @ElearningLeaderboardManage
+    public ClassLeaderboardResponse classLeaderboard(@Argument ClassLeaderboardInput input) {
+        return service.classLeaderboard(manager(input.tenantId()), input.classId());
+    }
+
+    @MutationMapping
+    @ElearningLeaderboardManage
+    public LeaderboardClassResponse setClassLeaderboardEnabled(@Argument SetClassLeaderboardEnabledInput input) {
+        return service.setClassLeaderboardEnabled(manager(input.tenantId()), input.classId(),
+                Boolean.TRUE.equals(input.enabled()));
+    }
+
     private DiscussionModerator moderator(String requestedTenantId) {
-        ErgPrincipal principal = requirePrincipal("elearning.discussion.moderate");
+        return scope(requestedTenantId, "elearning.discussion.moderate");
+    }
+
+    private LeaderboardManager manager(String requestedTenantId) {
+        DiscussionModerator scope = scope(requestedTenantId, "elearning.leaderboard.manage");
+        return new LeaderboardManager(scope.tenantId(), scope.userId(), scope.tenantWide());
+    }
+
+    /** Tenant-wide admins (ADMIN workspace role or platform-wide principal) open every class; others only classes taught. */
+    private DiscussionModerator scope(String requestedTenantId, String permission) {
+        ErgPrincipal principal = requirePrincipal(permission);
         boolean tenantWide = accessSupport.isWildcardPrincipal(principal)
                 || WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(principal.roles(), List.of(), List.of())
                         .contains("ADMIN");
@@ -144,4 +186,7 @@ public class StudentEngagementGraphQlController {
     public record StudentDiscussionModerationFeedInput(String tenantId, String classId, Integer page, Integer size) { }
     public record SetStudentDiscussionHiddenInput(String tenantId, String targetType, String targetId, Boolean hidden) { }
     public record DeleteStudentDiscussionItemInput(String tenantId, String targetType, String targetId) { }
+    public record StudentClassLeaderboardInput(String tenantId, String classId) { }
+    public record ClassLeaderboardInput(String tenantId, String classId) { }
+    public record SetClassLeaderboardEnabledInput(String tenantId, String classId, Boolean enabled) { }
 }

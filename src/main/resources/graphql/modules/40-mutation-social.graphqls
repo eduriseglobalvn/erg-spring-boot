@@ -7,6 +7,7 @@ type Mutation {
   markStudentAnnouncementRead(input: MarkStudentAnnouncementReadInput!): StudentAnnouncementReadPayload!
   setStudentDiscussionHidden(input: SetStudentDiscussionHiddenInput!): StudentDiscussionModerationPayload!
   deleteStudentDiscussionItem(input: DeleteStudentDiscussionItemInput!): StudentDiscussionModerationPayload!
+  setClassLeaderboardEnabled(input: SetClassLeaderboardEnabledInput!): LeaderboardClass!
   previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
   createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
@@ -36,6 +37,7 @@ input SetStudentDiscussionReactionInput { tenantId: String, targetType: String!,
 input MarkStudentAnnouncementReadInput { tenantId: String, announcementId: String! }
 input StudentDiscussionModerationFeedInput { tenantId: String, classId: String!, page: Int, size: Int }
 input SetStudentDiscussionHiddenInput { tenantId: String, targetType: String!, targetId: String!, hidden: Boolean! }
+input SetClassLeaderboardEnabledInput { tenantId: String, classId: String!, enabled: Boolean! }
 input DeleteStudentDiscussionItemInput { tenantId: String, targetType: String!, targetId: String! }
 
 type StudentDiscussionFeed { items: [StudentDiscussionPost!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }

@@ -71,7 +71,8 @@ class StudentDashboardQueryCountIntegrationTest {
 
         assertThat(statistics.getPrepareStatementCount())
                 .as("studentDashboard should use a bounded set of profile, projection and aggregate SQL statements")
-                .isLessThanOrEqualTo(6);
+                // 7th: one-row lookup of the class leaderboard switch (V138), so the student menu can hide "Xếp hạng".
+                .isLessThanOrEqualTo(7);
         assertThat(statistics.getEntityLoadCount())
                 .as("studentDashboard may load only the profile User and Student entities, not assignment/attempt graphs")
                 .isLessThanOrEqualTo(2);
