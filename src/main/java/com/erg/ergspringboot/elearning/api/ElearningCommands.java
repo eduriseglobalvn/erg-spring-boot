@@ -57,6 +57,10 @@ public final class ElearningCommands {
     ) {
     }
 
+    /** Teacher or admin moderating student discussions; {@code tenantWide} opens every class of the tenant. */
+    public record DiscussionModerator(String tenantId, String userId, boolean tenantWide) {
+    }
+
     public record MarkAnnouncementReadCommand(
             String tenantId,
             String actorUserId,

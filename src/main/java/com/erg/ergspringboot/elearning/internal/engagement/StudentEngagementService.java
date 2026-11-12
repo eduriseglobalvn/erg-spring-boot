@@ -44,11 +44,11 @@ public class StudentEngagementService {
         int page = Math.max(0, scope.page());
         int size = Math.max(1, Math.min(50, scope.size()));
         Long total = jdbc.queryForObject(
-                "select count(*) from student_discussion_threads where tenant_id = ? and academic_class_id = ?",
+                "select count(*) from student_discussion_threads where tenant_id = ? and academic_class_id = ? and hidden_at is null",
                 Long.class, scope.tenantId(), student.getAcademicClassId()
         );
         return new StudentDiscussionFeedResponse(
-                reader.classPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), size, page * size), page, size,
+                reader.classPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), size, page * size, false), page, size,
                 total == null ? 0 : total, total != null && (long) (page + 1) * size < total
         );
     }
@@ -90,7 +90,7 @@ public class StudentEngagementService {
         String existing = existingId("student_discussion_comments", command.tenantId(), command.actorUserId(), command.idempotencyKey());
         if (existing != null) return reader.commentById(command.tenantId(), command.actorUserId(), existing);
         String parentId = blank(command.parentCommentId());
-        if (parentId != null) requireCommentInPost(command.tenantId(), parentId, command.postId());
+        if (parentId != null) parentId = visibleRootComment(command.tenantId(), parentId, command.postId());
         String id = IdGenerator.newId();
         OffsetDateTime now = OffsetDateTime.now();
         try {
@@ -179,15 +179,23 @@ public class StudentEngagementService {
     }
 
     private void requirePostInClass(String tenantId, String postId, String classId) {
-        Integer count = jdbc.queryForObject("select count(*) from student_discussion_threads where tenant_id = ? and id = ? and academic_class_id = ?",
+        Integer count = jdbc.queryForObject("""
+                select count(*) from student_discussion_threads
+                where tenant_id = ? and id = ? and academic_class_id = ? and hidden_at is null
+                """,
                 Integer.class, tenantId, postId, classId);
         if (count == null || count == 0) throw new ResourceNotFoundException("Discussion post was not found in the student class.");
     }
 
-    private void requireCommentInPost(String tenantId, String commentId, String postId) {
-        Integer count = jdbc.queryForObject("select count(*) from student_discussion_comments where tenant_id = ? and id = ? and post_id = ?",
-                Integer.class, tenantId, commentId, postId);
-        if (count == null || count == 0) throw new ResourceNotFoundException("Parent comment was not found in the discussion post.");
+    /** Comments have two levels: a reply to a reply attaches to the root comment of the same post. */
+    private String visibleRootComment(String tenantId, String commentId, String postId) {
+        String root = jdbc.query("""
+                select coalesce(c.parent_id, c.id) from student_discussion_comments c
+                left join student_discussion_comments parent on parent.id = c.parent_id and parent.tenant_id = c.tenant_id
+                where c.tenant_id = ? and c.id = ? and c.post_id = ? and c.hidden_at is null and parent.hidden_at is null
+                """, rs -> rs.next() ? rs.getString(1) : null, tenantId, commentId, postId);
+        if (root == null) throw new ResourceNotFoundException("Parent comment was not found in the discussion post.");
+        return root;
     }
 
     private void requireTargetInClass(String tenantId, String type, String targetId, String classId) {
@@ -198,7 +206,9 @@ public class StudentEngagementService {
         Integer count = jdbc.queryForObject("""
                 select count(*) from student_discussion_comments c
                 join student_discussion_threads p on p.id = c.post_id and p.tenant_id = c.tenant_id
+                left join student_discussion_comments parent on parent.id = c.parent_id and parent.tenant_id = c.tenant_id
                 where c.tenant_id = ? and c.id = ? and p.academic_class_id = ?
+                  and c.hidden_at is null and parent.hidden_at is null and p.hidden_at is null
                 """, Integer.class, tenantId, targetId, classId);
         if (count == null || count == 0) throw new ResourceNotFoundException("Discussion comment was not found in the student class.");
     }

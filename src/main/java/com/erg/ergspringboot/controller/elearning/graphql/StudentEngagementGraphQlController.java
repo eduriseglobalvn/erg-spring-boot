@@ -3,19 +3,24 @@ package com.erg.ergspringboot.controller.elearning.graphql;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionPostResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionReactionResponse;
 import com.erg.ergspringboot.elearning.ElearningOperations;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.CreateDiscussionCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery;
+import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionModerator;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.MarkAnnouncementReadCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.ReplyCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.SetReactionCommand;
 import com.erg.ergspringboot.elearning.authorization.ElearningAnnouncementReadSelf;
 import com.erg.ergspringboot.elearning.authorization.ElearningDashboardRead;
+import com.erg.ergspringboot.elearning.authorization.ElearningDiscussionModerate;
 import com.erg.ergspringboot.elearning.authorization.ElearningDiscussionWriteSelf;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -83,6 +88,41 @@ public class StudentEngagementGraphQlController {
         ));
     }
 
+    @SchemaMapping(typeName = "ElearningQuery", field = "discussionModerationClasses")
+    @ElearningDiscussionModerate
+    public List<StudentDiscussionModerationClassResponse> discussionModerationClasses(@Argument String tenantId) {
+        return service.discussionModerationClasses(moderator(tenantId));
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "discussionModerationFeed")
+    @ElearningDiscussionModerate
+    public StudentDiscussionFeedResponse discussionModerationFeed(@Argument StudentDiscussionModerationFeedInput input) {
+        return service.discussionModerationFeed(moderator(input.tenantId()), input.classId(),
+                input.page() == null ? 0 : input.page(), input.size() == null ? 20 : input.size());
+    }
+
+    @MutationMapping
+    @ElearningDiscussionModerate
+    public StudentDiscussionModerationResponse setStudentDiscussionHidden(@Argument SetStudentDiscussionHiddenInput input) {
+        return service.setDiscussionHidden(moderator(input.tenantId()), input.targetType(), input.targetId(),
+                Boolean.TRUE.equals(input.hidden()));
+    }
+
+    @MutationMapping
+    @ElearningDiscussionModerate
+    public StudentDiscussionModerationResponse deleteStudentDiscussionItem(@Argument DeleteStudentDiscussionItemInput input) {
+        return service.deleteDiscussionItem(moderator(input.tenantId()), input.targetType(), input.targetId());
+    }
+
+    /** Tenant-wide admins (ADMIN workspace role or platform-wide principal) moderate every class; others only classes taught. */
+    private DiscussionModerator moderator(String requestedTenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.discussion.moderate");
+        boolean tenantWide = accessSupport.isWildcardPrincipal(principal)
+                || WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(principal.roles(), List.of(), List.of())
+                        .contains("ADMIN");
+        return new DiscussionModerator(accessSupport.verifiedTenantId(principal, requestedTenantId), principal.userId(), tenantWide);
+    }
+
     private ErgPrincipal requirePrincipal(String permission) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, permission, "*");
@@ -101,4 +141,7 @@ public class StudentEngagementGraphQlController {
                                                String parentCommentId, String content, List<String> attachmentIds) { }
     public record SetStudentDiscussionReactionInput(String tenantId, String targetType, String targetId, String reaction) { }
     public record MarkStudentAnnouncementReadInput(String tenantId, String announcementId) { }
+    public record StudentDiscussionModerationFeedInput(String tenantId, String classId, Integer page, Integer size) { }
+    public record SetStudentDiscussionHiddenInput(String tenantId, String targetType, String targetId, Boolean hidden) { }
+    public record DeleteStudentDiscussionItemInput(String tenantId, String targetType, String targetId) { }
 }

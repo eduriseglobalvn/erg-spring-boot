@@ -3,6 +3,8 @@ type ElearningQuery {
   status: String!
   studentDashboard(input: StudentDashboardInput): StudentDashboard!
   discussionFeed(input: StudentDiscussionFeedInput): StudentDiscussionFeed!
+  discussionModerationClasses(tenantId: String): [StudentDiscussionModerationClass!]!
+  discussionModerationFeed(input: StudentDiscussionModerationFeedInput!): StudentDiscussionFeed!
 }
 
 input StudentDashboardInput {

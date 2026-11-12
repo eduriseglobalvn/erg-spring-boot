@@ -31,11 +31,12 @@ public final class StudentEngagementResponses {
             String assignmentId,
             List<StudentDiscussionReactionCountResponse> reactions,
             String viewerReaction,
-            List<StudentDiscussionCommentResponse> comments
+            List<StudentDiscussionCommentResponse> comments,
+            boolean hidden
     ) {
         public static StudentDiscussionPostResponse empty(String id) {
             return new StudentDiscussionPostResponse(
-                    id, null, null, null, null, null, null, null, null, List.of(), null, List.of(), null, List.of()
+                    id, null, null, null, null, null, null, null, null, List.of(), null, List.of(), null, List.of(), false
             );
         }
     }
@@ -51,7 +52,8 @@ public final class StudentEngagementResponses {
             List<String> attachmentIds,
             List<StudentDiscussionReactionCountResponse> reactions,
             String viewerReaction,
-            List<StudentDiscussionCommentResponse> replies
+            List<StudentDiscussionCommentResponse> replies,
+            boolean hidden
     ) {
     }
 
@@ -64,6 +66,12 @@ public final class StudentEngagementResponses {
             String viewerReaction,
             List<StudentDiscussionReactionCountResponse> reactions
     ) {
+    }
+
+    public record StudentDiscussionModerationClassResponse(String id, String name) {
+    }
+
+    public record StudentDiscussionModerationResponse(String targetType, String targetId, boolean hidden, boolean deleted) {
     }
 
     public record AnnouncementReadResponse(String announcementId, boolean read, OffsetDateTime readAt) {
