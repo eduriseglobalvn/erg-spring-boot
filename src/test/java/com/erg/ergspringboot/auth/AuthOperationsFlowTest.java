@@ -269,7 +269,8 @@ class AuthOperationsFlowTest {
                 new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)
         );
 
-        assertEquals(List.of("admin"), response.portals());
+        // Portals follow the workspace projection of granted permissions; a role name alone opens none.
+        assertEquals(List.of(), response.portals());
     }
 
     @Test

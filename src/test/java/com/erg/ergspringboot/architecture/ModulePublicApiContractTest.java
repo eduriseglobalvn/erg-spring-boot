@@ -97,7 +97,9 @@ class ModulePublicApiContractTest {
                 .isNotNull();
         assertThat(ElearningOperations.class.getDeclaredConstructor(
                 com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardReadService.class,
-                com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.class))
+                com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.class,
+                com.erg.ergspringboot.elearning.internal.engagement.StudentDiscussionModerationService.class,
+                com.erg.ergspringboot.elearning.internal.engagement.ClassLeaderboardService.class))
                 .isNotNull();
 
         assertThat(Files.exists(Path.of(
