@@ -31,11 +31,12 @@ public final class StudentEngagementResponses {
             String assignmentId,
             List<StudentDiscussionReactionCountResponse> reactions,
             String viewerReaction,
-            List<StudentDiscussionCommentResponse> comments
+            List<StudentDiscussionCommentResponse> comments,
+            boolean hidden
     ) {
         public static StudentDiscussionPostResponse empty(String id) {
             return new StudentDiscussionPostResponse(
-                    id, null, null, null, null, null, null, null, null, List.of(), null, List.of(), null, List.of()
+                    id, null, null, null, null, null, null, null, null, List.of(), null, List.of(), null, List.of(), false
             );
         }
     }
@@ -51,7 +52,8 @@ public final class StudentEngagementResponses {
             List<String> attachmentIds,
             List<StudentDiscussionReactionCountResponse> reactions,
             String viewerReaction,
-            List<StudentDiscussionCommentResponse> replies
+            List<StudentDiscussionCommentResponse> replies,
+            boolean hidden
     ) {
     }
 
@@ -64,6 +66,29 @@ public final class StudentEngagementResponses {
             String viewerReaction,
             List<StudentDiscussionReactionCountResponse> reactions
     ) {
+    }
+
+    public record StudentDiscussionModerationClassResponse(String id, String name) {
+    }
+
+    public record StudentDiscussionModerationResponse(String targetType, String targetId, boolean hidden, boolean deleted) {
+    }
+
+    /**
+     * {@code enabled == false} for a student means the teacher switched the board off: entries are empty.
+     * {@code periodEndsAt}: when the period's board closes (ISO-8601).
+     */
+    public record ClassLeaderboardResponse(String classId, String className, boolean enabled, String period,
+                                           String scope, String periodEndsAt, boolean viewerHidden,
+                                           List<ClassLeaderboardEntryResponse> entries) {
+    }
+
+    /** {@code rank} is null with no XP in the period (listed last); {@code rankChange} &gt; 0 means moved up. */
+    public record ClassLeaderboardEntryResponse(Integer rank, String studentId, String studentName, int xp,
+                                                int streakDays, Integer rankChange, boolean isViewer) {
+    }
+
+    public record LeaderboardClassResponse(String id, String name, boolean leaderboardEnabled) {
     }
 
     public record AnnouncementReadResponse(String announcementId, boolean read, OffsetDateTime readAt) {

@@ -66,7 +66,8 @@ public final class StudentDashboardResponses {
             String schoolId,
             String academicClassId,
             String status,
-            OffsetDateTime updatedAt
+            OffsetDateTime updatedAt,
+            boolean leaderboardEnabled
     ) {
     }
 

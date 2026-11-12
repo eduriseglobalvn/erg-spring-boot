@@ -9,54 +9,13 @@ import com.erg.ergspringboot.users.persistence.User;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-/** Pure mapping of a completed login into its response parts: profile, lifecycle, session and portals. */
+/** Pure mapping of a completed login into its response parts: profile, lifecycle, session. */
 final class LoginResponseMapper {
 
     private LoginResponseMapper() {
-    }
-
-    /**
-     * Portals listed in the login response. These are a compatibility/audit hint only; authorization
-     * is evaluated later from the verified server-side grants.
-     */
-    static List<String> entitledPortals(List<String> permissions, List<String> roles) {
-        if (permissions.contains("*")) {
-            return List.of("*");
-        }
-        Set<String> portals = new TreeSet<>();
-        permissions.forEach(permission -> {
-            int separator = permission.indexOf('.');
-            if (separator <= 0) {
-                return;
-            }
-            String namespace = permission.substring(0, separator).toLowerCase(Locale.ROOT);
-            if (Set.of("admin", "crm", "lcms", "lms", "elearning").contains(namespace)) {
-                portals.add(namespace);
-            }
-        });
-        if (roles != null) {
-            roles.stream()
-                    .map(role -> role == null ? "" : role.trim().toLowerCase(Locale.ROOT))
-                    .forEach(role -> {
-                        if (role.equals("admin") || role.equals("administrator")
-                                || role.equals("system.super_admin") || role.equals("erg_super_admin")
-                                || role.equals("global_admin") || role.equals("lms_admin")) {
-                            portals.add("admin");
-                        } else if (role.equals("teacher") || role.equals("instructor")) {
-                            portals.add("lms");
-                        } else if (role.equals("student") || role.equals("learner")) {
-                            portals.add("elearning");
-                        } else if (role.equals("crm") || role.equals("crm_manager")) {
-                            portals.add("crm");
-                        }
-                    });
-        }
-        return List.copyOf(portals);
     }
 
     static ProfileResponse profile(User user) {

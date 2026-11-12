@@ -30,19 +30,22 @@ final class StudentDiscussionReader {
         this.namedJdbc = namedJdbc;
     }
 
-    List<StudentDiscussionPostResponse> classPosts(String tenantId, String actorUserId, String classId, int size, int offset) {
+    /** Students pass {@code includeHidden = false}: hidden posts, hidden comments and replies under a hidden comment are left out. */
+    List<StudentDiscussionPostResponse> classPosts(
+            String tenantId, String actorUserId, String classId, int size, int offset, boolean includeHidden
+    ) {
         List<PostRow> posts = jdbc.query("""
                 select p.id, p.author_id, coalesce(u.full_name, 'Học viên') author_name,
                        p.academic_class_id, coalesce(c.name, '') class_name, p.title, p.content,
-                       p.created_at, p.attachment_ids::text, p.assignment_id
+                       p.created_at, p.attachment_ids::text, p.assignment_id, p.hidden_at is not null hidden
                 from student_discussion_threads p
                 left join users u on u.id = p.author_id and u.tenant_id = p.tenant_id
                 left join academic_classes c on c.id = p.academic_class_id and c.tenant_id = p.tenant_id
-                where p.tenant_id = ? and p.academic_class_id = ?
+                where p.tenant_id = ? and p.academic_class_id = ? and (? or p.hidden_at is null)
                 order by p.latest_activity_at desc, p.created_at desc
                 limit ? offset ?
-                """, this::mapPost, tenantId, classId, size, offset);
-        return assemblePosts(tenantId, actorUserId, posts);
+                """, this::mapPost, tenantId, classId, includeHidden, size, offset);
+        return assemblePosts(tenantId, actorUserId, posts, includeHidden);
     }
 
     List<StudentDiscussionReactionCountResponse> reactionCounts(String tenantId, String targetType, String targetId) {
@@ -54,26 +57,31 @@ final class StudentDiscussionReader {
         List<PostRow> rows = jdbc.query("""
                 select p.id, p.author_id, coalesce(u.full_name, 'Học viên') author_name,
                        p.academic_class_id, coalesce(c.name, '') class_name, p.title, p.content,
-                       p.created_at, p.attachment_ids::text, p.assignment_id
+                       p.created_at, p.attachment_ids::text, p.assignment_id, p.hidden_at is not null hidden
                 from student_discussion_threads p
                 left join users u on u.id = p.author_id and u.tenant_id = p.tenant_id
                 left join academic_classes c on c.id = p.academic_class_id and c.tenant_id = p.tenant_id
                 where p.tenant_id = ? and p.id = ?
                 """, this::mapPost, tenantId, id);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Discussion post was not found.");
-        return assemblePosts(tenantId, actorUserId, rows).getFirst();
+        return assemblePosts(tenantId, actorUserId, rows, true).getFirst();
     }
 
-    private List<StudentDiscussionPostResponse> assemblePosts(String tenantId, String actorUserId, List<PostRow> posts) {
+    private List<StudentDiscussionPostResponse> assemblePosts(
+            String tenantId, String actorUserId, List<PostRow> posts, boolean includeHidden
+    ) {
         if (posts.isEmpty()) return List.of();
         List<String> postIds = posts.stream().map(PostRow::id).toList();
-        MapSqlParameterSource params = new MapSqlParameterSource().addValue("tenantId", tenantId).addValue("postIds", postIds);
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("tenantId", tenantId).addValue("postIds", postIds)
+                .addValue("includeHidden", includeHidden);
         List<CommentRow> comments = namedJdbc.query("""
                 select c.id, c.post_id, c.parent_id, c.author_id, coalesce(u.full_name, 'Học viên') author_name,
-                       c.content, c.created_at, c.attachment_ids::text
+                       c.content, c.created_at, c.attachment_ids::text, c.hidden_at is not null hidden
                 from student_discussion_comments c
                 left join users u on u.id = c.author_id and u.tenant_id = c.tenant_id
+                left join student_discussion_comments parent on parent.id = c.parent_id and parent.tenant_id = c.tenant_id
                 where c.tenant_id = :tenantId and c.post_id in (:postIds)
+                  and (:includeHidden or (c.hidden_at is null and parent.hidden_at is null))
                 order by c.created_at asc
                 """, params, this::mapComment);
         List<TargetKey> targets = new ArrayList<>();
@@ -89,7 +97,7 @@ final class StudentDiscussionReader {
                     post.id(), post.authorId(), post.authorName(), initials(post.authorName()), post.academicClassId(),
                     post.className(), post.title(), post.content(), post.createdAt(), parseJsonList(post.attachmentIdsJson()),
                     post.assignmentId(), counts.getOrDefault(key, List.of()), viewer.get(key),
-                    assembleComments(byPost.getOrDefault(post.id(), List.of()), counts, viewer)
+                    assembleComments(byPost.getOrDefault(post.id(), List.of()), counts, viewer), post.hidden()
             );
         }).toList();
     }
@@ -116,14 +124,15 @@ final class StudentDiscussionReader {
         return new StudentDiscussionCommentResponse(
                 row.id(), row.parentId(), row.authorId(), row.authorName(), initials(row.authorName()), row.content(),
                 row.createdAt(), parseJsonList(row.attachmentIdsJson()), counts.getOrDefault(key, List.of()), viewer.get(key),
-                children.getOrDefault(row.id(), List.of()).stream().map(child -> toComment(child, Map.of(), counts, viewer)).toList()
+                children.getOrDefault(row.id(), List.of()).stream().map(child -> toComment(child, Map.of(), counts, viewer)).toList(),
+                row.hidden()
         );
     }
 
     StudentDiscussionCommentResponse commentById(String tenantId, String actorUserId, String id) {
         List<CommentRow> rows = jdbc.query("""
                 select c.id, c.post_id, c.parent_id, c.author_id, coalesce(u.full_name, 'Học viên') author_name,
-                       c.content, c.created_at, c.attachment_ids::text
+                       c.content, c.created_at, c.attachment_ids::text, c.hidden_at is not null hidden
                 from student_discussion_comments c left join users u on u.id = c.author_id and u.tenant_id = c.tenant_id
                 where c.tenant_id = ? and c.id = ?
                 """, this::mapComment, tenantId, id);
@@ -178,13 +187,13 @@ final class StudentDiscussionReader {
         return new PostRow(rs.getString("id"), rs.getString("author_id"), rs.getString("author_name"),
                 rs.getString("academic_class_id"), rs.getString("class_name"), rs.getString("title"),
                 rs.getString("content"), rs.getObject("created_at", OffsetDateTime.class),
-                rs.getString("attachment_ids"), rs.getString("assignment_id"));
+                rs.getString("attachment_ids"), rs.getString("assignment_id"), rs.getBoolean("hidden"));
     }
 
     private CommentRow mapComment(ResultSet rs, int row) throws SQLException {
         return new CommentRow(rs.getString("id"), rs.getString("post_id"), rs.getString("parent_id"),
                 rs.getString("author_id"), rs.getString("author_name"), rs.getString("content"),
-                rs.getObject("created_at", OffsetDateTime.class), rs.getString("attachment_ids"));
+                rs.getObject("created_at", OffsetDateTime.class), rs.getString("attachment_ids"), rs.getBoolean("hidden"));
     }
 
     private List<String> parseJsonList(String value) {
@@ -201,9 +210,10 @@ final class StudentDiscussionReader {
     }
 
     private record PostRow(String id, String authorId, String authorName, String academicClassId, String className,
-                           String title, String content, OffsetDateTime createdAt, String attachmentIdsJson, String assignmentId) { }
+                           String title, String content, OffsetDateTime createdAt, String attachmentIdsJson, String assignmentId,
+                           boolean hidden) { }
     private record CommentRow(String id, String postId, String parentId, String authorId, String authorName,
-                              String content, OffsetDateTime createdAt, String attachmentIdsJson) { }
+                              String content, OffsetDateTime createdAt, String attachmentIdsJson, boolean hidden) { }
     private record TargetKey(String type, String id) { }
     private record ReactionCountRow(TargetKey target, StudentDiscussionReactionCountResponse count) { }
     private record ViewerReactionRow(TargetKey target, String reaction) { }

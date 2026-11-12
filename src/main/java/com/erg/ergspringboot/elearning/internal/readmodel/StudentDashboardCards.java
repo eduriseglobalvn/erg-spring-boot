@@ -98,7 +98,8 @@ final class StudentDashboardCards {
             StudentDashboardReadScope scope,
             User user,
             Student student,
-            String selectedClassId
+            String selectedClassId,
+            boolean leaderboardEnabled
     ) {
         return new StudentDashboardProfileResponse(
                 scope.userId(),
@@ -118,7 +119,8 @@ final class StudentDashboardCards {
                         student == null ? null : student.getStatus(),
                         user == null ? null : user.getStatus()
                 ),
-                student == null ? null : student.getUpdatedAt()
+                student == null ? null : student.getUpdatedAt(),
+                leaderboardEnabled
         );
     }
 
