@@ -100,16 +100,21 @@ public class ElearningOperations {
                 command.tenantId(), command.actorUserId(), command.announcementId()));
     }
 
-    public ClassLeaderboardResponse studentClassLeaderboard(String tenantId, String userId, String classId) {
-        return leaderboard.forStudent(tenantId, userId, classId);
+    public ClassLeaderboardResponse studentClassLeaderboard(String tenantId, String userId, String classId,
+                                                            String period, String scope) {
+        return leaderboard.forStudent(tenantId, userId, classId, period, scope);
+    }
+
+    public boolean setMyLeaderboardHidden(String tenantId, String userId, boolean hidden) {
+        return leaderboard.setHidden(tenantId, userId, hidden);
     }
 
     public java.util.List<LeaderboardClassResponse> leaderboardClasses(LeaderboardManager manager) {
         return leaderboard.classes(manager(manager));
     }
 
-    public ClassLeaderboardResponse classLeaderboard(LeaderboardManager manager, String classId) {
-        return leaderboard.forManager(manager(manager), classId);
+    public ClassLeaderboardResponse classLeaderboard(LeaderboardManager manager, String classId, String period) {
+        return leaderboard.forManager(manager(manager), classId, period);
     }
 
     public LeaderboardClassResponse setClassLeaderboardEnabled(LeaderboardManager manager, String classId, boolean enabled) {

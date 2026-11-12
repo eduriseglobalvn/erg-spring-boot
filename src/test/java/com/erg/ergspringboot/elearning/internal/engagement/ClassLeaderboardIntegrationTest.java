@@ -17,6 +17,7 @@ import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-/** V138 class leaderboard: ranking rule (latest hand-in per assignment), student own-class scope, per-class switch. */
+/** "Thi đua" board (V138, V139): XP ranking, grade scope, hiding oneself, own-class scope, per-class switch. */
 @ActiveProfiles("test")
 @SpringBootTest
 @Transactional
@@ -58,53 +59,81 @@ class ClassLeaderboardIntegrationTest {
         classroom(CLASS_B, OTHER_TEACHER);
         assignment("a1", CLASS_A);
         assignment("a2", CLASS_A);
+        assignment("a3", CLASS_A);
         assignment("b1", CLASS_B);
+        OffsetDateTime lastWeek = LeaderboardXp.window(LeaderboardXp.Period.WEEK, ZonedDateTime.now(LeaderboardXp.ZONE))
+                .previous(LeaderboardXp.Period.WEEK).start().plusHours(1).toOffsetDateTime();
 
         student("s-an", "An", CLASS_A);
-        attempt("s-an", "a1", "submitted", 40.0, 3); // older hand-in, replaced by the one below
-        attempt("s-an", "a1", "submitted", 90.0, 2);
-        attempt("s-an", "a2", "submitted", 80.0, 1);
+        attempt("s-an", "a1", "submitted", 10, false, NOW.minusMinutes(5)); // 25 + 10 before the deadline
+        attempt("s-an", "a1", "submitted", 10, false, NOW.minusMinutes(4)); // a retake earns nothing
+        attempt("s-an", "a2", "submitted", 20, false, NOW.minusMinutes(3)); // 40 + 10
         student("s-binh", "Bình", CLASS_A);
-        attempt("s-binh", "a1", "submitted", 85.0, 1);
+        attempt("s-binh", "a1", "submitted", 10, true, NOW.minusMinutes(3)); // late: 25
         student("s-cuong", "Cường", CLASS_A);
-        attempt("s-cuong", "a1", "submitted", 100.0, 3);
-        attempt("s-cuong", "a1", "submitted", 50.0, 2); // latest hand-in counts, not the best
-        attempt("s-cuong", "a2", "in_progress", 100.0, 1); // not handed in
+        attempt("s-cuong", "a1", "submitted", null, false, NOW.minusMinutes(3)); // 10 + 10
+        attempt("s-cuong", "a2", "in_progress", 20, false, null); // not handed in
+        attempt("s-cuong", "a3", "submitted", 20, false, lastWeek); // last week's leader
         student("s-dung", "Dũng", CLASS_A);
-        // Primary class B, enrolled in A: listed in both.
+        // Primary class B, enrolled in A: listed in both; XP belongs to the student, from every class.
         student("s-em", "Em", CLASS_B);
         enrollment("s-em", CLASS_A);
-        attempt("s-em", "a2", "submitted", 70.0, 1);
-        attempt("s-em", "b1", "submitted", 10.0, 1);
+        attempt("s-em", "a2", "submitted", 10, false, NOW.minusMinutes(2));
+        attempt("s-em", "b1", "submitted", 10, false, NOW.minusMinutes(2));
         student("s-other", "Giang", CLASS_B);
         entityManager.flush();
         entityManager.clear();
     }
 
     @Test
-    void ranksByAverageThenCompletedThenNameWithUnrankedLast() {
-        ClassLeaderboardResponse board = service.forStudent(TENANT, "usr-s-an", null);
+    void ranksByXpWithoutScoresAndUnrankedLast() {
+        ClassLeaderboardResponse board = service.forStudent(TENANT, "usr-s-an", null, null, null);
 
         assertThat(board.classId()).isEqualTo(CLASS_A);
         assertThat(board.enabled()).isTrue();
+        assertThat(board.period()).isEqualTo("WEEK");
+        assertThat(board.scope()).isEqualTo("CLASS");
         assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::studentName)
-                .containsExactly("An", "Bình", "Em", "Cường", "Dũng");
+                .containsExactly("An", "Em", "Bình", "Cường", "Dũng");
+        assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::xp).containsExactly(85, 70, 25, 20, 0);
         assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::rank).containsExactly(1, 2, 3, 4, null);
-        assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::averagePercent)
-                .containsExactly(85.0, 85.0, 70.0, 50.0, null);
-        assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::completedCount)
-                .containsExactly(2L, 1L, 1L, 1L, 0L);
+        assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::streakDays).containsExactly(1, 1, 1, 1, 0);
+        // Cường led last week alone and is 4th now; nobody else was ranked last week.
+        assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::rankChange)
+                .containsExactly(null, null, null, -3, null);
         assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::isViewer)
                 .containsExactly(true, false, false, false, false);
     }
 
     @Test
+    void gradeBoardListsEveryClassOfTheGrade() {
+        ClassLeaderboardResponse grade = service.forStudent(TENANT, "usr-s-an", null, "week", "grade");
+        assertThat(grade.scope()).isEqualTo("GRADE");
+        assertThat(grade.entries()).extracting(ClassLeaderboardEntryResponse::studentName)
+                .containsExactly("An", "Em", "Bình", "Cường", "Dũng", "Giang");
+    }
+
+    @Test
+    void aHiddenStudentKeepsTheirOwnRankButClassmatesAndNotTeachersLoseThem() {
+        service.setHidden(TENANT, "usr-s-binh", true);
+
+        ClassLeaderboardResponse own = service.forStudent(TENANT, "usr-s-binh", null, null, null);
+        assertThat(own.viewerHidden()).isTrue();
+        assertThat(own.entries()).filteredOn(ClassLeaderboardEntryResponse::isViewer)
+                .extracting(ClassLeaderboardEntryResponse::rank).containsExactly(3);
+        assertThat(service.forStudent(TENANT, "usr-s-an", null, null, null).entries())
+                .extracting(ClassLeaderboardEntryResponse::studentName).doesNotContain("Bình");
+        assertThat(service.forManager(new Manager(TENANT, TEACHER, false), CLASS_A, null).entries())
+                .extracting(ClassLeaderboardEntryResponse::studentName).contains("Bình");
+    }
+
+    @Test
     void studentOnlyOpensOwnClasses() {
-        assertThatThrownBy(() -> service.forStudent(TENANT, "usr-s-an", CLASS_B)).isInstanceOf(ForbiddenException.class);
-        ClassLeaderboardResponse enrolled = service.forStudent(TENANT, "usr-s-em", CLASS_A);
+        assertThatThrownBy(() -> service.forStudent(TENANT, "usr-s-an", CLASS_B, null, null)).isInstanceOf(ForbiddenException.class);
+        ClassLeaderboardResponse enrolled = service.forStudent(TENANT, "usr-s-em", CLASS_A, null, null);
         assertThat(enrolled.entries()).filteredOn(ClassLeaderboardEntryResponse::isViewer)
                 .extracting(ClassLeaderboardEntryResponse::studentName).containsExactly("Em");
-        assertThat(service.forStudent(TENANT, "usr-s-em", null).classId()).isEqualTo(CLASS_B);
+        assertThat(service.forStudent(TENANT, "usr-s-em", null, null, null).classId()).isEqualTo(CLASS_B);
     }
 
     @Test
@@ -118,21 +147,21 @@ class ClassLeaderboardIntegrationTest {
         entityManager.clear();
 
         assertThat(repository.findLeaderboardEnabled(TENANT, CLASS_A)).contains(false);
-        ClassLeaderboardResponse student = service.forStudent(TENANT, "usr-s-an", null);
+        ClassLeaderboardResponse student = service.forStudent(TENANT, "usr-s-an", null, null, null);
         assertThat(student.enabled()).isFalse();
         assertThat(student.entries()).isEmpty();
-        ClassLeaderboardResponse forTeacher = service.forManager(teacher, CLASS_A);
+        ClassLeaderboardResponse forTeacher = service.forManager(teacher, CLASS_A, null);
         assertThat(forTeacher.enabled()).isFalse();
         assertThat(forTeacher.entries()).hasSize(5);
 
         service.setEnabled(teacher, CLASS_A, true);
-        assertThat(service.forStudent(TENANT, "usr-s-an", null).entries()).hasSize(5);
+        assertThat(service.forStudent(TENANT, "usr-s-an", null, null, null).entries()).hasSize(5);
     }
 
     @Test
     void teacherOutsideTheClassIsForbiddenAndTenantAdminSeesEveryClass() {
         Manager other = new Manager(TENANT, OTHER_TEACHER, false);
-        assertThatThrownBy(() -> service.forManager(other, CLASS_A)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.forManager(other, CLASS_A, null)).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> service.setEnabled(other, CLASS_A, false)).isInstanceOf(ForbiddenException.class);
         assertThat(service.classes(new Manager(TENANT, "usr-lb-admin", true)))
                 .extracting(row -> row.id()).containsExactly(CLASS_A, CLASS_B);
@@ -207,7 +236,8 @@ class ClassLeaderboardIntegrationTest {
 
     private int attempts;
 
-    private void attempt(String studentId, String assignmentId, String status, double percent, int hoursAgo) {
+    private void attempt(String studentId, String assignmentId, String status, Integer questions, boolean late,
+                         OffsetDateTime submittedAt) {
         Attempt attempt = new Attempt();
         attempt.setId("att-lb-" + (++attempts));
         attempt.setTenantId(TENANT);
@@ -215,13 +245,15 @@ class ClassLeaderboardIntegrationTest {
         attempt.setQuizId("qz_math_g6_base");
         attempt.setStudentId(studentId);
         attempt.setStatus(status);
-        attempt.setPercent(percent);
-        attempt.setScore(percent);
+        attempt.setTotalQuestions(questions);
+        attempt.setLate(late);
+        attempt.setPercent(50.0D);
+        attempt.setScore(50.0D);
         attempt.setMaxScore(100.0D);
-        attempt.setPassed(percent >= 50);
-        attempt.setStartedAt(NOW.minusHours(hoursAgo + 1L));
-        attempt.setSubmittedAt("submitted".equals(status) ? NOW.minusHours(hoursAgo) : null);
-        attempt.setUpdatedAt(NOW.minusHours(hoursAgo));
+        attempt.setPassed(true);
+        attempt.setStartedAt(NOW.minusHours(1));
+        attempt.setSubmittedAt(submittedAt);
+        attempt.setUpdatedAt(submittedAt == null ? NOW : submittedAt);
         entityManager.persist(attempt);
     }
 }

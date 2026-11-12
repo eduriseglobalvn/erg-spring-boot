@@ -224,6 +224,22 @@ fields:
     generation-domain: mutation-invalidation
     cold-warm-scenario: authenticated-write
     fixture-id: graphql-class-leaderboard-v1
+  - coordinate: Mutation.setMyLeaderboardHidden
+    owner: com.erg.ergspringboot.controller.elearning.graphql.StudentEngagementGraphQlController.setMyLeaderboardHidden
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 4
+    row-budget: 2
+    payload-budget-bytes: 262144
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 500
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-class-leaderboard-v1
   - coordinate: LcmsQuery.accessManagementWorkspace
     owner: com.erg.ergspringboot.controller.lcms.graphql.LcmsWorkspaceGraphQlController.accessManagementWorkspace
     auth: tenant-and-permission

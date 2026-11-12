@@ -74,14 +74,18 @@ public final class StudentEngagementResponses {
     public record StudentDiscussionModerationResponse(String targetType, String targetId, boolean hidden, boolean deleted) {
     }
 
-    /** {@code enabled == false} for a student means the teacher switched the leaderboard off: entries are empty. */
-    public record ClassLeaderboardResponse(String classId, String className, boolean enabled,
+    /**
+     * {@code enabled == false} for a student means the teacher switched the board off: entries are empty.
+     * {@code periodEndsAt}: when the period's board closes (ISO-8601).
+     */
+    public record ClassLeaderboardResponse(String classId, String className, boolean enabled, String period,
+                                           String scope, String periodEndsAt, boolean viewerHidden,
                                            List<ClassLeaderboardEntryResponse> entries) {
     }
 
-    /** {@code rank} and {@code averagePercent} are null for a student with no handed-in work (listed last). */
-    public record ClassLeaderboardEntryResponse(Integer rank, String studentId, String studentName,
-                                                Double averagePercent, long completedCount, boolean isViewer) {
+    /** {@code rank} is null with no XP in the period (listed last); {@code rankChange} &gt; 0 means moved up. */
+    public record ClassLeaderboardEntryResponse(Integer rank, String studentId, String studentName, int xp,
+                                                int streakDays, Integer rankChange, boolean isViewer) {
     }
 
     public record LeaderboardClassResponse(String id, String name, boolean leaderboardEnabled) {

@@ -10,13 +10,14 @@ type ElearningQuery {
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
 }
 
-input StudentClassLeaderboardInput { tenantId: String, classId: String }
-input ClassLeaderboardInput { tenantId: String, classId: String! }
+"""period: WEEK (default), MONTH or TERM. scope: CLASS (default) or GRADE."""
+input StudentClassLeaderboardInput { tenantId: String, classId: String, period: String, scope: String }
+input ClassLeaderboardInput { tenantId: String, classId: String!, period: String }
 
-"""enabled = false for a student: the teacher switched the leaderboard off, entries are empty."""
-type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, entries: [ClassLeaderboardEntry!]! }
-"""rank and averagePercent are null for a student with no handed-in work (listed last)."""
-type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, averagePercent: Float, completedCount: Int!, isViewer: Boolean! }
+"""Ranked by XP only; scores are never returned. enabled = false for a student: the teacher switched the board off, entries are empty."""
+type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, period: String!, scope: String!, periodEndsAt: String!, viewerHidden: Boolean!, entries: [ClassLeaderboardEntry!]! }
+"""rank is null with no XP in the period (listed last). rankChange > 0: moved up since the previous period."""
+type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, xp: Int!, streakDays: Int!, rankChange: Int, isViewer: Boolean! }
 type LeaderboardClass { id: String!, name: String, leaderboardEnabled: Boolean! }
 
 input StudentDashboardInput {

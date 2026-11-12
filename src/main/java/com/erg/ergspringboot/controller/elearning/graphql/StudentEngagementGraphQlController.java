@@ -118,14 +118,24 @@ public class StudentEngagementGraphQlController {
         return service.deleteDiscussionItem(moderator(input.tenantId()), input.targetType(), input.targetId());
     }
 
-    /** Class leaderboard ("Xếp hạng") of the student's own class; no entries once the teacher switched it off. */
+    /** "Thi đua" board of the student's own class or grade, by XP; no entries once the teacher switched it off. */
     @SchemaMapping(typeName = "ElearningQuery", field = "studentClassLeaderboard")
     @ElearningDashboardRead
     public ClassLeaderboardResponse studentClassLeaderboard(@Argument StudentClassLeaderboardInput input) {
         ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
-        StudentClassLeaderboardInput safe = input == null ? new StudentClassLeaderboardInput(null, null) : input;
+        StudentClassLeaderboardInput safe = input == null ? new StudentClassLeaderboardInput(null, null, null, null) : input;
         return service.studentClassLeaderboard(
-                accessSupport.verifiedTenantId(principal, safe.tenantId()), principal.userId(), safe.classId());
+                accessSupport.verifiedTenantId(principal, safe.tenantId()), principal.userId(), safe.classId(),
+                safe.period(), safe.scope());
+    }
+
+    /** The student hides themselves from classmates on the board; they still see their own rank. */
+    @MutationMapping
+    @ElearningDashboardRead
+    public boolean setMyLeaderboardHidden(@Argument SetMyLeaderboardHiddenInput input) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return service.setMyLeaderboardHidden(accessSupport.verifiedTenantId(principal, input.tenantId()),
+                principal.userId(), Boolean.TRUE.equals(input.hidden()));
     }
 
     @SchemaMapping(typeName = "ElearningQuery", field = "leaderboardClasses")
@@ -137,7 +147,7 @@ public class StudentEngagementGraphQlController {
     @SchemaMapping(typeName = "ElearningQuery", field = "classLeaderboard")
     @ElearningLeaderboardManage
     public ClassLeaderboardResponse classLeaderboard(@Argument ClassLeaderboardInput input) {
-        return service.classLeaderboard(manager(input.tenantId()), input.classId());
+        return service.classLeaderboard(manager(input.tenantId()), input.classId(), input.period());
     }
 
     @MutationMapping
@@ -186,7 +196,8 @@ public class StudentEngagementGraphQlController {
     public record StudentDiscussionModerationFeedInput(String tenantId, String classId, Integer page, Integer size) { }
     public record SetStudentDiscussionHiddenInput(String tenantId, String targetType, String targetId, Boolean hidden) { }
     public record DeleteStudentDiscussionItemInput(String tenantId, String targetType, String targetId) { }
-    public record StudentClassLeaderboardInput(String tenantId, String classId) { }
-    public record ClassLeaderboardInput(String tenantId, String classId) { }
+    public record StudentClassLeaderboardInput(String tenantId, String classId, String period, String scope) { }
+    public record ClassLeaderboardInput(String tenantId, String classId, String period) { }
+    public record SetMyLeaderboardHiddenInput(String tenantId, Boolean hidden) { }
     public record SetClassLeaderboardEnabledInput(String tenantId, String classId, Boolean enabled) { }
 }
