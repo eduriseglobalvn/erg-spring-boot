@@ -34,8 +34,8 @@ class ApplicationYamlMigrationTest {
                 .contains("minimum-idle: ${DB__MAX_IDLE_CONNS:5}")
                 .contains("connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:5000}");
         assertThat(productionEnvironment)
-                .contains("DB__MAX_OPEN_CONNS=8")
-                .contains("DB__MAX_IDLE_CONNS=1")
+                .contains("DB__MAX_OPEN_CONNS=40")
+                .contains("DB__MAX_IDLE_CONNS=10")
                 .contains("SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=5000");
     }
 
