@@ -213,8 +213,8 @@ Phải thay ít nhất các giá trị sau:
 
 - `ERG_APP_IMAGE`: digest của image vừa push, ví dụ `ghcr.io/your-org/erg-spring@sha256:<64-hex-digest>`.
 - `ERG_ROLLBACK_IMAGE`: digest known-good trước đó và phải khác `ERG_APP_IMAGE`.
-- `POSTGRES_PASSWORD`, `REDIS_STATE_PASSWORD` và `REDIS_CACHE_PASSWORD`.
-- `SECRET_AUTH__JWT_SECRET` và `SECRET_AUTH__JWT_REFRESH_SECRET`.
+- `POSTGRES_PASSWORD`, `POSTGRES_RUNTIME_PASSWORD`, `REDIS_STATE_PASSWORD` và `REDIS_CACHE_PASSWORD`: file mẫu để trống, tạo mỗi cái bằng `openssl rand -hex 32`. `deploy.sh` dừng trước khi đụng production nếu một trong bốn biến trống hoặc còn giá trị mẫu cũ (`bash scripts/deploy-secret-check.test.sh` kiểm phần này).
+- `SECRET_AUTH__JWT_SECRET`.
 - `HTTP__CORS__ALLOWED_ORIGINS` và `AUTH__COOKIE__DOMAIN`.
 - Secret của SMTP, Firebase, R2 hoặc AI nếu tích hợp tương ứng được bật.
 
