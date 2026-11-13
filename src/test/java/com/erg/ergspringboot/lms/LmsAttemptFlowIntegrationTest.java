@@ -121,6 +121,53 @@ class LmsAttemptFlowIntegrationTest {
     }
 
     @Test
+    void assignmentProgressCountsStudentsByTheirLatestHandIn() {
+        seed();
+        entityManager.persist(student("stu-flow-c", null, "FLOW-C"));
+        OffsetDateTime base = OffsetDateTime.now().minusHours(1);
+        // A: submitted, then a graded retake -> one handed-in student, not awaiting review.
+        attemptRepository.saveAndFlush(handedIn("att-prog-a1", "stu-flow-a", "submitted", base));
+        attemptRepository.saveAndFlush(handedIn("att-prog-a2", "stu-flow-a", "graded", base.plusMinutes(10)));
+        // B: an old needs_review hand-in, then a completed one -> handed in, no longer awaiting review.
+        attemptRepository.saveAndFlush(handedIn("att-prog-b1", "stu-flow-b", "needs_review", base));
+        attemptRepository.saveAndFlush(handedIn("att-prog-b2", "stu-flow-b", "completed", base.plusMinutes(5)));
+        // C: the only hand-in awaits review.
+        attemptRepository.saveAndFlush(handedIn("att-prog-c1", "stu-flow-c", "review_required", base));
+
+        var summary = attemptRepository.summarizeAssignmentProgress(TENANT, "asg-flow");
+        assertThat(summary.submittedCount()).isEqualTo(3);
+        assertThat(summary.needsReviewCount()).isEqualTo(1);
+        assertThat(summary.inProgressCount()).isZero();
+
+        // A retake in progress does not move A out of "handed in" nor count A twice.
+        attemptRepository.saveAndFlush(handedIn("att-prog-a3", "stu-flow-a", "in_progress", base.plusMinutes(30)));
+        summary = attemptRepository.summarizeAssignmentProgress(TENANT, "asg-flow");
+        assertThat(summary.submittedCount()).isEqualTo(3);
+        assertThat(summary.inProgressCount()).isZero();
+    }
+
+    @Test
+    void assignmentProgressCountsAStudentWhoHasNotHandedInAsInProgress() {
+        seed();
+        attemptRepository.saveAndFlush(inProgress("att-prog-only"));
+
+        var summary = attemptRepository.summarizeAssignmentProgress(TENANT, "asg-flow");
+        assertThat(summary.submittedCount()).isZero();
+        assertThat(summary.inProgressCount()).isEqualTo(1);
+        assertThat(summary.needsReviewCount()).isZero();
+    }
+
+    private Attempt handedIn(String id, String studentId, String status, OffsetDateTime at) {
+        Attempt attempt = inProgress(id);
+        attempt.setStudentId(studentId);
+        attempt.setStatus(status);
+        attempt.setStartedAt(at);
+        if (!"in_progress".equals(status)) attempt.setSubmittedAt(at);
+        attempt.setUpdatedAt(at);
+        return attempt;
+    }
+
+    @Test
     void expirySweepFindsAndClosesAnAttemptPastItsDuration() {
         seed();
         Assignment assignment = entityManager.find(Assignment.class, "asg-flow");

@@ -13,7 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 
 /** P2-4: status literals in aggregate JPQL must stay the vocabulary owned by {@link LmsStatePolicy}. */
 class AttemptStateSqlParityTest {
-    private static final Pattern NEEDS_REVIEW = Pattern.compile("status\\) in \\(([^)]*)\\) then 1 else 0 end");
+    private static final Pattern NEEDS_REVIEW = Pattern.compile("status\\) in \\(([^)]*)\\) then ");
     private static final Pattern EQUALS = Pattern.compile("status\\) = '([a-z_]+)' then");
     private static final Pattern HANDED_IN = Pattern.compile(
             "status\\) in \\(([^)]*)\\) then 1 else 0 end\\), 0\\) as submittedCount");
@@ -37,8 +37,8 @@ class AttemptStateSqlParityTest {
         for (String query : attemptQueries) {
             var equals = EQUALS.matcher(query);
             List<String> singles = Stream.iterate(equals.find(), f -> f, f -> equals.find()).map(f -> equals.group(1)).toList();
-            assertThat(singles).containsExactly(
-                    LmsStatePolicy.submittedAttemptState(), LmsStatePolicy.initialAttemptState());
+            // Handed-in students are counted through :completedStates (latest hand-in), so only in_progress is a literal.
+            assertThat(singles).containsExactly(LmsStatePolicy.initialAttemptState());
         }
         // DATA-01: the teacher's "submitted" column counts every handed-in state, graded included.
         for (String query : progressQueries) {
