@@ -92,6 +92,7 @@ public class LmsAttemptUseCase {
         String persistedStudent = learner == null ? studentId : learner.getId();
         OffsetDateTime now = now();
         String key = blank(idempotencyKey);
+        attempts.lockStart(tenant, request.assignmentId(), request.quizId(), persistedStudent);
         if (key != null) {
             Optional<Attempt> existing = attempts.findByStartIdempotencyKey(tenant, request.assignmentId(), request.quizId(), persistedStudent, key);
             if (existing.isPresent()) return response(existing.get());

@@ -3,6 +3,8 @@ package com.erg.ergspringboot.lms.internal.core;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class LmsAttemptService {
 
     private final AttemptRepository repository;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public LmsAttemptService(AttemptRepository repository) {
         this.repository = repository;
@@ -100,6 +104,17 @@ public class LmsAttemptService {
                     org.springframework.data.domain.Pageable pageable) {
         return repository.findScopedQuizAttemptSummaries(
                 tenantId, quizId, allClasses, classIds, allUnits, unitIds, pageable);
+    }
+
+    /**
+     * Holds starts of one learner on one assignment quiz until the transaction ends, so a double click or a second
+     * tab waits and then resumes the attempt the first one opened instead of failing with 409 or 500.
+     */
+    @Transactional("postgresTransactionManager")
+    public void lockStart(String tenantId, String assignmentId, String quizId, String studentId) {
+        entityManager.createNativeQuery("select pg_advisory_xact_lock(hashtextextended(:key, 0))")
+                .setParameter("key", "lms-attempt-start:" + tenantId + ":" + assignmentId + ":" + quizId + ":" + studentId)
+                .getSingleResult();
     }
 
     @Transactional("postgresTransactionManager")
