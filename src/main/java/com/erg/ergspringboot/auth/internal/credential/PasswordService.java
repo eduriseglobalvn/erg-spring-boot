@@ -17,11 +17,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class PasswordService implements CredentialHasher {
 
-    private static final long PERMIT_WAIT_SECONDS = 2;
+    // A login burst queues here instead of failing: 3 hash threads clear ~24 logins/s on the 4-core production box.
+    private static final long PERMIT_WAIT_SECONDS = 10;
 
     private final PasswordEncoder passwordEncoder;
     // Each Argon2 hash allocates ~16 MB; a login burst on 200 Tomcat threads would exhaust the heap.
     private final Semaphore hashPermits;
+    private final long permitWaitMillis;
     // Requests run on virtual threads, which the JVM never preempts: an Argon2 hash on one pins a carrier for its
     // whole run, and a login burst pinned all four, so requests holding pooled connections could not resume and
     // the pool ran dry. Hashing on OS threads leaves the carriers free; the OS time-slices the CPU fairly.
@@ -34,7 +36,12 @@ public class PasswordService implements CredentialHasher {
     }
 
     PasswordService(PasswordEncoder passwordEncoder, int hashConcurrency) {
+        this(passwordEncoder, hashConcurrency, TimeUnit.SECONDS.toMillis(PERMIT_WAIT_SECONDS));
+    }
+
+    PasswordService(PasswordEncoder passwordEncoder, int hashConcurrency, long permitWaitMillis) {
         this.passwordEncoder = passwordEncoder;
+        this.permitWaitMillis = permitWaitMillis;
         this.hashPermits = new Semaphore(hashConcurrency, true);
         this.hashThreads = Executors.newFixedThreadPool(
                 hashConcurrency, Thread.ofPlatform().name("argon2-", 0).daemon().factory());
@@ -67,7 +74,7 @@ public class PasswordService implements CredentialHasher {
 
     private <T> T withHashPermit(Supplier<T> work) {
         try {
-            if (!hashPermits.tryAcquire(PERMIT_WAIT_SECONDS, TimeUnit.SECONDS)) {
+            if (!hashPermits.tryAcquire(permitWaitMillis, TimeUnit.MILLISECONDS)) {
                 throw new AuthFailure.PasswordHashBusy();
             }
         } catch (InterruptedException ex) {

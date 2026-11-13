@@ -77,7 +77,7 @@ class PasswordServiceConcurrencyTest {
                 Thread.currentThread().interrupt();
             }
         });
-        PasswordService service = new PasswordService(blocking, 1);
+        PasswordService service = new PasswordService(blocking, 1, 2_000);
         Thread holder = new Thread(() -> service.matches("secret", "stored"));
         holder.start();
         try {
