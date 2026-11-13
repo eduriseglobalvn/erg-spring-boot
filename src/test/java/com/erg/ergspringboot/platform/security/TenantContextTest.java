@@ -29,6 +29,31 @@ class TenantContextTest {
     }
 
     @Test
+    void contextStaysPerRequestOnVirtualThreads() throws Exception {
+        // SPRING_THREADS_VIRTUAL_ENABLED=true runs each request on its own virtual thread; the ThreadLocal
+        // must neither leak between them nor survive a cleared request.
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var results = new java.util.ArrayList<java.util.concurrent.Future<Boolean>>();
+            for (int i = 0; i < 500; i++) {
+                String tenant = "tenant-" + i;
+                results.add(executor.submit(() -> {
+                    TenantContext.set(TenantContext.of(tenant, "user", "lms"));
+                    try {
+                        Thread.sleep(5);
+                        return tenant.equals(TenantContext.current().tenantId());
+                    } finally {
+                        TenantContext.clear();
+                    }
+                }));
+            }
+            for (var result : results) {
+                assertThat(result.get()).isTrue();
+            }
+            assertThat(executor.submit(TenantContext::current).get()).isNull();
+        }
+    }
+
+    @Test
     void holderReturnsNullWhenUnset() {
         assertThat(TenantContext.current()).isNull();
     }
