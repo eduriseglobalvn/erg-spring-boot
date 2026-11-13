@@ -86,7 +86,8 @@ class LmsClassWorkspaceQueryCountIntegrationTest {
 
         assertThat(statistics.getPrepareStatementCount())
                 .as("classWorkspace should use a bounded set of projection/page/aggregate SQL statements")
-                .isLessThanOrEqualTo(8);
+                // 9th: one aggregate of each student's latest hand-in per assignment (ClassStudentScoreRepository).
+                .isLessThanOrEqualTo(9);
         assertThat(statistics.getEntityLoadCount())
                 .as("projection read should not materialize entity graphs")
                 .isZero();
