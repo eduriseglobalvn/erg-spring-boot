@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -211,6 +212,25 @@ class LmsRuntimeControllerContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items", hasSize(1)))
                 .andExpect(jsonPath("$.data.items[0].id").value("sch_binh_an"));
+    }
+
+    @Test
+    void educationUnitEndpointsRequireClassReadLikeTheLmsAlias() throws Exception {
+        for (String path : List.of("/api/v1/education-units", "/api/v1/centers")) {
+            mockMvc.perform(get(path)
+                            .header("X-Tenant-ID", "erg")
+                            .header("X-User-ID", "usr_stu_cl_0001")
+                            .header("X-Permissions", "lms.assignment.read_self")
+                            .header("X-Managed-EducationUnit-IDs", "sch_binh_an"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(get(path)
+                            .header("X-Tenant-ID", "erg")
+                            .header("X-User-ID", "teacher")
+                            .header("X-Permissions", "lms.class.read")
+                            .header("X-Managed-EducationUnit-IDs", "sch_binh_an"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.educationUnits[0].id").value("sch_binh_an"));
+        }
     }
 
     private String extractString(String json, String marker) {
