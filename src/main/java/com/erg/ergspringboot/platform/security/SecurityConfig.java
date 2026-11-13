@@ -114,7 +114,7 @@ public class SecurityConfig {
                         .requestMatchers(prometheusAccessRequestMatcher).permitAll()
                         .requestMatchers(
                                 "/api/v1/health", "/api/v1/ready", "/api/health", "/api/ready",
-                                "/healthz", "/ready", "/metrics",
+                                "/healthz", "/ready",
                                 "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**",
                                 "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml"
                         ).permitAll()
