@@ -46,6 +46,5 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "  Push hoàn tất thành công!" -ForegroundColor Green
-Write-Host "  Server Watchtower sẽ tự động phát hiện và cập nhật" -ForegroundColor Cyan
-Write-Host "  Backend container trên server trong vòng ~30 giây!" -ForegroundColor Cyan
+Write-Host "  Server KHÔNG tự cập nhật: deploy bằng ops/docker/deploy.sh <git-sha>." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Green

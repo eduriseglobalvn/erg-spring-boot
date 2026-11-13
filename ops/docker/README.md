@@ -300,6 +300,15 @@ Linux:
 
 `down` không xóa named volume. Chỉ dùng `docker compose down --volumes` khi chủ động muốn xóa toàn bộ dữ liệu của đúng Compose project.
 
+### Giờ trên máy chủ
+
+Máy chủ chạy múi giờ **UTC** (giữ nguyên). Mọi giờ trong cron, log, Prometheus/Grafana và tin của bot đều là UTC; giờ Việt Nam = UTC + 7. Ví dụ cron sao lưu `0 20 * * *` = **03:00 giờ Việt Nam**. Khi đọc log hay đặt lịch, luôn đổi giờ trước khi kết luận "chạy lúc nào".
+
+### Cảnh báo chưa có nguồn số liệu
+
+- `cloudflared` chạy trên máy chủ (ngoài Docker) nhưng Prometheus chưa scrape nó, nên chưa có luật "tunnel mất kết nối". Cần: chạy `cloudflared` với `--metrics 0.0.0.0:<cổng>` (chỉ trong mạng nội bộ), thêm target vào `monitor/prometheus/prometheus.yml`, rồi thêm luật trên `cloudflared_tunnel_ha_connections < 1`.
+- `OffsiteBackupStale` sẽ bắn cho tới khi bản sao lưu ngoài máy ghi chỉ số `erg_backup_offsite_last_success_timestamp_seconds` (việc G1-04).
+
 ## 8. Cấu trúc file
 
 ```text

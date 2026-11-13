@@ -66,6 +66,22 @@ groups:
           summary: "HTTP 5xx error rate > 5%"
           description: "Error ratio has reached {{ $value | printf \"%.2f\" }}%."
 
+      # The global ratio hid SRV-01: one broken endpoint stays under 5% of all traffic. At least 5 errors
+      # in 10 minutes so a single failed call on a quiet endpoint does not page anyone.
+      - alert: BackendEndpointErrorRate
+        expr: |
+          (
+            sum by (method, uri) (rate(http_server_requests_seconds_count{job="erg-backend",status=~"5.."}[10m]))
+            / sum by (method, uri) (rate(http_server_requests_seconds_count{job="erg-backend"}[10m]))
+          ) > 0.05
+          and sum by (method, uri) (increase(http_server_requests_seconds_count{job="erg-backend",status=~"5.."}[10m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.method }} {{ $labels.uri }} returns 5xx for {{ $value | humanizePercentage }} of calls"
+          description: "One endpoint is failing even if the overall error rate looks fine. Check backend logs for this URI."
+
       - alert: HikariCPPoolSaturated
         expr: hikaricp_connections_pending > 5
         for: 2m
@@ -156,7 +172,17 @@ groups:
           severity: critical
         annotations:
           summary: "No successful database backup in the last 26 hours"
-          description: "ops/backup/backup.sh (cron 03:00) did not finish; check /opt/erg/ops/backup/backup.log."
+          description: "ops/backup/backup.sh (cron 20:00 UTC = 03:00 Vietnam) did not finish; check /opt/erg/ops/backup/backup.log."
+
+      # Fires until the off-host copy (fable G1-04) writes this metric: a backup on the same disk is not a backup.
+      - alert: OffsiteBackupStale
+        expr: time() - erg_backup_offsite_last_success_timestamp_seconds > 26 * 3600 or absent(erg_backup_offsite_last_success_timestamp_seconds)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No successful off-host backup copy in the last 26 hours"
+          description: "The encrypted off-host upload after ops/backup/backup.sh did not succeed; a disk failure would lose the data and its local backups together."
 
       - alert: BackendContainerMemoryHigh
         expr: sum(jvm_memory_committed_bytes{job="erg-backend"}) > 2.55 * 1024 * 1024 * 1024
