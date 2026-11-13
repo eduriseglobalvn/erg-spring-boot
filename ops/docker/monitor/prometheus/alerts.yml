@@ -184,6 +184,15 @@ groups:
           summary: "No successful off-host backup copy in the last 26 hours"
           description: "The encrypted off-host upload after ops/backup/backup.sh did not succeed; a disk failure would lose the data and its local backups together."
 
+      - alert: OffsiteBackupStale
+        expr: time() - erg_backup_offsite_last_success_timestamp_seconds > 26 * 3600 or absent(erg_backup_offsite_last_success_timestamp_seconds)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No encrypted off-host database copy in the last 26 hours"
+          description: "backup.sh did not upload to BACKUP_RCLONE_REMOTE (missing age/rclone or variables, or upload failed); check /opt/erg/ops/backup/backup.log."
+
       - alert: BackendContainerMemoryHigh
         expr: sum(jvm_memory_committed_bytes{job="erg-backend"}) > 2.55 * 1024 * 1024 * 1024
         for: 10m
