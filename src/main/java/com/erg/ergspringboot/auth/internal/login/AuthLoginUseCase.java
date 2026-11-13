@@ -131,7 +131,8 @@ public class AuthLoginUseCase {
         if (!rateLimiter.allowAccount(accountKey).allowed()) {
             throw new AuthFailure.TooManyAttempts();
         }
-        // Argon2 runs before the transaction: inside it, 2000 logins a minute held all 40 pooled connections on hashing.
+        // Argon2 runs before the transaction: a login may queue up to 10 s for a hash thread, and must not hold a
+        // pooled connection meanwhile (a 2000-login burst parked up to 29 connections idle in transaction).
         CheckedPassword password = CheckedPassword.check(passwords, found, request.password());
         return transaction.execute(status -> loginVerified(identifier, portal, password, context,
                 Boolean.TRUE.equals(request.rememberMe())));
