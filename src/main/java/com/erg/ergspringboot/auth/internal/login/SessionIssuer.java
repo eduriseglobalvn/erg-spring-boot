@@ -10,6 +10,7 @@ import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.auth.SecurityEvent;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.EffectivePermissionResolver;
+import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.auth.SecurityEventRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
@@ -73,7 +74,9 @@ final class SessionIssuer {
 
     AuthResponse issueTokens(
             User user, AuthClientContext context, String loginProvider, String portal) {
-        List<String> permissions = effectivePermissions(user);
+        List<UserRoleAssignment> assignments = activeAssignments(user);
+        List<String> permissions = EffectivePermissionResolver.resolve(user, assignments, now()).granted();
+        boolean studentOnly = StudentAccountPolicy.isStudentOnly(user, assignments, now());
         // The requested portal is a compatibility/audit hint only. Shared Auth must issue one
         // session before workspace selection; authorization is evaluated later from the verified
         // server-side grants, never from a hostname, query parameter, or login hint.
@@ -128,7 +131,7 @@ final class SessionIssuer {
         users.save(user);
 
         return new AuthResponse(
-                LoginResponseMapper.profile(user), accessToken, refreshToken, ACCESS_TOKEN_TTL.toSeconds(),
+                LoginResponseMapper.profile(user, studentOnly), accessToken, refreshToken, ACCESS_TOKEN_TTL.toSeconds(),
                 "Bearer", LoginResponseMapper.sessionResponse(session), permissions, portals,
                 firstNonBlank(user.getAccountType(), "erg"), "user");
     }
@@ -143,12 +146,11 @@ final class SessionIssuer {
         }
     }
 
-    private List<String> effectivePermissions(User user) {
-        List<UserRoleAssignment> assignments = roleAssignments == null || user.getId() == null
+    private List<UserRoleAssignment> activeAssignments(User user) {
+        return roleAssignments == null || user.getId() == null
                 ? List.of()
                 : roleAssignments.findActiveForUser(
                         user.getId(), firstNonBlank(user.getTenantId(), DEFAULT_TENANT), now());
-        return EffectivePermissionResolver.resolve(user, assignments, now()).granted();
     }
 
     private Duration sessionTtl(User user) {

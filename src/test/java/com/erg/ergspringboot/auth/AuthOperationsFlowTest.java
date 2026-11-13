@@ -292,6 +292,27 @@ class AuthOperationsFlowTest {
     }
 
     @Test
+    void studentLoginReturnsActiveLifecycleWithoutNextSteps() {
+        User user = activeUser("user-student", "hs@example.com", "secret123");
+        user.setMustChangePassword(true);
+        user.setRecoveryEmailVerified(false);
+        Permission permission = new Permission(); permission.setName("lms.assignment.read_self");
+        Role role = new Role(); role.setName("lms.learner"); role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission)));
+        UserRoleAssignment assignment = new UserRoleAssignment(); assignment.setRole(role);
+        when(userRepository.findForLogin("hs@example.com")).thenReturn(Optional.of(user));
+        when(userRoleAssignmentRepository.findActiveForUser(eq("user-student"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment));
+
+        AuthResponse response = authService.login(
+                new LoginRequest("hs@example.com", "secret123", "web-1", "Chrome", null, "elearning", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)
+        );
+
+        assertEquals("ACTIVE", response.user().lifecycle().status());
+        assertEquals(List.of(), response.user().lifecycle().nextSteps());
+    }
+
+    @Test
     void loginAcceptsNormalizedInternalUsernameIdentifier() {
         User user = activeUser("user-username", "student@example.com", "secret123");
         user.setUsername("hs001");

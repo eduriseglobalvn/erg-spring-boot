@@ -207,7 +207,8 @@ public class ErgPrincipalService {
                 permissions.granted().contains("*") ? "admin" : "user",
                 AccessScopeAssembler.mergeLegacyAttributes(Map.of(
                         "assignedScopeIds", assignedScopeIds(assignments),
-                        "lifecycleRestricted", isLifecycleRestricted(user)
+                        "lifecycleRestricted", !StudentAccountPolicy.isStudentOnly(roles, permissions.granted(), permissions.denied())
+                                && isLifecycleRestricted(user)
                 ), AccessScopeSet.legacy(managedEducationUnitIds, assignedClassIds(assignments), null, null))
         );
     }
