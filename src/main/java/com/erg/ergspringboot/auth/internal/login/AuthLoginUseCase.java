@@ -19,12 +19,15 @@ import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Transactional owner of the login flow. Orchestrates rate limiting, {@link CredentialVerifier}
  * and {@link SessionIssuer}; attempts are recorded through {@link LoginAttemptRecorder}.
- * The collaborators are plain objects that run inside this method's transaction.
+ * The password is hashed first ({@link CheckedPassword}), then the collaborators run inside one
+ * transaction: hashing inside it parked every pooled connection during a login burst.
  */
 @Service
 public class AuthLoginUseCase {
@@ -34,7 +37,10 @@ public class AuthLoginUseCase {
     private final LoginAttemptRecorder attemptRecorder;
     private final CredentialVerifier credentialVerifier;
     private final SessionIssuer sessionIssuer;
+    private final PasswordService passwords;
+    private TransactionOperations transaction = TransactionOperations.withoutTransaction();
     private AuthLoginRateLimiter rateLimiter;
+    private LoginPasswordCache passwordCache;
 
     /** Compatibility constructor retained for legacy tests and callers wiring without metrics. */
     public AuthLoginUseCase(
@@ -75,8 +81,14 @@ public class AuthLoginUseCase {
         this.rateLimiter = java.util.Objects.requireNonNull(rateLimiter, "rateLimiter");
         this.users = users;
         this.attemptRecorder = new LoginAttemptRecorder(attempts, meterRegistry, failureEnforcement);
-        this.credentialVerifier = new CredentialVerifier(passwords, failureEnforcement, attemptRecorder);
+        this.passwords = passwords;
+        this.credentialVerifier = new CredentialVerifier(failureEnforcement, attemptRecorder);
         this.sessionIssuer = new SessionIssuer(users, sessions, tokens, attemptRecorder);
+    }
+
+    @Autowired(required = false)
+    public void setTransactionManager(PlatformTransactionManager transactionManager) {
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
     @Autowired(required = false)
@@ -104,11 +116,15 @@ public class AuthLoginUseCase {
     }
 
     @Autowired(required = false)
+    void setLoginPasswordCache(LoginPasswordCache passwordCache) {
+        this.passwordCache = passwordCache;
+    }
+
+    @Autowired(required = false)
     public void setUserRoleAssignmentRepository(UserRoleAssignmentRepository roleAssignments) {
         sessionIssuer.setUserRoleAssignmentRepository(roleAssignments);
     }
 
-    @Transactional
     public AuthResponse login(LoginRequest request, AuthClientContext context) {
         String identifier = normalizeIdentifier(request.identifier());
         String portal = normalizePortal(request.portal());
@@ -121,9 +137,20 @@ public class AuthLoginUseCase {
         if (!rateLimiter.allowAccount(accountKey).allowed()) {
             throw new AuthFailure.TooManyAttempts();
         }
+        // Argon2 runs before the transaction: a login may queue up to 10 s for a hash thread, and must not hold a
+        // pooled connection meanwhile (a 2000-login burst parked up to 29 connections idle in transaction).
+        CheckedPassword password = CheckedPassword.check(passwords, passwordCache, found, request.password());
+        return transaction.execute(status -> loginVerified(identifier, portal, password, context,
+                Boolean.TRUE.equals(request.rememberMe())));
+    }
+
+    private AuthResponse loginVerified(
+            String identifier, String portal, CheckedPassword password, AuthClientContext context, boolean rememberMe) {
+        // Re-read inside the transaction so the account updates below act on a managed, current row.
+        Optional<User> found = users.findForLogin(identifier);
         CredentialVerifier.VerifiedLogin verified;
         try {
-            verified = credentialVerifier.verify(found, identifier, request.password(), context, portal);
+            verified = credentialVerifier.verify(found, identifier, password, context, portal);
         } catch (AuthFailure.InvalidCredentials wrongPassword) {
             rateLimiter.recordFailedLogin(context);
             throw wrongPassword;
@@ -135,7 +162,7 @@ public class AuthLoginUseCase {
             users.save(user);
         }
         return sessionIssuer.issueTokens(
-                user, context, "erg", portal, Boolean.TRUE.equals(request.rememberMe()));
+                user, context, "erg", portal, rememberMe);
     }
 
     private String normalizeIdentifier(String identifier) {

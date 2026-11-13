@@ -42,6 +42,7 @@ x-backend-environment: &backend-environment
   TK_PHOTOS_LOCAL_ALLOWED_IN_PROD: "true"
   ERG_TK_PHOTOS_LOCAL_ROOT: /tmp/tk-photos
   SECRET_TK_PHOTO_URL_SIGNING_KEY: benchmark-only-tk-photo-key-0123456789-abcdef
+  SECRET_AUTH_LOGIN_CACHE_KEY: benchmark-only-login-cache-key-0123456789-abcdef
   TENANT__ENABLED: "true"
   ERG_PROCESS_LOCAL_ENABLED: "false"
   ERG_OUTBOX_WORKER_ENABLED: "false"

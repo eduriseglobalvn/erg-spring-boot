@@ -50,6 +50,22 @@ class PasswordServiceConcurrencyTest {
     }
 
     @Test
+    void hashingFromAVirtualThreadRunsOnAnOsThreadSoItNeverPinsACarrier() throws Exception {
+        AtomicInteger hashes = new AtomicInteger();
+        AtomicInteger virtualHashes = new AtomicInteger();
+        PasswordService service = new PasswordService(new FakeEncoder(() -> {
+            hashes.incrementAndGet();
+            if (Thread.currentThread().isVirtual()) virtualHashes.incrementAndGet();
+        }), 2);
+
+        Thread request = Thread.ofVirtual().start(() -> service.matches("secret", "stored"));
+        request.join(5_000);
+
+        assertThat(hashes.get()).isEqualTo(1);
+        assertThat(virtualHashes.get()).isZero();
+    }
+
+    @Test
     void waitingLongerThanTheTimeoutIsRejectedAsTooManyRequests() throws Exception {
         CountDownLatch holderInside = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -61,7 +77,7 @@ class PasswordServiceConcurrencyTest {
                 Thread.currentThread().interrupt();
             }
         });
-        PasswordService service = new PasswordService(blocking, 1);
+        PasswordService service = new PasswordService(blocking, 1, 2_000);
         Thread holder = new Thread(() -> service.matches("secret", "stored"));
         holder.start();
         try {

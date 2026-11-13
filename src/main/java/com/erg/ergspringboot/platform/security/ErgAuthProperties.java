@@ -33,7 +33,7 @@ public class ErgAuthProperties {
     /** Argon2 hashes allowed at once (each one allocates ~16 MB); callers beyond this wait, then get 429. */
     @Min(1)
     @Max(256)
-    private int passwordHashConcurrency = 8;
+    private int passwordHashConcurrency = 3;
 
     public int getPasswordHashConcurrency() { return passwordHashConcurrency; }
     public void setPasswordHashConcurrency(int passwordHashConcurrency) { this.passwordHashConcurrency = passwordHashConcurrency; }

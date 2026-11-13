@@ -14,6 +14,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
@@ -326,7 +327,8 @@ class AuthOperationsFlowTest {
         );
 
         assertEquals("student@example.com", response.user().email());
-        verify(userRepository).findForLogin("hs001");
+        // Once before hashing, once inside the transaction for a current row.
+        verify(userRepository, times(2)).findForLogin("hs001");
     }
 
     @Test

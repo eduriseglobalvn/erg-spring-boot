@@ -91,6 +91,8 @@ ensure_env SECRET_QUIZ_PACKAGE_SIGNING_KEY "$(openssl rand -hex 32)"
 ensure_env QUIZ_PACKAGE_PUBLIC_KEY_ID quiz-pkg-1
 # Signs punch-photo URLs; a new key only expires links already handed out.
 ensure_env SECRET_TK_PHOTO_URL_SIGNING_KEY "$(openssl rand -hex 32)"
+# Keys the 12 h "password verified" cache in Redis; a new key only costs one full Argon2 login per user.
+ensure_env SECRET_AUTH_LOGIN_CACHE_KEY "$(openssl rand -hex 32)"
 # The nightly cron runs ops/backup/backup.sh; its metrics dir is read by node-exporter (non-root).
 install -d -m 700 "$ROOT/ops/backup" && install -m 750 "$ROOT/src/ops/backup/backup.sh" "$ROOT/ops/backup/backup.sh"
 install -d -m 755 "$ROOT/ops/backup/metrics"
