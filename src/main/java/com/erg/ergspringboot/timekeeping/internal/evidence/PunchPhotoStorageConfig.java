@@ -35,12 +35,30 @@ class PunchPhotoStorageConfig {
             @Value("${erg.timekeeping.photos.local-allowed-in-prod:false}") boolean localAllowedInProd,
             Clock clock,
             Environment environment) {
-        if (Arrays.asList(environment.getActiveProfiles()).contains("prod") && !localAllowedInProd) {
+        if (Arrays.asList(environment.getActiveProfiles()).contains("prod")) {
+            rejectUnsafeLocalStoreInProd(localRoot, signingSecret, localAllowedInProd);
+        }
+        return new LocalPrivateObjectStorage(Path.of(localRoot), signingSecret, clock);
+    }
+
+    // A relative root (the default .erg-private) resolves inside the container's writable layer, which a
+    // redeploy discards; an absolute ERG_TK_PHOTOS_LOCAL_ROOT is the explicit statement that a volume is
+    // mounted there. A blank secret means a random per-process key, so signed URLs die on every restart.
+    private static void rejectUnsafeLocalStoreInProd(String localRoot, String signingSecret, boolean localAllowedInProd) {
+        if (!localAllowedInProd) {
             throw new IllegalStateException("Punch photos need the private R2 bucket in prod: "
                     + "set TK_PHOTOS_R2__ENABLED=true and TK_PHOTOS_R2__* (local disk storage is dev-only; "
                     + "TK_PHOTOS_LOCAL_ALLOWED_IN_PROD=true is a temporary opt-in)");
         }
-        return new LocalPrivateObjectStorage(Path.of(localRoot), signingSecret, clock);
+        if (localRoot == null || localRoot.isBlank() || !Path.of(localRoot).isAbsolute()) {
+            throw new IllegalStateException("TK_PHOTOS_LOCAL_ALLOWED_IN_PROD=true needs ERG_TK_PHOTOS_LOCAL_ROOT set to "
+                    + "the absolute path of a mounted volume (included in backups); got '" + localRoot
+                    + "', which lives in the container layer and is lost on redeploy");
+        }
+        if (signingSecret == null || signingSecret.isBlank()) {
+            throw new IllegalStateException("SECRET_TK_PHOTO_URL_SIGNING_KEY must be set in prod: without it punch photo "
+                    + "URLs are signed with a random per-process key and break on every restart");
+        }
     }
 
     // The lcms media bucket is served publicly; selfies there would be world-readable.
