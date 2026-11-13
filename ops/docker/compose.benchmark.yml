@@ -7,11 +7,12 @@ x-backend-environment: &backend-environment
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/erg_benchmark
   SPRING_DATASOURCE_USERNAME: erg_app
   SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-erg-benchmark-runtime}
-  # The measured 500-VU run saturated the generic 25-connection default (169 pending) while
-  # backend/Postgres CPU remained below one core. Keep this single-backend benchmark pool explicit
-  # and below half of Postgres max_connections so Flyway, exporters and operator sessions retain room.
-  DB__MAX_OPEN_CONNS: ${BACKEND_DB_MAX_OPEN_CONNS:-80}
-  DB__MAX_IDLE_CONNS: ${BACKEND_DB_MIN_IDLE_CONNS:-25}
+  # Same pool, timeout and thread model as .env.production.example so the benchmark measures what
+  # production runs (PERF-06). Override the variables to compare against the old 80-connection pool.
+  DB__MAX_OPEN_CONNS: ${BACKEND_DB_MAX_OPEN_CONNS:-40}
+  DB__MAX_IDLE_CONNS: ${BACKEND_DB_MIN_IDLE_CONNS:-10}
+  SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: ${BACKEND_DB_CONNECTION_TIMEOUT_MS:-5000}
+  SPRING_THREADS_VIRTUAL_ENABLED: ${BACKEND_VIRTUAL_THREADS:-true}
   SPRING_FLYWAY_USER: erg
   SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:-erg-benchmark-owner}
   FLYWAY_ENABLED: "true"
@@ -100,7 +101,7 @@ services:
     command:
       - postgres
       - -c
-      - max_connections=${POSTGRES_MAX_CONNECTIONS:-160}
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-60}
       - -c
       - shared_preload_libraries=pg_stat_statements
       - -c
