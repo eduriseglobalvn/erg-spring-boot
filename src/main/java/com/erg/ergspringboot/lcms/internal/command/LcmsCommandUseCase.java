@@ -64,6 +64,7 @@ public class LcmsCommandUseCase implements LcmsCommandPort {
     @Override public DeleteQuizResponse deleteQuiz(String tenantId, String quizId) { return quizzes.delete(tenantId, quizId); }
     @Override public MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request) { return media.presign(tenantId, userId, request); }
     @Override public long maxMediaUploadBytes() { return MediaService.MAX_IMAGE_BYTES; }
+    @Override public boolean isSignedMediaUploadAuthorized(String uploadUrl, String tenantId, String mimeType, long byteSize) { return media.isSignedUploadAuthorized(uploadUrl, tenantId, mimeType, byteSize); }
     @Override public boolean storeSignedMediaUpload(String uploadUrl, String tenantId, String mimeType, byte[] bytes) { return media.storeSignedUpload(uploadUrl, tenantId, mimeType, bytes); }
     @Override public MediaCommitResponse commitMedia(String tenantId, MediaCommitRequest request) { return media.commit(tenantId, request); }
     @Override public LcmsQuizBundleResponse exportActiveBundle(String tenantId, String quizId) {

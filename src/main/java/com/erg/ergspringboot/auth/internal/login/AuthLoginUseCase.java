@@ -121,8 +121,13 @@ public class AuthLoginUseCase {
         if (!rateLimiter.allowAccount(accountKey).allowed()) {
             throw new AuthFailure.TooManyAttempts();
         }
-        CredentialVerifier.VerifiedLogin verified =
-                credentialVerifier.verify(found, identifier, request.password(), context, portal);
+        CredentialVerifier.VerifiedLogin verified;
+        try {
+            verified = credentialVerifier.verify(found, identifier, request.password(), context, portal);
+        } catch (AuthFailure.InvalidCredentials wrongPassword) {
+            rateLimiter.recordFailedLogin(context);
+            throw wrongPassword;
+        }
         User user = verified.user();
 
         if (verified.restrictedFirstLogin()) {

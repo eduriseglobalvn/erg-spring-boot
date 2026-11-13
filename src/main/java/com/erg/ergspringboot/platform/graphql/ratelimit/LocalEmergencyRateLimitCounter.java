@@ -16,6 +16,12 @@ public class LocalEmergencyRateLimitCounter implements GraphQlRateLimitCounter {
             .build();
 
     @Override
+    public long current(String key) {
+        AtomicLong counter = counters.getIfPresent(key);
+        return counter == null ? 0 : counter.get();
+    }
+
+    @Override
     public RateLimitCounterResult increment(String key, long upperBound, Instant windowEnd) {
         AtomicLong counter = counters.get(key, ignored -> new AtomicLong());
         while (true) {

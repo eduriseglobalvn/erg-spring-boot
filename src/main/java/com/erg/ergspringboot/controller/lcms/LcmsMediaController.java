@@ -45,15 +45,21 @@ public class LcmsMediaController {
     ) throws java.io.IOException {
         // SQ-07: reject oversized uploads from Content-Length and a bounded read, never buffering the full body.
         long max = lcms.maxMediaUploadBytes();
-        if (request.getContentLengthLong() > max) {
+        long declaredBytes = request.getContentLengthLong();
+        if (declaredBytes > max) {
             throw new BadRequestException("media exceeds the maximum allowed size");
+        }
+        String uploadUrl = request.getRequestURL()
+                + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
+        // SEC-02: this route is public, so verify signature/expiry/tenant/mime against the signed size
+        // (Content-Length) before reading any body byte; a missing Content-Length cannot be verified.
+        if (declaredBytes < 0 || !lcms.isSignedMediaUploadAuthorized(uploadUrl, tenantId, mimeType, declaredBytes)) {
+            throw new BadRequestException("signed media upload is invalid or expired");
         }
         byte[] bytes = request.getInputStream().readNBytes((int) Math.min(Integer.MAX_VALUE - 1L, max + 1));
         if (bytes.length > max) {
             throw new BadRequestException("media exceeds the maximum allowed size");
         }
-        String uploadUrl = request.getRequestURL()
-                + (request.getQueryString() == null ? "" : "?" + request.getQueryString());
         if (!lcms.storeSignedMediaUpload(uploadUrl, tenantId, mimeType, bytes)) {
             throw new BadRequestException("signed media upload is invalid or expired");
         }

@@ -17,9 +17,22 @@ class AuthLoginRateLimiterTest {
         AuthClientContext source = new AuthClientContext("203.0.113.10", "JUnit", "device-a", null, "fp-a");
 
         assertThat(limiter.allow("first@example.com", source).allowed()).isTrue();
+        limiter.recordFailedLogin(source);
         assertThat(limiter.allow("second@example.com", source).allowed()).isTrue();
+        limiter.recordFailedLogin(source);
         assertThat(limiter.allow("third@example.com", source).allowed()).isFalse();
         assertThat(limiter.debugKeys()).noneMatch(key -> key.contains("@") || key.contains("example.com"));
+    }
+
+    @Test
+    void aWholeSchoolBehindOneAddressLogsInWhenThePasswordsAreRight() {
+        // 600 students behind one school NAT address, each on their own device, none mistyping.
+        AuthLoginRateLimiter limiter = AuthLoginRateLimiter.localForTest(30, 10, 20);
+
+        for (int student = 1; student <= 600; student++) {
+            assertThat(limiter.allow("student" + student, context("203.0.113.50", "pc-" + student)).allowed())
+                    .as("student %s", student).isTrue();
+        }
     }
 
     @Test

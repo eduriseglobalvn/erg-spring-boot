@@ -75,10 +75,14 @@ public class AuthLoginRateLimiter {
         return request.allowed() && account.allowed() ? request : request.allowed() ? account : request;
     }
 
-    /** Source-IP and device dimensions, checked before the account is looked up. */
+    /**
+     * Source-IP and device dimensions, checked before the account is looked up. The source dimension
+     * only counts failed logins ({@link #recordFailedLogin}): a whole school shares one NAT address,
+     * so counting every login blocked the 31st student of the minute even with the right password.
+     */
     public Decision allowRequest(AuthClientContext context) {
-        return check(windowStart -> increment(key("source", context == null ? null : context.ipAddress(), windowStart),
-                        sourceLimit, windowEnd(windowStart))
+        return check(windowStart -> current(key("source", context == null ? null : context.ipAddress(), windowStart))
+                        < sourceLimit
                 && increment(key("device", context == null ? null
                         : first(context.deviceFingerprint(), context.deviceId()), windowStart), deviceLimit,
                         windowEnd(windowStart)));
@@ -91,6 +95,19 @@ public class AuthLoginRateLimiter {
     public Decision allowAccount(String accountKey) {
         return check(windowStart -> increment(key("account", accountKey, windowStart), accountLimit,
                 windowEnd(windowStart)));
+    }
+
+    /** Counts one wrong-password attempt against the source address (password spraying across accounts). */
+    public void recordFailedLogin(AuthClientContext context) {
+        if (!enabled) return;
+        long now = System.currentTimeMillis();
+        long windowStart = now - now % WINDOW_MILLIS;
+        try {
+            increment(key("source", context == null ? null : context.ipAddress(), windowStart), sourceLimit,
+                    windowEnd(windowStart));
+        } catch (RuntimeException unavailable) {
+            // The login already failed; a counter outage must not turn it into a server error.
+        }
     }
 
     private Decision check(java.util.function.LongPredicate counters) {
@@ -118,6 +135,12 @@ public class AuthLoginRateLimiter {
                 ? localCounter.increment(key, limit, windowEnd)
                 : redis.increment(key, limit, windowEnd);
         return result.incrementApplied();
+    }
+
+    private long current(String key) {
+        if (captureDebugKeys) debugKeys.add(key);
+        GraphQlRateLimitCounterRouter redis = redisCounter == null ? null : redisCounter.getIfAvailable();
+        return redis == null ? localCounter.current(key) : redis.current(key);
     }
 
     private String key(String dimension, String value, long windowStart) {
