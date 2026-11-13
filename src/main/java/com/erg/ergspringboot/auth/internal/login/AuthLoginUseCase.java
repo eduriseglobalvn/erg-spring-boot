@@ -134,7 +134,8 @@ public class AuthLoginUseCase {
             user.setStatus("ACTIVE");
             users.save(user);
         }
-        return sessionIssuer.issueTokens(user, context, "erg", portal);
+        return sessionIssuer.issueTokens(
+                user, context, "erg", portal, Boolean.TRUE.equals(request.rememberMe()));
     }
 
     private String normalizeIdentifier(String identifier) {
