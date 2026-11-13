@@ -7,6 +7,18 @@
 # restored copy (isolated network, workers off), then switch the backend and nginx and wait for health.
 # Migrations are forward-only: a failed rehearsal stops before production is touched.
 set -Eeuo pipefail
+# The build takes every core for minutes, so deploys run outside school hours: 06:30-21:30 Vietnam time (the
+# server clock is UTC). FORCE=1 overrides for an urgent fix; DEPLOY_NOW_HHMM fakes the clock for tests.
+in_school_hours() { local m=$((10#${1%:*} * 60 + 10#${1#*:})); [ "$m" -ge 390 ] && [ "$m" -lt 1290 ]; }
+NOW_VN=${DEPLOY_NOW_HHMM:-$(TZ=Asia/Ho_Chi_Minh date +%H:%M)}
+if in_school_hours "$NOW_VN"; then
+  if [ "${FORCE:-0}" != 1 ]; then
+    echo "Từ chối deploy lúc $NOW_VN giờ Việt Nam: trong giờ học 06:30-21:30, build trên máy chủ làm chậm học sinh." >&2
+    echo "Deploy sau 21:30, hoặc nếu bắt buộc: ... | ssh erg@ssh.erg.edu.vn FORCE=1 bash /opt/erg/ops/docker/deploy.sh <sha>" >&2
+    exit 75
+  fi
+  echo "FORCE=1: deploy trong giờ học ($NOW_VN giờ Việt Nam)." >&2
+fi
 SHA=${1:?usage: deploy.sh <git-sha> (source tar on stdin)}
 ROOT=/opt/erg
 DOCKER_DIR=$ROOT/ops/docker
