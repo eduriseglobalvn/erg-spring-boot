@@ -437,7 +437,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
             where attempt.tenantId = :tenantId
               and assignment.academicClassId = :academicClassId
               and lower(attempt.status) in :completedStates
-            """)
+            """ + LatestHandedInAttempt.OF_ATTEMPT)
     ClassScoreSummaryProjection summarizeClassWorkspaceScores(String tenantId, String academicClassId, java.util.Collection<String> completedStates);
 
     /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */
