@@ -13,15 +13,17 @@ class AttemptRepositoryReadModelContractTest {
         Method method = AttemptRepository.class.getMethod(
                 "summarizeAssignmentProgress",
                 String.class,
-                String.class
+                String.class,
+                java.util.Collection.class
         );
         Query query = method.getAnnotation(Query.class);
 
         assertThat(query).isNotNull();
         assertThat(query.value())
                 .contains("AssignmentProgressProjection")
-                .contains("sum(case when lower(attempt.status) = 'submitted'")
-                .contains("sum(case when lower(attempt.status) = 'in_progress'")
+                .contains("count(distinct case when lower(attempt.status) in :completedStates then attempt.studentId end)")
+                .contains("count(distinct case when lower(attempt.status) = 'in_progress' then attempt.studentId end)")
+                .contains("newer.studentId = attempt.studentId")
                 .contains("attempt.tenantId = :tenantId")
                 .contains("attempt.assignmentId = :assignmentId")
                 .doesNotContain("select attempt");

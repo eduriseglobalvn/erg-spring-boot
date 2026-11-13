@@ -13,7 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 
 /** P2-4: status literals in aggregate JPQL must stay the vocabulary owned by {@link LmsStatePolicy}. */
 class AttemptStateSqlParityTest {
-    private static final Pattern NEEDS_REVIEW = Pattern.compile("status\\) in \\(([^)]*)\\) then 1 else 0 end");
+    private static final Pattern NEEDS_REVIEW = Pattern.compile("status\\) in \\(([^)]*)\\) then ");
     private static final Pattern EQUALS = Pattern.compile("status\\) = '([a-z_]+)' then");
 
     @Test
@@ -37,8 +37,13 @@ class AttemptStateSqlParityTest {
             var equals = EQUALS.matcher(query);
             List<String> singles = Stream.iterate(equals.find(), found -> found, found -> equals.find())
                     .map(found -> equals.group(1)).toList();
-            assertThat(singles).containsExactly(
-                    LmsStatePolicy.submittedAttemptState(), LmsStatePolicy.initialAttemptState());
+            // summarizeAssignmentProgress counts handed-in students through :completedStates, not a 'submitted' literal.
+            if (query.contains(":completedStates")) {
+                assertThat(singles).containsExactly(LmsStatePolicy.initialAttemptState());
+            } else {
+                assertThat(singles).containsExactly(
+                        LmsStatePolicy.submittedAttemptState(), LmsStatePolicy.initialAttemptState());
+            }
         }
     }
 

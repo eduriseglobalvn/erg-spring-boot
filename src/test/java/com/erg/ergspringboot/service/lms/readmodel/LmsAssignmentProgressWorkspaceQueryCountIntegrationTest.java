@@ -93,8 +93,9 @@ class LmsAssignmentProgressWorkspaceQueryCountIntegrationTest {
         assertThat(response.assignment().assignedBy()).isEqualTo("teacher-apwq");
         assertThat(response.assignment().resources()).hasSize(1);
         assertThat(response.assignment().resources().getFirst().quizVersionId()).isEqualTo("qv_math_g6_v1");
-        assertThat(response.summary().submittedCount()).isEqualTo(53);
-        assertThat(response.summary().inProgressCount()).isEqualTo(14);
+        // Counted per student: all 40 handed in; a retake in progress does not count; 13 latest hand-ins await review.
+        assertThat(response.summary().submittedCount()).isEqualTo(40);
+        assertThat(response.summary().inProgressCount()).isZero();
         assertThat(response.summary().needsReviewCount()).isEqualTo(13);
         assertThat(response.attempts().items()).hasSize(20);
         assertThat(response.attempts().totalItems()).isEqualTo(80);
