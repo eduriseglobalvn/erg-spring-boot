@@ -15,9 +15,11 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:25-jre AS jvm-runtime
 
+# Password hashing loads libargon2 from the system: JNA cannot unpack its bundled copy into the noexec /tmp.
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl \
+    && apt-get install --no-install-recommends -y ca-certificates curl libargon2-1 \
     && rm -rf /var/lib/apt/lists/* \
+    && lib="$(dpkg -L libargon2-1 | grep '/libargon2.so.1$')" && ln -s "$lib" "${lib%.1}" \
     && groupadd --system --gid 999 erg \
     && useradd --system --uid 999 --gid 999 --home-dir /app --shell /usr/sbin/nologin erg
 
