@@ -4,7 +4,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import lombok.AllArgsConstructor;
@@ -12,6 +15,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.data.domain.Persistable;
 
 /**
  * Append-only attempt event, idempotent by {@code id} = {@code AttemptEvent.id} (spec §1.7). Replay is
@@ -28,7 +32,7 @@ import org.hibernate.type.SqlTypes;
                 @Index(name = "idx_attempt_events_attempt_created", columnList = "attempt_id, created_at")
         }
 )
-public class AttemptEvent {
+public class AttemptEvent implements Persistable<String> {
 
     @Id
     @Column(name = "id", length = 36, nullable = false, updatable = false)
@@ -69,4 +73,21 @@ public class AttemptEvent {
 
     @Column(name = "received_at", nullable = false)
     private OffsetDateTime receivedAt;
+
+    /** Assigned ids make Spring Data merge, which SELECTs the row first; a row built in memory is persisted directly. */
+    @Transient
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
+    private transient boolean stored;
+
+    @Override
+    public boolean isNew() {
+        return !stored;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markStored() {
+        stored = true;
+    }
 }

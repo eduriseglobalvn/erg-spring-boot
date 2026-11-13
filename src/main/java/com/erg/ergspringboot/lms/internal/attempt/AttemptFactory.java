@@ -84,7 +84,9 @@ final class AttemptFactory {
         snapshot.put("questionCount", questionCount);
         snapshot.put("durationMinutes", assignment.getMaxDurationMinutes());
         snapshot.put("deadlineAt", deadline == null ? null : deadline.toString());
-        snapshot.put("submitGraceSeconds", deadlines.submitGrace().toSeconds());
+        // An int, like the value read back from JSON: a Long here never equals its own snapshot, so Hibernate
+        // rewrote the new attempt (and bumped record_version) on every flush of the start transaction.
+        snapshot.put("submitGraceSeconds", Math.toIntExact(deadlines.submitGrace().toSeconds()));
         snapshot.put("attemptLimit", assignment.getAttemptLimit());
         snapshot.put("gradingMode", gradingMode);
         snapshot.put("offlineAllowed", assignment.isOfflineAllowed()

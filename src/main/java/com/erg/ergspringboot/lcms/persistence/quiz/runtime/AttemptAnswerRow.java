@@ -5,7 +5,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Index;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -14,6 +17,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.springframework.data.domain.Persistable;
 
 /**
  * Normalized per-question grading result (spec §1.7) — the report source of truth. One row per
@@ -32,7 +36,7 @@ import org.hibernate.type.SqlTypes;
                 @Index(name = "idx_attempt_answers_attempt", columnList = "attempt_id")
         }
 )
-public class AttemptAnswerRow {
+public class AttemptAnswerRow implements Persistable<AttemptAnswerId> {
 
     @Id
     @Column(name = "attempt_id", nullable = false)
@@ -71,4 +75,26 @@ public class AttemptAnswerRow {
 
     @Column(name = "needs_manual_grade", nullable = false)
     private Boolean needsManualGrade;
+
+    /** Assigned ids make Spring Data merge, which SELECTs the row first; a row built in memory is persisted directly. */
+    @Transient
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
+    private transient boolean stored;
+
+    @Override
+    public AttemptAnswerId getId() {
+        return new AttemptAnswerId(attemptId, quizVersionQuestionId);
+    }
+
+    @Override
+    public boolean isNew() {
+        return !stored;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markStored() {
+        stored = true;
+    }
 }

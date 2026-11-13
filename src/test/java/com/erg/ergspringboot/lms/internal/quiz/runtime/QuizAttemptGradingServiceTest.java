@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.BadRequestException;
@@ -16,6 +18,7 @@ import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRowRepos
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgressRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
+import com.erg.ergspringboot.platform.security.TenantContext;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +51,23 @@ class QuizAttemptGradingServiceTest {
 
         assertThat(graded.percent()).isBetween(66.0, 67.0);
         assertThat(graded.passed()).isFalse();
+    }
+
+    @Test
+    void submitsOfOnePublishedVersionReadItsQuestionsAndPassMarkOncePerTenant() {
+        when(versions.findById("ver-1")).thenReturn(Optional.empty());
+        when(questions.findByQuizVersionIdOrderByOrderIndexAsc("ver-1")).thenReturn(List.of(choice("vq-1", "q1")));
+        when(rows.findByAttemptIdAndQuizVersionQuestionIdIn(any(), anyCollection())).thenReturn(List.of());
+
+        for (String tenant : List.of("tenant-a", "tenant-a", "tenant-b")) {
+            try (var scope = TenantContext.scope(TenantContext.of(tenant, "usr-1", "student"))) {
+                assertThat(service.runtimeQuestionIds("ver-1")).containsExactly("q1");
+                assertThat(service.gradeSubmission(tenant, "att-" + tenant, "ver-1", Map.of("q1", Map.of("choiceId", "b")))).isPresent();
+            }
+        }
+
+        verify(questions, times(2)).findByQuizVersionIdOrderByOrderIndexAsc("ver-1");
+        verify(versions, times(2)).findById("ver-1");
     }
 
     @Test
