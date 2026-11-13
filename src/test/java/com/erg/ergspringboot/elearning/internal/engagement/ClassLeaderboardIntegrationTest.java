@@ -163,7 +163,10 @@ class ClassLeaderboardIntegrationTest {
         Manager other = new Manager(TENANT, OTHER_TEACHER, false);
         assertThatThrownBy(() -> service.forManager(other, CLASS_A, null)).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> service.setEnabled(other, CLASS_A, false)).isInstanceOf(ForbiddenException.class);
-        assertThat(service.classes(new Manager(TENANT, "usr-lb-admin", true)))
+        Manager admin = new Manager(TENANT, "usr-lb-admin", true);
+        assertThatThrownBy(() -> service.forManager(admin, "cls-of-another-tenant", null)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.setEnabled(admin, "cls-of-another-tenant", false)).isInstanceOf(ForbiddenException.class);
+        assertThat(service.classes(admin))
                 .extracting(row -> row.id()).containsExactly(CLASS_A, CLASS_B);
     }
 

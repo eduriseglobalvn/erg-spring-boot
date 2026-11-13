@@ -171,6 +171,13 @@ class StudentDiscussionPinFollowQuestionThreadIntegrationTest {
         assertThat(answered.messages()).extracting(m -> m.senderRole()).containsExactly("STUDENT", "TEACHER");
         assertThat(answered.messages().getLast().mine()).isTrue();
 
+        assertThat(answered.unread()).isFalse(); // the teacher's own view
+        assertThat(service.detail(new Actor(tenantId, STUDENT_USER, false), thread.id()).unread()).isTrue();
+        assertThatThrownBy(() -> service.markRead(new Actor(tenantId, TEACHER_USER, false), thread.id())).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.markRead(new Actor(tenantId, OTHER_USER, false), thread.id())).isInstanceOf(ForbiddenException.class);
+        assertThat(service.markRead(new Actor(tenantId, STUDENT_USER, false), thread.id())).isTrue();
+        assertThat(service.detail(new Actor(tenantId, STUDENT_USER, false), thread.id()).unread()).isFalse();
+
         QuestionThreadResponse thanks = service.send(new Actor(tenantId, STUDENT_USER, false), thread.id(), "Em cảm ơn cô ạ!", List.of());
         assertThat(thanks.status()).isEqualTo("ANSWERED");
         assertThat(thanks.messages()).hasSize(3);

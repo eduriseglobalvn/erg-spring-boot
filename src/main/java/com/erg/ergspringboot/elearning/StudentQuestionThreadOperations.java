@@ -32,6 +32,10 @@ public class StudentQuestionThreadOperations {
         return threads.list(new Actor(tenantId, userId, tenantWide), teacherSide, status);
     }
 
+    public boolean markRead(String tenantId, String userId, String threadId) {
+        return threads.markRead(new Actor(tenantId, userId, false), threadId);
+    }
+
     public QuestionThreadResponse detail(String tenantId, String userId, boolean tenantWide, String threadId) {
         return threads.detail(new Actor(tenantId, userId, tenantWide), threadId);
     }

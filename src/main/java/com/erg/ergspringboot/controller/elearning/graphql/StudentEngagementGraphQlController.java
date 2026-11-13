@@ -152,6 +152,13 @@ public class StudentEngagementGraphQlController {
     }
 
     @MutationMapping
+    @ElearningDashboardRead
+    public boolean markStudentQuestionThreadRead(@Argument String threadId, @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return questionThreads.markRead(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), threadId);
+    }
+
+    @MutationMapping
     @ElearningDiscussionModerate
     public QuestionThreadResponse answerQuestionThread(@Argument SendQuestionThreadMessageInput input) {
         DiscussionModerator teacher = moderator(input.tenantId());
