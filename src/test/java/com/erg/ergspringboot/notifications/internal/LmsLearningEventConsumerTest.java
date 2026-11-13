@@ -13,6 +13,7 @@ import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentAudience;
+import com.erg.ergspringboot.lms.LmsNotificationProjection.Submitter;
 import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -49,27 +50,38 @@ class LmsLearningEventConsumerTest {
     @Test
     void failedGradedAttemptAlsoRaisesLowScoreSupportForTheAssigningTeacher() {
         when(lms.assignmentAudience("erg", "asg-1")).thenReturn(Optional.of(audience));
-        when(lms.studentName("erg", "stu-1")).thenReturn(Optional.of("An"));
+        when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", "user-9")));
 
         consumer.on(submitted("submitted", false));
 
         verify(publisher).attemptSubmitted("attempt-submitted:att-1", "erg", "asg-1", "Bai 1", "att-1", "stu-1",
-                "An", List.of("teacher-1"));
+                "user-9", "An", List.of("teacher-1"));
         verify(publisher).supportNeededLowScore("attempt-submitted:att-1:low-score", "erg", "asg-1", "Bai 1",
-                "att-1", "stu-1", "An", 3.0, 10.0, List.of("teacher-1"));
+                "att-1", "stu-1", "user-9", "An", 3.0, 10.0, List.of("teacher-1"));
     }
 
     @Test
     void provisionalNeedsReviewScoreIsNotReportedAsLowScore() {
         when(lms.assignmentAudience("erg", "asg-1")).thenReturn(Optional.of(audience));
-        when(lms.studentName("erg", "stu-1")).thenReturn(Optional.of("An"));
+        when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", "user-9")));
 
         consumer.on(submitted("needs_review", false));
 
         verify(publisher).attemptSubmitted(anyString(), anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), any());
+                anyString(), anyString(), anyString(), any());
         verify(publisher, never()).supportNeededLowScore(anyString(), anyString(), anyString(), anyString(),
-                anyString(), anyString(), anyString(), anyDouble(), anyDouble(), any());
+                anyString(), anyString(), anyString(), anyString(), anyDouble(), anyDouble(), any());
+    }
+
+    @Test
+    void studentWithoutLoginAccountIsSentWithNoCreator() {
+        when(lms.assignmentAudience("erg", "asg-1")).thenReturn(Optional.of(audience));
+        when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", null)));
+
+        consumer.on(submitted("submitted", true));
+
+        verify(publisher).attemptSubmitted("attempt-submitted:att-1", "erg", "asg-1", "Bai 1", "att-1", "stu-1",
+                null, "An", List.of("teacher-1"));
     }
 
     private LmsAttemptSubmitted submitted(String status, boolean passed) {

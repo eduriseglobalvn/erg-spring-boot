@@ -4,6 +4,7 @@ import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentAudience;
+import com.erg.ergspringboot.lms.LmsNotificationProjection.Submitter;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher;
 import java.util.List;
@@ -37,13 +38,17 @@ public class LmsLearningEventConsumer {
             return;
         }
         List<String> teachers = List.of(audience.assignedBy());
-        String studentName = lms.studentName(event.tenantId(), event.studentId()).orElse(event.studentId());
+        Submitter student = lms.submitter(event.tenantId(), event.studentId())
+                .orElse(new Submitter(event.studentId(), null));
+        // created_by references users(id): the student's login account, never the lms_students id.
+        String studentUserId = student.userId();
+        String studentName = student.fullName();
         notifications.attemptSubmitted(event.eventId(), event.tenantId(), event.assignmentId(), audience.title(),
-                event.attemptId(), event.studentId(), studentName, teachers);
+                event.attemptId(), event.studentId(), studentUserId, studentName, teachers);
         // A needs_review score is provisional (manual answers count as 0), so it is not a low score yet.
         if (!event.passed() && !LmsStatePolicy.attemptNeedsReview(event.status())) {
             notifications.supportNeededLowScore(event.eventId() + ":low-score", event.tenantId(),
-                    event.assignmentId(), audience.title(), event.attemptId(), event.studentId(), studentName,
+                    event.assignmentId(), audience.title(), event.attemptId(), event.studentId(), studentUserId, studentName,
                     event.score(), event.maxScore(), teachers);
         }
     }

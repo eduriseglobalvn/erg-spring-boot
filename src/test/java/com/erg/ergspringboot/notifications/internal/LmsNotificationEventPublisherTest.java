@@ -25,6 +25,7 @@ class LmsNotificationEventPublisherTest {
     private static final String CLASS_ID = "class-1";
     private static final String ATTEMPT_ID = "attempt-1";
     private static final String STUDENT_ID = "student-1";
+    private static final String STUDENT_USER_ID = "user-of-student-1";
     private static final String STUDENT_NAME = "Nguyen Van A";
     private static final String DUE_AT = "2026-06-20T23:59:59+07:00";
     private static final String CREATED_BY = "teacher-1";
@@ -76,7 +77,7 @@ class LmsNotificationEventPublisherTest {
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();
         assertThat(cmd.eventType()).isEqualTo("ASSIGNMENT_DUE_SOON");
-        assertThat(cmd.createdBy()).isEqualTo("system");
+        assertThat(cmd.createdBy()).as("no users row named system; FK to users").isNull();
         assertThat(cmd.priority()).isEqualTo("normal");
         assertThat(cmd.title()).contains("Sap den han");
     }
@@ -87,6 +88,7 @@ class LmsNotificationEventPublisherTest {
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();
         assertThat(cmd.eventType()).isEqualTo("ASSIGNMENT_OVERDUE");
+        assertThat(cmd.createdBy()).isNull();
         assertThat(cmd.priority()).isEqualTo("high");
         assertThat(cmd.title()).contains("Qua han");
     }
@@ -94,24 +96,27 @@ class LmsNotificationEventPublisherTest {
     @Test
     void attemptSubmitted_enqueuesCommandWithCorrectArgs() {
         publisher.attemptSubmitted("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, ATTEMPT_ID,
-                STUDENT_ID, STUDENT_NAME, List.of("teacher-1"));
+                STUDENT_ID, STUDENT_USER_ID, STUDENT_NAME, List.of("teacher-1"));
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();
         assertThat(cmd.eventType()).isEqualTo("ATTEMPT_SUBMITTED");
         assertThat(cmd.sourceType()).isEqualTo("attempt");
         assertThat(cmd.sourceId()).isEqualTo(ATTEMPT_ID);
-        assertThat(cmd.createdBy()).isEqualTo(STUDENT_ID);
+        // created_by references users(id): the student's login account, never the lms_students id.
+        assertThat(cmd.createdBy()).isEqualTo(STUDENT_USER_ID);
+        assertThat(cmd.data().get("studentId")).isEqualTo(STUDENT_ID);
         assertThat(cmd.title()).contains("da duoc nop");
     }
 
     @Test
     void supportNeededLowScore_enqueuesCommandWithCorrectArgs() {
         publisher.supportNeededLowScore("evt-1", TENANT_ID, ASSIGNMENT_ID, ASSIGNMENT_TITLE, ATTEMPT_ID,
-                STUDENT_ID, STUDENT_NAME, 30.0, 100.0, List.of("teacher-1"));
+                STUDENT_ID, STUDENT_USER_ID, STUDENT_NAME, 30.0, 100.0, List.of("teacher-1"));
         verify(notificationCommandService).enqueue(commandCaptor.capture());
         NotificationCommand cmd = commandCaptor.getValue();
         assertThat(cmd.eventType()).isEqualTo("SUPPORT_NEEDED_LOW_SCORE");
         assertThat(cmd.priority()).isEqualTo("high");
+        assertThat(cmd.createdBy()).isEqualTo(STUDENT_USER_ID);
         assertThat(cmd.data().get("score")).isEqualTo("30.0");
     }
 }
