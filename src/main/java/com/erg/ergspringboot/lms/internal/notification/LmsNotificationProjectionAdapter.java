@@ -2,7 +2,6 @@ package com.erg.ergspringboot.lms.internal.notification;
 
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
 import com.erg.ergspringboot.lms.persistence.AssignmentRecipient;
-import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
@@ -46,7 +45,8 @@ class LmsNotificationProjectionAdapter implements LmsNotificationProjection {
 
     @Override
     @Transactional(value = "postgresTransactionManager", readOnly = true)
-    public Optional<String> studentName(String tenantId, String studentId) {
-        return students.findByTenantIdAndId(tenantId, studentId).map(Student::getFullName);
+    public Optional<Submitter> submitter(String tenantId, String studentId) {
+        return students.findByTenantIdAndId(tenantId, studentId)
+                .map(student -> new Submitter(student.getFullName(), student.getAuthUserId()));
     }
 }
