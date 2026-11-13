@@ -23,7 +23,10 @@ public final class ElearningCommands {
     ) {
     }
 
-    public record DiscussionFeedQuery(String tenantId, String actorUserId, int page, int size) {
+    public record DiscussionFeedQuery(String tenantId, String actorUserId, int page, int size, String filter, String subject) {
+        public DiscussionFeedQuery(String tenantId, String actorUserId, int page, int size) {
+            this(tenantId, actorUserId, page, size, null, null);
+        }
     }
 
     public record CreateDiscussionCommand(
@@ -33,8 +36,13 @@ public final class ElearningCommands {
             String title,
             String content,
             String assignmentId,
-            List<String> attachmentIds
+            List<String> attachmentIds,
+            String subject
     ) {
+        public CreateDiscussionCommand(String tenantId, String actorUserId, String idempotencyKey, String title,
+                                       String content, String assignmentId, List<String> attachmentIds) {
+            this(tenantId, actorUserId, idempotencyKey, title, content, assignmentId, attachmentIds, null);
+        }
     }
 
     public record ReplyCommand(

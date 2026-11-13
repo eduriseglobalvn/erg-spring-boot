@@ -5,6 +5,7 @@ import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponse
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionPostResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionReactionResponse;
+import com.erg.ergspringboot.elearning.ElearningNotice;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.persistence.Student;
@@ -13,6 +14,8 @@ import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -30,10 +33,17 @@ public class StudentEngagementService {
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate namedJdbc;
     private final StudentDiscussionReader reader;
+    private final ApplicationEventPublisher events;
 
     public StudentEngagementService(StudentRepository students, JdbcTemplate jdbc) {
+        this(students, jdbc, event -> { });
+    }
+
+    @Autowired
+    public StudentEngagementService(StudentRepository students, JdbcTemplate jdbc, ApplicationEventPublisher events) {
         this.students = students;
         this.jdbc = jdbc;
+        this.events = events;
         this.namedJdbc = new NamedParameterJdbcTemplate(jdbc);
         this.reader = new StudentDiscussionReader(jdbc, namedJdbc);
     }
@@ -43,13 +53,11 @@ public class StudentEngagementService {
         Student student = requireStudent(scope.tenantId(), scope.actorUserId());
         int page = Math.max(0, scope.page());
         int size = Math.max(1, Math.min(50, scope.size()));
-        Long total = jdbc.queryForObject(
-                "select count(*) from student_discussion_threads where tenant_id = ? and academic_class_id = ? and hidden_at is null",
-                Long.class, scope.tenantId(), student.getAcademicClassId()
-        );
+        StudentDiscussionReader.PostFilter filter = StudentDiscussionReader.PostFilter.of(scope.filter(), scope.subject());
+        long total = reader.countPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), false, filter);
         return new StudentDiscussionFeedResponse(
-                reader.classPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), size, page * size, false), page, size,
-                total == null ? 0 : total, total != null && (long) (page + 1) * size < total
+                reader.classPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), size, page * size, false, filter),
+                page, size, total, (long) (page + 1) * size < total
         );
     }
 
@@ -59,6 +67,7 @@ public class StudentEngagementService {
         requireText(command.idempotencyKey(), "idempotencyKey", 192);
         requireText(command.title(), "title", 250);
         requireText(command.content(), "content", 4000);
+        if (command.subject() != null && command.subject().trim().length() > 64) throw new BadRequestException("subject exceeds 64 characters.");
         String existing = existingId("student_discussion_threads", command.tenantId(), command.actorUserId(), command.idempotencyKey());
         if (existing != null) return reader.postById(command.tenantId(), command.actorUserId(), existing);
         String id = IdGenerator.newId();
@@ -67,11 +76,11 @@ public class StudentEngagementService {
             jdbc.update("""
                     insert into student_discussion_threads
                       (id, tenant_id, academic_class_id, title, content, assignment_id, attachment_ids,
-                       author_id, idempotency_key, latest_activity_at, created_at, updated_at)
-                    values (?, ?, ?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?)
+                       author_id, idempotency_key, latest_activity_at, created_at, updated_at, subject)
+                    values (?, ?, ?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?)
                     """, id, command.tenantId(), student.getAcademicClassId(), command.title().trim(),
                     command.content().trim(), blank(command.assignmentId()), json(command.attachmentIds()),
-                    command.actorUserId(), command.idempotencyKey().trim(), now, now, now);
+                    command.actorUserId(), command.idempotencyKey().trim(), now, now, now, blank(command.subject()));
         } catch (DataIntegrityViolationException race) {
             String raced = existingId("student_discussion_threads", command.tenantId(), command.actorUserId(), command.idempotencyKey());
             if (raced != null) return reader.postById(command.tenantId(), command.actorUserId(), raced);
@@ -108,7 +117,26 @@ public class StudentEngagementService {
         }
         jdbc.update("update student_discussion_threads set latest_activity_at = ?, updated_at = ? where tenant_id = ? and id = ?",
                 now, now, command.tenantId(), command.postId());
+        notifyFollowers(command, id);
         return reader.commentById(command.tenantId(), command.actorUserId(), id);
+    }
+
+    /** Follow (or stop following) a thread of the student's class; followers are notified of new replies. */
+    @Transactional
+    public boolean follow(String tenantId, String actorUserId, String postId, boolean follow) {
+        Student student = requireStudent(tenantId, actorUserId);
+        requireText(postId, "postId", 36);
+        requirePostInClass(tenantId, postId, student.getAcademicClassId());
+        if (follow) {
+            jdbc.update("""
+                    insert into student_discussion_follows (tenant_id, post_id, user_id, created_at) values (?, ?, ?, ?)
+                    on conflict (tenant_id, post_id, user_id) do nothing
+                    """, tenantId, postId, actorUserId, OffsetDateTime.now());
+        } else {
+            jdbc.update("delete from student_discussion_follows where tenant_id = ? and post_id = ? and user_id = ?",
+                    tenantId, postId, actorUserId);
+        }
+        return follow;
     }
 
     @Transactional
@@ -165,6 +193,19 @@ public class StudentEngagementService {
                 """, IdGenerator.newId(), command.tenantId(), command.announcementId(), student.getId(),
                 command.actorUserId(), now, now, now);
         return new AnnouncementReadResponse(command.announcementId(), true, now);
+    }
+
+    private void notifyFollowers(ReplyCommand command, String commentId) {
+        List<String> followers = jdbc.queryForList(
+                "select user_id from student_discussion_follows where tenant_id = ? and post_id = ? and user_id <> ?",
+                String.class, command.tenantId(), command.postId(), command.actorUserId());
+        if (followers.isEmpty()) return;
+        String title = jdbc.queryForObject("select title from student_discussion_threads where tenant_id = ? and id = ?",
+                String.class, command.tenantId(), command.postId());
+        String content = command.content().trim();
+        events.publishEvent(new ElearningNotice("discussion-reply:" + commentId, command.tenantId(), "DISCUSSION_REPLY",
+                "discussion", command.postId(), "Có trả lời mới: " + title,
+                content.length() > 140 ? content.substring(0, 140) : content, command.actorUserId(), followers));
     }
 
     private Student requireStudent(String tenantId, String actorUserId) {
@@ -228,9 +269,18 @@ public class StudentEngagementService {
     private String upper(String value) { return value == null ? "" : value.trim().toUpperCase(); }
     private String lower(String value) { return value == null ? "" : value.trim().toLowerCase(); }
 
-    public record FeedScope(String tenantId, String actorUserId, int page, int size) { }
+    public record FeedScope(String tenantId, String actorUserId, int page, int size, String filter, String subject) {
+        public FeedScope(String tenantId, String actorUserId, int page, int size) {
+            this(tenantId, actorUserId, page, size, null, null);
+        }
+    }
     public record CreateDiscussionCommand(String tenantId, String actorUserId, String idempotencyKey, String title,
-                                          String content, String assignmentId, List<String> attachmentIds) { }
+                                          String content, String assignmentId, List<String> attachmentIds, String subject) {
+        public CreateDiscussionCommand(String tenantId, String actorUserId, String idempotencyKey, String title,
+                                       String content, String assignmentId, List<String> attachmentIds) {
+            this(tenantId, actorUserId, idempotencyKey, title, content, assignmentId, attachmentIds, null);
+        }
+    }
     public record ReplyCommand(String tenantId, String actorUserId, String idempotencyKey, String postId,
                                String parentCommentId, String content, List<String> attachmentIds) { }
     public record SetReactionCommand(String tenantId, String actorUserId, String targetType, String targetId, String reaction) { }

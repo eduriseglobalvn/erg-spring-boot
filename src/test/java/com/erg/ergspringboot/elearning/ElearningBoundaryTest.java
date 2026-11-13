@@ -20,7 +20,7 @@ class ElearningBoundaryTest {
         assertThat(StudentEngagementGraphQlController.class.getConstructors())
                 .singleElement()
                 .satisfies(constructor -> assertThat(constructor.getParameterTypes())
-                        .containsExactly(ElearningOperations.class,
+                        .containsExactly(ElearningOperations.class, StudentTierOperations.class, StudentQuestionThreadOperations.class,
                                 com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport.class));
     }
 

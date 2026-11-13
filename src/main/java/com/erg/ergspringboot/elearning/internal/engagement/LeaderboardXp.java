@@ -6,6 +6,7 @@ import java.time.Month;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -13,12 +14,13 @@ import java.util.Set;
  * A handed-in assignment earns 10 + 1.5 per question (at most 40), +10 when handed in before the deadline; an
  * assignment counts once, on its first hand-in. A streak of 7+ days multiplies the period's XP by 1.2.
  */
-final class LeaderboardXp {
+public final class LeaderboardXp {
 
     static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     static final int STREAK_BONUS_DAYS = 7;
 
-    enum Period { WEEK, MONTH, TERM }
+    /** COURSE: the school year, 1 Sep - 31 Aug (the class has no course entity yet). */
+    public enum Period { WEEK, MONTH, TERM, COURSE }
 
     enum Scope { CLASS, GRADE }
 
@@ -52,6 +54,10 @@ final class LeaderboardXp {
                 start = day.with(DayOfWeek.MONDAY);
                 end = start.plusWeeks(1);
             }
+            case COURSE -> {
+                start = LocalDate.of(day.getMonthValue() >= 9 ? day.getYear() : day.getYear() - 1, 9, 1);
+                end = start.plusYears(1);
+            }
             case MONTH -> {
                 start = day.withDayOfMonth(1);
                 end = start.plusMonths(1);
@@ -67,7 +73,7 @@ final class LeaderboardXp {
         return new Window(start.atStartOfDay(ZONE), end.atStartOfDay(ZONE));
     }
 
-    static int handInXp(Integer totalQuestions, boolean beforeDeadline) {
+    public static int handInXp(Integer totalQuestions, boolean beforeDeadline) {
         int questions = totalQuestions == null ? 0 : Math.max(0, totalQuestions);
         return Math.min(40, 10 + (int) Math.round(questions * 1.5)) + (beforeDeadline ? 10 : 0);
     }
@@ -81,6 +87,24 @@ final class LeaderboardXp {
             day = day.minusDays(1);
         }
         return count;
+    }
+
+    /** School year (start year) a day belongs to: 1 Sep - 31 Aug. */
+    public static int schoolYearStart(LocalDate day) {
+        return day.getMonthValue() >= 9 ? day.getYear() : day.getYear() - 1;
+    }
+
+    /**
+     * XP of a whole course: the sum of each week's XP, where a week earns the streak bonus when the student has a
+     * 7+ day streak ending on that week's Sunday (or on {@code today} for the running week).
+     */
+    static int courseXp(Map<LocalDate, Integer> xpByWeekStart, Set<LocalDate> activeDays, LocalDate today) {
+        int total = 0;
+        for (Map.Entry<LocalDate, Integer> week : xpByWeekStart.entrySet()) {
+            LocalDate sunday = week.getKey().plusDays(6);
+            total += withStreakBonus(week.getValue(), streak(activeDays, sunday.isAfter(today) ? today : sunday));
+        }
+        return total;
     }
 
     static int withStreakBonus(int xp, int streak) {

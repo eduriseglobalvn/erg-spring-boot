@@ -58,19 +58,31 @@ public class ElearningOperations {
 
     public StudentDiscussionFeedResponse discussionFeed(DiscussionFeedQuery query) {
         return engagement.feed(new StudentEngagementService.FeedScope(
-                query.tenantId(), query.actorUserId(), query.page(), query.size()));
+                query.tenantId(), query.actorUserId(), query.page(), query.size(), query.filter(), query.subject()));
     }
 
     public StudentDiscussionPostResponse createDiscussion(CreateDiscussionCommand command) {
         return engagement.createDiscussion(new StudentEngagementService.CreateDiscussionCommand(
                 command.tenantId(), command.actorUserId(), command.idempotencyKey(), command.title(), command.content(),
-                command.assignmentId(), safe(command.attachmentIds())));
+                command.assignmentId(), safe(command.attachmentIds()), command.subject()));
     }
 
     public StudentDiscussionCommentResponse reply(ReplyCommand command) {
         return engagement.reply(new StudentEngagementService.ReplyCommand(
                 command.tenantId(), command.actorUserId(), command.idempotencyKey(), command.postId(),
                 command.parentCommentId(), command.content(), safe(command.attachmentIds())));
+    }
+
+    public boolean followDiscussion(String tenantId, String actorUserId, String postId, boolean follow) {
+        return engagement.follow(tenantId, actorUserId, postId, follow);
+    }
+
+    public StudentDiscussionPostResponse setDiscussionPinned(DiscussionModerator moderator, String postId, boolean pinned) {
+        return moderation.setPinned(moderator(moderator), postId, pinned);
+    }
+
+    public StudentDiscussionPostResponse acceptDiscussionReply(DiscussionModerator moderator, String postId, String commentId) {
+        return moderation.acceptReply(moderator(moderator), postId, commentId);
     }
 
     public StudentDiscussionReactionResponse setReaction(SetReactionCommand command) {

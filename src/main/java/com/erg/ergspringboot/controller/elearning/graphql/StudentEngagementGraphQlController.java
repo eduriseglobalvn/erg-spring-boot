@@ -9,7 +9,13 @@ import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponse
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionPostResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionReactionResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.MyFramesResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.QuestionThreadResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.MyTierResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.TierTableRowResponse;
 import com.erg.ergspringboot.elearning.ElearningOperations;
+import com.erg.ergspringboot.elearning.StudentQuestionThreadOperations;
+import com.erg.ergspringboot.elearning.StudentTierOperations;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.CreateDiscussionCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionModerator;
@@ -35,10 +41,15 @@ import org.springframework.stereotype.Controller;
 public class StudentEngagementGraphQlController {
 
     private final ElearningOperations service;
+    private final StudentTierOperations tiers;
+    private final StudentQuestionThreadOperations questionThreads;
     private final GraphQlAccessSupport accessSupport;
 
-    public StudentEngagementGraphQlController(ElearningOperations service, GraphQlAccessSupport accessSupport) {
+    public StudentEngagementGraphQlController(ElearningOperations service, StudentTierOperations tiers,
+                                              StudentQuestionThreadOperations questionThreads, GraphQlAccessSupport accessSupport) {
         this.service = service;
+        this.tiers = tiers;
+        this.questionThreads = questionThreads;
         this.accessSupport = accessSupport;
     }
 
@@ -46,10 +57,10 @@ public class StudentEngagementGraphQlController {
     @ElearningDashboardRead
     public StudentDiscussionFeedResponse discussionFeed(@Argument StudentDiscussionFeedInput input) {
         ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
-        StudentDiscussionFeedInput safe = input == null ? new StudentDiscussionFeedInput(null, 0, 20) : input;
+        StudentDiscussionFeedInput safe = input == null ? new StudentDiscussionFeedInput(null, 0, 20, null, null) : input;
         return service.discussionFeed(new DiscussionFeedQuery(
                 accessSupport.verifiedTenantId(principal, safe.tenantId()), principal.userId(),
-                safe.page() == null ? 0 : safe.page(), safe.size() == null ? 20 : safe.size()
+                safe.page() == null ? 0 : safe.page(), safe.size() == null ? 20 : safe.size(), safe.filter(), safe.subject()
         ));
     }
 
@@ -59,7 +70,7 @@ public class StudentEngagementGraphQlController {
         ErgPrincipal principal = requirePrincipal("elearning.discussion.write_self");
         return service.createDiscussion(new CreateDiscussionCommand(
                 accessSupport.verifiedTenantId(principal, input.tenantId()), principal.userId(), input.idempotencyKey(),
-                input.title(), input.content(), input.assignmentId(), safe(input.attachmentIds())
+                input.title(), input.content(), input.assignmentId(), safe(input.attachmentIds()), input.subject()
         ));
     }
 
@@ -71,6 +82,80 @@ public class StudentEngagementGraphQlController {
                 accessSupport.verifiedTenantId(principal, input.tenantId()), principal.userId(), input.idempotencyKey(),
                 input.postId(), input.parentCommentId(), input.content(), safe(input.attachmentIds())
         ));
+    }
+
+    @MutationMapping
+    @ElearningDiscussionWriteSelf
+    public boolean followStudentDiscussion(@Argument FollowStudentDiscussionInput input) {
+        ErgPrincipal principal = requirePrincipal("elearning.discussion.write_self");
+        return service.followDiscussion(accessSupport.verifiedTenantId(principal, input.tenantId()), principal.userId(),
+                input.postId(), Boolean.TRUE.equals(input.follow()));
+    }
+
+    @MutationMapping
+    @ElearningDiscussionModerate
+    public StudentDiscussionPostResponse setStudentDiscussionPinned(@Argument SetStudentDiscussionPinnedInput input) {
+        return service.setDiscussionPinned(moderator(input.tenantId()), input.postId(), Boolean.TRUE.equals(input.pinned()));
+    }
+
+    /** A null commentId clears the chosen answer. */
+    @MutationMapping
+    @ElearningDiscussionModerate
+    public StudentDiscussionPostResponse acceptStudentDiscussionReply(@Argument AcceptStudentDiscussionReplyInput input) {
+        return service.acceptDiscussionReply(moderator(input.tenantId()), input.postId(), input.commentId());
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "myQuestionThreads")
+    @ElearningDashboardRead
+    public List<QuestionThreadResponse> myQuestionThreads(@Argument String status, @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return questionThreads.list(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), false, false, status);
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "questionThread")
+    @ElearningDashboardRead
+    public QuestionThreadResponse questionThread(@Argument String id, @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return questionThreads.detail(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), false, id);
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "teacherQuestionThreads")
+    @ElearningDiscussionModerate
+    public List<QuestionThreadResponse> teacherQuestionThreads(@Argument String status, @Argument String tenantId) {
+        DiscussionModerator teacher = moderator(tenantId);
+        return questionThreads.list(teacher.tenantId(), teacher.userId(), teacher.tenantWide(), true, status);
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "teacherQuestionThread")
+    @ElearningDiscussionModerate
+    public QuestionThreadResponse teacherQuestionThread(@Argument String id, @Argument String tenantId) {
+        DiscussionModerator teacher = moderator(tenantId);
+        return questionThreads.detail(teacher.tenantId(), teacher.userId(), teacher.tenantWide(), id);
+    }
+
+    @MutationMapping
+    @ElearningDiscussionWriteSelf
+    public QuestionThreadResponse askTeacherAboutQuestion(@Argument AskTeacherAboutQuestionInput input) {
+        ErgPrincipal principal = requirePrincipal("elearning.discussion.write_self");
+        return questionThreads.ask(accessSupport.verifiedTenantId(principal, input.tenantId()), principal.userId(),
+                input.idempotencyKey(), input.assignmentId(), input.questionIndex() == null ? 0 : input.questionIndex(),
+                input.questionPrompt(), input.studentAnswerText(), input.message(), safe(input.attachmentIds()));
+    }
+
+    @MutationMapping
+    @ElearningDiscussionWriteSelf
+    public QuestionThreadResponse sendQuestionThreadMessage(@Argument SendQuestionThreadMessageInput input) {
+        ErgPrincipal principal = requirePrincipal("elearning.discussion.write_self");
+        return questionThreads.send(accessSupport.verifiedTenantId(principal, input.tenantId()), principal.userId(), false,
+                input.threadId(), input.message(), safe(input.attachmentIds()));
+    }
+
+    @MutationMapping
+    @ElearningDiscussionModerate
+    public QuestionThreadResponse answerQuestionThread(@Argument SendQuestionThreadMessageInput input) {
+        DiscussionModerator teacher = moderator(input.tenantId());
+        return questionThreads.send(teacher.tenantId(), teacher.userId(), teacher.tenantWide(), input.threadId(), input.message(),
+                safe(input.attachmentIds()));
     }
 
     @MutationMapping
@@ -138,6 +223,42 @@ public class StudentEngagementGraphQlController {
                 principal.userId(), Boolean.TRUE.equals(input.hidden()));
     }
 
+    /** Tier of the authenticated student; the tenant comes from the principal. */
+    @SchemaMapping(typeName = "ElearningQuery", field = "myTier")
+    @ElearningDashboardRead
+    public MyTierResponse myTier(@Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return tiers.myTier(accessSupport.verifiedTenantId(principal, tenantId), principal.userId());
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "tierTable")
+    @ElearningDashboardRead
+    public List<TierTableRowResponse> tierTable(@Argument String weekStart, @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return tiers.tierTable(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), weekStart);
+    }
+
+    @SchemaMapping(typeName = "ElearningQuery", field = "myFrames")
+    @ElearningDashboardRead
+    public MyFramesResponse myFrames(@Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return tiers.myFrames(accessSupport.verifiedTenantId(principal, tenantId), principal.userId());
+    }
+
+    @MutationMapping
+    @ElearningDashboardRead
+    public MyFramesResponse selectFrame(@Argument String tierKey, @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return tiers.selectFrame(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), tierKey);
+    }
+
+    @MutationMapping
+    @ElearningDashboardRead
+    public boolean acknowledgeTierPromotion(@Argument String weekStart, @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return tiers.acknowledgeTierPromotion(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), weekStart);
+    }
+
     @SchemaMapping(typeName = "ElearningQuery", field = "leaderboardClasses")
     @ElearningLeaderboardManage
     public List<LeaderboardClassResponse> leaderboardClasses(@Argument String tenantId) {
@@ -185,10 +306,17 @@ public class StudentEngagementGraphQlController {
         return values == null ? List.of() : List.copyOf(values);
     }
 
-    public record StudentDiscussionFeedInput(String tenantId, Integer page, Integer size) { }
+    public record StudentDiscussionFeedInput(String tenantId, Integer page, Integer size, String filter, String subject) { }
 
     public record CreateStudentDiscussionInput(String tenantId, String idempotencyKey, String title, String content,
-                                                String assignmentId, List<String> attachmentIds) { }
+                                                String assignmentId, List<String> attachmentIds, String subject) { }
+    public record FollowStudentDiscussionInput(String tenantId, String postId, Boolean follow) { }
+    public record SetStudentDiscussionPinnedInput(String tenantId, String postId, Boolean pinned) { }
+    public record AcceptStudentDiscussionReplyInput(String tenantId, String postId, String commentId) { }
+    public record AskTeacherAboutQuestionInput(String tenantId, String idempotencyKey, String assignmentId, Integer questionIndex,
+                                               String questionPrompt, String studentAnswerText, String message,
+                                               List<String> attachmentIds) { }
+    public record SendQuestionThreadMessageInput(String tenantId, String threadId, String message, List<String> attachmentIds) { }
     public record ReplyStudentDiscussionInput(String tenantId, String idempotencyKey, String postId,
                                                String parentCommentId, String content, List<String> attachmentIds) { }
     public record SetStudentDiscussionReactionInput(String tenantId, String targetType, String targetId, String reaction) { }

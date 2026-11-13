@@ -3,6 +3,7 @@ package com.erg.ergspringboot.elearning.internal.engagement;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionPostResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -56,10 +57,39 @@ public class StudentDiscussionModerationService {
                 safePage, safeSize, count, (long) (safePage + 1) * safeSize < count);
     }
 
+    /** The teacher pins a thread to the top of the class list; unpinning clears it. */
+    @Transactional
+    public StudentDiscussionPostResponse setPinned(Moderator moderator, String postId, boolean pinned) {
+        Target target = requireTarget(moderator, "POST", postId);
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update("update student_discussion_threads set pinned_at = ?, pinned_by = ?, updated_at = ? where tenant_id = ? and id = ?",
+                pinned ? now : null, pinned ? moderator.userId() : null, now, moderator.tenantId(), target.id());
+        return reader.postById(moderator.tenantId(), moderator.userId(), target.id());
+    }
+
+    /** The teacher marks a visible reply of the thread as the chosen answer; a null {@code commentId} clears the choice. */
+    @Transactional
+    public StudentDiscussionPostResponse acceptReply(Moderator moderator, String postId, String commentId) {
+        Target target = requireTarget(moderator, "POST", postId);
+        String accepted = commentId == null || commentId.isBlank() ? null : commentId.trim();
+        if (accepted != null) {
+            Integer count = jdbc.queryForObject("""
+                    select count(*) from student_discussion_comments c
+                    left join student_discussion_comments parent on parent.id = c.parent_id and parent.tenant_id = c.tenant_id
+                    where c.tenant_id = ? and c.id = ? and c.post_id = ? and c.hidden_at is null and parent.hidden_at is null
+                    """, Integer.class, moderator.tenantId(), accepted, target.id());
+            if (count == null || count == 0) throw new ResourceNotFoundException("Reply was not found in the discussion thread.");
+        }
+        jdbc.update("update student_discussion_threads set accepted_comment_id = ?, updated_at = ? where tenant_id = ? and id = ?",
+                accepted, OffsetDateTime.now(), moderator.tenantId(), target.id());
+        return reader.postById(moderator.tenantId(), moderator.userId(), target.id());
+    }
+
     @Transactional
     public StudentDiscussionModerationResponse setHidden(Moderator moderator, String targetType, String targetId, boolean hidden) {
         Target target = requireTarget(moderator, targetType, targetId);
         OffsetDateTime now = OffsetDateTime.now();
+        if (hidden && "COMMENT".equals(target.type())) clearAcceptedUnder(moderator.tenantId(), target.id());
         jdbc.update("update " + target.table() + " set hidden_at = ?, hidden_by = ?, updated_at = ? where tenant_id = ? and id = ?",
                 hidden ? now : null, hidden ? moderator.userId() : null, now, moderator.tenantId(), target.id());
         return new StudentDiscussionModerationResponse(target.type(), target.id(), hidden, false);
@@ -83,8 +113,18 @@ public class StudentDiscussionModerationService {
                         select id from student_discussion_comments where tenant_id = ? and (id = ? or parent_id = ?))
                     """, moderator.tenantId(), moderator.tenantId(), target.id(), target.id());
         }
+        if ("COMMENT".equals(target.type())) clearAcceptedUnder(moderator.tenantId(), target.id());
         jdbc.update("delete from " + target.table() + " where tenant_id = ? and id = ?", moderator.tenantId(), target.id());
         return new StudentDiscussionModerationResponse(target.type(), target.id(), false, true);
+    }
+
+    /** A hidden or deleted comment (or one under it) stops being the chosen answer. */
+    private void clearAcceptedUnder(String tenantId, String commentId) {
+        jdbc.update("""
+                update student_discussion_threads set accepted_comment_id = null
+                where tenant_id = ? and accepted_comment_id in (
+                    select id from student_discussion_comments where tenant_id = ? and (id = ? or parent_id = ?))
+                """, tenantId, tenantId, commentId, commentId);
     }
 
     private Target requireTarget(Moderator moderator, String targetType, String targetId) {

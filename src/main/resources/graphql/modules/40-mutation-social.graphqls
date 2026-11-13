@@ -7,8 +7,21 @@ type Mutation {
   markStudentAnnouncementRead(input: MarkStudentAnnouncementReadInput!): StudentAnnouncementReadPayload!
   setStudentDiscussionHidden(input: SetStudentDiscussionHiddenInput!): StudentDiscussionModerationPayload!
   deleteStudentDiscussionItem(input: DeleteStudentDiscussionItemInput!): StudentDiscussionModerationPayload!
+  "Follow (true) or unfollow a thread of the student's class; followers are notified of new replies"
+  followStudentDiscussion(input: FollowStudentDiscussionInput!): Boolean!
+  "Teacher or admin pins a thread to the top of the class list"
+  setStudentDiscussionPinned(input: SetStudentDiscussionPinnedInput!): StudentDiscussionPost!
+  "Teacher or admin chooses a reply as the answer; commentId null clears the choice"
+  acceptStudentDiscussionReply(input: AcceptStudentDiscussionReplyInput!): StudentDiscussionPost!
+  askTeacherAboutQuestion(input: AskTeacherAboutQuestionInput!): QuestionThread!
+  sendQuestionThreadMessage(input: SendQuestionThreadMessageInput!): QuestionThread!
+  "Teacher or admin answers; the thread becomes ANSWERED"
+  answerQuestionThread(input: SendQuestionThreadMessageInput!): QuestionThread!
   setClassLeaderboardEnabled(input: SetClassLeaderboardEnabledInput!): LeaderboardClass!
   setMyLeaderboardHidden(input: SetMyLeaderboardHiddenInput!): Boolean!
+  "tierKey null = no frame; a frame that is not unlocked is rejected"
+  selectFrame(tierKey: String, tenantId: String): MyFrames!
+  acknowledgeTierPromotion(weekStart: String!, tenantId: String): Boolean!
   previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
   createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
@@ -31,8 +44,9 @@ type GradebookWorkspace { tenantId: String!, classId: String!, subjectId: String
 type GradebookColumn { id: String!, label: String!, maxScore: Float!, kind: String!, position: Int!, version: Int!, updatedAt: String! }
 type GradebookScore { studentId: String!, columnId: String!, score: Float!, maxScore: Float!, version: Int!, updatedAt: String! }
 
-input StudentDiscussionFeedInput { tenantId: String, page: Int, size: Int }
-input CreateStudentDiscussionInput { tenantId: String, idempotencyKey: String!, title: String!, content: String!, assignmentId: String, attachmentIds: [String!] }
+"""filter: ALL (default), UNANSWERED (no reply yet) or MINE. subject narrows by the subject chip."""
+input StudentDiscussionFeedInput { tenantId: String, page: Int, size: Int, filter: String, subject: String }
+input CreateStudentDiscussionInput { tenantId: String, idempotencyKey: String!, title: String!, content: String!, assignmentId: String, attachmentIds: [String!], subject: String }
 input ReplyStudentDiscussionInput { tenantId: String, idempotencyKey: String!, postId: String!, parentCommentId: String, content: String!, attachmentIds: [String!] }
 input SetStudentDiscussionReactionInput { tenantId: String, targetType: String!, targetId: String!, reaction: String! }
 input MarkStudentAnnouncementReadInput { tenantId: String, announcementId: String! }
@@ -41,12 +55,21 @@ input SetStudentDiscussionHiddenInput { tenantId: String, targetType: String!, t
 input SetClassLeaderboardEnabledInput { tenantId: String, classId: String!, enabled: Boolean! }
 input SetMyLeaderboardHiddenInput { tenantId: String, hidden: Boolean! }
 input DeleteStudentDiscussionItemInput { tenantId: String, targetType: String!, targetId: String! }
+input FollowStudentDiscussionInput { tenantId: String, postId: String!, follow: Boolean! }
+input SetStudentDiscussionPinnedInput { tenantId: String, postId: String!, pinned: Boolean! }
+input AcceptStudentDiscussionReplyInput { tenantId: String, postId: String!, commentId: String }
+"""questionIndex is 1-based. questionPrompt and studentAnswerText are what the student saw; the correct answer is added server-side."""
+input AskTeacherAboutQuestionInput { tenantId: String, idempotencyKey: String!, assignmentId: String!, questionIndex: Int!, questionPrompt: String, studentAnswerText: String, message: String!, attachmentIds: [String!] }
+input SendQuestionThreadMessageInput { tenantId: String, threadId: String!, message: String!, attachmentIds: [String!] }
 
 type StudentDiscussionFeed { items: [StudentDiscussionPost!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }
-type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]!, hidden: Boolean! }
+type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]!, hidden: Boolean!, subject: String, pinned: Boolean!, "The reply the teacher chose as the answer" acceptedReplyId: String, "The viewer follows this thread" following: Boolean! }
 type StudentDiscussionComment { id: String!, parentId: String, authorId: String, authorName: String, authorInitials: String, content: String, createdAt: String, attachmentIds: [String!]!, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, replies: [StudentDiscussionComment!]!, hidden: Boolean! }
 type StudentDiscussionReactionCount { reaction: String!, count: Int! }
 type StudentDiscussionReactionPayload { targetType: String!, targetId: String!, viewerReaction: String, reactions: [StudentDiscussionReactionCount!]! }
 type StudentDiscussionModerationClass { id: String!, name: String }
 type StudentDiscussionModerationPayload { targetType: String!, targetId: String!, hidden: Boolean!, deleted: Boolean! }
+"""status: OPEN or ANSWERED. correctAnswerText is null unless the quiz lets students see answers and they handed in (teachers always get it)."""
+type QuestionThread { id: String!, assignmentId: String!, assignmentTitle: String, subjectName: String, className: String, questionIndex: Int!, questionPrompt: String, studentAnswerText: String, correctAnswerText: String, teacherId: String, teacherName: String, studentName: String, status: String!, lastMessageAt: String, lastMessagePreview: String, "Empty in lists; filled by the detail queries and the mutations" messages: [QuestionMessage!]! }
+type QuestionMessage { id: String!, senderId: String!, senderName: String, senderRole: String!, mine: Boolean!, body: String!, attachmentIds: [String!]!, createdAt: String! }
 type StudentAnnouncementReadPayload { announcementId: String!, read: Boolean!, readAt: String! }

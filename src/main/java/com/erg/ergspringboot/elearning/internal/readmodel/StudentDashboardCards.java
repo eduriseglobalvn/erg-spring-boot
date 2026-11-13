@@ -16,6 +16,8 @@ import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
 import com.erg.ergspringboot.lms.persistence.projection.AnnouncementCardProjection;
 import com.erg.ergspringboot.lms.persistence.projection.StudentDashboardAssignmentProjection;
 import com.erg.ergspringboot.lms.persistence.projection.StudentDashboardScoreSummaryProjection;
+import com.erg.ergspringboot.elearning.internal.engagement.LeaderboardXp;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -62,14 +64,42 @@ final class StudentDashboardCards {
     }
 
     static StudentDashboardAssignmentCardResponse toAssignmentCard(StudentDashboardAssignmentProjection projection) {
+        return toAssignmentCard(projection, OffsetDateTime.now());
+    }
+
+    static StudentDashboardAssignmentCardResponse toAssignmentCard(StudentDashboardAssignmentProjection p, OffsetDateTime now) {
+        OffsetDateTime dueAt = p.dueAt();
+        boolean handedIn = p.handedInAt() != null;
+        boolean pastDue = dueAt != null && now.isAfter(dueAt);
+        Integer questions = p.questionCount() != null ? p.questionCount()
+                : p.handedInTotalQuestions() != null ? p.handedInTotalQuestions() : p.latestTotalQuestions();
+        boolean open = p.latestAttemptStatus() != null
+                && !LmsStatePolicy.completedAttemptStates().contains(p.latestAttemptStatus().toLowerCase(java.util.Locale.ROOT));
+        Boolean onTime = !handedIn ? null : !Boolean.TRUE.equals(p.handedInLate()) && (dueAt == null || !p.handedInAt().isAfter(dueAt));
         return new StudentDashboardAssignmentCardResponse(
-                projection.assignmentId(),
-                projection.quizId(),
-                first(projection.title(), projection.subjectName(), projection.subjectId(), "Untitled assignment"),
-                assignmentStatus(projection),
-                projection.dueAt(),
-                projection.handedInPercent(),
-                projection.handedInAt()
+                p.assignmentId(),
+                p.quizId(),
+                first(p.title(), p.subjectName(), p.subjectId(), "Untitled assignment"),
+                assignmentStatus(p),
+                dueAt,
+                p.handedInPercent(),
+                p.handedInAt(),
+                p.subjectName(),
+                p.teacherName(),
+                questions,
+                p.maxDurationMinutes() != null && p.maxDurationMinutes() > 0 ? p.maxDurationMinutes() : null,
+                "test".equalsIgnoreCase(p.quizKind()) ? "TEST" : "PRACTICE",
+                open ? p.latestAnsweredCount() : null,
+                p.handedInScore(),
+                p.handedInMaxScore(),
+                null, // no per-attempt correct count is stored yet
+                p.handedInTotalQuestions(),
+                p.attemptCount() == null ? 0 : p.attemptCount().intValue(),
+                onTime,
+                Boolean.TRUE.equals(onTime) && dueAt != null ? Math.max(0, Duration.between(p.handedInAt(), dueAt).toMinutes()) : null,
+                handedIn ? 0 : LeaderboardXp.handInXp(questions, !pastDue),
+                null, // there is no late-submission window policy; an attempt in progress gets the server grace only
+                pastDue
         );
     }
 

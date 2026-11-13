@@ -51,7 +51,7 @@ class StudentEngagementGraphQlControllerTest {
         when(service.discussionFeed(any())).thenReturn(expected);
         StudentEngagementGraphQlController controller = controller();
 
-        assertThat(controller.discussionFeed(new StudentDiscussionFeedInput("tenant-a", 0, 20))).isSameAs(expected);
+        assertThat(controller.discussionFeed(new StudentDiscussionFeedInput("tenant-a", 0, 20, null, null))).isSameAs(expected);
 
         ArgumentCaptor<DiscussionFeedQuery> captor = ArgumentCaptor.forClass(DiscussionFeedQuery.class);
         verify(service).discussionFeed(captor.capture());
@@ -67,7 +67,7 @@ class StudentEngagementGraphQlControllerTest {
         StudentEngagementGraphQlController controller = controller();
 
         controller.createStudentDiscussion(new CreateStudentDiscussionInput(
-                "tenant-a", "idem-1", "Cần hỗ trợ", "Nội dung", null, List.of()
+                "tenant-a", "idem-1", "Cần hỗ trợ", "Nội dung", null, List.of(), null
         ));
 
         ArgumentCaptor<CreateDiscussionCommand> captor =
@@ -102,7 +102,7 @@ class StudentEngagementGraphQlControllerTest {
     }
 
     private StudentEngagementGraphQlController controller() {
-        return new StudentEngagementGraphQlController(service, new GraphQlAccessSupport(new ErgPolicyService()));
+        return new StudentEngagementGraphQlController(service, null, null, new GraphQlAccessSupport(new ErgPolicyService()));
     }
 
     private void authenticate(ErgPrincipal principal) {

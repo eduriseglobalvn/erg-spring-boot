@@ -225,16 +225,39 @@ type ElearningQuery {
   studentClassLeaderboard(input: StudentClassLeaderboardInput): ClassLeaderboard!
   leaderboardClasses(tenantId: String): [LeaderboardClass!]!
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
+  "Tier of the authenticated student; dates are yyyy-MM-dd strings"
+  myTier(tenantId: String): MyTier!
+  "Cutoffs of the student's own grade for weekStart (default: the latest update)"
+  tierTable(weekStart: String, tenantId: String): [TierTableRow!]!
+  myFrames(tenantId: String): MyFrames!
+  "Hộp thư: the student's own threads about a question, newest first. status: OPEN or ANSWERED"
+  myQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  questionThread(id: String!, tenantId: String): QuestionThread!
+  "Threads addressed to the teacher (a tenant-wide admin sees every thread of the tenant)"
+  teacherQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  teacherQuestionThread(id: String!, tenantId: String): QuestionThread!
 }
 
-"""period: WEEK (default), MONTH or TERM. scope: CLASS (default) or GRADE."""
+type MyTier { tierKey: String, division: Int, gradeRank: Int, gradeSize: Int, courseXp: Int!, eligible: Boolean!, submittedCount: Int!, protected: Boolean!, nextDivision: TierStep, nextTier: TierStep, pendingPromotion: TierPromotion }
+"""nextDivision: the next division of the same tier; nextTier: the entry division of the next tier. studentsToPass: grade ranks still to climb to get in."""
+type TierStep { tierKey: String!, division: Int, minXp: Int!, studentsToPass: Int! }
+type TierPromotion { weekStart: String!, fromKey: String!, fromDivision: Int, toKey: String!, toDivision: Int, studentsPassed: Int!, gradePercentile: Int! }
+type TierTableRow { tierKey: String!, share: String!, seats: Int!, divisions: [TierCell!]! }
+type TierCell { division: Int, rankFrom: Int!, rankTo: Int!, minXp: Int! }
+type Frame { tierKey: String!, unlocked: Boolean!, unlockedAt: String, schoolYear: String, studentsToPass: Int }
+"""selected: the frame worn (null = none)"""
+type MyFrames { selected: String, frames: [Frame!]! }
+
+"""period: WEEK (default), MONTH, TERM (teachers/admins) or COURSE (the school year, 1 Sep - 31 Aug). scope: CLASS (default) or GRADE."""
 input StudentClassLeaderboardInput { tenantId: String, classId: String, period: String, scope: String }
 input ClassLeaderboardInput { tenantId: String, classId: String!, period: String }
 
 """Ranked by XP only; scores are never returned. enabled = false for a student: the teacher switched the board off, entries are empty."""
-type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, period: String!, scope: String!, periodEndsAt: String!, viewerHidden: Boolean!, entries: [ClassLeaderboardEntry!]! }
+type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, period: String!, scope: String!, periodEndsAt: String!, viewerHidden: Boolean!, entries: [ClassLeaderboardEntry!]!, "Only for the student board" me: LeaderboardMe }
 """rank is null with no XP in the period (listed last). rankChange > 0: moved up since the previous period."""
-type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, xp: Int!, streakDays: Int!, rankChange: Int, isViewer: Boolean! }
+type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, xp: Int!, streakDays: Int!, rankChange: Int, isViewer: Boolean!, "Rank gained since yesterday (>0 = moved up); null when unranked yesterday" rankDelta: Int, submittedInPeriod: Int!, xpToday: Int!, "Tier of the student; null without a tier or when hidden from others" tierKey: String, division: Int, "Frame worn; null when none or hidden" frameKey: String, hidden: Boolean! }
+"""rank/size in the requested scope (size = students listed); gradeRank/gradeSize in the whole grade; xpToNextRank: XP to pass the student above, null at rank 1"""
+type LeaderboardMe { rank: Int, size: Int!, xp: Int!, gradeRank: Int, gradeSize: Int!, xpToNextRank: Int, nextRankName: String }
 type LeaderboardClass { id: String!, name: String, leaderboardEnabled: Boolean! }
 
 input StudentDashboardInput {
@@ -318,6 +341,29 @@ type StudentDashboardAssignmentCard {
   "Latest handed-in attempt, 0-100; null until one is handed in"
   scorePercent: Float
   submittedAt: String
+  subjectName: String
+  teacherName: String
+  questionCount: Int
+  "Assignment time limit in minutes; null when there is none"
+  estimatedMinutes: Int
+  "PRACTICE or TEST"
+  kind: String!
+  "Answers saved on the attempt in progress; null when none is open"
+  answeredCount: Int
+  "Raw score of the latest handed-in attempt and its scale"
+  score: Float
+  maxScore: Float
+  "Not stored per attempt yet: always null"
+  correctCount: Int
+  totalQuestions: Int
+  attemptCount: Int!
+  onTime: Boolean
+  minutesBeforeDue: Int
+  "XP still earned by handing in now; 0 once handed in"
+  xpReward: Int!
+  "No late-submission window exists yet: always null"
+  lateSubmitUntil: String
+  closed: Boolean!
 }
 
 type StudentDashboardNextAction {
@@ -978,8 +1024,21 @@ type Mutation {
   markStudentAnnouncementRead(input: MarkStudentAnnouncementReadInput!): StudentAnnouncementReadPayload!
   setStudentDiscussionHidden(input: SetStudentDiscussionHiddenInput!): StudentDiscussionModerationPayload!
   deleteStudentDiscussionItem(input: DeleteStudentDiscussionItemInput!): StudentDiscussionModerationPayload!
+  "Follow (true) or unfollow a thread of the student's class; followers are notified of new replies"
+  followStudentDiscussion(input: FollowStudentDiscussionInput!): Boolean!
+  "Teacher or admin pins a thread to the top of the class list"
+  setStudentDiscussionPinned(input: SetStudentDiscussionPinnedInput!): StudentDiscussionPost!
+  "Teacher or admin chooses a reply as the answer; commentId null clears the choice"
+  acceptStudentDiscussionReply(input: AcceptStudentDiscussionReplyInput!): StudentDiscussionPost!
+  askTeacherAboutQuestion(input: AskTeacherAboutQuestionInput!): QuestionThread!
+  sendQuestionThreadMessage(input: SendQuestionThreadMessageInput!): QuestionThread!
+  "Teacher or admin answers; the thread becomes ANSWERED"
+  answerQuestionThread(input: SendQuestionThreadMessageInput!): QuestionThread!
   setClassLeaderboardEnabled(input: SetClassLeaderboardEnabledInput!): LeaderboardClass!
   setMyLeaderboardHidden(input: SetMyLeaderboardHiddenInput!): Boolean!
+  "tierKey null = no frame; a frame that is not unlocked is rejected"
+  selectFrame(tierKey: String, tenantId: String): MyFrames!
+  acknowledgeTierPromotion(weekStart: String!, tenantId: String): Boolean!
   previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
   createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
@@ -1002,8 +1061,9 @@ type GradebookWorkspace { tenantId: String!, classId: String!, subjectId: String
 type GradebookColumn { id: String!, label: String!, maxScore: Float!, kind: String!, position: Int!, version: Int!, updatedAt: String! }
 type GradebookScore { studentId: String!, columnId: String!, score: Float!, maxScore: Float!, version: Int!, updatedAt: String! }
 
-input StudentDiscussionFeedInput { tenantId: String, page: Int, size: Int }
-input CreateStudentDiscussionInput { tenantId: String, idempotencyKey: String!, title: String!, content: String!, assignmentId: String, attachmentIds: [String!] }
+"""filter: ALL (default), UNANSWERED (no reply yet) or MINE. subject narrows by the subject chip."""
+input StudentDiscussionFeedInput { tenantId: String, page: Int, size: Int, filter: String, subject: String }
+input CreateStudentDiscussionInput { tenantId: String, idempotencyKey: String!, title: String!, content: String!, assignmentId: String, attachmentIds: [String!], subject: String }
 input ReplyStudentDiscussionInput { tenantId: String, idempotencyKey: String!, postId: String!, parentCommentId: String, content: String!, attachmentIds: [String!] }
 input SetStudentDiscussionReactionInput { tenantId: String, targetType: String!, targetId: String!, reaction: String! }
 input MarkStudentAnnouncementReadInput { tenantId: String, announcementId: String! }
@@ -1012,14 +1072,23 @@ input SetStudentDiscussionHiddenInput { tenantId: String, targetType: String!, t
 input SetClassLeaderboardEnabledInput { tenantId: String, classId: String!, enabled: Boolean! }
 input SetMyLeaderboardHiddenInput { tenantId: String, hidden: Boolean! }
 input DeleteStudentDiscussionItemInput { tenantId: String, targetType: String!, targetId: String! }
+input FollowStudentDiscussionInput { tenantId: String, postId: String!, follow: Boolean! }
+input SetStudentDiscussionPinnedInput { tenantId: String, postId: String!, pinned: Boolean! }
+input AcceptStudentDiscussionReplyInput { tenantId: String, postId: String!, commentId: String }
+"""questionIndex is 1-based. questionPrompt and studentAnswerText are what the student saw; the correct answer is added server-side."""
+input AskTeacherAboutQuestionInput { tenantId: String, idempotencyKey: String!, assignmentId: String!, questionIndex: Int!, questionPrompt: String, studentAnswerText: String, message: String!, attachmentIds: [String!] }
+input SendQuestionThreadMessageInput { tenantId: String, threadId: String!, message: String!, attachmentIds: [String!] }
 
 type StudentDiscussionFeed { items: [StudentDiscussionPost!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }
-type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]!, hidden: Boolean! }
+type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]!, hidden: Boolean!, subject: String, pinned: Boolean!, "The reply the teacher chose as the answer" acceptedReplyId: String, "The viewer follows this thread" following: Boolean! }
 type StudentDiscussionComment { id: String!, parentId: String, authorId: String, authorName: String, authorInitials: String, content: String, createdAt: String, attachmentIds: [String!]!, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, replies: [StudentDiscussionComment!]!, hidden: Boolean! }
 type StudentDiscussionReactionCount { reaction: String!, count: Int! }
 type StudentDiscussionReactionPayload { targetType: String!, targetId: String!, viewerReaction: String, reactions: [StudentDiscussionReactionCount!]! }
 type StudentDiscussionModerationClass { id: String!, name: String }
 type StudentDiscussionModerationPayload { targetType: String!, targetId: String!, hidden: Boolean!, deleted: Boolean! }
+"""status: OPEN or ANSWERED. correctAnswerText is null unless the quiz lets students see answers and they handed in (teachers always get it)."""
+type QuestionThread { id: String!, assignmentId: String!, assignmentTitle: String, subjectName: String, className: String, questionIndex: Int!, questionPrompt: String, studentAnswerText: String, correctAnswerText: String, teacherId: String, teacherName: String, studentName: String, status: String!, lastMessageAt: String, lastMessagePreview: String, "Empty in lists; filled by the detail queries and the mutations" messages: [QuestionMessage!]! }
+type QuestionMessage { id: String!, senderId: String!, senderName: String, senderRole: String!, mine: Boolean!, body: String!, attachmentIds: [String!]!, createdAt: String! }
 type StudentAnnouncementReadPayload { announcementId: String!, read: Boolean!, readAt: String! }
 
 extend type Mutation {
