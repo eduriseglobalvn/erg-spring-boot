@@ -22,15 +22,15 @@ public class ReportingAnalyticsService implements ReportingAnalyticsPort {
             new KpiDefinition("totalRecipients", "Total recipients",
                     "Count of normalized student_progress rows in the filtered assignment cohort.", SOURCE),
             new KpiDefinition("submittedCount", "Submitted",
-                    "Rows whose server-authoritative status is submitted.", SOURCE),
+                    "Rows handed in: submitted, needs_review, review_required, graded or completed.", SOURCE),
             new KpiDefinition("inProgressCount", "In progress",
                     "Rows whose server-authoritative status is in_progress.", SOURCE),
             new KpiDefinition("needsReviewCount", "Needs review",
-                    "Rows whose status is needs_review or review_required.", SOURCE),
+                    "Handed-in rows whose status is needs_review or review_required.", SOURCE),
             new KpiDefinition("notStartedCount", "Not started",
-                    "Total recipients minus submitted, in-progress and needs-review rows.", SOURCE),
+                    "Total recipients minus handed-in and in-progress rows.", SOURCE),
             new KpiDefinition("averagePercent", "Average percent",
-                    "Average normalized score/percent for the filtered cohort; zero when no scored row exists.", SOURCE)
+                    "Average of each row's latest hand-in percent (0-100); zero when no scored row exists.", SOURCE)
     );
 
     private final QuizReportService reports;

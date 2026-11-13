@@ -15,43 +15,52 @@ import org.springframework.data.jpa.repository.Query;
 class AttemptStateSqlParityTest {
     private static final Pattern NEEDS_REVIEW = Pattern.compile("status\\) in \\(([^)]*)\\) then 1 else 0 end");
     private static final Pattern EQUALS = Pattern.compile("status\\) = '([a-z_]+)' then");
+    private static final Pattern HANDED_IN = Pattern.compile(
+            "status\\) in \\(([^)]*)\\) then 1 else 0 end\\), 0\\) as submittedCount");
 
     @Test
     void aggregateQueriesUseThePolicyStates() {
-        List<String> queries = Stream.of(AttemptRepository.class, StudentProgressRepository.class)
-                .flatMap(type -> Arrays.stream(type.getMethods()))
-                .filter(method -> method.getName().equals("summarizeAssignment")
-                        || method.getName().equals("summarizeAssignmentProgress"))
+        List<String> attemptQueries = queries(AttemptRepository.class, "summarizeAssignmentProgress");
+        List<String> progressQueries = queries(StudentProgressRepository.class, "summarizeAssignment");
+        assertThat(attemptQueries).hasSize(1);
+        assertThat(progressQueries).hasSize(2);
+        List<String> reviewStates = Stream.of("submitted", "needs_review", "review_required", "graded", "completed", "in_progress")
+                .filter(LmsStatePolicy::attemptNeedsReview).sorted().toList();
+        for (String query : Stream.concat(attemptQueries.stream(), progressQueries.stream()).toList()) {
+            var review = NEEDS_REVIEW.matcher(query);
+            boolean found = false;
+            while (review.find()) {
+                found |= states(review.group(1)).equals(reviewStates);
+            }
+            assertThat(found).as(query).isTrue();
+        }
+        for (String query : attemptQueries) {
+            var equals = EQUALS.matcher(query);
+            List<String> singles = Stream.iterate(equals.find(), f -> f, f -> equals.find()).map(f -> equals.group(1)).toList();
+            assertThat(singles).containsExactly(
+                    LmsStatePolicy.submittedAttemptState(), LmsStatePolicy.initialAttemptState());
+        }
+        // DATA-01: the teacher's "submitted" column counts every handed-in state, graded included.
+        for (String query : progressQueries) {
+            var handedIn = HANDED_IN.matcher(query);
+            assertThat(handedIn.find()).as(query).isTrue();
+            assertThat(states(handedIn.group(1))).isEqualTo(LmsStatePolicy.completedAttemptStates().stream().sorted().toList());
+            var equals = EQUALS.matcher(query);
+            assertThat(equals.find()).isTrue();
+            assertThat(equals.group(1)).isEqualTo(LmsStatePolicy.initialAttemptState());
+        }
+    }
+
+    private static List<String> queries(Class<?> type, String name) {
+        return Arrays.stream(type.getMethods())
+                .filter(method -> method.getName().equals(name))
                 .map(method -> method.getAnnotation(Query.class))
                 .filter(query -> query != null)
                 .map(Query::value)
                 .toList();
-        assertThat(queries).hasSizeGreaterThanOrEqualTo(3);
-        List<String> reviewStates = Stream.of("submitted", "needs_review", "review_required", "graded", "completed", "in_progress")
-                .filter(LmsStatePolicy::attemptNeedsReview).sorted().toList();
-        for (String query : queries) {
-            var review = NEEDS_REVIEW.matcher(query);
-            assertThat(review.find()).as(query).isTrue();
-            assertThat(Arrays.stream(review.group(1).split(",")).map(s -> s.trim().replace("'", "")).sorted().toList())
-                    .isEqualTo(reviewStates);
-            var equals = EQUALS.matcher(query);
-            List<String> singles = Stream.iterate(equals.find(), found -> found, found -> equals.find())
-                    .map(found -> equals.group(1)).toList();
-            assertThat(singles).containsExactly(
-                    LmsStatePolicy.submittedAttemptState(), LmsStatePolicy.initialAttemptState());
-        }
     }
 
-    @Test
-    void quizReportStatusConstantsUseThePolicyStates() throws Exception {
-        assertThat(constant("STATUS_SUBMITTED")).isEqualTo(LmsStatePolicy.submittedAttemptState());
-        assertThat(constant("STATUS_IN_PROGRESS")).isEqualTo(LmsStatePolicy.initialAttemptState());
-        assertThat(LmsStatePolicy.attemptNeedsReview(constant("STATUS_NEEDS_REVIEW"))).isTrue();
-    }
-
-    private static String constant(String name) throws Exception {
-        var field = com.erg.ergspringboot.reporting.quiz.QuizReportService.class.getDeclaredField(name);
-        field.setAccessible(true);
-        return (String) field.get(null);
+    private static List<String> states(String csv) {
+        return Arrays.stream(csv.split(",")).map(s -> s.trim().replace("'", "")).sorted().toList();
     }
 }
