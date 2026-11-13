@@ -10,6 +10,7 @@ import com.erg.ergspringboot.platform.cache.CacheDescriptor;
 import com.erg.ergspringboot.platform.cache.CacheDescriptorContributor;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Function;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
@@ -25,7 +26,8 @@ public class PlatformCacheDescriptorContributor implements CacheDescriptorContri
                 descriptor("contentStudioBootstrap", untyped, Duration.ofSeconds(60), 16),
                 descriptor("contentResources", untyped, Duration.ofSeconds(60), 32),
                 descriptor("contentResourceDetail", untyped, Duration.ofSeconds(60), 32),
-                descriptor("lmsClassesBySchool", untyped, Duration.ofSeconds(60), 32),
+                // Scoped by school so one school's class/student write keeps the other schools' entries.
+                descriptor("lmsClassesBySchool", untyped, Duration.ofSeconds(60), 32, LmsCacheDescriptorContributor.keyPart(1)),
                 descriptor("organizationEducationUnits", mapper.constructType(EducationUnitListResponse.class), Duration.ofSeconds(60), 32),
                 descriptor("organizationEducationUnitEntities", untyped, Duration.ofSeconds(60), 32),
                 descriptor("authorizationRoles", untyped, Duration.ofSeconds(60), 16),
@@ -34,12 +36,17 @@ public class PlatformCacheDescriptorContributor implements CacheDescriptorContri
                 descriptor("calendarWorkspace", mapper.constructType(CalendarWorkspaceResponse.class), Duration.ofSeconds(30), 64),
                 descriptor("curriculumTree", mapper.constructType(CurriculumTreeResponse.class), Duration.ofMinutes(15), 32),
                 descriptor("learningResourceLibrary", mapper.constructType(LearningResourceLibraryResponse.class), Duration.ofSeconds(60), 128),
-                descriptor("lcmsSchoolOperations", mapper.constructType(SchoolOperationsWorkspace.class), Duration.ofSeconds(30), 128)
+                descriptor("lcmsSchoolOperations", mapper.constructType(SchoolOperationsWorkspace.class), Duration.ofSeconds(30), 128,
+                        LmsCacheDescriptorContributor.keyPart(1))
         );
     }
 
     private CacheDescriptor<Object> descriptor(String name, JavaType type, Duration ttl, long l1MiB) {
+        return descriptor(name, type, ttl, l1MiB, null);
+    }
+
+    private CacheDescriptor<Object> descriptor(String name, JavaType type, Duration ttl, long l1MiB, Function<Object, String> scope) {
         return new CacheDescriptor<>(name, type, ttl, ttl.multipliedBy(4), l1MiB * 1024 * 1024,
-                1024 * 1024, true, false);
+                1024 * 1024, true, false, scope);
     }
 }
