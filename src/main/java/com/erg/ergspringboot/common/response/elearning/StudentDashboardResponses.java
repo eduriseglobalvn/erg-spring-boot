@@ -137,7 +137,9 @@ public final class StudentDashboardResponses {
             /** XP still earned by handing in now; 0 once handed in. */
             int xpReward,
             OffsetDateTime lateSubmitUntil,
-            boolean closed
+            boolean closed,
+            /** The latest attempt is handed in (LmsStatePolicy.completedAttemptStates()); clients never list states. */
+            boolean handedIn
     ) {
     }
 

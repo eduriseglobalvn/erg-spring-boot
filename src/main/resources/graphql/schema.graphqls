@@ -364,6 +364,8 @@ type StudentDashboardAssignmentCard {
   "No late-submission window exists yet: always null"
   lateSubmitUntil: String
   closed: Boolean!
+  "The latest attempt is handed in (server state policy); clients must not classify status strings"
+  handedIn: Boolean!
 }
 
 type StudentDashboardNextAction {
