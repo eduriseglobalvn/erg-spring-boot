@@ -134,6 +134,37 @@ class LmsAttemptFlowIntegrationTest {
                 true, List.of("x"), false, List.of("school-other"), page).getTotalElements()).isZero();
     }
 
+    @Test
+    void classAverageCountsOnlyEachStudentsLatestHandedInAttempt() {
+        seed();
+        OffsetDateTime base = OffsetDateTime.now().minusHours(1);
+        attemptRepository.saveAndFlush(graded("att-avg-a1", "stu-flow-a", 40.0, base));
+        attemptRepository.saveAndFlush(graded("att-avg-a2", "stu-flow-a", 60.0, base.plusMinutes(10)));
+        attemptRepository.saveAndFlush(graded("att-avg-a3", "stu-flow-a", 90.0, base.plusMinutes(20)));
+
+        var single = attemptRepository.summarizeClassWorkspaceScores(TENANT, "class-flow");
+        assertThat(single.averagePercent()).isEqualTo(90.0);
+        assertThat(single.completedAttemptCount()).isEqualTo(1L);
+
+        attemptRepository.saveAndFlush(graded("att-avg-b1", "stu-flow-b", 50.0, base));
+        var both = attemptRepository.summarizeClassWorkspaceScores(TENANT, "class-flow");
+        assertThat(both.averagePercent()).isEqualTo(70.0);
+        assertThat(both.completedAttemptCount()).isEqualTo(2L);
+        assertThat(both.attemptedStudentCount()).isEqualTo(2L);
+        assertThat(both.bestPercent()).isEqualTo(90.0);
+    }
+
+    private Attempt graded(String id, String studentId, double percent, OffsetDateTime at) {
+        Attempt attempt = inProgress(id);
+        attempt.setStudentId(studentId);
+        attempt.setStatus("graded");
+        attempt.setPercent(percent);
+        attempt.setStartedAt(at);
+        attempt.setSubmittedAt(at);
+        attempt.setUpdatedAt(at);
+        return attempt;
+    }
+
     private List<String> staleIdsForThisTenant(OffsetDateTime now) {
         return expiryRepository.findExpiredCandidates(now, 10_000).stream()
                 .filter(ref -> TENANT.equals(ref.getTenantId())).map(ref -> ref.getId()).toList();
