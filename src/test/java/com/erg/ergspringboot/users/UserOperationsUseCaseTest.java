@@ -107,7 +107,7 @@ class UserOperationsUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        passwordService = new PasswordService();
+        passwordService = new PasswordService(new com.erg.ergspringboot.platform.security.ErgAuthProperties());
         operations = new UserOperations(
                 new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository),
                 new UserProfileUseCase(userRepository, userActivityRepository),

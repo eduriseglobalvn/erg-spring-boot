@@ -149,9 +149,9 @@ public class GlobalExceptionHandler {
 
         var builder = ResponseEntity.status(exception.getStatus())
                 .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId());
-        if ("AUTH_TOO_MANY_ATTEMPTS".equals(exception.getCode())) {
-            builder.header("Retry-After", "60");
-        }
+        String retryAfter = "AUTH_TOO_MANY_ATTEMPTS".equals(exception.getCode()) ? "60"
+                : "AUTH_PASSWORD_HASH_BUSY".equals(exception.getCode()) ? "2" : null;
+        if (retryAfter != null) builder.header("Retry-After", retryAfter);
         return builder.body(response);
     }
 

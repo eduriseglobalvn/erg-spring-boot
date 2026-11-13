@@ -326,6 +326,8 @@ erg:
     max-failed-login: ${AUTH__MAX_FAILED_LOGIN:5}
     failed-login-window: ${AUTH__FAILED_LOGIN_WINDOW:15m}
     block-duration: ${AUTH__BLOCK_DURATION:15m}
+    # Argon2 hashes running at once (~16 MB each). Extra logins wait up to 2s, then get 429.
+    password-hash-concurrency: ${ERG_AUTH_PASSWORD_HASH_CONCURRENCY:8}
     login-rate-limit:
       enabled: ${ERG_AUTH_LOGIN_RATE_LIMIT_ENABLED:true}
       source-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE:30}
