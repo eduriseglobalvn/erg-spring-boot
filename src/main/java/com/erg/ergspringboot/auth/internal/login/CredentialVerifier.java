@@ -3,7 +3,6 @@ package com.erg.ergspringboot.auth.internal.login;
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.exception.auth.AuthFailure;
 import com.erg.ergspringboot.users.persistence.User;
-import com.erg.ergspringboot.auth.internal.credential.PasswordService;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -11,7 +10,8 @@ import java.util.Optional;
  * Verifies a login's credentials and account status in a fixed, disclosure-safe order:
  * unknown account, temporary lockout, password, then account status. Every rejection is
  * recorded through {@link LoginAttemptRecorder} before the {@link AuthFailure} is thrown.
- * Runs inside the caller's transaction; it is not a Spring bean and adds no proxy boundary.
+ * Runs inside the caller's transaction; it is not a Spring bean and adds no proxy boundary. The password was
+ * already hashed before that transaction ({@link CheckedPassword}); this only reads the verdict.
  */
 final class CredentialVerifier {
     private static final String STATUS_PENDING = "PENDING";
@@ -19,15 +19,12 @@ final class CredentialVerifier {
     private static final String STATUS_BANNED = "BANNED";
     private static final String PROVIDER_LOCAL = "local";
 
-    private final PasswordService passwords;
     private final LoginAttemptRecorder attemptRecorder;
     private LoginFailureEnforcementService failureEnforcement;
 
     CredentialVerifier(
-            PasswordService passwords,
             LoginFailureEnforcementService failureEnforcement,
             LoginAttemptRecorder attemptRecorder) {
-        this.passwords = passwords;
         this.failureEnforcement = Objects.requireNonNull(failureEnforcement, "failureEnforcement");
         this.attemptRecorder = attemptRecorder;
     }
@@ -42,25 +39,23 @@ final class CredentialVerifier {
      * @param found the account resolved for {@code identifier}, if any
      */
     VerifiedLogin verify(
-            Optional<User> found, String identifier, String password,
+            Optional<User> found, String identifier, CheckedPassword password,
             AuthClientContext context, String portal) {
         User user = found.orElseThrow(() -> {
-            passwords.burnUnknownAccountCheck(password);
             attemptRecorder.recordFailure(null, identifier, context, portal, "invalid_credentials", false);
             return new AuthFailure.InvalidCredentials();
         });
         String email = user.getEmail();
 
-        // A locked-out account answers exactly like a wrong password and never evaluates the
-        // submitted password, so lockout reveals neither account existence nor password validity.
+        // A locked-out account answers exactly like a wrong password and never acts on the password
+        // verdict, so lockout reveals neither account existence nor password validity.
         if (failureEnforcement.isTemporarilyLocked(user)) {
-            passwords.burnUnknownAccountCheck(password);
             attemptRecorder.recordFailure(user, email, context, portal, "account_temporarily_locked", false);
             throw new AuthFailure.InvalidCredentials();
         }
         // Wrong passwords always yield AUTH_INVALID_CREDENTIALS; account status is disclosed
         // only to a caller that proved knowledge of the password.
-        if (!passwords.matches(password, user.getPasswordHash())) {
+        if (!password.matches(user.getPasswordHash())) {
             attemptRecorder.recordFailure(user, email, context, portal, "invalid_credentials", true);
             throw new AuthFailure.InvalidCredentials();
         }

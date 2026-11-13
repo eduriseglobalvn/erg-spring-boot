@@ -26,7 +26,10 @@ class AuthLoginUseCaseArchitectureTest {
     void loginCollaboratorsRunInsideTheUseCaseTransactionWithoutTheirOwnProxyBoundary() throws Exception {
         String useCase = login("AuthLoginUseCase");
         assertThat(useCase)
-                .contains("@Transactional\n    public AuthResponse login(")
+                // Argon2 runs before the transaction opens, so a login burst never parks pooled connections on hashing.
+                .contains("CheckedPassword.check(passwords, found, request.password())")
+                .contains("transaction.execute(")
+                .doesNotContain("@Transactional")
                 .contains("credentialVerifier.verify(")
                 .contains("sessionIssuer.issueTokens(")
                 .doesNotContain("passwords.matches(")
@@ -34,7 +37,9 @@ class AuthLoginUseCaseArchitectureTest {
         // Rate limiting stays ahead of any credential evaluation.
         assertThat(useCase.indexOf("rateLimiter.allowAccount("))
                 .isPositive()
+                .isLessThan(useCase.indexOf("CheckedPassword.check("))
                 .isLessThan(useCase.indexOf("credentialVerifier.verify("));
+        assertThat(useCase.indexOf("CheckedPassword.check(")).isLessThan(useCase.indexOf("transaction.execute("));
 
         for (String collaborator : new String[] {
                 "CredentialVerifier", "LoginAttemptRecorder", "SessionIssuer", "LoginResponseMapper"}) {
@@ -53,7 +58,7 @@ class AuthLoginUseCaseArchitectureTest {
     void credentialChecksKeepLockoutBeforePasswordAndPasswordBeforeAccountStatus() throws Exception {
         String verifier = login("CredentialVerifier");
         int lockout = verifier.indexOf("failureEnforcement.isTemporarilyLocked(user)");
-        int password = verifier.indexOf("passwords.matches(");
+        int password = verifier.indexOf("password.matches(user.getPasswordHash())");
         int locked = verifier.indexOf("isLocked(user)");
         assertThat(lockout).isPositive().isLessThan(password);
         assertThat(password).isLessThan(locked);
