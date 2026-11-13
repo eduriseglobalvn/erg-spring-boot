@@ -61,6 +61,26 @@ class LmsAcademicRecordGraphQlControllerTest {
     }
 
     @Test
+    void attendanceDefaultsToTodayInVietnamWhateverTheServerZone() {
+        authenticate(principal("teacher-1", "tenant-a", List.of("class-1")));
+        java.util.TimeZone original = java.util.TimeZone.getDefault();
+        // UTC+14 and UTC-12: at any instant at least one of them is on a different date than Vietnam.
+        try {
+            for (String zone : List.of("Pacific/Kiritimati", "Etc/GMT+12")) {
+                java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(zone));
+                controller().attendanceWorkspace(new AttendanceWorkspaceInput(
+                        "tenant-a", "class-1", null, "subject-1", null, null));
+            }
+        } finally {
+            java.util.TimeZone.setDefault(original);
+        }
+        ArgumentCaptor<String> to = ArgumentCaptor.forClass(String.class);
+        verify(service, org.mockito.Mockito.times(2)).attendanceWorkspace(any(), any(), any(), any(), to.capture());
+        assertThat(to.getAllValues()).containsOnly(
+                java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toString());
+    }
+
+    @Test
     void rejectsCrossTenantBeforeService() {
         authenticate(principal("teacher-1", "tenant-a", List.of("class-1")));
         assertThatThrownBy(() -> controller().attendanceWorkspace(new AttendanceWorkspaceInput(
