@@ -30,6 +30,7 @@ $nginxDev = Require-File "ops/docker/nginx/dev.conf"
 $nginxNative = Require-File "ops/docker/nginx/native.conf"
 $envDev = Require-File "ops/docker/.env.dev.example"
 $envProduction = Require-File "ops/docker/.env.production.example"
+$deployScript = Require-File "ops/docker/deploy.sh"
 $windowsScript = Require-File "scripts/docker.ps1"
 $linuxScript = Require-File "scripts/docker.sh"
 $runtimeRoleMigration = Require-File "src/main/resources/db/migration/postgres/V74__runtime_role_rls_grants.sql"
@@ -91,12 +92,17 @@ foreach ($name in @(
     "SPRING_PROFILES_ACTIVE",
     "SERVER_PORT",
     "FLYWAY_ENABLED",
-    "SECRET_AUTH__JWT_SECRET",
-    "SECRET_AUTH__JWT_REFRESH_SECRET"
+    "SECRET_AUTH__JWT_SECRET"
 )) {
     Require-Match $envDev "(?m)^$([regex]::Escape($name))=" "Development env must define $name"
     Require-Match $envProduction "(?m)^$([regex]::Escape($name))=" "Production env must define $name"
 }
+
+# SRV-04: a committed sample password must never be usable; deploy.sh refuses blank ones.
+foreach ($name in @("POSTGRES_PASSWORD", "POSTGRES_RUNTIME_PASSWORD", "REDIS_STATE_PASSWORD", "REDIS_CACHE_PASSWORD")) {
+    Require-Match $envProduction "(?m)^$([regex]::Escape($name))=\r?$" "Production env example must leave $name blank"
+}
+Require-Match $deployScript 'check_secrets' "deploy.sh must refuse blank or sample database/Redis passwords"
 
 Require-Match $envProduction '(?m)^ERG_APP_IMAGE=[^/]+/.+@sha256:[0-9a-f]{64}$' "Production env must define a digest-pinned ERG_APP_IMAGE"
 Require-Match $envProduction '(?m)^ERG_ROLLBACK_IMAGE=[^/]+/.+@sha256:[0-9a-f]{64}$' "Production env must define a digest-pinned ERG_ROLLBACK_IMAGE"

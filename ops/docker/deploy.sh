@@ -34,6 +34,30 @@ on_error() {
   notify "❌ Deploy ${SHA:0:7} lỗi ở bước \"$STEP\" (dòng $1) sau $((SECONDS / 60)) phút. $state"
 }
 trap 'on_error $LINENO' ERR
+
+# SRV-04: never run with a blank database/Redis password or one still equal to an old sample value from
+# .env.production.example. Compared as SHA-256 so neither the samples nor the secrets are printed.
+SAMPLE_SECRET_SHA256="99be40432fc38c1333a4ea4fbf3ea2975250ff1ff2283d9c476e73f852d5a859
+c4444892486cacdd43119d3dde018ffcede47c132abe6546833b3c3c8c5e2369
+28943b3628c7826d337002105b6e761008612e1381aaf26ee45fa742ffbb5648
+39dc3b58ddbb2aecd1183adc61f93db338d59e3f759d6015cc798ed43f35c390"
+check_secrets() {
+  local name value bad=0
+  for name in POSTGRES_PASSWORD POSTGRES_RUNTIME_PASSWORD REDIS_STATE_PASSWORD REDIS_CACHE_PASSWORD; do
+    value=$(envval "$name")
+    if [ -z "$value" ]; then
+      echo "$name is empty in $ENV_FILE" >&2; bad=1
+    elif grep -qxF "$(printf %s "$value" | sha256sum | cut -d' ' -f1)" <<<"$SAMPLE_SECRET_SHA256"; then
+      echo "$name still has a sample value from .env.production.example: rotate it (docs/runbooks/credential-rotation-p0-2.md)" >&2; bad=1
+    fi
+  done
+  return $bad
+}
+if ! check_secrets; then
+  notify "⛔ Deploy ${SHA:0:7} bị từ chối: mật khẩu Postgres/Redis trong .env.production trống hoặc còn giá trị mẫu. Production chưa bị đụng."
+  echo "Deploy stopped before touching anything." >&2; exit 1
+fi
+
 notify "🚀 Bắt đầu deploy ${SHA:0:7}. Backend sẽ ngắt khoảng 1 phút lúc đổi bản."
 
 log "unpack $SHA"
