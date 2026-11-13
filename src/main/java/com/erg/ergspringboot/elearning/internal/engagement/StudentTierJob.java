@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.elearning.internal.engagement;
 
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
+import com.erg.ergspringboot.platform.security.TenantContext;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import org.slf4j.Logger;
@@ -35,13 +36,16 @@ public class StudentTierJob {
     public void run(LocalDate weekStart) {
         if (weekStart.getDayOfWeek() != DayOfWeek.MONDAY) throw new IllegalArgumentException("weekStart must be a Monday");
         int failed = 0;
-        for (StudentTierService.Cohort cohort : tiers.cohorts()) {
-            try {
-                tiers.refreshCohort(cohort, weekStart);
-            } catch (RuntimeException error) {
-                // One broken cohort must not stop the others; the next run replaces the week again.
-                failed++;
-                log.error("Tier update failed for school {} grade {} week {}", cohort.schoolId(), cohort.grade(), weekStart, error);
+        // Reads every tenant and writes RLS-protected tables, so it runs in maintenance mode like the other sweep jobs.
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.maintenance())) {
+            for (StudentTierService.Cohort cohort : tiers.cohorts()) {
+                try {
+                    tiers.refreshCohort(cohort, weekStart);
+                } catch (RuntimeException error) {
+                    // One broken cohort must not stop the others; the next run replaces the week again.
+                    failed++;
+                    log.error("Tier update failed for school {} grade {} week {}", cohort.schoolId(), cohort.grade(), weekStart, error);
+                }
             }
         }
         log.info("Tier update for week {} done, {} cohort(s) failed", weekStart, failed);
