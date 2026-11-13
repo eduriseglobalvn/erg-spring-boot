@@ -3,6 +3,7 @@ package com.erg.ergspringboot.elearning;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.MyFramesResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.MyTierResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.TierTableRowResponse;
+import com.erg.ergspringboot.elearning.internal.engagement.StudentTierJob;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentTierReader;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -12,9 +13,16 @@ import org.springframework.stereotype.Service;
 public class StudentTierOperations {
 
     private final StudentTierReader tiers;
+    private final StudentTierJob job;
 
-    public StudentTierOperations(StudentTierReader tiers) {
+    public StudentTierOperations(StudentTierReader tiers, StudentTierJob job) {
         this.tiers = tiers;
+        this.job = job;
+    }
+
+    /** Admin trigger of the weekly tier update for one tenant; returns how many students were tiered. */
+    public int runTierUpdate(String tenantId) {
+        return job.runForTenant(tenantId);
     }
 
     public MyTierResponse myTier(String tenantId, String userId) {

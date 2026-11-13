@@ -51,6 +51,20 @@ public class StudentTierJob {
         log.info("Tier update for week {} done, {} cohort(s) failed", weekStart, failed);
     }
 
+    /**
+     * Manual run for one tenant (admin mutation), in the caller's own tenant context, for the current week. Safe to repeat:
+     * {@link StudentTierService#refreshCohort} replaces the week and derives its state from earlier weeks only.
+     */
+    public int runForTenant(String tenantId) {
+        LocalDate weekStart = mondayOf(LocalDate.now(LeaderboardXp.ZONE));
+        int students = 0;
+        for (StudentTierService.Cohort cohort : tiers.cohorts()) {
+            if (cohort.tenantId().equals(tenantId)) students += tiers.refreshCohort(cohort, weekStart);
+        }
+        log.info("Manual tier update for tenant {} week {}: {} student(s)", tenantId, weekStart, students);
+        return students;
+    }
+
     static LocalDate mondayOf(LocalDate day) {
         return day.with(DayOfWeek.MONDAY);
     }

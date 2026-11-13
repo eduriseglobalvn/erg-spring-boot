@@ -1042,6 +1042,8 @@ type Mutation {
   acceptStudentDiscussionReply(input: AcceptStudentDiscussionReplyInput!): StudentDiscussionPost!
   askTeacherAboutQuestion(input: AskTeacherAboutQuestionInput!): QuestionThread!
   sendQuestionThreadMessage(input: SendQuestionThreadMessageInput!): QuestionThread!
+  "Student: marks one of their own question threads as read (clears QuestionThread.unread until the teacher writes again)"
+  markStudentQuestionThreadRead(threadId: ID!, tenantId: String): Boolean!
   "Teacher or admin answers; the thread becomes ANSWERED"
   answerQuestionThread(input: SendQuestionThreadMessageInput!): QuestionThread!
   setClassLeaderboardEnabled(input: SetClassLeaderboardEnabledInput!): LeaderboardClass!
@@ -1049,6 +1051,8 @@ type Mutation {
   "tierKey null = no frame; a frame that is not unlocked is rejected"
   selectFrame(tierKey: String, tenantId: String): MyFrames!
   acknowledgeTierPromotion(weekStart: String!, tenantId: String): Boolean!
+  "Admin: runs the weekly tier update now for the caller's tenant; returns the number of students tiered. Safe to repeat."
+  runStudentTierUpdate(tenantId: String): Int!
   previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
   createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
@@ -1097,7 +1101,7 @@ type StudentDiscussionReactionPayload { targetType: String!, targetId: String!, 
 type StudentDiscussionModerationClass { id: String!, name: String }
 type StudentDiscussionModerationPayload { targetType: String!, targetId: String!, hidden: Boolean!, deleted: Boolean! }
 """status: OPEN or ANSWERED. correctAnswerText is null unless the quiz lets students see answers and they handed in (teachers always get it)."""
-type QuestionThread { id: String!, assignmentId: String!, assignmentTitle: String, subjectName: String, className: String, questionIndex: Int!, questionPrompt: String, studentAnswerText: String, correctAnswerText: String, teacherId: String, teacherName: String, studentName: String, status: String!, lastMessageAt: String, lastMessagePreview: String, "Empty in lists; filled by the detail queries and the mutations" messages: [QuestionMessage!]! }
+type QuestionThread { id: String!, assignmentId: String!, assignmentTitle: String, subjectName: String, className: String, questionIndex: Int!, questionPrompt: String, studentAnswerText: String, correctAnswerText: String, teacherId: String, teacherName: String, studentName: String, status: String!, lastMessageAt: String, lastMessagePreview: String, "Empty in lists; filled by the detail queries and the mutations" messages: [QuestionMessage!]!, "Student view: a teacher message is newer than the last markStudentQuestionThreadRead; always false on the teacher side" unread: Boolean! }
 type QuestionMessage { id: String!, senderId: String!, senderName: String, senderRole: String!, mine: Boolean!, body: String!, attachmentIds: [String!]!, createdAt: String! }
 type StudentAnnouncementReadPayload { announcementId: String!, read: Boolean!, readAt: String! }
 

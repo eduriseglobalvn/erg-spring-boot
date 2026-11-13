@@ -124,6 +124,16 @@ public class StudentQuestionThreadService {
         return toResponse(actor, requireVisible(actor, threadId), true);
     }
 
+    /** Student only: marks the thread as read up to now. */
+    @Transactional
+    public boolean markRead(Actor actor, String threadId) {
+        ThreadRow thread = requireVisible(actor, threadId);
+        if (!actor.userId().equals(thread.studentUserId())) throw new ForbiddenException("Only the student of the thread can mark it read.");
+        jdbc.update("update student_question_threads set student_read_at = ? where tenant_id = ? and id = ?",
+                OffsetDateTime.now(), actor.tenantId(), thread.id());
+        return true;
+    }
+
     private QuestionThreadResponse toResponse(Actor actor, ThreadRow t, boolean withMessages) {
         List<QuestionMessageResponse> messages = jdbc.query("""
                 select m.id, m.sender_id, coalesce(u.full_name, '') sender_name, m.sender_role, m.body,
@@ -137,10 +147,12 @@ public class StudentQuestionThreadService {
         QuestionMessageResponse last = messages.isEmpty() ? null : messages.getLast();
         String preview = last == null ? null : last.body().length() > 120 ? last.body().substring(0, 120) : last.body();
         boolean studentSide = actor.userId().equals(t.studentUserId());
+        boolean unread = studentSide && messages.stream().anyMatch(m -> "TEACHER".equals(m.senderRole())
+                && (t.studentReadAt() == null || m.createdAt().isAfter(t.studentReadAt())));
         String correct = !studentSide || answersVisible(actor.tenantId(), t) ? correctAnswerText(actor.tenantId(), t) : null;
         return new QuestionThreadResponse(t.id(), t.assignmentId(), t.assignmentTitle(), t.subjectName(), t.className(),
                 t.questionIndex(), t.questionPrompt(), t.studentAnswerText(), correct, t.teacherId(), t.teacherName(),
-                t.studentName(), t.status(), t.lastMessageAt(), preview, withMessages ? messages : List.of());
+                t.studentName(), t.status(), t.lastMessageAt(), preview, withMessages ? messages : List.of(), unread);
     }
 
     /** The quiz lets learners see answers after submitting ({@code settings.showAnswersAfterSubmit}) and this student handed in. */
@@ -203,7 +215,7 @@ public class StudentQuestionThreadService {
 
     private static final String THREAD_SELECT = """
             select t.id, t.student_id, t.student_user_id, t.teacher_id, t.assignment_id, t.question_index, t.question_prompt,
-                   t.student_answer_text, t.status, t.last_message_at,
+                   t.student_answer_text, t.status, t.last_message_at, t.student_read_at,
                    coalesce(a.title, '') assignment_title, coalesce(s.name, '') subject_name, coalesce(c.name, '') class_name,
                    coalesce(tu.full_name, '') teacher_name, coalesce(su.full_name, '') student_name
             from student_question_threads t
@@ -218,7 +230,8 @@ public class StudentQuestionThreadService {
         return new ThreadRow(rs.getString("id"), rs.getString("student_id"), rs.getString("student_user_id"),
                 rs.getString("teacher_id"), rs.getString("assignment_id"), rs.getInt("question_index"),
                 rs.getString("question_prompt"), rs.getString("student_answer_text"), rs.getString("status"),
-                rs.getObject("last_message_at", OffsetDateTime.class), rs.getString("assignment_title"),
+                rs.getObject("last_message_at", OffsetDateTime.class), rs.getObject("student_read_at", OffsetDateTime.class),
+                rs.getString("assignment_title"),
                 rs.getString("subject_name"), rs.getString("class_name"), rs.getString("teacher_name"), rs.getString("student_name"));
     }
 
@@ -249,6 +262,6 @@ public class StudentQuestionThreadService {
 
     private record ThreadRow(String id, String studentId, String studentUserId, String teacherId, String assignmentId,
                              int questionIndex, String questionPrompt, String studentAnswerText, String status,
-                             OffsetDateTime lastMessageAt, String assignmentTitle, String subjectName, String className,
+                             OffsetDateTime lastMessageAt, OffsetDateTime studentReadAt, String assignmentTitle, String subjectName, String className,
                              String teacherName, String studentName) { }
 }

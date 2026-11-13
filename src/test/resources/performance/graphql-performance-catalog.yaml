@@ -96,6 +96,22 @@ fields:
     generation-domain: mutation-invalidation
     cold-warm-scenario: authenticated-write
     fixture-id: graphql-student-announcement-read-v1
+  - coordinate: Mutation.markStudentQuestionThreadRead
+    owner: com.erg.ergspringboot.controller.elearning.graphql.StudentEngagementGraphQlController.markStudentQuestionThreadRead
+    auth: tenant-user-class-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 8
+    row-budget: 20
+    payload-budget-bytes: 262144
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 500
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-student-announcement-read-v1
   - coordinate: ElearningQuery.discussionModerationClasses
     owner: com.erg.ergspringboot.controller.elearning.graphql.StudentEngagementGraphQlController.discussionModerationClasses
     auth: tenant-user-class-permission
@@ -314,6 +330,22 @@ fields:
     payload-budget-bytes: 262144
     selection-scenario: bounded-mutation-input
     latency-budget-ms: 500
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-class-leaderboard-v1
+  - coordinate: Mutation.runStudentTierUpdate
+    owner: com.erg.ergspringboot.controller.elearning.graphql.StudentEngagementGraphQlController.runStudentTierUpdate
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 400
+    row-budget: 5000
+    payload-budget-bytes: 262144
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 30000
     cacheability: none
     cache-ttl-seconds: 0
     cache-scope: none
