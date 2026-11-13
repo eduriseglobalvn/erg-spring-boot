@@ -2,12 +2,14 @@ package com.erg.ergspringboot.lms;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.StartAttemptRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SubmitAttemptRequest;
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.lms.internal.attempt.LmsAttemptUseCase;
+import com.erg.ergspringboot.lms.internal.readmodel.LmsClassWorkspaceReadUseCase;
 import com.erg.ergspringboot.lms.persistence.Assignment;
 import com.erg.ergspringboot.lms.persistence.AssignmentResource;
 import com.erg.ergspringboot.lms.persistence.Attempt;
@@ -62,6 +64,7 @@ class LmsAttemptFlowIntegrationTest {
     @Autowired private EntityManager entityManager;
     @Autowired private LmsAttemptUseCase attempts;
     @Autowired private AttemptRepository attemptRepository;
+    @Autowired private LmsClassWorkspaceReadUseCase classWorkspace;
     @Autowired private AttemptExpiryRepository expiryRepository;
     @Autowired private QuizPackageRepository packageRepository;
 
@@ -97,6 +100,24 @@ class LmsAttemptFlowIntegrationTest {
 
         assertThatThrownBy(() -> attemptRepository.saveAndFlush(inProgress("att-flow-2")))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void classRosterShowsEachStudentsOwnLatestHandedInScore() {
+        seed();
+        OffsetDateTime base = OffsetDateTime.now().minusHours(1);
+        attemptRepository.saveAndFlush(handedIn("att-roster-a1", "stu-flow-a", 40.0, base));
+        attemptRepository.saveAndFlush(handedIn("att-roster-a2", "stu-flow-a", 90.0, base.plusMinutes(10)));
+        attemptRepository.saveAndFlush(handedIn("att-roster-b1", "stu-flow-b", 50.0, base));
+
+        var roster = classWorkspace.query(TENANT, "class-flow", null, null, null, null, null, null, null, true, false)
+                .students().items();
+        assertThat(roster).extracting("id", "averagePercent", "completedAssignmentCount")
+                .containsExactlyInAnyOrder(tuple("stu-flow-a", 90, 1), tuple("stu-flow-b", 50, 1));
+
+        var withoutGradeRead = classWorkspace.query(TENANT, "class-flow", null, null, null, null, null, null, null, false, false)
+                .students().items();
+        assertThat(withoutGradeRead).extracting("averagePercent").containsOnlyNulls();
     }
 
     @Test
@@ -137,6 +158,17 @@ class LmsAttemptFlowIntegrationTest {
     private List<String> staleIdsForThisTenant(OffsetDateTime now) {
         return expiryRepository.findExpiredCandidates(now, 10_000).stream()
                 .filter(ref -> TENANT.equals(ref.getTenantId())).map(ref -> ref.getId()).toList();
+    }
+
+    private Attempt handedIn(String id, String studentId, double percent, OffsetDateTime at) {
+        Attempt attempt = inProgress(id);
+        attempt.setStudentId(studentId);
+        attempt.setStatus("graded");
+        attempt.setPercent(percent);
+        attempt.setStartedAt(at);
+        attempt.setSubmittedAt(at);
+        attempt.setUpdatedAt(at);
+        return attempt;
     }
 
     private Attempt inProgress(String id) {

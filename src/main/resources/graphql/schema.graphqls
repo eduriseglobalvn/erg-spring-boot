@@ -509,6 +509,10 @@ type StudentRosterItem {
   email: String
   status: String
   updatedAt: String
+  "Mean of the student's latest hand-in per assignment in this class; null without hand-ins or lms.grade.read"
+  averagePercent: Int
+  "Assignments of this class the student has handed in; null without lms.grade.read"
+  completedAssignmentCount: Int
 }
 
 type AssignmentSummaryPage {
