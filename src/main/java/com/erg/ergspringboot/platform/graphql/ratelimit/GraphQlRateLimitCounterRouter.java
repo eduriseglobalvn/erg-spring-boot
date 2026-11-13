@@ -19,6 +19,11 @@ public final class GraphQlRateLimitCounterRouter implements GraphQlRateLimitCoun
     }
 
     @Override
+    public long current(String key) {
+        return capabilities.supportsIncrex() ? increx.current(key) : lua.current(key);
+    }
+
+    @Override
     public RateLimitCounterResult increment(String key, long upperBound, Instant windowEnd) {
         return capabilities.supportsIncrex()
                 ? increx.increment(key, upperBound, windowEnd)

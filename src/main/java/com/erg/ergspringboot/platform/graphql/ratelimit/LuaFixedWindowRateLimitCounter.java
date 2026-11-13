@@ -27,6 +27,12 @@ public final class LuaFixedWindowRateLimitCounter implements GraphQlRateLimitCou
     }
 
     @Override
+    public long current(String key) {
+        String value = redis.opsForValue().get(key);
+        return value == null ? 0 : Long.parseLong(value);
+    }
+
+    @Override
     public RateLimitCounterResult increment(String key, long upperBound, Instant windowEnd) {
         if (upperBound < 1) {
             throw new IllegalArgumentException("upperBound must be positive");
