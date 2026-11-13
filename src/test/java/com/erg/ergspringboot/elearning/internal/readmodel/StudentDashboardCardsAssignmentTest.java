@@ -62,4 +62,14 @@ class StudentDashboardCardsAssignmentTest {
         assertThat(late.onTime()).isFalse();
         assertThat(late.minutesBeforeDue()).isNull();
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(nullValues = "null", value = {
+            "submitted,true", "needs_review,true", "review_required,true", "graded,true", "completed,true",
+            "GRADED,true", "in_progress,false", "started,false", "done,false", "null,false"})
+    void handedInFlagFollowsTheServerHandedInStates(String latestStatus, boolean handedIn) {
+        StudentDashboardAssignmentCardResponse card = StudentDashboardCards.toAssignmentCard(
+                projection(NOW.plusDays(1), latestStatus, null, null, null, "train"), NOW);
+        assertThat(card.handedIn()).isEqualTo(handedIn);
+    }
 }
