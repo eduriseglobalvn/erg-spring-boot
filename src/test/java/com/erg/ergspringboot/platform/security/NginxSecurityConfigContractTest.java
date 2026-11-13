@@ -30,7 +30,7 @@ class NginxSecurityConfigContractTest {
         assertThat(config).contains("client_max_body_size 4m;");
         String env = Files.readString(Path.of("ops/docker/.env.production.example"));
         assertThat(env).contains(
-                "ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE=600",
+                "ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE=100",
                 "ERG_AUTH_LOGIN_RATE_LIMIT_ACCOUNT_PER_MINUTE=10");
     }
 
