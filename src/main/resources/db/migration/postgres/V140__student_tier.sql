@@ -64,3 +64,31 @@ CREATE TABLE IF NOT EXISTS student_tier_seen (
     seen_at    timestamp with time zone NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, student_id, week_start)
 );
+
+-- Tenant isolation, same policy as the other tenant tables.
+ALTER TABLE student_tier_week ENABLE ROW LEVEL SECURITY;
+CREATE POLICY student_tier_week_tenant_isolation ON student_tier_week
+    USING (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''))
+    WITH CHECK (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''));
+ALTER TABLE student_tier_cutoff ENABLE ROW LEVEL SECURITY;
+CREATE POLICY student_tier_cutoff_tenant_isolation ON student_tier_cutoff
+    USING (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''))
+    WITH CHECK (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''));
+ALTER TABLE student_frame ENABLE ROW LEVEL SECURITY;
+CREATE POLICY student_frame_tenant_isolation ON student_frame
+    USING (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''))
+    WITH CHECK (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''));
+ALTER TABLE student_frame_choice ENABLE ROW LEVEL SECURITY;
+CREATE POLICY student_frame_choice_tenant_isolation ON student_frame_choice
+    USING (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''))
+    WITH CHECK (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''));
+ALTER TABLE student_tier_seen ENABLE ROW LEVEL SECURITY;
+CREATE POLICY student_tier_seen_tenant_isolation ON student_tier_seen
+    USING (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''))
+    WITH CHECK (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''));
+
+-- Tenant-leading indexes (the tenant migration policy test looks for an explicit one).
+CREATE INDEX IF NOT EXISTS idx_student_tier_cutoff_tenant ON student_tier_cutoff (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_student_frame_tenant ON student_frame (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_student_frame_choice_tenant ON student_frame_choice (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_student_tier_seen_tenant ON student_tier_seen (tenant_id);

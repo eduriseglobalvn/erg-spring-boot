@@ -67,3 +67,6 @@ CREATE POLICY student_question_threads_tenant_isolation ON student_question_thre
 CREATE POLICY student_question_messages_tenant_isolation ON student_question_messages
     USING (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''))
     WITH CHECK (current_setting('app.maintenance_mode', true) = 'true' OR tenant_id = nullif(current_setting('app.tenant_id', true), ''));
+
+-- Tenant-leading indexes (the tenant migration policy test looks for an explicit one).
+CREATE INDEX IF NOT EXISTS idx_student_discussion_follows_tenant ON student_discussion_follows (tenant_id);
