@@ -289,17 +289,17 @@ class LmsAttemptOwnershipAndGradingTest {
         when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment()));
         when(fixture.permissions.hasAny(LmsAssignmentAccessPolicy.REVIEW_PERMISSIONS)).thenReturn(true);
         when(fixture.grading.gradeManualAnswer("erg", "att-1", "ver-1", "essay-1", BigDecimal.valueOf(2.0), "usr-t"))
-                .thenReturn(new GradedAttempt(BigDecimal.TEN, BigDecimal.TEN, 100, true, false, 9, 9));
+                .thenReturn(new GradedAttempt(BigDecimal.valueOf(9), BigDecimal.TEN, 90, true, false, 9, 9));
         UserAccessContext teacher = new UserAccessContext("usr-t", "erg", List.of("*"), List.of("*"), null, null);
 
         var response = useCase.gradeManualAnswer("att-1", "essay-1", new ManualGradeRequest(2.0, 3L), teacher);
 
         assertThat(response.status()).isEqualTo("graded");
-        assertThat(response.percent()).isEqualTo(100.0);
+        assertThat(response.percent()).isEqualTo(90.0);
         assertThat(response.passed()).isTrue();
-        // P2-4: the manual score reaches the class progress projection (the class grade), not only the attempt.
+        // P2-4: the manual grade reaches the class progress projection as a percent (DATA-01), not raw points.
         verify(fixture.grading).projectProgress(any(), any(), any(), any(), any(), any(), any(), any(),
-                eq("graded"), anyInt(), anyInt(), eq(BigDecimal.valueOf(10.0)), eq(true), any(), any());
+                eq("graded"), anyInt(), anyInt(), eq(BigDecimal.valueOf(90.0)), eq(true), any(), any());
     }
 
     @Test

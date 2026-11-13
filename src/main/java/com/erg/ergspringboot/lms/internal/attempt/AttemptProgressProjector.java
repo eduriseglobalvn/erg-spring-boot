@@ -43,7 +43,8 @@ final class AttemptProgressProjector {
         String title = quizzes.findByTenantIdAndId(tenant, a.getQuizId()).map(Quiz::getTitle).orElse(null);
         int answered = a.getSubmittedCount() == null ? 0 : a.getSubmittedCount();
         int total = a.getTotalQuestions() == null ? 0 : a.getTotalQuestions();
-        BigDecimal score = BigDecimal.valueOf(a.getScore() == null ? 0 : a.getScore());
+        // Reports read student_progress.score as 0-100 (DATA-01), so project the percent, not raw points.
+        BigDecimal score = BigDecimal.valueOf(a.getPercent() == null ? 0 : a.getPercent());
         boolean passed = Boolean.TRUE.equals(a.getPassed());
         String status = a.getStatus();
         Runnable projection = () -> {

@@ -29,10 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(value = "postgresTransactionManager", readOnly = true)
 public class QuizReportService {
 
-    private static final String STATUS_SUBMITTED = "submitted";
-    private static final String STATUS_IN_PROGRESS = "in_progress";
-    private static final String STATUS_NEEDS_REVIEW = "needs_review";
-
     private final AttemptAnswerRowRepository answerRowRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final QuizVersionRepository quizVersionRepository;
@@ -80,28 +76,9 @@ public class QuizReportService {
         Page<StudentProgress> pageResult = studentProgressRepository
                 .findByTenantIdAndAssignmentIdOrderBySubmittedAtDesc(
                         tenantId, assignmentId, PageRequest.of(safePage, safeSize));
-        // Repository paging is part of the report contract. Never fall back to the
-        // legacy unbounded list method when a provider returns an unexpected null.
-        List<StudentProgress> progress = pageResult == null ? List.of() : pageResult.getContent();
-
-        StudentProgressSummaryProjection summary = studentProgressRepository
-                .summarizeAssignmentAggregate(tenantId, assignmentId);
-        if (summary == null) {
-            // Rolling-deploy safety for a database that has not backfilled the aggregate yet.
-            summary = studentProgressRepository.summarizeAssignment(tenantId, assignmentId);
-        }
-        long total = summary == null ? (pageResult == null ? progress.size() : pageResult.getTotalElements()) : summary.getTotalRecipients();
-        int submitted = (int) (summary == null ? progress.stream().filter(this::isSubmitted).count() : summary.getSubmittedCount());
-        int inProgress = (int) (summary == null ? progress.stream().filter(this::isInProgress).count() : summary.getInProgressCount());
-        int needsReview = (int) (summary == null ? progress.stream().filter(this::isNeedsReview).count() : summary.getNeedsReviewCount());
-        int notStarted = Math.max(0, (int) total - submitted - inProgress - needsReview);
-        double averagePercent = summary == null ? averageScore(progress) : summary.getAveragePercent();
-
-        List<StudentProgressRow> students = progress.stream().map(this::toProgressRow).toList();
-        return new AssignmentReportResponse(
-                assignmentId, (int) total, submitted, inProgress, notStarted, needsReview, averagePercent, students,
-                safePage, safeSize, pageResult == null ? (total == 0 ? 0 : (int) Math.ceil((double) total / safeSize))
-                        : pageResult.getTotalPages(), pageResult != null && pageResult.hasNext());
+        // The sharded aggregate (V69, states from V145) holds the summarizeAssignment counts without a row scan.
+        return report(assignmentId, pageResult,
+                studentProgressRepository.summarizeAssignmentAggregate(tenantId, assignmentId), safePage, safeSize);
     }
 
     /** Filtered assignment progress for REST reporting and bounded exports. */
@@ -115,26 +92,25 @@ public class QuizReportService {
                 PageRequest.of(safe.page(), safe.size()));
         StudentProgressSummaryProjection summary = studentProgressRepository.summarizeAssignment(
                 tenantId, assignmentId, safe.classId(), safe.status(), safe.submittedFrom(), safe.submittedTo());
-        List<StudentProgress> progress = pageResult == null ? List.of() : pageResult.getContent();
-        long total = summary == null ? (pageResult == null ? 0 : pageResult.getTotalElements()) : summary.getTotalRecipients();
-        int submitted = summary == null ? (int) progress.stream().filter(this::isSubmitted).count() : (int) summary.getSubmittedCount();
-        int inProgress = summary == null ? (int) progress.stream().filter(this::isInProgress).count() : (int) summary.getInProgressCount();
-        int needsReview = summary == null ? (int) progress.stream().filter(this::isNeedsReview).count() : (int) summary.getNeedsReviewCount();
-        int notStarted = Math.max(0, (int) total - submitted - inProgress - needsReview);
-        double averagePercent = summary == null ? averageScore(progress) : summary.getAveragePercent();
-        int totalPages = pageResult == null ? (total == 0 ? 0 : (int) Math.ceil((double) total / safe.size())) : pageResult.getTotalPages();
-        return new AssignmentReportResponse(
-                assignmentId, (int) total, submitted, inProgress, notStarted, needsReview, averagePercent,
-                progress.stream().map(this::toProgressRow).toList(), safe.page(), safe.size(), totalPages,
-                pageResult != null && pageResult.hasNext());
+        return report(assignmentId, pageResult, summary, safe.page(), safe.size());
     }
 
-    private boolean isSubmitted(StudentProgress row) { return STATUS_SUBMITTED.equalsIgnoreCase(row.getStatus()); }
-    private boolean isInProgress(StudentProgress row) { return STATUS_IN_PROGRESS.equalsIgnoreCase(row.getStatus()); }
-    private boolean isNeedsReview(StudentProgress row) { return STATUS_NEEDS_REVIEW.equalsIgnoreCase(row.getStatus()); }
-    private double averageScore(List<StudentProgress> rows) {
-        return rows.stream().map(StudentProgress::getScore).filter(java.util.Objects::nonNull)
-                .mapToDouble(BigDecimal::doubleValue).average().orElse(0.0);
+    /** Counts and average always come from one SQL summary, never re-derived from the visible page. */
+    private AssignmentReportResponse report(String assignmentId, Page<StudentProgress> pageResult,
+            StudentProgressSummaryProjection summary, int page, int size) {
+        List<StudentProgress> progress = pageResult == null ? List.of() : pageResult.getContent();
+        long total = summary == null ? 0 : summary.getTotalRecipients();
+        int submitted = summary == null ? 0 : (int) summary.getSubmittedCount();
+        int inProgress = summary == null ? 0 : (int) summary.getInProgressCount();
+        int needsReview = summary == null ? 0 : (int) summary.getNeedsReviewCount();
+        // Needs-review rows are already inside "submitted" (handed in), so they are not subtracted twice.
+        int notStarted = Math.max(0, (int) total - submitted - inProgress);
+        double averagePercent = summary == null ? 0.0 : summary.getAveragePercent();
+        int totalPages = pageResult == null ? (total == 0 ? 0 : (int) Math.ceil((double) total / size)) : pageResult.getTotalPages();
+        return new AssignmentReportResponse(
+                assignmentId, (int) total, submitted, inProgress, notStarted, needsReview, averagePercent,
+                progress.stream().map(this::toProgressRow).toList(), page, size, totalPages,
+                pageResult != null && pageResult.hasNext());
     }
 
     private QuestionAnalyticsRow toRow(QuestionAnalyticsProjection projection) {
