@@ -17,6 +17,7 @@ curriculum_topics: 1000
 content_placements: 1000
 quiz_versions: 10
 quiz_version_questions: 500
+quiz_packages: 10
 attempt_answer_rows: 900000
 report_jobs: 50
 student_progress_rows: 180000

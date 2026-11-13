@@ -37,6 +37,9 @@ x-backend-environment: &backend-environment
   NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_KEY: benchmark-only-push-token-key-0123456789
   HTTP__CORS__ALLOWED_ORIGINS: https://benchmark.invalid
   AUTH__GEO_BLOCK_ENABLED: "false"
+  # prod requires a private R2 bucket for timekeeping selfies; the benchmark has none and never punches.
+  TK_PHOTOS_R2__ENABLED: "false"
+  TK_PHOTOS_LOCAL_ALLOWED_IN_PROD: "true"
   TENANT__ENABLED: "true"
   ERG_PROCESS_LOCAL_ENABLED: "false"
   ERG_OUTBOX_WORKER_ENABLED: "false"

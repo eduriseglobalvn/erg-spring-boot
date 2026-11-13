@@ -216,6 +216,26 @@ FROM lms_students student
 WHERE student.id LIKE 'seed-lms-student-%'
 ON CONFLICT (id) DO NOTHING;
 
+-- Homeroom teachers (same tenant as the class) can read their class's homework progress
+-- (erg-teacher-progress.js). Plain role_lms_teacher has no lms.assignment.progress.read.
+INSERT INTO user_access_scopes
+    (id, created_at, updated_at, user_id, education_unit_id, modules, role)
+SELECT 'load-tscope-' || substr(md5(class.id), 1, 24), now(), now(),
+       class.homeroom_teacher_id, class.school_id, 'lms', 'teacher'
+FROM academic_classes class
+JOIN users teacher ON teacher.id = class.homeroom_teacher_id AND teacher.tenant_id = class.tenant_id
+WHERE class.id LIKE 'seed-class-%'
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO user_role_assignments
+    (id, user_id, role_id, tenant_id, scope_type, scope_id, assigned_by, created_at, updated_at)
+SELECT 'load-tclass-' || substr(md5(class.id), 1, 24), class.homeroom_teacher_id,
+       'role_lms_homeroom_teacher', class.tenant_id, 'CLASS', class.id, class.homeroom_teacher_id, now(), now()
+FROM academic_classes class
+JOIN users teacher ON teacher.id = class.homeroom_teacher_id AND teacher.tenant_id = class.tenant_id
+WHERE class.id LIKE 'seed-class-%'
+ON CONFLICT (id) DO NOTHING;
+
 -- One 50-question quiz per tenant (500 tenant-isolated bank questions total).
 INSERT INTO lms_questions
     (id, created_at, updated_at, tenant_id, scope, subject_id, level_id, topic_id,
@@ -298,7 +318,8 @@ SELECT 'seed-qvq-' || substr(md5(t::text || ':' || q::text), 1, 27), now(), now(
        format('seed-tenant-%s', lpad(t::text, 2, '0')),
        format('runtime-%s-%s', t, q), format('slide-%s-%s', t, q),
        format('seed-q-%s-%s', lpad(t::text, 2, '0'), lpad(q::text, 3, '0')),
-       'multiple_choice', 'multiple_choice', 1, true, 'auto', q - 1,
+       -- kind must be a runtime kind (QuestionKindRegistry) or submit grading throws.
+       'single_choice', 'multiple_choice', 1, true, 'auto', q - 1,
        jsonb_build_object('stem', format('Seed question %s for tenant %s?', q, t)),
        '{"choiceId":"a"}'::jsonb
 FROM generate_series(1, 10) AS tenant(t)
@@ -308,6 +329,18 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE lms_quizzes quiz
 SET current_version_id = format('seed-qver-%s', right(quiz.tenant_id, 2)), updated_at = now()
 WHERE quiz.id LIKE 'seed-quiz-%' AND quiz.current_version_id IS NULL;
+
+-- One published runtime package per quiz version: the player starts attempts with its id/hash
+-- (erg-exam-session.js) and attempt_events.package_id references it.
+INSERT INTO quiz_packages
+    (id, created_at, updated_at, quiz_id, quiz_version_id, quiz_version, tenant_id, content_hash,
+     signature, grading_mode, schema_version, package_format, generated_at, release_channel)
+SELECT format('seed-qpkg-%s', lpad(t::text, 2, '0')), now(), now(),
+       format('seed-quiz-%s', lpad(t::text, 2, '0')), format('seed-qver-%s', lpad(t::text, 2, '0')), 'v1',
+       format('seed-tenant-%s', lpad(t::text, 2, '0')), md5('seed-version-' || t::text),
+       'local', 'server', 1, 'single', now(), 'stable'
+FROM generate_series(1, 10) AS tenant(t)
+ON CONFLICT (id) DO NOTHING;
 
 -- 1,000 canonical learning resources for library/list/cache benchmarks.
 INSERT INTO content_items
