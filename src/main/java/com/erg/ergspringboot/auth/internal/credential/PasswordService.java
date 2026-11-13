@@ -10,7 +10,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +31,7 @@ public class PasswordService implements CredentialHasher {
 
     @Autowired
     public PasswordService(ErgAuthProperties properties) {
-        this(Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8(), properties.getPasswordHashConcurrency());
+        this(NativeArgon2PasswordEncoder.preferNative(), properties.getPasswordHashConcurrency());
     }
 
     PasswordService(PasswordEncoder passwordEncoder, int hashConcurrency) {
