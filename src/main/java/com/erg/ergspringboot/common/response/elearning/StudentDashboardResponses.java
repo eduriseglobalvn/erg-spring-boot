@@ -116,7 +116,28 @@ public final class StudentDashboardResponses {
             OffsetDateTime dueAt,
             /** Latest handed-in attempt, 0-100; null until the student hands one in. */
             Double scorePercent,
-            OffsetDateTime submittedAt
+            OffsetDateTime submittedAt,
+            String subjectName,
+            String teacherName,
+            Integer questionCount,
+            /** The assignment time limit in minutes; null when it has none. */
+            Integer estimatedMinutes,
+            /** PRACTICE or TEST. */
+            String kind,
+            /** Answers saved on the attempt in progress; null when none is open. */
+            Integer answeredCount,
+            /** Raw score of the latest handed-in attempt and its scale. */
+            Double score,
+            Double maxScore,
+            Integer correctCount,
+            Integer totalQuestions,
+            int attemptCount,
+            Boolean onTime,
+            Long minutesBeforeDue,
+            /** XP still earned by handing in now; 0 once handed in. */
+            int xpReward,
+            OffsetDateTime lateSubmitUntil,
+            boolean closed
     ) {
     }
 

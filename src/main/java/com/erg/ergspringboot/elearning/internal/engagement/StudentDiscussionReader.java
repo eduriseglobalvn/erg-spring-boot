@@ -3,6 +3,7 @@ package com.erg.ergspringboot.elearning.internal.engagement;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionPostResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionReactionCountResponse;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,19 +35,72 @@ final class StudentDiscussionReader {
     List<StudentDiscussionPostResponse> classPosts(
             String tenantId, String actorUserId, String classId, int size, int offset, boolean includeHidden
     ) {
-        List<PostRow> posts = jdbc.query("""
-                select p.id, p.author_id, coalesce(u.full_name, 'Học viên') author_name,
-                       p.academic_class_id, coalesce(c.name, '') class_name, p.title, p.content,
-                       p.created_at, p.attachment_ids::text, p.assignment_id, p.hidden_at is not null hidden
-                from student_discussion_threads p
-                left join users u on u.id = p.author_id and u.tenant_id = p.tenant_id
-                left join academic_classes c on c.id = p.academic_class_id and c.tenant_id = p.tenant_id
+        return classPosts(tenantId, actorUserId, classId, size, offset, includeHidden, PostFilter.ALL);
+    }
+
+    /** Pinned threads first, then the latest activity. */
+    List<StudentDiscussionPostResponse> classPosts(
+            String tenantId, String actorUserId, String classId, int size, int offset, boolean includeHidden, PostFilter filter
+    ) {
+        List<PostRow> posts = jdbc.query(POST_SELECT + """
                 where p.tenant_id = ? and p.academic_class_id = ? and (? or p.hidden_at is null)
-                order by p.latest_activity_at desc, p.created_at desc
+                """ + filter.sql(includeHidden) + """
+                order by (p.pinned_at is not null) desc, p.latest_activity_at desc, p.created_at desc
                 limit ? offset ?
-                """, this::mapPost, tenantId, classId, includeHidden, size, offset);
+                """, this::mapPost, filter.args(actorUserId, tenantId, classId, includeHidden, size, offset));
         return assemblePosts(tenantId, actorUserId, posts, includeHidden);
     }
+
+    long countPosts(String tenantId, String actorUserId, String classId, boolean includeHidden, PostFilter filter) {
+        Long total = jdbc.queryForObject("""
+                select count(*) from student_discussion_threads p
+                where p.tenant_id = ? and p.academic_class_id = ? and (? or p.hidden_at is null)
+                """ + filter.sql(includeHidden), Long.class, filter.args(actorUserId, tenantId, classId, includeHidden));
+        return total == null ? 0 : total;
+    }
+
+    /** {@code kind}: ALL, UNANSWERED (no visible reply) or MINE (written by the viewer); {@code subject} narrows by subject chip. */
+    record PostFilter(String kind, String subject) {
+        static final PostFilter ALL = new PostFilter("ALL", null);
+
+        static PostFilter of(String kind, String subject) {
+            String k = kind == null || kind.isBlank() ? "ALL" : kind.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!k.equals("ALL") && !k.equals("UNANSWERED") && !k.equals("MINE")) {
+                throw new BadRequestException("filter must be ALL, UNANSWERED or MINE.");
+            }
+            return new PostFilter(k, subject == null || subject.isBlank() ? null : subject.trim());
+        }
+
+        private String sql(boolean includeHidden) {
+            String sql = "";
+            if (subject != null) sql += " and p.subject = ? ";
+            if (kind.equals("MINE")) sql += " and p.author_id = ? ";
+            if (kind.equals("UNANSWERED")) {
+                sql += " and not exists (select 1 from student_discussion_comments r where r.tenant_id = p.tenant_id and r.post_id = p.id"
+                        + (includeHidden ? "" : " and r.hidden_at is null") + ") ";
+            }
+            return sql;
+        }
+
+        /** Bind order follows {@link #sql}: tenant, class, includeHidden, subject, author, then paging. */
+        private Object[] args(String actorUserId, String tenantId, String classId, boolean includeHidden, Object... paging) {
+            List<Object> args = new ArrayList<>(List.of(tenantId, classId, includeHidden));
+            if (subject != null) args.add(subject);
+            if (kind.equals("MINE")) args.add(actorUserId);
+            args.addAll(List.of(paging));
+            return args.toArray();
+        }
+    }
+
+    private static final String POST_SELECT = """
+            select p.id, p.author_id, coalesce(u.full_name, 'Học viên') author_name,
+                   p.academic_class_id, coalesce(c.name, '') class_name, p.title, p.content,
+                   p.created_at, p.attachment_ids::text, p.assignment_id, p.hidden_at is not null hidden,
+                   p.subject, p.pinned_at is not null pinned, p.accepted_comment_id
+            from student_discussion_threads p
+            left join users u on u.id = p.author_id and u.tenant_id = p.tenant_id
+            left join academic_classes c on c.id = p.academic_class_id and c.tenant_id = p.tenant_id
+            """;
 
     List<StudentDiscussionReactionCountResponse> reactionCounts(String tenantId, String targetType, String targetId) {
         TargetKey key = new TargetKey(targetType, targetId);
@@ -54,15 +108,7 @@ final class StudentDiscussionReader {
     }
 
     StudentDiscussionPostResponse postById(String tenantId, String actorUserId, String id) {
-        List<PostRow> rows = jdbc.query("""
-                select p.id, p.author_id, coalesce(u.full_name, 'Học viên') author_name,
-                       p.academic_class_id, coalesce(c.name, '') class_name, p.title, p.content,
-                       p.created_at, p.attachment_ids::text, p.assignment_id, p.hidden_at is not null hidden
-                from student_discussion_threads p
-                left join users u on u.id = p.author_id and u.tenant_id = p.tenant_id
-                left join academic_classes c on c.id = p.academic_class_id and c.tenant_id = p.tenant_id
-                where p.tenant_id = ? and p.id = ?
-                """, this::mapPost, tenantId, id);
+        List<PostRow> rows = jdbc.query(POST_SELECT + " where p.tenant_id = ? and p.id = ?", this::mapPost, tenantId, id);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Discussion post was not found.");
         return assemblePosts(tenantId, actorUserId, rows, true).getFirst();
     }
@@ -89,6 +135,10 @@ final class StudentDiscussionReader {
         comments.forEach(comment -> targets.add(new TargetKey("COMMENT", comment.id())));
         Map<TargetKey, List<StudentDiscussionReactionCountResponse>> counts = reactionCounts(tenantId, targets);
         Map<TargetKey, String> viewer = viewerReactions(tenantId, actorUserId, targets);
+        java.util.Set<String> followed = new java.util.HashSet<>(namedJdbc.queryForList("""
+                select post_id from student_discussion_follows
+                where tenant_id = :tenantId and user_id = :userId and post_id in (:postIds)
+                """, new MapSqlParameterSource(params.getValues()).addValue("userId", actorUserId), String.class));
         Map<String, List<CommentRow>> byPost = new HashMap<>();
         comments.forEach(comment -> byPost.computeIfAbsent(comment.postId(), ignored -> new ArrayList<>()).add(comment));
         return posts.stream().map(post -> {
@@ -97,7 +147,8 @@ final class StudentDiscussionReader {
                     post.id(), post.authorId(), post.authorName(), initials(post.authorName()), post.academicClassId(),
                     post.className(), post.title(), post.content(), post.createdAt(), parseJsonList(post.attachmentIdsJson()),
                     post.assignmentId(), counts.getOrDefault(key, List.of()), viewer.get(key),
-                    assembleComments(byPost.getOrDefault(post.id(), List.of()), counts, viewer), post.hidden()
+                    assembleComments(byPost.getOrDefault(post.id(), List.of()), counts, viewer), post.hidden(),
+                    post.subject(), post.pinned(), post.acceptedCommentId(), followed.contains(post.id())
             );
         }).toList();
     }
@@ -187,7 +238,8 @@ final class StudentDiscussionReader {
         return new PostRow(rs.getString("id"), rs.getString("author_id"), rs.getString("author_name"),
                 rs.getString("academic_class_id"), rs.getString("class_name"), rs.getString("title"),
                 rs.getString("content"), rs.getObject("created_at", OffsetDateTime.class),
-                rs.getString("attachment_ids"), rs.getString("assignment_id"), rs.getBoolean("hidden"));
+                rs.getString("attachment_ids"), rs.getString("assignment_id"), rs.getBoolean("hidden"),
+                rs.getString("subject"), rs.getBoolean("pinned"), rs.getString("accepted_comment_id"));
     }
 
     private CommentRow mapComment(ResultSet rs, int row) throws SQLException {
@@ -211,7 +263,7 @@ final class StudentDiscussionReader {
 
     private record PostRow(String id, String authorId, String authorName, String academicClassId, String className,
                            String title, String content, OffsetDateTime createdAt, String attachmentIdsJson, String assignmentId,
-                           boolean hidden) { }
+                           boolean hidden, String subject, boolean pinned, String acceptedCommentId) { }
     private record CommentRow(String id, String postId, String parentId, String authorId, String authorName,
                               String content, OffsetDateTime createdAt, String attachmentIdsJson, boolean hidden) { }
     private record TargetKey(String type, String id) { }

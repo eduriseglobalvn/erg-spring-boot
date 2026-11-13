@@ -3,6 +3,7 @@ package com.erg.ergspringboot.elearning.internal.engagement;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.ClassLeaderboardEntryResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.ClassLeaderboardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.LeaderboardClassResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.LeaderboardMeResponse;
 import com.erg.ergspringboot.elearning.internal.engagement.LeaderboardXp.Period;
 import com.erg.ergspringboot.elearning.internal.engagement.LeaderboardXp.Scope;
 import com.erg.ergspringboot.elearning.internal.engagement.LeaderboardXp.Window;
@@ -53,7 +54,7 @@ public class ClassLeaderboardService {
             """;
 
     /** First hand-in of each assignment (a retake earns nothing more), from {@code since}. */
-    private static final String HAND_INS = """
+    static final String HAND_INS = """
             select student_id, submitted_at, total_questions, before_deadline from (
                 select distinct on (a.student_id, a.assignment_id)
                     a.student_id, a.submitted_at, a.total_questions,
@@ -67,7 +68,7 @@ public class ClassLeaderboardService {
             where submitted_at >= :since
             """;
 
-    private static final String ACTIVE_DAYS = """
+    static final String ACTIVE_DAYS = """
             select distinct a.student_id, cast(a.submitted_at at time zone 'Asia/Ho_Chi_Minh' as date) as day
             from lms_attempts a
             where a.tenant_id = :tenantId and a.student_id in (:studentIds)
@@ -77,10 +78,12 @@ public class ClassLeaderboardService {
     private final ClassroomRepository classrooms;
     private final StudentRepository students;
     private final LmsReadCacheInvalidator caches;
+    private final StudentTierService tiers;
     private final NamedParameterJdbcTemplate jdbc;
 
     public ClassLeaderboardService(ClassroomRepository classrooms, StudentRepository students,
-                                   LmsReadCacheInvalidator caches, JdbcTemplate jdbc) {
+                                   LmsReadCacheInvalidator caches, JdbcTemplate jdbc, StudentTierService tiers) {
+        this.tiers = tiers;
         this.classrooms = classrooms;
         this.students = students;
         this.caches = caches;
@@ -102,11 +105,14 @@ public class ClassLeaderboardService {
         if (self == null) throw new ForbiddenException("The class is outside the authenticated student's enrollment scope.");
         Board board = board(tenantId, target, period, scope);
         if (!target.leaderboardEnabled()) {
-            return board.response(false, self == 1, List.of());
+            return board.response(false, self == 1, List.of(), null);
         }
-        List<ClassLeaderboardEntryResponse> visible = rank(board, userId).stream()
+        List<ClassLeaderboardEntryResponse> all = rank(board, userId);
+        List<ClassLeaderboardEntryResponse> visible = all.stream()
                 .filter(entry -> entry.isViewer() || !board.hidden().contains(entry.studentId())).toList();
-        return board.response(true, self == 1, visible);
+        List<ClassLeaderboardEntryResponse> gradeAll = board.scope() == Scope.GRADE ? all
+                : rank(board(tenantId, target, board.period(), Scope.GRADE), userId);
+        return board.response(true, self == 1, visible, me(all, gradeAll));
     }
 
     @Transactional
@@ -129,7 +135,7 @@ public class ClassLeaderboardService {
     public ClassLeaderboardResponse forManager(Manager manager, String classId, String period) {
         LeaderboardClassResponse target = requireClass(manager, classId);
         Board board = board(manager.tenantId(), target, period, null);
-        return board.response(target.leaderboardEnabled(), false, rank(board, manager.userId()));
+        return board.response(target.leaderboardEnabled(), false, rank(board, manager.userId()), null);
     }
 
     @Transactional
@@ -149,37 +155,73 @@ public class ClassLeaderboardService {
             period = LeaderboardXp.period(periodValue);
             scope = LeaderboardXp.scope(scopeValue);
         } catch (IllegalArgumentException invalid) {
-            throw new BadRequestException("period must be WEEK, MONTH or TERM and scope CLASS or GRADE.");
+            throw new BadRequestException("period must be WEEK, MONTH, TERM or COURSE and scope CLASS or GRADE.");
         }
+        return board(tenantId, target, period, scope);
+    }
+
+    private Board board(String tenantId, LeaderboardClassResponse target, Period period, Scope scope) {
         List<String> classIds = scope == Scope.GRADE ? gradeClassIds(tenantId, target.id()) : List.of(target.id());
         List<Member> members = jdbc.query(MEMBERS, Map.of("tenantId", tenantId, "classIds", classIds), (rs, row) ->
                 new Member(rs.getString("id"), rs.getString("full_name"), rs.getString("auth_user_id"), rs.getBoolean("leaderboard_hidden")));
         Window current = LeaderboardXp.window(period, ZonedDateTime.now(LeaderboardXp.ZONE));
-        Window previous = current.previous(period);
+        boolean course = period == Period.COURSE;
+        // The course board has no "previous period" column: its rank change is only measured against yesterday.
+        Window previous = course ? null : current.previous(period);
         Set<String> hidden = new HashSet<>();
         members.forEach(member -> { if (member.hidden()) hidden.add(member.studentId()); });
         Map<String, Integer> xp = new HashMap<>();
+        Map<String, Integer> yesterdayXp = new HashMap<>();
         Map<String, Integer> previousXp = new HashMap<>();
         Map<String, Integer> streaks = new HashMap<>();
+        Map<String, Integer> submitted = new HashMap<>();
         if (!members.isEmpty()) {
             List<String> ids = members.stream().map(Member::studentId).toList();
             LocalDate today = LocalDate.now(LeaderboardXp.ZONE);
+            ZonedDateTime todayStart = today.atStartOfDay(LeaderboardXp.ZONE);
+            LocalDate daysSince = course ? current.start().toLocalDate().minusDays(7) : today.minusDays(STREAK_LOOKBACK_DAYS);
             Map<String, Set<LocalDate>> days = new HashMap<>();
             jdbc.query(ACTIVE_DAYS, Map.of("tenantId", tenantId, "studentIds", ids, "states", LmsStatePolicy.completedAttemptStates(),
-                    "since", today.minusDays(STREAK_LOOKBACK_DAYS).atStartOfDay(LeaderboardXp.ZONE).toOffsetDateTime()), rs -> {
+                    "since", daysSince.atStartOfDay(LeaderboardXp.ZONE).toOffsetDateTime()), rs -> {
                 days.computeIfAbsent(rs.getString("student_id"), key -> new HashSet<>()).add(rs.getObject("day", LocalDate.class));
             });
             days.forEach((studentId, set) -> streaks.put(studentId, LeaderboardXp.streak(set, today)));
+            // Course XP is the sum of weekly XP, each week with its own streak bonus (spec 5.2).
+            Map<String, Map<LocalDate, Integer>> weekly = new HashMap<>();
+            Map<String, Map<LocalDate, Integer>> weeklyYesterday = new HashMap<>();
             jdbc.query(HAND_INS, Map.of("tenantId", tenantId, "studentIds", ids, "states", LmsStatePolicy.completedAttemptStates(),
-                    "since", previous.start().toOffsetDateTime()), rs -> {
+                    "since", (course ? current.start() : previous.start()).toOffsetDateTime()), rs -> {
                 ZonedDateTime at = rs.getObject("submitted_at", java.time.OffsetDateTime.class).atZoneSameInstant(LeaderboardXp.ZONE);
                 int earned = LeaderboardXp.handInXp((Integer) rs.getObject("total_questions"), rs.getBoolean("before_deadline"));
-                Map<String, Integer> bucket = !at.isBefore(current.start()) ? xp : at.isBefore(previous.end()) ? previousXp : null;
-                if (bucket != null) bucket.merge(rs.getString("student_id"), earned, Integer::sum);
+                String studentId = rs.getString("student_id");
+                if (!at.isBefore(current.start())) {
+                    submitted.merge(studentId, 1, Integer::sum);
+                    boolean beforeToday = at.isBefore(todayStart);
+                    if (course) {
+                        LocalDate week = at.toLocalDate().with(java.time.DayOfWeek.MONDAY);
+                        weekly.computeIfAbsent(studentId, key -> new HashMap<>()).merge(week, earned, Integer::sum);
+                        if (beforeToday) weeklyYesterday.computeIfAbsent(studentId, key -> new HashMap<>()).merge(week, earned, Integer::sum);
+                    } else {
+                        xp.merge(studentId, earned, Integer::sum);
+                        if (beforeToday) yesterdayXp.merge(studentId, earned, Integer::sum);
+                    }
+                } else if (previous != null && at.isBefore(previous.end())) {
+                    previousXp.merge(studentId, earned, Integer::sum);
+                }
             });
-            xp.replaceAll((studentId, value) -> LeaderboardXp.withStreakBonus(value, streaks.getOrDefault(studentId, 0)));
+            if (course) {
+                weekly.forEach((studentId, byWeek) -> xp.put(studentId,
+                        LeaderboardXp.courseXp(byWeek, days.getOrDefault(studentId, Set.of()), today)));
+                weeklyYesterday.forEach((studentId, byWeek) -> yesterdayXp.put(studentId,
+                        LeaderboardXp.courseXp(byWeek, days.getOrDefault(studentId, Set.of()), today.minusDays(1))));
+            } else {
+                xp.replaceAll((studentId, value) -> LeaderboardXp.withStreakBonus(value, streaks.getOrDefault(studentId, 0)));
+                yesterdayXp.replaceAll((studentId, value) -> LeaderboardXp.withStreakBonus(value,
+                        LeaderboardXp.streak(days.getOrDefault(studentId, Set.of()), today.minusDays(1))));
+            }
         }
-        return new Board(target, period, scope, current, members, hidden, xp, previousXp, streaks);
+        return new Board(target, period, scope, current, members, hidden, xp, previousXp, yesterdayXp, streaks, submitted,
+                tiers.tiersFor(tenantId, members.stream().map(Member::studentId).toList()));
     }
 
     /** Same grade, school and year as the class; classes whose teacher switched the board off stay out. */
@@ -195,11 +237,8 @@ public class ClassLeaderboardService {
     }
 
     private List<ClassLeaderboardEntryResponse> rank(Board board, String viewerUserId) {
-        Map<String, Integer> previousRanks = new HashMap<>();
-        List<Member> previousOrder = ordered(board.members(), board.previousXp());
-        for (int i = 0; i < previousOrder.size() && board.previousXp().getOrDefault(previousOrder.get(i).studentId(), 0) > 0; i++) {
-            previousRanks.put(previousOrder.get(i).studentId(), i + 1);
-        }
+        Map<String, Integer> previousRanks = ranks(board.members(), board.previousXp());
+        Map<String, Integer> yesterdayRanks = ranks(board.members(), board.yesterdayXp());
         List<Member> order = ordered(board.members(), board.xp());
         List<ClassLeaderboardEntryResponse> entries = new ArrayList<>(order.size());
         for (int i = 0; i < order.size(); i++) {
@@ -207,12 +246,45 @@ public class ClassLeaderboardService {
             int xp = board.xp().getOrDefault(member.studentId(), 0);
             Integer rank = xp > 0 ? i + 1 : null;
             Integer before = previousRanks.get(member.studentId());
+            Integer yesterday = yesterdayRanks.get(member.studentId());
+            boolean viewer = viewerUserId != null && viewerUserId.equals(member.authUserId());
+            // A student who hid themselves shows no tier or frame to others (spec 5.7).
+            Tier tier = member.hidden() && !viewer ? null : board.tiers().get(member.studentId());
             entries.add(new ClassLeaderboardEntryResponse(rank, member.studentId(), member.fullName(), xp,
                     board.streaks().getOrDefault(member.studentId(), 0),
-                    rank != null && before != null ? before - rank : null,
-                    viewerUserId != null && viewerUserId.equals(member.authUserId())));
+                    rank != null && before != null ? before - rank : null, viewer,
+                    rank != null && yesterday != null ? yesterday - rank : null,
+                    board.submitted().getOrDefault(member.studentId(), 0),
+                    Math.max(0, xp - board.yesterdayXp().getOrDefault(member.studentId(), 0)),
+                    tier == null ? null : tier.tierKey(), tier == null ? null : tier.division(),
+                    tier == null ? null : tier.frameKey(), member.hidden()));
         }
         return entries;
+    }
+
+    private static Map<String, Integer> ranks(List<Member> members, Map<String, Integer> xp) {
+        Map<String, Integer> ranks = new HashMap<>();
+        List<Member> order = ordered(members, xp);
+        for (int i = 0; i < order.size() && xp.getOrDefault(order.get(i).studentId(), 0) > 0; i++) {
+            ranks.put(order.get(i).studentId(), i + 1);
+        }
+        return ranks;
+    }
+
+    /** The viewer's standing; {@code grade} is the whole-grade board of the same period (the same board for scope GRADE). */
+    static LeaderboardMeResponse me(List<ClassLeaderboardEntryResponse> entries, List<ClassLeaderboardEntryResponse> gradeEntries) {
+        ClassLeaderboardEntryResponse mine = entries.stream().filter(ClassLeaderboardEntryResponse::isViewer).findFirst().orElse(null);
+        ClassLeaderboardEntryResponse gradeMine = gradeEntries.stream().filter(ClassLeaderboardEntryResponse::isViewer).findFirst().orElse(null);
+        if (mine == null) return new LeaderboardMeResponse(null, entries.size(), 0, null, gradeEntries.size(), null, null);
+        Integer toNext = null;
+        String nextName = null;
+        if (mine.rank() != null && mine.rank() > 1) {
+            ClassLeaderboardEntryResponse above = entries.get(mine.rank() - 2);
+            toNext = above.xp() - mine.xp() + 1; // strictly more XP passes; ties are broken by name
+            nextName = "Hạng " + (mine.rank() - 1);
+        }
+        return new LeaderboardMeResponse(mine.rank(), entries.size(), mine.xp(), gradeMine == null ? null : gradeMine.rank(),
+                gradeEntries.size(), toNext, nextName);
     }
 
     private static List<Member> ordered(List<Member> members, Map<String, Integer> xp) {
@@ -248,14 +320,19 @@ public class ClassLeaderboardService {
 
     public record Manager(String tenantId, String userId, boolean tenantWide) { }
 
+    /** Tier shown next to a student (null fields when untiered or no frame is worn). */
+    record Tier(String tierKey, Integer division, String frameKey) { }
+
     private record Member(String studentId, String fullName, String authUserId, boolean hidden) { }
 
     private record Board(LeaderboardClassResponse target, Period period, Scope scope, Window window, List<Member> members,
                          Set<String> hidden, Map<String, Integer> xp, Map<String, Integer> previousXp,
-                         Map<String, Integer> streaks) {
-        ClassLeaderboardResponse response(boolean enabled, boolean viewerHidden, List<ClassLeaderboardEntryResponse> entries) {
+                         Map<String, Integer> yesterdayXp, Map<String, Integer> streaks, Map<String, Integer> submitted,
+                         Map<String, Tier> tiers) {
+        ClassLeaderboardResponse response(boolean enabled, boolean viewerHidden, List<ClassLeaderboardEntryResponse> entries,
+                                          LeaderboardMeResponse me) {
             return new ClassLeaderboardResponse(target.id(), target.name(), enabled, period.name(), scope.name(),
-                    window.end().toOffsetDateTime().toString(), viewerHidden, entries);
+                    window.end().toOffsetDateTime().toString(), viewerHidden, entries, me);
         }
     }
 }

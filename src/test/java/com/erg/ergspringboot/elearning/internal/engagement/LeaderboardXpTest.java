@@ -56,4 +56,27 @@ class LeaderboardXpTest {
         assertThat(LeaderboardXp.withStreakBonus(100, 7)).isEqualTo(120);
         assertThat(LeaderboardXp.withStreakBonus(100, 6)).isEqualTo(100);
     }
+
+    @Test
+    void courseIsTheSchoolYearFromSeptember() {
+        Window autumn = LeaderboardXp.window(Period.COURSE, vn(2026, 11, 12, 9));
+        assertThat(autumn.start()).isEqualTo(vn(2026, 9, 1, 0));
+        assertThat(autumn.end()).isEqualTo(vn(2027, 9, 1, 0));
+        Window spring = LeaderboardXp.window(Period.COURSE, vn(2027, 3, 3, 9));
+        assertThat(spring.start()).isEqualTo(vn(2026, 9, 1, 0));
+        assertThat(LeaderboardXp.window(Period.COURSE, vn(2027, 8, 31, 23)).end()).isEqualTo(vn(2027, 9, 1, 0));
+    }
+
+    @Test
+    void courseXpAppliesTheStreakBonusPerWeek() {
+        LocalDate week1 = LocalDate.of(2026, 11, 2);
+        LocalDate week2 = LocalDate.of(2026, 11, 9);
+        // Week 1 has a full 7-day streak (2-8 Nov), week 2 only two days.
+        Set<LocalDate> days = new java.util.HashSet<>();
+        for (int d = 0; d < 7; d++) days.add(week1.plusDays(d));
+        days.add(week2.plusDays(1));
+        java.util.Map<LocalDate, Integer> xp = java.util.Map.of(week1, 100, week2, 50);
+        // Week 1: 100 x 1.2 = 120; week 2: the streak ending 12 Nov is only 2 days (10-11 Nov... 12 is today), so 50.
+        assertThat(LeaderboardXp.courseXp(xp, days, LocalDate.of(2026, 11, 12))).isEqualTo(170);
+    }
 }

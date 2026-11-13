@@ -8,16 +8,39 @@ type ElearningQuery {
   studentClassLeaderboard(input: StudentClassLeaderboardInput): ClassLeaderboard!
   leaderboardClasses(tenantId: String): [LeaderboardClass!]!
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
+  "Tier of the authenticated student; dates are yyyy-MM-dd strings"
+  myTier(tenantId: String): MyTier!
+  "Cutoffs of the student's own grade for weekStart (default: the latest update)"
+  tierTable(weekStart: String, tenantId: String): [TierTableRow!]!
+  myFrames(tenantId: String): MyFrames!
+  "Hộp thư: the student's own threads about a question, newest first. status: OPEN or ANSWERED"
+  myQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  questionThread(id: String!, tenantId: String): QuestionThread!
+  "Threads addressed to the teacher (a tenant-wide admin sees every thread of the tenant)"
+  teacherQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  teacherQuestionThread(id: String!, tenantId: String): QuestionThread!
 }
 
-"""period: WEEK (default), MONTH or TERM. scope: CLASS (default) or GRADE."""
+type MyTier { tierKey: String, division: Int, gradeRank: Int, gradeSize: Int, courseXp: Int!, eligible: Boolean!, submittedCount: Int!, protected: Boolean!, nextDivision: TierStep, nextTier: TierStep, pendingPromotion: TierPromotion }
+"""nextDivision: the next division of the same tier; nextTier: the entry division of the next tier. studentsToPass: grade ranks still to climb to get in."""
+type TierStep { tierKey: String!, division: Int, minXp: Int!, studentsToPass: Int! }
+type TierPromotion { weekStart: String!, fromKey: String!, fromDivision: Int, toKey: String!, toDivision: Int, studentsPassed: Int!, gradePercentile: Int! }
+type TierTableRow { tierKey: String!, share: String!, seats: Int!, divisions: [TierCell!]! }
+type TierCell { division: Int, rankFrom: Int!, rankTo: Int!, minXp: Int! }
+type Frame { tierKey: String!, unlocked: Boolean!, unlockedAt: String, schoolYear: String, studentsToPass: Int }
+"""selected: the frame worn (null = none)"""
+type MyFrames { selected: String, frames: [Frame!]! }
+
+"""period: WEEK (default), MONTH, TERM (teachers/admins) or COURSE (the school year, 1 Sep - 31 Aug). scope: CLASS (default) or GRADE."""
 input StudentClassLeaderboardInput { tenantId: String, classId: String, period: String, scope: String }
 input ClassLeaderboardInput { tenantId: String, classId: String!, period: String }
 
 """Ranked by XP only; scores are never returned. enabled = false for a student: the teacher switched the board off, entries are empty."""
-type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, period: String!, scope: String!, periodEndsAt: String!, viewerHidden: Boolean!, entries: [ClassLeaderboardEntry!]! }
+type ClassLeaderboard { classId: String!, className: String, enabled: Boolean!, period: String!, scope: String!, periodEndsAt: String!, viewerHidden: Boolean!, entries: [ClassLeaderboardEntry!]!, "Only for the student board" me: LeaderboardMe }
 """rank is null with no XP in the period (listed last). rankChange > 0: moved up since the previous period."""
-type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, xp: Int!, streakDays: Int!, rankChange: Int, isViewer: Boolean! }
+type ClassLeaderboardEntry { rank: Int, studentId: String!, studentName: String, xp: Int!, streakDays: Int!, rankChange: Int, isViewer: Boolean!, "Rank gained since yesterday (>0 = moved up); null when unranked yesterday" rankDelta: Int, submittedInPeriod: Int!, xpToday: Int!, "Tier of the student; null without a tier or when hidden from others" tierKey: String, division: Int, "Frame worn; null when none or hidden" frameKey: String, hidden: Boolean! }
+"""rank/size in the requested scope (size = students listed); gradeRank/gradeSize in the whole grade; xpToNextRank: XP to pass the student above, null at rank 1"""
+type LeaderboardMe { rank: Int, size: Int!, xp: Int!, gradeRank: Int, gradeSize: Int!, xpToNextRank: Int, nextRankName: String }
 type LeaderboardClass { id: String!, name: String, leaderboardEnabled: Boolean! }
 
 input StudentDashboardInput {
@@ -101,6 +124,29 @@ type StudentDashboardAssignmentCard {
   "Latest handed-in attempt, 0-100; null until one is handed in"
   scorePercent: Float
   submittedAt: String
+  subjectName: String
+  teacherName: String
+  questionCount: Int
+  "Assignment time limit in minutes; null when there is none"
+  estimatedMinutes: Int
+  "PRACTICE or TEST"
+  kind: String!
+  "Answers saved on the attempt in progress; null when none is open"
+  answeredCount: Int
+  "Raw score of the latest handed-in attempt and its scale"
+  score: Float
+  maxScore: Float
+  "Not stored per attempt yet: always null"
+  correctCount: Int
+  totalQuestions: Int
+  attemptCount: Int!
+  onTime: Boolean
+  minutesBeforeDue: Int
+  "XP still earned by handing in now; 0 once handed in"
+  xpReward: Int!
+  "No late-submission window exists yet: always null"
+  lateSubmitUntil: String
+  closed: Boolean!
 }
 
 type StudentDashboardNextAction {
