@@ -27,7 +27,8 @@ public class LmsCacheDescriptorContributor implements CacheDescriptorContributor
     @Override
     public List<CacheDescriptor<?>> descriptors(ObjectMapper mapper) {
         JavaType untyped = mapper.constructType(Object.class);
-        JavaType quizPackage = mapper.getTypeFactory().constructParametricType(Optional.class, QuizPackageResponse.class);
+        // activePackage returns Optional, but Spring unwraps it before put(): the cached value is the bare response.
+        JavaType quizPackage = mapper.constructType(QuizPackageResponse.class);
         return List.of(
                 descriptor("lmsClassWorkspace", mapper.constructType(ClassWorkspaceResponse.class), Duration.ofSeconds(30), 64),
                 descriptor("lmsHomeworkWorkspace", mapper.constructType(TeacherHomeworkWorkspaceResponse.class), Duration.ofSeconds(30), 64, keyPart(1)),
