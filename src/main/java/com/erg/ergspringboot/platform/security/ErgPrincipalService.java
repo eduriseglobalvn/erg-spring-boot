@@ -2,7 +2,6 @@ package com.erg.ergspringboot.platform.security;
 
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.authorization.Permission;
-import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.User;
@@ -190,7 +189,7 @@ public class ErgPrincipalService {
     private ErgPrincipal principal(AuthSession session) {
         User user = session.getUser();
         List<UserRoleAssignment> assignments = activeAssignments(user);
-        List<String> roles = roles(user, assignments);
+        List<String> roles = EffectivePermissionResolver.roleNames(user, assignments);
         EffectivePermissionResolver.Result resolved =
                 EffectivePermissionResolver.resolve(user, assignments, OffsetDateTime.now());
         PermissionEnvelope permissions = new PermissionEnvelope(resolved.granted(), resolved.denied());
@@ -226,23 +225,6 @@ public class ErgPrincipalService {
         return WorkspaceCapabilityMapper.legacyPortalsFor(List.of(), roles, permissions.granted());
     }
 
-    private List<String> roles(User user, List<UserRoleAssignment> assignments) {
-        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
-        if (user == null || user.getRoles() == null || user.getRoles().isEmpty()) {
-            names.add("user");
-        } else {
-            user.getRoles().stream()
-                    .map(Role::getName)
-                    .filter(name -> name != null && !name.isBlank())
-                    .map(String::trim)
-                    .map(String::toLowerCase)
-                    .forEach(names::add);
-        }
-        assignments.stream().map(UserRoleAssignment::getRole).filter(java.util.Objects::nonNull)
-                .map(Role::getName).filter(name -> name != null && !name.isBlank())
-                .map(String::trim).map(String::toLowerCase).forEach(names::add);
-        return List.copyOf(names);
-    }
 
     private List<UserRoleAssignment> activeAssignments(User user) {
         if (userRoleAssignmentRepository == null || user == null || user.getId() == null) return List.of();

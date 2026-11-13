@@ -4,7 +4,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 
 import com.erg.ergspringboot.auth.internal.credential.PasswordService;
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
@@ -55,6 +57,41 @@ class StudentLifecycleExemptionIntegrationTest {
         mockMvc.perform(get("/api/v1/lms/classes").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errors").value(containsString("ACCOUNT_LIFECYCLE_RESTRICTED")));
+    }
+
+    @Test
+    void studentBootstrapCountsOnlyActiveRoleAssignments() throws Exception {
+        String email = seedUser("role_lms_student");
+        String id = email.substring(0, email.indexOf('@'));
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            jdbc.update("""
+                    insert into user_role_assignments (id, user_id, role_id, tenant_id, scope_type, assigned_by,
+                        revoked_at, revoked_by)
+                    values (?, ?, 'role_lms_homeroom_teacher', 'erg', 'TENANT', 'usr_super_admin', now(), 'usr_super_admin')
+                    """, UUID.randomUUID().toString(), id);
+            jdbc.update("""
+                    insert into user_role_assignments (id, user_id, role_id, tenant_id, scope_type, assigned_by,
+                        created_at, expires_at)
+                    values (?, ?, 'role_lms_homeroom_teacher', 'erg', 'TENANT', 'usr_super_admin',
+                        now() - interval '2 days', now() - interval '1 day')
+                    """, UUID.randomUUID().toString(), id);
+        });
+
+        mockMvc.perform(get("/api/v1/sessions/current").header("Authorization", "Bearer " + login(email)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.workspaces").value(contains("STUDENT")))
+                .andExpect(jsonPath("$.data.lifecycle.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.lifecycle.nextSteps").isEmpty());
+    }
+
+    @Test
+    void teacherBootstrapReadsWorkspaceFromRoleAssignment() throws Exception {
+        String token = login(seedUser("role_lms_homeroom_teacher"));
+
+        mockMvc.perform(get("/api/v1/sessions/current").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.workspaces").value(hasItem("TEACHER")))
+                .andExpect(jsonPath("$.data.lifecycle.nextSteps").value(hasItem("CHANGE_PASSWORD")));
     }
 
     private String seedUser(String roleId) {

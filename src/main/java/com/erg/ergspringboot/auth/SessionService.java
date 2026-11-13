@@ -13,6 +13,8 @@ import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.EffectivePermissionResolver;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
@@ -25,7 +27,6 @@ import com.erg.ergspringboot.users.persistence.organization.EducationUnitReposit
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class SessionService {
 
     private final AuthSessionRepository sessionRepository;
     private final UserPermissionOverrideRepository userPermissionOverrideRepository;
+    private final UserRoleAssignmentRepository userRoleAssignmentRepository;
     private final SessionUnitScopeResolver unitScopes;
 
     @Autowired
@@ -49,6 +51,7 @@ public class SessionService {
     ) {
         this.sessionRepository = sessionRepository;
         this.userPermissionOverrideRepository = userPermissionOverrideRepository;
+        this.userRoleAssignmentRepository = userRoleAssignmentRepository;
         this.unitScopes = new SessionUnitScopeResolver(
                 educationUnitRepository, classroomRepository, userRoleAssignmentRepository);
     }
@@ -86,8 +89,14 @@ public class SessionService {
             throw new ResourceNotFoundException("session user not found");
         }
 
-        List<String> roles = roleNames(user);
-        PermissionEnvelope permissionEnvelope = permissionEnvelope(user);
+        OffsetDateTime now = OffsetDateTime.now();
+        // Same grant sources as the request principal (ErgPrincipalService) and login (SessionIssuer).
+        List<UserRoleAssignment> assignments =
+                userRoleAssignmentRepository.findActiveForUser(user.getId(), normalizeTenant(tenantId), now);
+        List<String> roles = EffectivePermissionResolver.roleNames(user, assignments);
+        PermissionEnvelope permissionEnvelope = permissionEnvelope(user, assignments, now);
+        boolean studentOnly = StudentAccountPolicy.isStudentOnly(
+                roles, permissionEnvelope.grantedPermissions(), permissionEnvelope.deniedPermissions());
         boolean canAccessGlobalErg = permissionEnvelope.grantedPermissions().contains("*");
 
         List<SessionUnitScopeResolver.ManagedUnit> managedUnits = unitScopes.resolveManageableUnits(user, roles, canAccessGlobalErg, normalizeTenant(tenantId));
@@ -110,7 +119,7 @@ public class SessionService {
                         permissionEnvelope.deniedPermissions()
                 ),
                 effectivePortals(roles, permissionEnvelope.grantedPermissions()),
-                lifecycle(user),
+                lifecycle(user, studentOnly),
                 currentScope,
                 manageableUnits,
                 manageableClasses,
@@ -119,11 +128,14 @@ public class SessionService {
         );
     }
 
-    private AccountLifecycleResponse lifecycle(User user) {
+    /** A student account (STU-01) is never sent to onboarding, password change or email verification. */
+    private AccountLifecycleResponse lifecycle(User user, boolean studentOnly) {
         List<String> nextSteps = new java.util.ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        if (!studentOnly) {
+            if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
+            if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
+            if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        }
         String status = nextSteps.isEmpty() ? "ACTIVE" : "FIRST_LOGIN_RESTRICTED";
         return new AccountLifecycleResponse(
                 status,
@@ -153,25 +165,12 @@ public class SessionService {
                 && "ACTIVE".equalsIgnoreCase(user.getStatus());
     }
 
-    private List<String> roleNames(User user) {
-        if (user.getRoles() == null || user.getRoles().isEmpty()) {
-            return List.of("user");
-        }
-        return user.getRoles().stream()
-                .map(Role::getName)
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(name -> !name.isBlank())
-                .distinct()
-                .toList();
-    }
-
-    private PermissionEnvelope permissionEnvelope(User user) {
+    private PermissionEnvelope permissionEnvelope(User user, List<UserRoleAssignment> assignments, OffsetDateTime now) {
         Collection<UserPermissionOverride> overrides = user.getPermissionOverrides() == null
                 ? userPermissionOverrideRepository.findByUserId(user.getId())
                 : user.getPermissionOverrides();
         EffectivePermissionResolver.Result resolved =
-                EffectivePermissionResolver.resolve(user.getRoles(), overrides, List.of(), OffsetDateTime.now());
+                EffectivePermissionResolver.resolve(user.getRoles(), overrides, assignments, now);
         return new PermissionEnvelope(resolved.granted(), resolved.denied());
     }
     private List<String> effectivePortals(List<String> roles, List<String> grantedPermissions) {

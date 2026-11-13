@@ -288,6 +288,80 @@ class SessionServiceTest {
         }
     }
 
+    @Test
+    void currentBootstrapResolvesStudentFromRoleAssignmentsAndNeverHoldsItInTheLifecycle() {
+        SessionService service = new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
+                userPermissionOverrideRepository, userRoleAssignmentRepository);
+        User user = assignedOnlyUser("u-student");
+        user.setMustChangePassword(true);
+        user.setIsProfileCompleted(false);
+        user.setRecoveryEmailVerified(false);
+        stubSession(user, "s-student");
+        when(userRoleAssignmentRepository.findActiveForUser(eq("u-student"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment("u-student", "lms.learner", "lms.quiz.play", "lms.assignment.submit")));
+
+        SessionBootstrapResponse response = service.currentBootstrap("s-student", "erg",
+                new UserAccessContext("u-student", "erg", List.of(), List.of(), null, null));
+
+        assertThat(response.workspaces()).containsExactly("STUDENT");
+        assertThat(response.permissions().roles()).contains("lms.learner");
+        assertThat(response.permissions().grantedPermissions()).contains("lms.quiz.play", "lms.assignment.submit");
+        assertThat(response.lifecycle().status()).isEqualTo("ACTIVE");
+        assertThat(response.lifecycle().nextSteps()).isEmpty();
+    }
+
+    @Test
+    void currentBootstrapResolvesTeacherWorkspaceFromRoleAssignments() {
+        SessionService service = new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
+                userPermissionOverrideRepository, userRoleAssignmentRepository);
+        User user = assignedOnlyUser("u-assigned-teacher");
+        user.setMustChangePassword(true);
+        stubSession(user, "s-assigned-teacher");
+        when(userRoleAssignmentRepository.findActiveForUser(eq("u-assigned-teacher"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment("u-assigned-teacher", "teacher", "lms.classes.read")));
+
+        SessionBootstrapResponse response = service.currentBootstrap("s-assigned-teacher", "erg",
+                new UserAccessContext("u-assigned-teacher", "erg", List.of(), List.of(), null, null));
+
+        assertThat(response.workspaces()).contains("TEACHER");
+        assertThat(response.lifecycle().status()).isEqualTo("FIRST_LOGIN_RESTRICTED");
+        assertThat(response.lifecycle().nextSteps()).contains("CHANGE_PASSWORD");
+    }
+
+    private User assignedOnlyUser(String userId) {
+        User user = new User();
+        user.setId(userId);
+        user.setTenantId("erg");
+        user.setFullName("Assigned");
+        user.setStatus("ACTIVE");
+        user.setRoles(new LinkedHashSet<>());
+        return user;
+    }
+
+    private void stubSession(User user, String sessionId) {
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId(sessionId);
+        session.setTenantId("erg");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+        when(sessionRepository.findWithUserBySessionIdAndTenantId(sessionId, "erg")).thenReturn(Optional.of(session));
+    }
+
+    private UserRoleAssignment assignment(String userId, String roleName, String... permissions) {
+        Role role = new Role();
+        role.setName(roleName);
+        role.setPermissions(new LinkedHashSet<>(java.util.Arrays.stream(permissions).map(name -> {
+            Permission permission = new Permission();
+            permission.setName(name);
+            return permission;
+        }).toList()));
+        UserRoleAssignment assignment = new UserRoleAssignment();
+        assignment.setUserId(userId);
+        assignment.setRoleId("role-" + roleName);
+        assignment.setRole(role);
+        return assignment;
+    }
+
     private EducationUnit educationUnit(String id, String name, String type, String parentId) {
         EducationUnit educationUnit = new EducationUnit();
         educationUnit.setId(id);
