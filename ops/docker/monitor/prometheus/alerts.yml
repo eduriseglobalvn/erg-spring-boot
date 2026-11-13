@@ -149,6 +149,15 @@ groups:
           summary: "No successful database backup in the last 26 hours"
           description: "ops/backup/backup.sh (cron 03:00) did not finish; check /opt/erg/ops/backup/backup.log."
 
+      - alert: OffsiteBackupStale
+        expr: time() - erg_backup_offsite_last_success_timestamp_seconds > 26 * 3600 or absent(erg_backup_offsite_last_success_timestamp_seconds)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No encrypted off-host database copy in the last 26 hours"
+          description: "backup.sh did not upload to BACKUP_RCLONE_REMOTE (missing age/rclone or variables, or upload failed); check /opt/erg/ops/backup/backup.log."
+
       - alert: BackendContainerMemoryHigh
         expr: sum(jvm_memory_committed_bytes{job="erg-backend"}) > 3.4 * 1024 * 1024 * 1024
         for: 10m
