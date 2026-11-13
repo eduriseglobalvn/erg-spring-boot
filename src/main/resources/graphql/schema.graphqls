@@ -264,6 +264,8 @@ input StudentDashboardInput {
   tenantId: String
   studentUserId: String
   classId: String
+  "How many assignments to return, oldest due first: default 50, at most 500"
+  assignmentLimit: Int
 }
 
 type StudentDashboard {
@@ -277,6 +279,8 @@ type StudentDashboard {
   announcements: [StudentDashboardAnnouncementCard!]!
   selectedClassId: String
   classes: [StudentDashboardClassMembership!]!
+  "True when the student has more assignments than were returned (ask again with a larger assignmentLimit)"
+  assignmentsHasMore: Boolean
 }
 
 type StudentDashboardClassMembership {

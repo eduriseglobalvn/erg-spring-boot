@@ -19,8 +19,15 @@ public final class ElearningCommands {
             List<String> portals,
             String accountType,
             String accessLevel,
-            String requestedClassId
+            String requestedClassId,
+            Integer assignmentLimit
     ) {
+        public DashboardReadQuery(String userId, String tenantId, String requestedTenantId, String requestedStudentUserId,
+                List<String> roles, List<String> permissions, List<String> deniedPermissions, List<String> portals,
+                String accountType, String accessLevel, String requestedClassId) {
+            this(userId, tenantId, requestedTenantId, requestedStudentUserId, roles, permissions, deniedPermissions,
+                    portals, accountType, accessLevel, requestedClassId, null);
+        }
     }
 
     public record DiscussionFeedQuery(String tenantId, String actorUserId, int page, int size, String filter, String subject) {

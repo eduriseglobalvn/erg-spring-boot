@@ -15,8 +15,17 @@ public record StudentDashboardReadScope(
         List<String> portals,
         String accountType,
         String accessLevel,
-        String requestedClassId
+        String requestedClassId,
+        Integer assignmentLimit
 ) {
+
+    public StudentDashboardReadScope(String userId, String tenantId, String requestedTenantId,
+            String requestedStudentUserId, List<String> roles, List<String> permissions,
+            List<String> deniedPermissions, List<String> portals, String accountType, String accessLevel,
+            String requestedClassId) {
+        this(userId, tenantId, requestedTenantId, requestedStudentUserId, roles, permissions, deniedPermissions,
+                portals, accountType, accessLevel, requestedClassId, null);
+    }
 
     public StudentDashboardReadScope(
             String userId,

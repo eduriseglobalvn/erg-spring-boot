@@ -45,7 +45,8 @@ public class StudentDashboardGraphQlController {
                 safeList(principal.portals()),
                 principal.accountType(),
                 principal.accessLevel(),
-                safeInput.classId()
+                safeInput.classId(),
+                safeInput.assignmentLimit()
         ));
     }
 
@@ -56,15 +57,20 @@ public class StudentDashboardGraphQlController {
     public record StudentDashboardInput(
             String tenantId,
             String studentUserId,
-            String classId
+            String classId,
+            Integer assignmentLimit
     ) {
 
         public StudentDashboardInput(String tenantId, String studentUserId) {
-            this(tenantId, studentUserId, null);
+            this(tenantId, studentUserId, null, null);
+        }
+
+        public StudentDashboardInput(String tenantId, String studentUserId, String classId) {
+            this(tenantId, studentUserId, classId, null);
         }
 
         static StudentDashboardInput empty() {
-            return new StudentDashboardInput(null, null, null);
+            return new StudentDashboardInput(null, null, null, null);
         }
     }
 }
