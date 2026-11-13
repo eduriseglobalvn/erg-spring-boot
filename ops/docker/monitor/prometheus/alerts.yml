@@ -76,13 +76,13 @@ groups:
           description: "HikariCP has queued connection requests. Backend needs larger pool or PostgreSQL tuning."
 
       - alert: PostgresHighConnections
-        expr: pg_stat_activity_count > 80
+        expr: sum(pg_stat_activity_count) > 48
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "PostgreSQL active connections > 80"
-          description: "Postgres connections close to limit (max 100/120)."
+          summary: "PostgreSQL connections > 48"
+          description: "Postgres connections at 80% of max_connections=60 (1 backend x 16 + Flyway + exporters)."
 
   - name: erg-dependency-and-abuse-alerts
     rules:
@@ -112,6 +112,15 @@ groups:
         annotations:
           summary: "Redis ({{ $labels.job }}) is down"
           description: "The exporter cannot reach {{ $labels.instance }}."
+
+      - alert: RedisMemoryNearMaxmemory
+        expr: redis_memory_used_bytes / (redis_memory_max_bytes > 0) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis ({{ $labels.job }}) above 80% of maxmemory"
+          description: "{{ $value | humanizePercentage }} of maxmemory used. redis-state is noeviction: at 100% it refuses writes (sessions, attempts)."
 
       - alert: NotificationOutboxDeadLetters
         expr: max(notifications_outbox_dead) > 0
@@ -150,10 +159,10 @@ groups:
           description: "ops/backup/backup.sh (cron 03:00) did not finish; check /opt/erg/ops/backup/backup.log."
 
       - alert: BackendContainerMemoryHigh
-        expr: sum(jvm_memory_committed_bytes{job="erg-backend"}) > 3.4 * 1024 * 1024 * 1024
+        expr: sum(jvm_memory_committed_bytes{job="erg-backend"}) > 2.55 * 1024 * 1024 * 1024
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Backend memory near its 4 GB container limit"
+          summary: "Backend memory near its 3 GB container limit"
           description: "JVM committed memory is {{ $value | humanize1024 }}B; the kernel kills the backend at the limit."

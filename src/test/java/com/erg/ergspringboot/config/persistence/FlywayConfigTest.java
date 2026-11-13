@@ -93,6 +93,14 @@ class FlywayConfigTest {
     }
 
     @Test
+    void migrationsAreExemptFromTheServerStatementTimeout() {
+        // compose.yml sets statement_timeout=30s for the app pool; a long CREATE INDEX must not be killed mid-deploy.
+        assertThat(FlywayConfig.migrationInitSql(new MockEnvironment())).isEqualTo("SET statement_timeout = 0");
+        assertThat(FlywayConfig.migrationInitSql(new MockEnvironment().withProperty(FlywayConfig.DEMO_PURGE, "true")))
+                .isEqualTo("SET statement_timeout = 0; SET erg.demo_purge = 'true'");
+    }
+
+    @Test
     void flywayCanUseMigrationOwnerCredentialsSeparateFromRuntimeDatasource() throws Exception {
         Method method = FlywayConfig.class.getDeclaredMethod(
                 "migrationDataSource",

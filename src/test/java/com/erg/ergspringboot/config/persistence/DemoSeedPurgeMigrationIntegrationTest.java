@@ -99,7 +99,7 @@ class DemoSeedPurgeMigrationIntegrationTest {
                 .dataSource(url, postgres.getUsername(), postgres.getPassword())
                 .locations("classpath:db/migration/postgres")
                 .configuration(FlywayConfig.SESSION_LEVEL_LOCK)
-                .initSql(FlywayConfig.demoPurgeInitSql(environment))
+                .initSql(FlywayConfig.migrationInitSql(environment))
                 .load();
     }
 

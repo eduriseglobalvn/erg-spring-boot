@@ -45,6 +45,11 @@ public class ClusterJobLock {
                 log.debug("Skipping scheduled job {}: another instance holds its lock", jobName);
                 return null;
             }
+            // The session lock outlives the commit; an open transaction here would sit idle for the whole job
+            // and be killed by Postgres' idle_in_transaction_session_timeout (ops/docker/compose.yml).
+            if (!connection.getAutoCommit()) {
+                connection.commit();
+            }
             try {
                 return task.get();
             } finally {

@@ -235,6 +235,24 @@ docker compose pull
 docker compose up --no-build --scale backend=3 --wait --wait-timeout 180
 ```
 
+### Ngân sách bộ nhớ (máy 16 GB, 4 nhân, SSD SATA)
+
+Giới hạn container lấy từ `.env.production.example` (mặc định trong compose trùng giá trị này). Tổng ≤ 12,5 GB để phần còn lại cho hệ điều hành và page cache mà Postgres dựa vào (`effective_cache_size=7GB`). `PostgresPerformanceDockerConfigTest` kiểm tra tổng này và tỉ lệ `maxmemory` của Redis.
+
+| Thành phần | Biến | Giới hạn | Ghi chú |
+| --- | --- | --- | --- |
+| Postgres 17 | `POSTGRES_CONTAINER_MEMORY` | 5g | `shared_buffers=3GB`, `shm_size: 512m`, `max_connections=60` |
+| Backend JVM, 1 bản | `BACKEND_CONTAINER_MEMORY`, `BACKEND_REPLICAS=1` | 3g | Heap 75 % ≈ 2,25 GB |
+| Redis cache | `REDIS_CACHE_CONTAINER_MEMORY` | 1024m | `maxmemory 768mb`, `allkeys-lfu` |
+| Redis state | `REDIS_STATE_CONTAINER_MEMORY` | 512m | `maxmemory 384mb` (≤ 75 % giới hạn), `noeviction` |
+| nginx API | `NGINX_CONTAINER_MEMORY` | 128m | |
+| Giám sát (`compose.monitor.yml`) | cố định trong file | ≈ 1,6 GB | Prometheus, Loki, Grafana, Alertmanager, exporter |
+| **Tổng** | | **≈ 11,3 GB** | |
+
+`maxmemory` của Redis phải ≤ 75 % giới hạn container: nếu cao hơn, kernel giết Redis trước khi Redis kịp từ chối ghi. Đổi giới hạn container thì đổi `redis/*.conf` theo. Cảnh báo `RedisMemoryNearMaxmemory` bắn khi dùng quá 80 % `maxmemory`.
+
+Postgres đặt `statement_timeout=30s`, `idle_in_transaction_session_timeout=30s`, `log_min_duration_statement=250ms`. Flyway (`FlywayConfig.migrationInitSql`) và `pg_dump`/`pg_restore` tự đặt `statement_timeout=0` cho phiên của mình, nên migration dài và sao lưu không bị cắt. Chạy tay SQL dài bằng `psql` (ví dụ `ops/postgres/online/*.sql`) thì `SET statement_timeout = 0;` trước.
+
 ### Phát hành phiên bản mới
 
 1. Build và push một tag mới từ Windows.
