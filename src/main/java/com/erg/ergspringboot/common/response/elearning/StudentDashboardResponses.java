@@ -18,8 +18,25 @@ public final class StudentDashboardResponses {
             List<StudentDashboardNextActionResponse> nextActions,
             List<StudentDashboardAnnouncementCardResponse> announcements,
             String selectedClassId,
-            List<StudentDashboardClassMembershipResponse> classes
+            List<StudentDashboardClassMembershipResponse> classes,
+            Boolean assignmentsHasMore
     ) {
+        public StudentDashboardResponse(
+                String tenantId,
+                StudentDashboardViewerResponse viewer,
+                StudentDashboardProfileResponse profile,
+                StudentDashboardSummaryResponse summary,
+                List<StudentDashboardCourseCardResponse> courses,
+                List<StudentDashboardAssignmentCardResponse> assignments,
+                List<StudentDashboardNextActionResponse> nextActions,
+                List<StudentDashboardAnnouncementCardResponse> announcements,
+                String selectedClassId,
+                List<StudentDashboardClassMembershipResponse> classes
+        ) {
+            this(tenantId, viewer, profile, summary, courses, assignments, nextActions, announcements,
+                    selectedClassId, classes, false);
+        }
+
         public StudentDashboardResponse(
                 String tenantId,
                 StudentDashboardViewerResponse viewer,
@@ -137,7 +154,9 @@ public final class StudentDashboardResponses {
             /** XP still earned by handing in now; 0 once handed in. */
             int xpReward,
             OffsetDateTime lateSubmitUntil,
-            boolean closed
+            boolean closed,
+            /** The latest attempt is handed in (LmsStatePolicy.completedAttemptStates()); clients never list states. */
+            boolean handedIn
     ) {
     }
 

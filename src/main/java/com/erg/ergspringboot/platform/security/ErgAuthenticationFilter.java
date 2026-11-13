@@ -119,13 +119,20 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         String bearerToken = bearerToken(request);
         if (bearerToken != null) {
             String requestedTenantId = SecurityUtils.trimToNull(request.getHeader("X-Tenant-ID"));
+            Optional<ErgPrincipal> cached = principalService.cachedPrincipal(bearerToken);
+            if (cached.isPresent()) {
+                // The cached principal came from this token's own session, so its tenant is authoritative.
+                return requestedTenantId == null || requestedTenantId.equals(cached.get().tenantId())
+                        ? cached
+                        : Optional.empty();
+            }
             if (requestedTenantId == null) {
                 Optional<String> resolvedTenantId = principalService.resolveTenantId(bearerToken);
                 if (resolvedTenantId.isEmpty()) {
                     request.setAttribute(AUTH_FAILURE_CODE_ATTRIBUTE, "AUTHENTICATION_REQUIRED");
                     return Optional.empty();
                 }
-                return withBearerLookupContext(request, resolvedTenantId.get(), () -> principalService.fromBearerToken(
+                return withBearerLookupContext(request, resolvedTenantId.get(), () -> principalService.fromBearerTokenForResolvedTenant(
                         bearerToken, resolvedTenantId.get()));
             }
             return withBearerLookupContext(request, () -> principalService.fromBearerToken(

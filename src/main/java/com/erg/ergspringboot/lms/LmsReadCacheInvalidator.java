@@ -82,7 +82,7 @@ public class LmsReadCacheInvalidator {
         evictScopesAfterCommit(tenantId, scopes);
     }
 
-    void evictScopesAfterCommit(String tenantId, Map<String, List<String>> scopesByCache) {
+    public void evictScopesAfterCommit(String tenantId, Map<String, List<String>> scopesByCache) {
         if (tenantId == null || tenantId.isBlank()) throw new IllegalArgumentException("tenantId is required");
         String tenant = tenantId.trim();
         scopesByCache.forEach((name, scopes) -> {

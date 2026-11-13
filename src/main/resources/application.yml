@@ -326,6 +326,8 @@ erg:
     max-failed-login: ${AUTH__MAX_FAILED_LOGIN:5}
     failed-login-window: ${AUTH__FAILED_LOGIN_WINDOW:15m}
     block-duration: ${AUTH__BLOCK_DURATION:15m}
+    # Argon2 hashes running at once (~16 MB each). Extra logins wait up to 2s, then get 429.
+    password-hash-concurrency: ${ERG_AUTH_PASSWORD_HASH_CONCURRENCY:8}
     login-rate-limit:
       enabled: ${ERG_AUTH_LOGIN_RATE_LIMIT_ENABLED:true}
       source-per-minute: ${ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE:30}
@@ -367,7 +369,8 @@ erg:
         region: ${TK_PHOTOS_R2__REGION:auto}
       # Local/dev store when R2 is off. Blank secret = random per process (URLs die on restart, single instance only).
       local-root: ${ERG_TK_PHOTOS_LOCAL_ROOT:.erg-private}
-      # Temporary opt-in: lets prod keep selfies on the container disk (lost on redeploy) until the private R2 bucket exists.
+      # Temporary opt-in: lets prod keep selfies on local disk until the private R2 bucket exists. Prod then also
+      # requires an absolute ERG_TK_PHOTOS_LOCAL_ROOT (a mounted, backed-up volume) and SECRET_TK_PHOTO_URL_SIGNING_KEY.
       local-allowed-in-prod: ${TK_PHOTOS_LOCAL_ALLOWED_IN_PROD:false}
       signing-secret: ${SECRET_TK_PHOTO_URL_SIGNING_KEY:}
       retention-days: ${TK_PHOTOS_RETENTION_DAYS:60}

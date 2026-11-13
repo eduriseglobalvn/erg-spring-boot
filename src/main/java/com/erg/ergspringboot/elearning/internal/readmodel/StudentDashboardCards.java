@@ -73,8 +73,8 @@ final class StudentDashboardCards {
         boolean pastDue = dueAt != null && now.isAfter(dueAt);
         Integer questions = p.questionCount() != null ? p.questionCount()
                 : p.handedInTotalQuestions() != null ? p.handedInTotalQuestions() : p.latestTotalQuestions();
-        boolean open = p.latestAttemptStatus() != null
-                && !LmsStatePolicy.completedAttemptStates().contains(p.latestAttemptStatus().toLowerCase(java.util.Locale.ROOT));
+        boolean latestHandedIn = LmsStatePolicy.attemptIsCompleted(p.latestAttemptStatus());
+        boolean open = p.latestAttemptStatus() != null && !latestHandedIn;
         Boolean onTime = !handedIn ? null : !Boolean.TRUE.equals(p.handedInLate()) && (dueAt == null || !p.handedInAt().isAfter(dueAt));
         return new StudentDashboardAssignmentCardResponse(
                 p.assignmentId(),
@@ -99,7 +99,8 @@ final class StudentDashboardCards {
                 Boolean.TRUE.equals(onTime) && dueAt != null ? Math.max(0, Duration.between(p.handedInAt(), dueAt).toMinutes()) : null,
                 handedIn ? 0 : LeaderboardXp.handInXp(questions, !pastDue),
                 null, // there is no late-submission window policy; an attempt in progress gets the server grace only
-                pastDue
+                pastDue,
+                latestHandedIn
         );
     }
 

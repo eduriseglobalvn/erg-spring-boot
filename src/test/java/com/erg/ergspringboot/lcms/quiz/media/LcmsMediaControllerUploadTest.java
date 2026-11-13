@@ -92,6 +92,59 @@ class LcmsMediaControllerUploadTest {
     }
 
     @Test
+    void rejectsTamperedSignatureBeforeReadingTheBody() {
+        // SEC-02: the endpoint is permitAll, so an unsigned PUT must not make the server buffer its body.
+        byte[] bytes = "unsigned-body".getBytes(StandardCharsets.UTF_8);
+        String key = storage.storageKey("tenant-a", sha256(bytes), "image/png");
+        String url = storage.presignUpload(key, "image/png", bytes.length).replace("signature=", "signature=00");
+        URI uri = URI.create(url);
+        String[] segments = uri.getPath().split("/");
+        java.util.concurrent.atomic.AtomicInteger bodyReads = new java.util.concurrent.atomic.AtomicInteger();
+        MockHttpServletRequest request = new MockHttpServletRequest("PUT", uri.getPath()) {
+            @Override
+            public jakarta.servlet.ServletInputStream getInputStream() {
+                bodyReads.incrementAndGet();
+                return super.getInputStream();
+            }
+        };
+        request.setQueryString(uri.getRawQuery());
+        request.setContent(bytes);
+
+        assertThatThrownBy(() -> controller.uploadLocal(
+                "tenant-a", segments[segments.length - 2], segments[segments.length - 1], "image/png", request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("invalid or expired");
+        assertThat(bodyReads).hasValue(0);
+    }
+
+    @Test
+    void rejectsUploadWithoutContentLengthBeforeReadingTheBody() {
+        byte[] bytes = "chunked".getBytes(StandardCharsets.UTF_8);
+        String url = storage.presignUpload(
+                storage.storageKey("tenant-a", sha256(bytes), "image/png"), "image/png", bytes.length);
+        URI uri = URI.create(url);
+        String[] segments = uri.getPath().split("/");
+        MockHttpServletRequest request = new MockHttpServletRequest("PUT", uri.getPath()) {
+            @Override
+            public long getContentLengthLong() {
+                return -1;
+            }
+
+            @Override
+            public jakarta.servlet.ServletInputStream getInputStream() {
+                throw new AssertionError("body must not be read without a signed Content-Length");
+            }
+        };
+        request.setQueryString(uri.getRawQuery());
+        request.setContent(bytes);
+
+        assertThatThrownBy(() -> controller.uploadLocal(
+                "tenant-a", segments[segments.length - 2], segments[segments.length - 1], "image/png", request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("invalid or expired");
+    }
+
+    @Test
     void rejectsExpiredUrl() {
         byte[] bytes = "expired".getBytes(StandardCharsets.UTF_8);
         String sha = sha256(bytes);

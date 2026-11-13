@@ -64,9 +64,9 @@ public class QuizRuntimePackageService {
 
     /** The package of a specific (pinned) quiz version; used when an assignment pinned a version at assign time. */
     public Optional<QuizPackage> packageEntityForVersion(String tenantId, String quizId, String quizVersionId) {
-        return quizVersionRepository.findByIdAndTenantId(quizVersionId, tenantId)
-                .filter(version -> quizId.equals(version.getQuizId()))
-                .flatMap(version -> packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId));
+        // The package carries the quiz id of its version, so the version row (and its JSON blobs) need not be loaded.
+        return packageRepository.findByQuizVersionIdAndTenantId(quizVersionId, tenantId)
+                .filter(pkg -> quizId.equals(pkg.getQuizId()));
     }
 
     /** A package by its own id (offline result import); empty when it is not in the tenant. */

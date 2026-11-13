@@ -72,6 +72,11 @@ class FixedWindowRateLimitCounterIntegrationTest {
             assertThat(luaResult.value()).isEqualTo(nativeResult.value());
             assertThat(luaResult.incrementApplied()).isEqualTo(nativeResult.incrementApplied());
         }
+        // Reading must not count: the login limiter peeks at failures before checking a password.
+        assertThat(increx.current("erg:state:v1:test:native:" + suffix)).isEqualTo(3);
+        assertThat(increx.current("erg:state:v1:test:native:" + suffix)).isEqualTo(3);
+        assertThat(lua.current("erg:state:v1:test:lua:" + suffix)).isEqualTo(3);
+        assertThat(lua.current("erg:state:v1:test:missing:" + suffix)).isZero();
     }
 
     @Test

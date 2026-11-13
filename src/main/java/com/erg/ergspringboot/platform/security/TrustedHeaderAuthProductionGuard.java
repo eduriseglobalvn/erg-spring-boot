@@ -5,10 +5,10 @@ import java.util.Arrays;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
-// Fail closed at startup: header-only auth in prod would let anyone forge a principal via
-// X-User-ID/X-Permissions. A stray env var or misapplied test profile must not boot. Kept out of
-// ErgSecurityProperties so that class stays a plain @ConfigurationProperties bean (field-bound,
-// no-arg constructable in tests).
+// Fail closed at startup: header-only auth outside tests would let anyone forge a principal via
+// X-User-ID/X-Permissions. Allow-list the test profile instead of deny-listing prod, so a public
+// staging/dev box with a stray env var cannot boot either. Kept out of ErgSecurityProperties so
+// that class stays a plain @ConfigurationProperties bean (field-bound, no-arg constructable in tests).
 @Component
 public class TrustedHeaderAuthProductionGuard {
 
@@ -21,11 +21,11 @@ public class TrustedHeaderAuthProductionGuard {
     }
 
     @PostConstruct
-    void rejectTrustedHeaderAuthInProduction() {
+    void rejectTrustedHeaderAuthOutsideTests() {
         if (properties.isTrustedHeaderAuthEnabled()
-                && Arrays.asList(environment.getActiveProfiles()).contains("prod")) {
+                && !Arrays.asList(environment.getActiveProfiles()).contains("test")) {
             throw new IllegalStateException(
-                    "erg.security.trusted-header-auth-enabled must be false in the prod profile");
+                    "erg.security.trusted-header-auth-enabled may only be true in the test profile");
         }
     }
 }

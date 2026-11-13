@@ -36,6 +36,7 @@ public class LcmsOperations {
     public DeleteQuizResponse deleteQuiz(String tenantId, String quizId) { return commands.deleteQuiz(tenantId, quizId); }
     public MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request) { return commands.presignMedia(tenantId, userId, request); }
     public long maxMediaUploadBytes() { return commands.maxMediaUploadBytes(); }
+    public boolean isSignedMediaUploadAuthorized(String uploadUrl, String tenantId, String mimeType, long byteSize) { return commands.isSignedMediaUploadAuthorized(uploadUrl, tenantId, mimeType, byteSize); }
     public boolean storeSignedMediaUpload(String uploadUrl, String tenantId, String mimeType, byte[] bytes) { return commands.storeSignedMediaUpload(uploadUrl, tenantId, mimeType, bytes); }
     public MediaCommitResponse commitMedia(String tenantId, MediaCommitRequest request) { return commands.commitMedia(tenantId, request); }
     public LcmsQuizBundleResponse exportActiveBundle(String tenantId, String quizId) { return commands.exportActiveBundle(tenantId, quizId); }

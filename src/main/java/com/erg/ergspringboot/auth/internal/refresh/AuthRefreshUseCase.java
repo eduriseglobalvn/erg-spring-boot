@@ -12,6 +12,7 @@ import com.erg.ergspringboot.users.persistence.auth.RefreshTokenHistoryRepositor
 import com.erg.ergspringboot.users.persistence.auth.SecurityEventRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;
+import com.erg.ergspringboot.auth.internal.session.RememberedStudentSession;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -109,6 +110,7 @@ public class AuthRefreshUseCase {
         session.setRefreshTokenHash(tokens.hashToken(refreshToken));
         session.setLastActiveAt(now);
         session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
+        RememberedStudentSession.slide(session, now);
         sessions.save(session);
 
         return new TokenResponse(accessToken, refreshToken, ACCESS_TOKEN_TTL.toSeconds(), "Bearer");

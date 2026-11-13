@@ -32,18 +32,18 @@ final class AttemptProgressProjector {
 
     /**
      * Resolves the projection inputs inside the caller's transaction and registers the write to run after commit
-     * (or runs it immediately when no transaction synchronization is active).
+     * (or runs it immediately when no transaction synchronization is active). Returns the learner's login user id.
      */
-    void projectAfterCommit(Attempt a, Assignment assignment, String tenant) {
+    String projectAfterCommit(Attempt a, Assignment assignment, String tenant) {
         String classId = assignment == null || blank(assignment.getAcademicClassId()) == null ? a.getClassId() : assignment.getAcademicClassId();
-        Student student = students.findByTenantIdAndId(tenant, a.getStudentId())
-                .or(() -> students.findFirstByTenantIdAndAuthUserId(tenant, a.getStudentId())).orElse(null);
+        Student student = student(a, tenant);
         String studentName = student == null ? null : student.getFullName();
-        String progressId = student == null || student.getAuthUserId() == null ? a.getStudentId() : student.getAuthUserId();
+        String progressId = userId(a, student);
         String title = quizzes.findByTenantIdAndId(tenant, a.getQuizId()).map(Quiz::getTitle).orElse(null);
         int answered = a.getSubmittedCount() == null ? 0 : a.getSubmittedCount();
         int total = a.getTotalQuestions() == null ? 0 : a.getTotalQuestions();
-        BigDecimal score = BigDecimal.valueOf(a.getScore() == null ? 0 : a.getScore());
+        // Reports read student_progress.score as 0-100 (DATA-01), so project the percent, not raw points.
+        BigDecimal score = BigDecimal.valueOf(a.getPercent() == null ? 0 : a.getPercent());
         boolean passed = Boolean.TRUE.equals(a.getPassed());
         String status = a.getStatus();
         Runnable projection = () -> {
@@ -57,11 +57,26 @@ final class AttemptProgressProjector {
         };
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             projection.run();
-            return;
+            return progressId;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() { projection.run(); }
         });
+        return progressId;
+    }
+
+    /** Login user id of the attempt's learner (attempts store Student.id; legacy rows store the user id itself). */
+    String studentUserId(Attempt a, String tenant) {
+        return userId(a, student(a, tenant));
+    }
+
+    private Student student(Attempt a, String tenant) {
+        return students.findByTenantIdAndId(tenant, a.getStudentId())
+                .or(() -> students.findFirstByTenantIdAndAuthUserId(tenant, a.getStudentId())).orElse(null);
+    }
+
+    private String userId(Attempt a, Student student) {
+        return student == null || student.getAuthUserId() == null ? a.getStudentId() : student.getAuthUserId();
     }
 
     private String blank(String value) { return value == null || value.isBlank() ? null : value.trim(); }

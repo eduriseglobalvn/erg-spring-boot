@@ -75,12 +75,19 @@ class BenchmarkPlatformContractTest {
         String environment = Files.readString(Path.of("ops/docker/.env.benchmark.example"));
 
         assertThat(compose)
-                .contains("DB__MAX_OPEN_CONNS: ${BACKEND_DB_MAX_OPEN_CONNS:-80}")
-                .contains("DB__MAX_IDLE_CONNS: ${BACKEND_DB_MIN_IDLE_CONNS:-25}");
+                .contains("DB__MAX_OPEN_CONNS: ${BACKEND_DB_MAX_OPEN_CONNS:-40}")
+                .contains("DB__MAX_IDLE_CONNS: ${BACKEND_DB_MIN_IDLE_CONNS:-10}")
+                .contains("SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: ${BACKEND_DB_CONNECTION_TIMEOUT_MS:-5000}")
+                .contains("SPRING_THREADS_VIRTUAL_ENABLED: ${BACKEND_VIRTUAL_THREADS:-true}");
         assertThat(environment)
-                .contains("BACKEND_DB_MAX_OPEN_CONNS=80")
-                .contains("BACKEND_DB_MIN_IDLE_CONNS=25")
-                .contains("POSTGRES_MAX_CONNECTIONS=160");
+                .contains("BACKEND_DB_MAX_OPEN_CONNS=40")
+                .contains("BACKEND_DB_MIN_IDLE_CONNS=10")
+                .contains("BACKEND_DB_CONNECTION_TIMEOUT_MS=5000")
+                .contains("POSTGRES_MAX_CONNECTIONS=60");
+        // Benchmark and production must run the same pool, timeout and thread model.
+        assertThat(Files.readString(Path.of("ops/docker/.env.production.example")))
+                .contains("DB__MAX_OPEN_CONNS=40", "DB__MAX_IDLE_CONNS=10",
+                        "SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=5000", "SPRING_THREADS_VIRTUAL_ENABLED=true");
     }
 
     @Test

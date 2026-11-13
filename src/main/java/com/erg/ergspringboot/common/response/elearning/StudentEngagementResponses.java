@@ -74,7 +74,7 @@ public final class StudentEngagementResponses {
                                          String className, int questionIndex, String questionPrompt, String studentAnswerText,
                                          String correctAnswerText, String teacherId, String teacherName, String studentName,
                                          String status, OffsetDateTime lastMessageAt, String lastMessagePreview,
-                                         List<QuestionMessageResponse> messages) {
+                                         List<QuestionMessageResponse> messages, boolean unread) {
     }
 
     public record StudentDiscussionReactionCountResponse(String reaction, int count) {

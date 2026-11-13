@@ -2,10 +2,15 @@ package com.erg.ergspringboot.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
+import com.erg.ergspringboot.platform.cache.CacheDescriptor;
+import com.erg.ergspringboot.platform.cache.JacksonCacheValueCodec;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -22,6 +27,32 @@ class CacheDescriptorContributorTest {
         assertThat(descriptors).hasSize(26);
         assertThat(names).hasSize(26);
         assertThat(names).contains("lmsClassWorkspace", "quizRuntimePackage", "calendarWorkspace", "curriculumTree");
+    }
+
+    @Test
+    void noCacheDeclaresAnOptionalValueBecauseSpringStoresTheUnwrappedValue() {
+        var mapper = JsonMapper.builder().findAndAddModules().build();
+        var optionalCaches = List.of(new LmsCacheDescriptorContributor(), new PlatformCacheDescriptorContributor())
+                .stream().flatMap(contributor -> contributor.descriptors(mapper).stream())
+                .filter(descriptor -> Optional.class.isAssignableFrom(descriptor.valueType().getRawClass()))
+                .map(CacheDescriptor::name).toList();
+
+        assertThat(optionalCaches).isEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void quizRuntimePackageEncodesAndDecodesTheValueSpringPuts() {
+        var mapper = JsonMapper.builder().findAndAddModules().build();
+        var descriptor = (CacheDescriptor<Object>) new LmsCacheDescriptorContributor().descriptors(mapper).stream()
+                .filter(candidate -> candidate.name().equals("quizRuntimePackage")).findFirst().orElseThrow();
+        var codec = new JacksonCacheValueCodec(mapper);
+        var pkg = new QuizPackageResponse(3, "pkg-hash", "content-hash", "sig", "auto", null, Map.of("q1", "A"), "pkg-1");
+
+        var encoded = codec.encode(descriptor, pkg);
+
+        assertThat(encoded.cacheable()).isTrue();
+        assertThat(codec.decode(descriptor, encoded.bytes())).isEqualTo(pkg);
     }
 
     @Test

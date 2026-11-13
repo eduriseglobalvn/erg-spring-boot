@@ -78,5 +78,8 @@ public class AuthSession extends BaseEntity {
 
     private OffsetDateTime revokedAt;
 
+    // Student ticked "ghi nhớ đăng nhập": refresh slides the expiry (RememberedStudentSession).
+    private boolean rememberMe;
+
     private String revokedReason;
 }

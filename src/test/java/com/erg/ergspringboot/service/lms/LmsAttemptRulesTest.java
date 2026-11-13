@@ -182,6 +182,26 @@ class LmsAttemptRulesTest {
     }
 
     @Test
+    void draftMergesAnswersPerQuestionAndNullRemovesOne() {
+        Attempt attempt = attempt();
+        when(fixture.attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
+        when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));
+        when(fixture.attempts.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.saveDraft("attempt-1", new AttemptDraftRequest(Map.of("question-1", "A"), "hash-1", "1", null, Map.of()), access());
+        var both = service.saveDraft("attempt-1", new AttemptDraftRequest(Map.of("question-2", "B"), "hash-1", "1", null, Map.of()), access());
+
+        assertThat(both.answers()).containsOnlyKeys("question-1", "question-2");
+        assertThat(both.answers().get("question-1").answer()).isEqualTo("A");
+
+        Map<String, Object> removeFirst = new java.util.HashMap<>();
+        removeFirst.put("question-1", null);
+        var afterRemove = service.saveDraft("attempt-1", new AttemptDraftRequest(removeFirst, "hash-1", "1", null, Map.of()), access());
+
+        assertThat(afterRemove.answers()).containsOnlyKeys("question-2");
+    }
+
+    @Test
     void draftForAnotherPackageIsRejected() {
         when(fixture.attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt()));
         when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));

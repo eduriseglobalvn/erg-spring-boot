@@ -7,6 +7,18 @@
 # restored copy (isolated network, workers off), then switch the backend and nginx and wait for health.
 # Migrations are forward-only: a failed rehearsal stops before production is touched.
 set -Eeuo pipefail
+# The build takes every core for minutes, so deploys run outside school hours: 06:30-21:30 Vietnam time (the
+# server clock is UTC). FORCE=1 overrides for an urgent fix; DEPLOY_NOW_HHMM fakes the clock for tests.
+in_school_hours() { local m=$((10#${1%:*} * 60 + 10#${1#*:})); [ "$m" -ge 390 ] && [ "$m" -lt 1290 ]; }
+NOW_VN=${DEPLOY_NOW_HHMM:-$(TZ=Asia/Ho_Chi_Minh date +%H:%M)}
+if in_school_hours "$NOW_VN"; then
+  if [ "${FORCE:-0}" != 1 ]; then
+    echo "Từ chối deploy lúc $NOW_VN giờ Việt Nam: trong giờ học 06:30-21:30, build trên máy chủ làm chậm học sinh." >&2
+    echo "Deploy sau 21:30, hoặc nếu bắt buộc: ... | ssh erg@ssh.erg.edu.vn FORCE=1 bash /opt/erg/ops/docker/deploy.sh <sha>" >&2
+    exit 75
+  fi
+  echo "FORCE=1: deploy trong giờ học ($NOW_VN giờ Việt Nam)." >&2
+fi
 SHA=${1:?usage: deploy.sh <git-sha> (source tar on stdin)}
 ROOT=/opt/erg
 DOCKER_DIR=$ROOT/ops/docker
@@ -34,6 +46,30 @@ on_error() {
   notify "❌ Deploy ${SHA:0:7} lỗi ở bước \"$STEP\" (dòng $1) sau $((SECONDS / 60)) phút. $state"
 }
 trap 'on_error $LINENO' ERR
+
+# SRV-04: never run with a blank database/Redis password or one still equal to an old sample value from
+# .env.production.example. Compared as SHA-256 so neither the samples nor the secrets are printed.
+SAMPLE_SECRET_SHA256="99be40432fc38c1333a4ea4fbf3ea2975250ff1ff2283d9c476e73f852d5a859
+c4444892486cacdd43119d3dde018ffcede47c132abe6546833b3c3c8c5e2369
+28943b3628c7826d337002105b6e761008612e1381aaf26ee45fa742ffbb5648
+39dc3b58ddbb2aecd1183adc61f93db338d59e3f759d6015cc798ed43f35c390"
+check_secrets() {
+  local name value bad=0
+  for name in POSTGRES_PASSWORD POSTGRES_RUNTIME_PASSWORD REDIS_STATE_PASSWORD REDIS_CACHE_PASSWORD; do
+    value=$(envval "$name")
+    if [ -z "$value" ]; then
+      echo "$name is empty in $ENV_FILE" >&2; bad=1
+    elif grep -qxF "$(printf %s "$value" | sha256sum | cut -d' ' -f1)" <<<"$SAMPLE_SECRET_SHA256"; then
+      echo "$name still has a sample value from .env.production.example: rotate it (docs/runbooks/credential-rotation-p0-2.md)" >&2; bad=1
+    fi
+  done
+  return $bad
+}
+if ! check_secrets; then
+  notify "⛔ Deploy ${SHA:0:7} bị từ chối: mật khẩu Postgres/Redis trong .env.production trống hoặc còn giá trị mẫu. Production chưa bị đụng."
+  echo "Deploy stopped before touching anything." >&2; exit 1
+fi
+
 notify "🚀 Bắt đầu deploy ${SHA:0:7}. Backend sẽ ngắt khoảng 1 phút lúc đổi bản."
 
 log "unpack $SHA"
@@ -53,6 +89,8 @@ ensure_env() { # $1 name, $2 value used only when the name is missing or empty
 }
 ensure_env SECRET_QUIZ_PACKAGE_SIGNING_KEY "$(openssl rand -hex 32)"
 ensure_env QUIZ_PACKAGE_PUBLIC_KEY_ID quiz-pkg-1
+# Signs punch-photo URLs; a new key only expires links already handed out.
+ensure_env SECRET_TK_PHOTO_URL_SIGNING_KEY "$(openssl rand -hex 32)"
 # The nightly cron runs ops/backup/backup.sh; its metrics dir is read by node-exporter (non-root).
 install -d -m 700 "$ROOT/ops/backup" && install -m 750 "$ROOT/src/ops/backup/backup.sh" "$ROOT/ops/backup/backup.sh"
 install -d -m 755 "$ROOT/ops/backup/metrics"
@@ -86,7 +124,7 @@ docker run -d --name $N-app --network $N --env-file "$ENV_FILE" \
   -e SPRING_DATASOURCE_URL=jdbc:postgresql://$N-pg:5432/erg -e SPRING_DATASOURCE_USERNAME="$RUNTIME_USER" -e SPRING_DATASOURCE_PASSWORD="$PW" \
   -e SPRING_FLYWAY_USER=erg -e SPRING_FLYWAY_PASSWORD="$PW" -e FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres \
   -e SPRING_DATA_REDIS_URL="$R" -e ERG_REDIS_STATE_URL="$R" -e ERG_REDIS_CACHE_URL="$R" \
-  -e SERVER_ADDRESS=0.0.0.0 -e SERVER_PORT=1606 -e SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED=false \
+  -e SERVER_ADDRESS=0.0.0.0 -e SERVER_PORT=1606 -e ERG_TK_PHOTOS_LOCAL_ROOT=/tmp/tk-photos -e SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED=false \
   -e ERG_SCHEDULING_ENABLED=false -e ERG_OUTBOX_WORKER_ENABLED=false -e NOTIFICATIONS__WORKER__ENABLED=false \
   -e ERG_REPORTING_WORKER_ENABLED=false -e NOTIFICATIONS__PUSH__ENABLED=false -e SPRING_MAIL_HOST=mail.invalid \
   "$IMAGE" >/dev/null

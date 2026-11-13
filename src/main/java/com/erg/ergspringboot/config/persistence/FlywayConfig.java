@@ -43,8 +43,18 @@ public class FlywayConfig {
                 .baselineVersion("0")
                 .table("flyway_schema_history")
                 .configuration(SESSION_LEVEL_LOCK)
-                .initSql(demoPurgeInitSql(environment))
+                .initSql(migrationInitSql(environment))
                 .load();
+    }
+
+    /**
+     * Postgres runs with statement_timeout=30s (ops/docker/compose.yml) to stop runaway app queries. Migrations
+     * (CREATE INDEX on a large table) may legitimately run longer, and the deploy rehearsal runs on a server
+     * without that limit, so a timeout would first show up on production. Migration sessions turn it off.
+     */
+    static String migrationInitSql(Environment environment) {
+        String demoPurge = demoPurgeInitSql(environment);
+        return "SET statement_timeout = 0" + (demoPurge == null ? "" : "; " + demoPurge);
     }
 
     /** Fresh-install demo purge switch (env {@code ERG_FLYWAY_DEMO_PURGE=true}), read by V125. */

@@ -30,6 +30,14 @@ public class ErgAuthProperties {
     private java.time.Duration failedLoginWindow = java.time.Duration.ofMinutes(15);
     private java.time.Duration blockDuration = java.time.Duration.ofMinutes(15);
 
+    /** Argon2 hashes allowed at once (each one allocates ~16 MB); callers beyond this wait, then get 429. */
+    @Min(1)
+    @Max(256)
+    private int passwordHashConcurrency = 8;
+
+    public int getPasswordHashConcurrency() { return passwordHashConcurrency; }
+    public void setPasswordHashConcurrency(int passwordHashConcurrency) { this.passwordHashConcurrency = passwordHashConcurrency; }
+
     public int getMaxFailedLogin() { return maxFailedLogin; }
     public void setMaxFailedLogin(int maxFailedLogin) { this.maxFailedLogin = maxFailedLogin; }
     public java.time.Duration getFailedLoginWindow() { return failedLoginWindow; }

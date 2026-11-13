@@ -28,7 +28,7 @@ public class OpenApiConfig {
      */
     static final List<AccessRule> ACCESS_RULES = List.of(
             AccessRule.publicFor(null,
-                    "/api/v1/health", "/api/v1/ready", "/api/health", "/api/ready", "/healthz", "/ready", "/metrics",
+                    "/api/v1/health", "/api/v1/ready", "/api/health", "/api/ready", "/healthz", "/ready",
                     "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**",
                     "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml"),
             AccessRule.publicFor("POST", "/webhooks/discord", "/webhooks/telegram"),

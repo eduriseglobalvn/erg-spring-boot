@@ -123,7 +123,7 @@ public class LmsNotificationEventPublisher {
 
             NotificationCommand command = new NotificationCommand(
                     tenantId,
-                    "system",
+                    null,                           // createdBy: no system row in users
                     null,                           // idempotencyKey
                     "ASSIGNMENT_DUE_SOON",
                     "assignment",
@@ -178,7 +178,7 @@ public class LmsNotificationEventPublisher {
 
             NotificationCommand command = new NotificationCommand(
                     tenantId,
-                    "system",
+                    null,                           // createdBy: no system row in users
                     null,                           // idempotencyKey
                     "ASSIGNMENT_OVERDUE",
                     "assignment",
@@ -213,7 +213,8 @@ public class LmsNotificationEventPublisher {
      * @param assignmentId    identifier of the assignment
      * @param assignmentTitle display title of the assignment
      * @param attemptId       identifier of the submitted attempt
-     * @param studentId       user ID of the submitting student
+     * @param studentId       lms_students id of the submitting student (kept in the payload)
+     * @param studentUserId   login account (users.id) of the student, recorded as created_by; may be null
      * @param studentName     display name of the student
      * @param teacherUserIds  user IDs of the teachers to notify
      */
@@ -224,6 +225,7 @@ public class LmsNotificationEventPublisher {
             String assignmentTitle,
             String attemptId,
             String studentId,
+            String studentUserId,
             String studentName,
             List<String> teacherUserIds
     ) {
@@ -236,7 +238,7 @@ public class LmsNotificationEventPublisher {
 
         NotificationCommand command = new NotificationCommand(
                 tenantId,
-                studentId,
+                studentUserId,
                 idempotencyKey,
                 "ATTEMPT_SUBMITTED",
                 "attempt",
@@ -272,7 +274,8 @@ public class LmsNotificationEventPublisher {
      * @param assignmentId    identifier of the assignment
      * @param assignmentTitle display title of the assignment
      * @param attemptId       identifier of the graded attempt
-     * @param studentId       user ID of the student
+     * @param studentId       lms_students id of the student (kept in the payload)
+     * @param studentUserId   login account (users.id) of the student, recorded as created_by; may be null
      * @param studentName     display name of the student
      * @param score           numeric score achieved
      * @param maxScore        maximum possible score
@@ -285,6 +288,7 @@ public class LmsNotificationEventPublisher {
             String assignmentTitle,
             String attemptId,
             String studentId,
+            String studentUserId,
             String studentName,
             double score,
             double maxScore,
@@ -300,7 +304,7 @@ public class LmsNotificationEventPublisher {
 
         NotificationCommand command = new NotificationCommand(
                 tenantId,
-                studentId,
+                studentUserId,
                 idempotencyKey,
                 "SUPPORT_NEEDED_LOW_SCORE",
                 "attempt",

@@ -43,6 +43,7 @@ import com.erg.ergspringboot.users.persistence.UserRoleNameProjection;
 import com.erg.ergspringboot.users.persistence.authorization.PermissionRepository;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverrideRepository;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
@@ -100,6 +101,9 @@ class UserOperationsUseCaseTest {
     private AccountMailSender accountMailSender;
 
     @Mock
+    private UserRoleAssignmentRepository userRoleAssignmentRepository;
+
+    @Mock
     private RoleAssignmentAudit authorizationMutationAuditService;
 
     private PasswordService passwordService;
@@ -107,14 +111,15 @@ class UserOperationsUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        passwordService = new PasswordService();
+        passwordService = new PasswordService(new com.erg.ergspringboot.platform.security.ErgAuthProperties());
         operations = new UserOperations(
                 new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository),
                 new UserProfileUseCase(userRepository, userActivityRepository),
                 new UserPasswordUseCase(userRepository, sessionRepository, userActivityRepository, passwordService),
                 new UserSessionUseCase(sessionRepository, userActivityRepository),
                 new UserProvisioningUseCase(userRepository, sessionRepository, roleRepository,
-                        userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender),
+                        userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender,
+                        userRoleAssignmentRepository),
                 new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository),
                 new UserRoleAssignmentUseCase(userRepository, roleRepository, permissionRepository,
                         permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService));
@@ -487,6 +492,39 @@ class UserOperationsUseCaseTest {
                 "TEACHER_CREDENTIAL_RESET".equals(activity.getAction())
                         && "user-1".equals(activity.getTargetUserId())
         ));
+    }
+
+    @Test
+    void resettingStudentCredentialDoesNotForcePasswordChange() {
+        User user = user("student-1");
+        user.setMustChangePassword(false);
+        Role learner = new Role();
+        learner.setName("lms.learner");
+        user.setRoles(new java.util.LinkedHashSet<>(List.of(learner)));
+        when(userRepository.findByIdAndTenantId("student-1", "erg")).thenReturn(Optional.of(user));
+
+        var response = operations.resetCredential("student-1", "erg", "ONE_TIME_PASSWORD", null);
+
+        assertTrue(passwordService.matches(response.oneTimePassword(), user.getPasswordHash()));
+        assertFalse(user.getMustChangePassword());
+    }
+
+    @Test
+    void resettingStudentAssignedThroughScopedRoleDoesNotForcePasswordChange() {
+        User user = user("student-2");
+        user.setMustChangePassword(false);
+        Role learner = new Role();
+        learner.setName("lms.learner");
+        com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment assignment =
+                new com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment();
+        assignment.setRole(learner);
+        when(userRepository.findByIdAndTenantId("student-2", "erg")).thenReturn(Optional.of(user));
+        when(userRoleAssignmentRepository.findActiveForUser(eq("student-2"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment));
+
+        operations.resetCredential("student-2", "erg", "ONE_TIME_PASSWORD", null);
+
+        assertFalse(user.getMustChangePassword());
     }
 
     @Test

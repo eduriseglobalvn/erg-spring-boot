@@ -15,6 +15,8 @@ import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
+import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
@@ -43,12 +45,13 @@ public class UserProvisioningUseCase {
     private final RoleRepository roles; private final UserAccessScopeRepository scopes;
     private final UserActivityRepository activities; private final CredentialHasher passwords;
     private final AccountMailSender mail; private final ProtectedRolePolicy rolePolicy = new ProtectedRolePolicy();
+    private final UserRoleAssignmentRepository assignments;
 
     public UserProvisioningUseCase(UserRepository users, AuthSessionRepository sessions, RoleRepository roles,
             UserAccessScopeRepository scopes, UserActivityRepository activities,
-            CredentialHasher passwords, AccountMailSender mail) {
+            CredentialHasher passwords, AccountMailSender mail, UserRoleAssignmentRepository assignments) {
         this.users = users; this.sessions = sessions; this.roles = roles; this.scopes = scopes;
-        this.activities = activities; this.passwords = passwords; this.mail = mail;
+        this.activities = activities; this.passwords = passwords; this.mail = mail; this.assignments = assignments;
     }
 
     @Transactional
@@ -100,15 +103,18 @@ public class UserProvisioningUseCase {
         String delivery = delivery(requestedDelivery);
         boolean previous = Boolean.TRUE.equals(user.getMustChangePassword());
         String credential = IdGenerator.newId() + "Aa1!";
-        user.setPasswordHash(passwords.hash(credential)); user.setMustChangePassword(true); users.save(user);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        // STU-01: a student account is never forced to change its password.
+        boolean forceChange = !StudentAccountPolicy.isStudentOnly(user,
+                assignments.findActiveForUser(user.getId(), tenant(tenantId), now), now);
+        user.setPasswordHash(passwords.hash(credential)); if (forceChange) user.setMustChangePassword(true); users.save(user);
         List<AuthSession> active = sessions.findByUserIdAndTenantIdAndRevokedAtIsNull(userId, tenant(tenantId));
-        OffsetDateTime revokedAt = OffsetDateTime.now(ZoneOffset.UTC);
-        active.forEach(session -> { session.setRevokedAt(revokedAt); session.setRevokedReason("credential_reset"); });
+        active.forEach(session -> { session.setRevokedAt(now); session.setRevokedReason("credential_reset"); });
         if (!active.isEmpty()) sessions.saveAll(active);
         mail.sendTeacherInvite(user.getEmail(), user.getFullName(), credential);
         record(user, audit, "EMAIL_INVITE".equals(delivery) ? "TEACHER_INVITE_RESENT" : "TEACHER_CREDENTIAL_RESET",
                 "Teacher temporary credential rotated", Map.of("mustChangePassword", previous),
-                Map.of("mustChangePassword", true, "credentialDelivery", delivery, "revokedSessions", active.size()));
+                Map.of("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()), "credentialDelivery", delivery, "revokedSessions", active.size()));
         return new CredentialDeliveryResponse("EMAIL_INVITE".equals(delivery) ? "QUEUED_FOR_DELIVERY" : "READY",
                 "ONE_TIME_PASSWORD".equals(delivery) ? credential : null);
     }

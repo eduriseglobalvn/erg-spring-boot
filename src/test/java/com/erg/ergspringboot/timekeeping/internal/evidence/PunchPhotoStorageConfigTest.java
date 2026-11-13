@@ -40,6 +40,35 @@ class PunchPhotoStorageConfigTest {
     }
 
     @Test
+    void prodOptInRefusesTheRelativeDefaultRootThatLivesInTheContainerLayer() {
+        MockEnvironment prod = new MockEnvironment();
+        prod.setActiveProfiles("prod");
+
+        assertThatThrownBy(() -> new PunchPhotoStorageConfig()
+                .timekeepingLocalPhotoStorage(".erg-private", SECRET, true, Clock.systemUTC(), prod))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ERG_TK_PHOTOS_LOCAL_ROOT");
+    }
+
+    @Test
+    void prodRefusesBlankSigningSecret() {
+        MockEnvironment prod = new MockEnvironment();
+        prod.setActiveProfiles("prod");
+
+        assertThatThrownBy(() -> new PunchPhotoStorageConfig()
+                .timekeepingLocalPhotoStorage(root.toString(), " ", true, Clock.systemUTC(), prod))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SECRET_TK_PHOTO_URL_SIGNING_KEY");
+    }
+
+    @Test
+    void devKeepsRelativeRootAndRandomSecret() {
+        assertThat(new PunchPhotoStorageConfig()
+                .timekeepingLocalPhotoStorage(".erg-private", "", false, Clock.systemUTC(), new MockEnvironment()))
+                .isNotNull();
+    }
+
+    @Test
     void privateBucketMustNotBeThePublicMediaBucket() {
         assertThatThrownBy(() -> PunchPhotoStorageConfig.rejectPublicBucket("erg-media", "ERG-media "))
                 .isInstanceOf(IllegalStateException.class);

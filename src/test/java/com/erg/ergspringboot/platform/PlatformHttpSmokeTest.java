@@ -48,7 +48,7 @@ class PlatformHttpSmokeTest {
     }
 
     @Test
-    void legacyProbeAndMetricsPathsAreMounted() throws Exception {
+    void legacyProbePathsAreMounted() throws Exception {
         mockMvc.perform(get("/healthz"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ok"));
@@ -56,10 +56,13 @@ class PlatformHttpSmokeTest {
         mockMvc.perform(get("/ready"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.checks.app").value(true));
+    }
 
+    @Test
+    void legacyMetricsPathIsNotPublic() throws Exception {
+        // Prometheus scrapes /actuator/prometheus inside Docker; nothing scrapes this old text endpoint.
         mockMvc.perform(get("/metrics"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Content-Type", "text/plain;charset=UTF-8"));
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

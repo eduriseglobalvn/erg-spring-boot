@@ -85,7 +85,7 @@ class AuthOperationsFlowTest {
 
     @BeforeEach
     void setUp() {
-        passwordService = new PasswordService();
+        passwordService = new PasswordService(new com.erg.ergspringboot.platform.security.ErgAuthProperties());
         tokenService = new AuthTokenService();
         loginFlow = new AuthLoginUseCase(
                 userRepository,
@@ -139,6 +139,7 @@ class AuthOperationsFlowTest {
         assertEquals("fingerprint", session.getDeviceFingerprint());
         assertEquals("127.0.0.1", session.getIpAddress());
         assertEquals(Duration.ofHours(12), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
+        assertFalse(session.isRememberMe());
         assertNotEquals(response.refreshToken(), session.getRefreshTokenHash());
 
         assertEquals("active@example.com", response.user().email());
@@ -289,6 +290,27 @@ class AuthOperationsFlowTest {
         );
 
         assertTrue(response.permissions().contains("rbac.role.read"));
+    }
+
+    @Test
+    void studentLoginReturnsActiveLifecycleWithoutNextSteps() {
+        User user = activeUser("user-student", "hs@example.com", "secret123");
+        user.setMustChangePassword(true);
+        user.setRecoveryEmailVerified(false);
+        Permission permission = new Permission(); permission.setName("lms.assignment.read_self");
+        Role role = new Role(); role.setName("lms.learner"); role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission)));
+        UserRoleAssignment assignment = new UserRoleAssignment(); assignment.setRole(role);
+        when(userRepository.findForLogin("hs@example.com")).thenReturn(Optional.of(user));
+        when(userRoleAssignmentRepository.findActiveForUser(eq("user-student"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment));
+
+        AuthResponse response = authService.login(
+                new LoginRequest("hs@example.com", "secret123", "web-1", "Chrome", null, "elearning", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null)
+        );
+
+        assertEquals("ACTIVE", response.user().lifecycle().status());
+        assertEquals(List.of(), response.user().lifecycle().nextSteps());
     }
 
     @Test
@@ -722,6 +744,101 @@ class AuthOperationsFlowTest {
         assertThrows(com.erg.ergspringboot.exception.ForbiddenException.class, () -> authService.ipSecurityStatus(
                 "admin@example.com", new AuthClientContext("10.0.0.1", "JUnit", null, null, null)));
         assertNotNull(authService.ipSecurityStatus(null, new AuthClientContext("10.0.0.1", "JUnit", null, null, null)));
+    }
+
+    @Test
+    void rememberedStudentLoginGetsThirtyDaySession() {
+        AuthSession session = loginStudent(true);
+
+        assertEquals(Duration.ofDays(30), Duration.between(session.getCreatedAt(), session.getExpiresAt()));
+        assertTrue(session.isRememberMe());
+    }
+
+    @Test
+    void studentLoginWithoutRememberMeKeepsTwelveHourSession() {
+        AuthSession session = loginStudent(false);
+
+        assertEquals(Duration.ofHours(12), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
+    }
+
+    @Test
+    void refreshSlidesRememberedStudentSessionThirtyDaysAhead() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        AuthSession session = refreshableSession(now.minusDays(10), now.minusDays(10).plusDays(30));
+
+        refreshStudent(session);
+
+        assertTrue(Duration.between(now.plusDays(30), session.getExpiresAt()).abs().toMinutes() < 1);
+    }
+
+    @Test
+    void refreshNeverExtendsRememberedSessionPastNinetyDaysFromLogin() {
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(80);
+        AuthSession session = refreshableSession(createdAt, createdAt.plusDays(85));
+
+        refreshStudent(session);
+
+        assertEquals(createdAt.plusDays(90), session.getExpiresAt());
+    }
+
+    @Test
+    void refreshDoesNotExtendSessionThatWasNotRemembered() {
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusHours(1);
+        AuthSession session = refreshableSession(createdAt, createdAt.plusHours(12));
+
+        refreshStudent(session);
+
+        assertEquals(createdAt.plusHours(12), session.getExpiresAt());
+    }
+
+    @Test
+    void rememberedSessionPastItsNinetyDayLimitCannotRefresh() {
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(90).minusMinutes(1);
+        AuthSession session = refreshableSession(createdAt, createdAt.plusDays(90));
+
+        assertThrows(AuthFailure.InvalidToken.class, () -> authService.refresh(
+                new RefreshRequest("student-refresh", "device-a"),
+                new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a")));
+        assertEquals(createdAt.plusDays(90), session.getExpiresAt());
+    }
+
+    private AuthSession loginStudent(boolean rememberMe) {
+        User user = activeUser("student-1", "hs001@example.com", "secret123");
+        Role role = new Role();
+        role.setName("student");
+        user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
+        when(userRepository.findForLogin("hs001@example.com")).thenReturn(Optional.of(user));
+
+        AuthResponse response = authService.login(
+                new LoginRequest("hs001@example.com", "secret123", "web-1", "Chrome", null, "elearning", rememberMe),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null));
+
+        assertEquals(List.of("elearning"), response.portals());
+        ArgumentCaptor<AuthSession> saved = ArgumentCaptor.forClass(AuthSession.class);
+        verify(sessionRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    private AuthSession refreshableSession(OffsetDateTime createdAt, OffsetDateTime expiresAt) {
+        AuthSession session = session("session-s", "student-1", "erg");
+        session.setRefreshTokenHash(tokenService.hashToken("student-refresh"));
+        session.setCreatedAt(createdAt);
+        session.setExpiresAt(expiresAt);
+        // The tests that build a session living longer than a day are the remembered ones.
+        session.setRememberMe(Duration.between(createdAt, expiresAt).toDays() >= 1);
+        lenient().when(sessionRepository.lockByRefreshTokenHash(session.getRefreshTokenHash()))
+                .thenReturn(Optional.of(session));
+        lenient().when(sessionRepository.findByPreviousRefreshTokenHash(any(String.class)))
+                .thenReturn(Optional.empty());
+        lenient().when(userRepository.findByIdAndTenantId("student-1", "erg"))
+                .thenReturn(Optional.of(activeUser("student-1", "hs001@example.com", "secret123")));
+        return session;
+    }
+
+    private void refreshStudent(AuthSession session) {
+        authService.refresh(new RefreshRequest("student-refresh", "device-a"),
+                new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a"));
+        verify(sessionRepository).save(session);
     }
 
     @org.junit.jupiter.api.AfterEach

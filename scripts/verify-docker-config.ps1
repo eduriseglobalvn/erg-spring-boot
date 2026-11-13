@@ -30,6 +30,7 @@ $nginxDev = Require-File "ops/docker/nginx/dev.conf"
 $nginxNative = Require-File "ops/docker/nginx/native.conf"
 $envDev = Require-File "ops/docker/.env.dev.example"
 $envProduction = Require-File "ops/docker/.env.production.example"
+$deployScript = Require-File "ops/docker/deploy.sh"
 $windowsScript = Require-File "scripts/docker.ps1"
 $linuxScript = Require-File "scripts/docker.sh"
 $runtimeRoleMigration = Require-File "src/main/resources/db/migration/postgres/V74__runtime_role_rls_grants.sql"
@@ -51,11 +52,11 @@ Require-Match $composeBase 'state\.conf' "redis-state must load state.conf"
 Require-Match $composeBase 'cache\.conf' "redis-cache must load cache.conf"
 Require-Match $composeBase 'redis-state-data:/data' "redis-state must use its own volume"
 Require-Match $composeBase 'redis-cache-data:/data' "redis-cache must use its own volume"
-Require-Match $redisState '(?m)^maxmemory\s+768mb$' "redis-state must reserve 768 MiB on the 16 GiB profile"
+Require-Match $redisState '(?m)^maxmemory\s+384mb$' "redis-state must stay at 75% of its 512 MiB container limit"
 Require-Match $redisState '(?m)^maxmemory-policy\s+noeviction$' "redis-state must use noeviction"
 Require-Match $redisState '(?m)^appendonly\s+yes$' "redis-state must enable AOF"
 Require-Match $redisState '(?m)^appendfsync\s+everysec$' "redis-state must fsync AOF every second"
-Require-Match $redisCache '(?m)^maxmemory\s+2gb$' "redis-cache must reserve 2 GiB on the 16 GiB profile"
+Require-Match $redisCache '(?m)^maxmemory\s+768mb$' "redis-cache must stay at 75% of its 1 GiB container limit"
 Require-Match $redisCache '(?m)^maxmemory-policy\s+allkeys-lfu$' "redis-cache must use allkeys-lfu"
 Require-Match $redisCache '(?m)^appendonly\s+no$' "redis-cache must disable AOF"
 Require-Match $redisCache '(?m)^save\s+""$' "redis-cache must disable RDB snapshots"
@@ -91,12 +92,17 @@ foreach ($name in @(
     "SPRING_PROFILES_ACTIVE",
     "SERVER_PORT",
     "FLYWAY_ENABLED",
-    "SECRET_AUTH__JWT_SECRET",
-    "SECRET_AUTH__JWT_REFRESH_SECRET"
+    "SECRET_AUTH__JWT_SECRET"
 )) {
     Require-Match $envDev "(?m)^$([regex]::Escape($name))=" "Development env must define $name"
     Require-Match $envProduction "(?m)^$([regex]::Escape($name))=" "Production env must define $name"
 }
+
+# SRV-04: a committed sample password must never be usable; deploy.sh refuses blank ones.
+foreach ($name in @("POSTGRES_PASSWORD", "POSTGRES_RUNTIME_PASSWORD", "REDIS_STATE_PASSWORD", "REDIS_CACHE_PASSWORD")) {
+    Require-Match $envProduction "(?m)^$([regex]::Escape($name))=\r?$" "Production env example must leave $name blank"
+}
+Require-Match $deployScript 'check_secrets' "deploy.sh must refuse blank or sample database/Redis passwords"
 
 Require-Match $envProduction '(?m)^ERG_APP_IMAGE=[^/]+/.+@sha256:[0-9a-f]{64}$' "Production env must define a digest-pinned ERG_APP_IMAGE"
 Require-Match $envProduction '(?m)^ERG_ROLLBACK_IMAGE=[^/]+/.+@sha256:[0-9a-f]{64}$' "Production env must define a digest-pinned ERG_ROLLBACK_IMAGE"

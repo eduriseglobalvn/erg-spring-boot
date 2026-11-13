@@ -9,6 +9,9 @@ import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgressReposi
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import com.erg.ergspringboot.lcms.quiz.publish.GradeResult;
+import com.erg.ergspringboot.platform.security.TenantContext;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
@@ -53,6 +56,15 @@ public class QuizAttemptGradingService {
     private final AttemptAnswerRowRepository answerRowRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final GradingEngine gradingEngine;
+    /**
+     * A published version never changes (a republish makes a new version id), so every submit of one exam reuses its
+     * questions and pass mark instead of reloading the question bodies and the whole version. Keyed by the caller's
+     * tenant so a version is only ever served to the tenant that could read it; bounded, entries are read-only.
+     */
+    private final Cache<String, PublishedVersion> publishedVersions = Caffeine.newBuilder().maximumSize(256).build();
+
+    private record PublishedVersion(List<QuizVersionQuestion> questions, double passPercent) {
+    }
 
     public QuizAttemptGradingService(
             QuizVersionRepository quizVersionRepository,
@@ -82,7 +94,7 @@ public class QuizAttemptGradingService {
         if (quizVersionId == null || quizVersionId.isBlank()) {
             return Optional.empty();
         }
-        List<QuizVersionQuestion> questions = questionRepository.findByQuizVersionIdOrderByOrderIndexAsc(quizVersionId);
+        List<QuizVersionQuestion> questions = published(quizVersionId).questions();
         if (questions.isEmpty()) {
             return Optional.empty();
         }
@@ -140,8 +152,7 @@ public class QuizAttemptGradingService {
     public java.util.Set<String> runtimeQuestionIds(String quizVersionId) {
         if (quizVersionId == null || quizVersionId.isBlank()) return java.util.Set.of();
         java.util.Set<String> ids = new java.util.LinkedHashSet<>();
-        questionRepository.findByQuizVersionIdOrderByOrderIndexAsc(quizVersionId)
-                .forEach(question -> ids.add(question.getRuntimeQuestionId()));
+        published(quizVersionId).questions().forEach(question -> ids.add(question.getRuntimeQuestionId()));
         return ids;
     }
 
@@ -157,7 +168,7 @@ public class QuizAttemptGradingService {
             BigDecimal points,
             String graderUserId
     ) {
-        List<QuizVersionQuestion> questions = questionRepository.findByQuizVersionIdOrderByOrderIndexAsc(quizVersionId);
+        List<QuizVersionQuestion> questions = published(quizVersionId).questions();
         QuizVersionQuestion target = questions.stream()
                 .filter(question -> runtimeQuestionId.equals(question.getRuntimeQuestionId()))
                 .findFirst()
@@ -220,6 +231,18 @@ public class QuizAttemptGradingService {
 
     /** Pass threshold from the pinned version's runtime settings ({@code passPercent}); 50% when unset. */
     double passPercent(String quizVersionId) {
+        return published(quizVersionId).passPercent();
+    }
+
+    private PublishedVersion published(String quizVersionId) {
+        TenantContext context = TenantContext.current();
+        String key = (context == null ? "" : context.tenantId()) + ":" + quizVersionId;
+        return publishedVersions.get(key, ignored -> new PublishedVersion(
+                List.copyOf(questionRepository.findByQuizVersionIdOrderByOrderIndexAsc(quizVersionId)),
+                loadPassPercent(quizVersionId)));
+    }
+
+    private double loadPassPercent(String quizVersionId) {
         return quizVersionRepository.findById(quizVersionId)
                 .map(QuizVersion::getRuntimeQuiz)
                 .map(QuizAttemptGradingService::configuredPassPercent)

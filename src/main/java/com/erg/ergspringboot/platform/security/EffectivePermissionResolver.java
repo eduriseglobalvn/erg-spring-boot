@@ -31,6 +31,25 @@ public final class EffectivePermissionResolver {
     private EffectivePermissionResolver() {
     }
 
+    /** Role names from the legacy {@code user_roles} set plus the active scoped assignments, lower-cased. */
+    public static List<String> roleNames(User user, Collection<UserRoleAssignment> activeAssignments) {
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        if (user == null || user.getRoles() == null || user.getRoles().isEmpty()) {
+            names.add("user");
+        } else {
+            user.getRoles().stream()
+                    .map(Role::getName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .map(String::trim)
+                    .map(name -> name.toLowerCase(Locale.ROOT))
+                    .forEach(names::add);
+        }
+        activeAssignments.stream().map(UserRoleAssignment::getRole).filter(Objects::nonNull)
+                .map(Role::getName).filter(name -> name != null && !name.isBlank())
+                .map(String::trim).map(name -> name.toLowerCase(Locale.ROOT)).forEach(names::add);
+        return List.copyOf(names);
+    }
+
     public static Result resolve(User user, Collection<UserRoleAssignment> activeAssignments, OffsetDateTime now) {
         if (user == null) {
             return new Result(List.of(), List.of());

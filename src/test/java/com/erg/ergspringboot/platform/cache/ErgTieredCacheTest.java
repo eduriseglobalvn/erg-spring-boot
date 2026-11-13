@@ -47,6 +47,30 @@ class ErgTieredCacheTest {
     }
 
     @Test
+    void encodeFailureForL2StillReturnsTheLoadedValue() throws Exception {
+        Fixture fixture = new Fixture(null, new CacheValueCodec() {
+            @Override
+            public <T> CacheEncoding encode(CacheDescriptor<T> descriptor, T value) {
+                throw new IllegalArgumentException("Cannot encode cache " + descriptor.name());
+            }
+
+            @Override
+            public <T> T decode(CacheDescriptor<T> descriptor, byte[] bytes) {
+                throw new AssertionError("nothing was stored in L2");
+            }
+        });
+        AtomicInteger loads = new AtomicInteger();
+
+        assertThat(fixture.cache.get("student-1", () -> {
+            loads.incrementAndGet();
+            return "package";
+        })).isEqualTo("package");
+        assertThat(fixture.cache.get("student-1", String.class)).isEqualTo("package");
+        assertThat(fixture.store.values).isEmpty();
+        assertThat(loads).hasValue(1);
+    }
+
+    @Test
     void clearInsideTransactionDropsL1EntriesRefilledBeforeCommit() {
         Fixture fixture = new Fixture();
         TransactionSynchronizationManager.initSynchronization();
@@ -106,12 +130,16 @@ class ErgTieredCacheTest {
         }
 
         Fixture(java.util.function.Function<Object, String> scope) {
+            this(scope, null);
+        }
+
+        Fixture(java.util.function.Function<Object, String> scope, CacheValueCodec codec) {
             descriptor = new CacheDescriptor<>("studentDashboard", mapper.constructType(String.class), Duration.ofMinutes(1),
                     Duration.ofMinutes(2), 1024 * 1024, 1024, true, false, scope);
             cache = new ErgTieredCache(
                 descriptor,
                 new CacheKeyFactory(mapper),
-                new JacksonCacheValueCodec(mapper),
+                codec != null ? codec : new JacksonCacheValueCodec(mapper),
                 store,
                 () -> "tenant-a",
                 generations,

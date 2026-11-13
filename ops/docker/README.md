@@ -213,8 +213,8 @@ Phải thay ít nhất các giá trị sau:
 
 - `ERG_APP_IMAGE`: digest của image vừa push, ví dụ `ghcr.io/your-org/erg-spring@sha256:<64-hex-digest>`.
 - `ERG_ROLLBACK_IMAGE`: digest known-good trước đó và phải khác `ERG_APP_IMAGE`.
-- `POSTGRES_PASSWORD`, `REDIS_STATE_PASSWORD` và `REDIS_CACHE_PASSWORD`.
-- `SECRET_AUTH__JWT_SECRET` và `SECRET_AUTH__JWT_REFRESH_SECRET`.
+- `POSTGRES_PASSWORD`, `POSTGRES_RUNTIME_PASSWORD`, `REDIS_STATE_PASSWORD` và `REDIS_CACHE_PASSWORD`: file mẫu để trống, tạo mỗi cái bằng `openssl rand -hex 32`. `deploy.sh` dừng trước khi đụng production nếu một trong bốn biến trống hoặc còn giá trị mẫu cũ (`bash scripts/deploy-secret-check.test.sh` kiểm phần này).
+- `SECRET_AUTH__JWT_SECRET`.
 - `HTTP__CORS__ALLOWED_ORIGINS` và `AUTH__COOKIE__DOMAIN`.
 - Secret của SMTP, Firebase, R2 hoặc AI nếu tích hợp tương ứng được bật.
 
@@ -234,6 +234,24 @@ chmod +x scripts/docker.sh
 docker compose pull
 docker compose up --no-build --scale backend=3 --wait --wait-timeout 180
 ```
+
+### Ngân sách bộ nhớ (máy 16 GB, 4 nhân, SSD SATA)
+
+Giới hạn container lấy từ `.env.production.example` (mặc định trong compose trùng giá trị này). Tổng ≤ 12,5 GB để phần còn lại cho hệ điều hành và page cache mà Postgres dựa vào (`effective_cache_size=7GB`). `PostgresPerformanceDockerConfigTest` kiểm tra tổng này và tỉ lệ `maxmemory` của Redis.
+
+| Thành phần | Biến | Giới hạn | Ghi chú |
+| --- | --- | --- | --- |
+| Postgres 17 | `POSTGRES_CONTAINER_MEMORY` | 5g | `shared_buffers=3GB`, `shm_size: 512m`, `max_connections=60` |
+| Backend JVM, 1 bản | `BACKEND_CONTAINER_MEMORY`, `BACKEND_REPLICAS=1` | 3g | Heap 75 % ≈ 2,25 GB |
+| Redis cache | `REDIS_CACHE_CONTAINER_MEMORY` | 1024m | `maxmemory 768mb`, `allkeys-lfu` |
+| Redis state | `REDIS_STATE_CONTAINER_MEMORY` | 512m | `maxmemory 384mb` (≤ 75 % giới hạn), `noeviction` |
+| nginx API | `NGINX_CONTAINER_MEMORY` | 128m | |
+| Giám sát (`compose.monitor.yml`) | cố định trong file | ≈ 1,6 GB | Prometheus, Loki, Grafana, Alertmanager, exporter |
+| **Tổng** | | **≈ 11,3 GB** | |
+
+`maxmemory` của Redis phải ≤ 75 % giới hạn container: nếu cao hơn, kernel giết Redis trước khi Redis kịp từ chối ghi. Đổi giới hạn container thì đổi `redis/*.conf` theo. Cảnh báo `RedisMemoryNearMaxmemory` bắn khi dùng quá 80 % `maxmemory`.
+
+Postgres đặt `statement_timeout=30s`, `idle_in_transaction_session_timeout=30s`, `log_min_duration_statement=250ms`. Flyway (`FlywayConfig.migrationInitSql`) và `pg_dump`/`pg_restore` tự đặt `statement_timeout=0` cho phiên của mình, nên migration dài và sao lưu không bị cắt. Chạy tay SQL dài bằng `psql` (ví dụ `ops/postgres/online/*.sql`) thì `SET statement_timeout = 0;` trước.
 
 ### Phát hành phiên bản mới
 
@@ -281,6 +299,15 @@ Linux:
 ```
 
 `down` không xóa named volume. Chỉ dùng `docker compose down --volumes` khi chủ động muốn xóa toàn bộ dữ liệu của đúng Compose project.
+
+### Giờ trên máy chủ
+
+Máy chủ chạy múi giờ **UTC** (giữ nguyên). Mọi giờ trong cron, log, Prometheus/Grafana và tin của bot đều là UTC; giờ Việt Nam = UTC + 7. Ví dụ cron sao lưu `0 20 * * *` = **03:00 giờ Việt Nam**. Khi đọc log hay đặt lịch, luôn đổi giờ trước khi kết luận "chạy lúc nào".
+
+### Cảnh báo chưa có nguồn số liệu
+
+- `cloudflared` chạy trên máy chủ (ngoài Docker) nhưng Prometheus chưa scrape nó, nên chưa có luật "tunnel mất kết nối". Cần: chạy `cloudflared` với `--metrics 0.0.0.0:<cổng>` (chỉ trong mạng nội bộ), thêm target vào `monitor/prometheus/prometheus.yml`, rồi thêm luật trên `cloudflared_tunnel_ha_connections < 1`.
+- `OffsiteBackupStale` sẽ bắn cho tới khi bản sao lưu ngoài máy ghi chỉ số `erg_backup_offsite_last_success_timestamp_seconds` (việc G1-04).
 
 ## 8. Cấu trúc file
 

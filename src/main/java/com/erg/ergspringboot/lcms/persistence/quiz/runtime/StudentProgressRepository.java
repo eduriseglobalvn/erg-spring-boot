@@ -31,8 +31,8 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
               and progress.assignmentId = :assignmentId
               and (:classId is null or progress.classId = :classId)
               and (:status is null or lower(progress.status) = :status)
-              and (:submittedFrom is null or progress.submittedAt >= :submittedFrom)
-              and (:submittedTo is null or progress.submittedAt <= :submittedTo)
+              and (cast(:submittedFrom as OffsetDateTime) is null or progress.submittedAt >= :submittedFrom)
+              and (cast(:submittedTo as OffsetDateTime) is null or progress.submittedAt <= :submittedTo)
             order by case when progress.submittedAt is null then 1 else 0 end,
                      progress.submittedAt desc, progress.id asc
             """)
@@ -50,7 +50,7 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
     @Query("""
             select
                 count(progress.id) as totalRecipients,
-                coalesce(sum(case when lower(progress.status) = 'submitted' then 1 else 0 end), 0) as submittedCount,
+                coalesce(sum(case when lower(progress.status) in ('submitted', 'needs_review', 'review_required', 'graded', 'completed') then 1 else 0 end), 0) as submittedCount,
                 coalesce(sum(case when lower(progress.status) = 'in_progress' then 1 else 0 end), 0) as inProgressCount,
                 coalesce(sum(case when lower(progress.status) in ('needs_review', 'review_required') then 1 else 0 end), 0) as needsReviewCount,
                 coalesce(avg(progress.score), 0) as averagePercent
@@ -63,7 +63,7 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
     @Query("""
             select
                 count(progress.id) as totalRecipients,
-                coalesce(sum(case when lower(progress.status) = 'submitted' then 1 else 0 end), 0) as submittedCount,
+                coalesce(sum(case when lower(progress.status) in ('submitted', 'needs_review', 'review_required', 'graded', 'completed') then 1 else 0 end), 0) as submittedCount,
                 coalesce(sum(case when lower(progress.status) = 'in_progress' then 1 else 0 end), 0) as inProgressCount,
                 coalesce(sum(case when lower(progress.status) in ('needs_review', 'review_required') then 1 else 0 end), 0) as needsReviewCount,
                 coalesce(avg(progress.score), 0) as averagePercent
@@ -72,8 +72,8 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
               and progress.assignmentId = :assignmentId
               and (:classId is null or progress.classId = :classId)
               and (:status is null or lower(progress.status) = :status)
-              and (:submittedFrom is null or progress.submittedAt >= :submittedFrom)
-              and (:submittedTo is null or progress.submittedAt <= :submittedTo)
+              and (cast(:submittedFrom as OffsetDateTime) is null or progress.submittedAt >= :submittedFrom)
+              and (cast(:submittedTo as OffsetDateTime) is null or progress.submittedAt <= :submittedTo)
             """)
     StudentProgressSummaryProjection summarizeAssignment(
             String tenantId,
@@ -99,6 +99,7 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
 
     interface StudentProgressSummaryProjection {
         long getTotalRecipients();
+        /** Handed in: every {@code LmsStatePolicy.completedAttemptStates()} state, needs-review included. */
         long getSubmittedCount();
         long getInProgressCount();
         long getNeedsReviewCount();

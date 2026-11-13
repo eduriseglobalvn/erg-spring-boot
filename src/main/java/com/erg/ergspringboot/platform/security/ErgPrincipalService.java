@@ -2,13 +2,13 @@ package com.erg.ergspringboot.platform.security;
 
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.authorization.Permission;
-import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +26,7 @@ public class ErgPrincipalService {
     private final AuthTokenService tokenService;
     private final AuthSessionTenantResolver tenantResolver;
     private UserRoleAssignmentRepository userRoleAssignmentRepository;
+    private PrincipalCache principalCache;
 
     @Autowired
     public ErgPrincipalService(
@@ -68,10 +69,51 @@ public class ErgPrincipalService {
         if (!resolvedTenantId.filter(requestedTenantId::equals).isPresent()) {
             return Optional.empty();
         }
-        return sessionRepository
-                .findPrincipalByAccessTokenHashAndTenantId(tokenService.hashToken(bearerToken.trim()), requestedTenantId)
-                .filter(this::active)
-                .map(this::principal);
+        return loadPrincipal(bearerToken, requestedTenantId);
+    }
+
+    /**
+     * Loads the principal for a tenant the caller already resolved from this token through
+     * {@link #resolveTenantId(String)}, so the session tenant lookup is not repeated. Never pass a
+     * client-supplied tenant here; that goes through {@link #fromBearerToken(String, String)}.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ErgPrincipal> fromBearerTokenForResolvedTenant(String bearerToken, String resolvedTenantId) {
+        if (tenantResolver == null || bearerToken == null || bearerToken.isBlank()) {
+            return fromBearerToken(bearerToken, resolvedTenantId);
+        }
+        return loadPrincipal(bearerToken, AuthenticatedTenant.require(resolvedTenantId));
+    }
+
+    /** A principal cached by an earlier successful load of this token; no database access. */
+    public Optional<ErgPrincipal> cachedPrincipal(String bearerToken) {
+        if (principalCache == null || bearerToken == null || bearerToken.isBlank()) {
+            return Optional.empty();
+        }
+        return principalCache.get(tokenService.hashToken(bearerToken.trim()));
+    }
+
+    private Optional<ErgPrincipal> loadPrincipal(String bearerToken, String tenantId) {
+        String tokenHash = tokenService.hashToken(bearerToken.trim());
+        long epoch = principalCache == null ? 0 : principalCache.epoch();
+        Optional<AuthSession> session = sessionRepository
+                .findPrincipalByAccessTokenHashAndTenantId(tokenHash, tenantId)
+                .filter(this::active);
+        Optional<ErgPrincipal> principal = session.map(this::principal);
+        if (principalCache != null && principal.isPresent()) {
+            principalCache.put(tokenHash, principal.get(), validUntil(session.get()), epoch);
+        }
+        return principal;
+    }
+
+    /** A cached principal must not outlive the access token or the session it was loaded from. */
+    private Instant validUntil(AuthSession session) {
+        OffsetDateTime until = session.getExpiresAt();
+        OffsetDateTime accessExpiry = session.getAccessTokenExpiresAt();
+        if (accessExpiry != null && accessExpiry.isBefore(until)) {
+            until = accessExpiry;
+        }
+        return until.toInstant();
     }
 
     /**
@@ -102,6 +144,11 @@ public class ErgPrincipalService {
 
     public String cacheTokenHash(String bearerToken) {
         return bearerToken == null || bearerToken.isBlank() ? "" : tokenService.hashToken(bearerToken.trim());
+    }
+
+    @Autowired(required = false)
+    void setPrincipalCache(PrincipalCache principalCache) {
+        this.principalCache = principalCache;
     }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -190,7 +237,7 @@ public class ErgPrincipalService {
     private ErgPrincipal principal(AuthSession session) {
         User user = session.getUser();
         List<UserRoleAssignment> assignments = activeAssignments(user);
-        List<String> roles = roles(user, assignments);
+        List<String> roles = EffectivePermissionResolver.roleNames(user, assignments);
         EffectivePermissionResolver.Result resolved =
                 EffectivePermissionResolver.resolve(user, assignments, OffsetDateTime.now());
         PermissionEnvelope permissions = new PermissionEnvelope(resolved.granted(), resolved.denied());
@@ -207,7 +254,8 @@ public class ErgPrincipalService {
                 permissions.granted().contains("*") ? "admin" : "user",
                 AccessScopeAssembler.mergeLegacyAttributes(Map.of(
                         "assignedScopeIds", assignedScopeIds(assignments),
-                        "lifecycleRestricted", isLifecycleRestricted(user)
+                        "lifecycleRestricted", !StudentAccountPolicy.isStudentOnly(roles, permissions.granted(), permissions.denied())
+                                && isLifecycleRestricted(user)
                 ), AccessScopeSet.legacy(managedEducationUnitIds, assignedClassIds(assignments), null, null))
         );
     }
@@ -225,23 +273,6 @@ public class ErgPrincipalService {
         return WorkspaceCapabilityMapper.legacyPortalsFor(List.of(), roles, permissions.granted());
     }
 
-    private List<String> roles(User user, List<UserRoleAssignment> assignments) {
-        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
-        if (user == null || user.getRoles() == null || user.getRoles().isEmpty()) {
-            names.add("user");
-        } else {
-            user.getRoles().stream()
-                    .map(Role::getName)
-                    .filter(name -> name != null && !name.isBlank())
-                    .map(String::trim)
-                    .map(String::toLowerCase)
-                    .forEach(names::add);
-        }
-        assignments.stream().map(UserRoleAssignment::getRole).filter(java.util.Objects::nonNull)
-                .map(Role::getName).filter(name -> name != null && !name.isBlank())
-                .map(String::trim).map(String::toLowerCase).forEach(names::add);
-        return List.copyOf(names);
-    }
 
     private List<UserRoleAssignment> activeAssignments(User user) {
         if (userRoleAssignmentRepository == null || user == null || user.getId() == null) return List.of();

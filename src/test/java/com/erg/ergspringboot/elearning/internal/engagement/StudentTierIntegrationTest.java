@@ -42,6 +42,9 @@ class StudentTierIntegrationTest {
     private StudentTierService service;
 
     @Autowired
+    private StudentTierJob job;
+
+    @Autowired
     private StudentTierReader reader;
 
     @Autowired
@@ -101,6 +104,17 @@ class StudentTierIntegrationTest {
         assertThat(table).hasSize(8);
         assertThat(table.stream().mapToInt(TierTableRowResponse::seats).sum()).isEqualTo(2);
         assertThatThrownBy(() -> reader.tierTable(TENANT, "usr-s-an", "not-a-date")).isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void manualRunCoversOnlyTheGivenTenantAndDoesNotRecountTheWeek() {
+        assertThat(job.runForTenant("other-tenant")).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from student_tier_week where tenant_id = ?", Integer.class, TENANT)).isZero();
+        int first = job.runForTenant(TENANT);
+        List<Integer> below = jdbc.queryForList("select below_count from student_tier_week where tenant_id = ? order by student_id", Integer.class, TENANT);
+        assertThat(job.runForTenant(TENANT)).isEqualTo(first).isEqualTo(4);
+        assertThat(jdbc.queryForList("select below_count from student_tier_week where tenant_id = ? order by student_id", Integer.class, TENANT))
+                .isEqualTo(below);
     }
 
     @Test

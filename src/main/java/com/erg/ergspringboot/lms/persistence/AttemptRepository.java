@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.lms.persistence;
 
-import com.erg.ergspringboot.lms.persistence.projection.AssignmentProgressProjection;
 import com.erg.ergspringboot.lms.persistence.projection.AttemptScoreProjection;
 import com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection;
 import com.erg.ergspringboot.lms.persistence.projection.ClassScoreSummaryProjection;
@@ -15,7 +14,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface AttemptRepository extends JpaRepository<Attempt, String> {
+public interface AttemptRepository extends JpaRepository<Attempt, String>, AttemptProgressQueries {
 
     Optional<Attempt> findByTenantIdAndId(String tenantId, String id);
 
@@ -112,18 +111,6 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
             String studentId,
             Collection<String> statuses
     );
-
-    @Query("""
-            select new com.erg.ergspringboot.lms.persistence.projection.AssignmentProgressProjection(
-                coalesce(sum(case when lower(attempt.status) = 'submitted' then 1 else 0 end), 0),
-                coalesce(sum(case when lower(attempt.status) = 'in_progress' then 1 else 0 end), 0),
-                coalesce(sum(case when lower(attempt.status) in ('needs_review', 'review_required') then 1 else 0 end), 0)
-            )
-            from Attempt attempt
-            where attempt.tenantId = :tenantId
-              and attempt.assignmentId = :assignmentId
-            """)
-    AssignmentProgressProjection summarizeAssignmentProgress(String tenantId, String assignmentId);
 
     @Query(
             value = """
@@ -437,7 +424,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String> {
             where attempt.tenantId = :tenantId
               and assignment.academicClassId = :academicClassId
               and lower(attempt.status) in :completedStates
-            """)
+            """ + LatestHandedInAttempt.OF_ATTEMPT)
     ClassScoreSummaryProjection summarizeClassWorkspaceScores(String tenantId, String academicClassId, java.util.Collection<String> completedStates);
 
     /** Uses the attempt state vocabulary owned by {@code LmsStatePolicy}. */

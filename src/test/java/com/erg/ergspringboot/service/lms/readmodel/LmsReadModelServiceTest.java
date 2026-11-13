@@ -20,6 +20,7 @@ import com.erg.ergspringboot.platform.concurrency.ErgReadTaskExecutor;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.ClassStudentScoreRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
 import com.erg.ergspringboot.lms.persistence.StudentGroupRepository;
@@ -73,6 +74,9 @@ class LmsReadModelServiceTest {
     private ClassroomRepository classroomRepository;
 
     @Mock
+    private ClassStudentScoreRepository classStudentScoreRepository;
+
+    @Mock
     private StudentRepository studentRepository;
 
     @Mock
@@ -93,7 +97,7 @@ class LmsReadModelServiceTest {
                 new LmsStudentGroupReadUseCase(studentGroupRepository, studentGroupMemberRepository),
                 new LmsAssignmentProgressQueryUseCase(attempts, assignments, assignmentResourceRepository),
                 new LmsClassWorkspaceReadUseCase(classroomRepository, studentRepository, assignmentRepository,
-                        assignmentResourceRepository, attemptRepository),
+                        assignmentResourceRepository, attemptRepository, classStudentScoreRepository),
                 new LmsTeacherHomeworkReadUseCase(assignments, assignmentResourceRepository,
                         classroomRepository, attempts, studentRepository));
     }

@@ -75,7 +75,7 @@ public class LmsAttemptUseCase {
         this.deadlines = new AttemptDeadlinePolicy(submitGrace);
         this.factory = new AttemptFactory(deadlines);
         this.progress = new AttemptProgressProjector(students, quizzes, grading);
-        this.effects = new AttemptCompletionEffects(events, progress, caches, policy, publisher);
+        this.effects = new AttemptCompletionEffects(events, progress, caches, publisher);
     }
 
     @Transactional("postgresTransactionManager")
@@ -92,6 +92,7 @@ public class LmsAttemptUseCase {
         String persistedStudent = learner == null ? studentId : learner.getId();
         OffsetDateTime now = now();
         String key = blank(idempotencyKey);
+        attempts.lockStart(tenant, request.assignmentId(), request.quizId(), persistedStudent);
         if (key != null) {
             Optional<Attempt> existing = attempts.findByStartIdempotencyKey(tenant, request.assignmentId(), request.quizId(), persistedStudent, key);
             if (existing.isPresent()) return response(existing.get());
@@ -110,7 +111,7 @@ public class LmsAttemptUseCase {
             attempt.setLastActiveAt(now);
             Attempt saved = attempts.save(attempt);
             log.info("EXAM_ATTEMPT_RESUME studentId={} attemptId={} quizId={} assignmentId={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId());
-            effects.evictReads(tenant, saved, assignment);
+            effects.evictReads(tenant, saved, assignment, studentId);
             AttemptResponse result = response(saved);
             complete(receipt, result, version(saved));
             return result;
@@ -135,7 +136,7 @@ public class LmsAttemptUseCase {
             throw new ConflictException("an attempt is already in progress for this quiz");
         }
         log.info("EXAM_ATTEMPT_START studentId={} attemptId={} quizId={} assignmentId={} mode={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId(), saved.getMode());
-        effects.evictReads(tenant, saved, assignment);
+        effects.evictReads(tenant, saved, assignment, studentId); // studentId is the caller's login user id
         AttemptResponse result = response(saved);
         complete(receipt, result, version(saved));
         return result;

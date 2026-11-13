@@ -10,6 +10,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 public final class ErgTieredCache implements Cache {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ErgTieredCache.class);
+
     private final CacheDescriptor<Object> descriptor;
     private final CacheKeyFactory keys;
     private final CacheValueCodec codec;
@@ -136,7 +138,15 @@ public final class ErgTieredCache implements Cache {
         String redisKey = redisKey(scoped, key);
         if (redisKey == null) return;
         long started = System.nanoTime();
-        CacheEncoding encoded = codec.encode(descriptor, value);
+        CacheEncoding encoded;
+        try {
+            encoded = codec.encode(descriptor, value);
+        } catch (RuntimeException exception) {
+            // L2 is an optimisation: the value is already loaded and in L1, so the request must not fail.
+            metric("l2", "put", "encode_error");
+            LOG.warn("Skipping L2 put for cache {}: {}", descriptor.name(), exception.toString());
+            return;
+        }
         metricSerialization(encoded.serializedSize(), System.nanoTime() - started);
         if (encoded.cacheable()) {
             failures.execute(() -> store.put(redisKey, encoded.bytes(), descriptor.l2Ttl()));

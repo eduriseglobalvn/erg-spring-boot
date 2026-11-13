@@ -18,12 +18,12 @@ final class LoginResponseMapper {
     private LoginResponseMapper() {
     }
 
-    static ProfileResponse profile(User user) {
+    static ProfileResponse profile(User user, boolean studentOnly) {
         return new ProfileResponse(
                 user.getId(), user.getEmail(), user.getFullName(), user.getAvatarUrl(), user.getPhone(),
                 user.getStatus(), user.getProvider(), firstNonBlank(user.getAccountType(), "erg"),
                 "user", user.getLastLoginProvider(), roles(user.getRoles()),
-                Boolean.TRUE.equals(user.getIsProfileCompleted()), toIso(user.getCreatedAt()), lifecycle(user));
+                Boolean.TRUE.equals(user.getIsProfileCompleted()), toIso(user.getCreatedAt()), lifecycle(user, studentOnly));
     }
 
     static SessionDeviceResponse sessionResponse(AuthSession session) {
@@ -41,16 +41,19 @@ final class LoginResponseMapper {
         return roles.stream().map(Role::getName).filter(name -> !isBlank(name)).collect(Collectors.toList());
     }
 
-    private static AccountLifecycleResponse lifecycle(User user) {
+    /** A student account (STU-01) is never sent to onboarding, password change or email verification. */
+    private static AccountLifecycleResponse lifecycle(User user, boolean studentOnly) {
         List<String> nextSteps = new ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) {
-            nextSteps.add("COMPLETE_PROFILE");
-        }
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
-            nextSteps.add("VERIFY_RECOVERY_EMAIL");
-        }
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) {
-            nextSteps.add("CHANGE_PASSWORD");
+        if (!studentOnly) {
+            if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) {
+                nextSteps.add("COMPLETE_PROFILE");
+            }
+            if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
+                nextSteps.add("VERIFY_RECOVERY_EMAIL");
+            }
+            if (Boolean.TRUE.equals(user.getMustChangePassword())) {
+                nextSteps.add("CHANGE_PASSWORD");
+            }
         }
         String lifecycleStatus = nextSteps.isEmpty() ? "ACTIVE"
                 : ("INVITED".equalsIgnoreCase(user.getStatus())

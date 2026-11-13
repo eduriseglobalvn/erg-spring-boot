@@ -46,8 +46,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentDashboardReadService {
 
     private static final String DASHBOARD_PERMISSION = "elearning.assignment.read_self";
-    // The student's whole assignment list (tabs Cần làm / Đã nộp / Quá hạn) comes from this slice, oldest due first.
+    // The student's whole assignment list (tabs Cần làm / Đã nộp / Quá hạn) comes from this slice, oldest due first;
+    // "Xem thêm" asks again with a larger assignmentLimit, capped so one request stays bounded.
     private static final int FIRST_SLICE_LIMIT = 50;
+    private static final int MAX_SLICE_LIMIT = 500;
     private static final int ANNOUNCEMENT_LIMIT = 5;
 
     private final AssignmentRepository assignmentRepository;
@@ -138,7 +140,7 @@ public class StudentDashboardReadService {
 
     @Cacheable(
             cacheNames = "studentDashboard",
-            key = "{#scope.userId(), #scope.tenantId(), #scope.requestedTenantId(), #scope.requestedStudentUserId(), #scope.requestedClassId()}",
+            key = "{#scope.userId(), #scope.tenantId(), #scope.requestedTenantId(), #scope.requestedStudentUserId(), #scope.requestedClassId(), #scope.assignmentLimit()}",
             unless = "#result == null"
     )
     public StudentDashboardResponse studentDashboard(StudentDashboardReadScope scope) {
@@ -155,14 +157,18 @@ public class StudentDashboardReadService {
         boolean leaderboardEnabled = academicClassId != null && leaderboardRepository != null
                 && leaderboardRepository.findLeaderboardEnabled(safeScope.tenantId(), academicClassId).orElse(false);
         StudentDashboardProfileResponse profile = toProfile(safeScope, user, student, academicClassId, leaderboardEnabled);
-        List<StudentDashboardAssignmentProjection> assignmentSlice = studentId == null
+        int sliceLimit = sliceLimit(safeScope.assignmentLimit());
+        List<StudentDashboardAssignmentProjection> fetched = studentId == null
                 ? List.of()
                 : assignmentRepository.findStudentDashboardAssignments(
                         safeScope.tenantId(),
                         academicClassId,
                         studentId,
-                        PageRequest.of(0, FIRST_SLICE_LIMIT)
+                        PageRequest.of(0, sliceLimit + 1)
                 );
+        // One extra row tells whether more assignments exist without a count query.
+        boolean assignmentsHasMore = fetched.size() > sliceLimit;
+        List<StudentDashboardAssignmentProjection> assignmentSlice = assignmentsHasMore ? fetched.subList(0, sliceLimit) : fetched;
         StudentDashboardAssignmentCountProjection assignmentCounts = studentId == null
                 ? null
                 : assignmentRepository.summarizeStudentDashboardAssignments(
@@ -221,8 +227,13 @@ public class StudentDashboardReadService {
                 nextActions,
                 announcements,
                 academicClassId,
-                classMemberships
+                classMemberships,
+                assignmentsHasMore
         );
+    }
+
+    static int sliceLimit(Integer requested) {
+        return requested == null ? FIRST_SLICE_LIMIT : Math.max(FIRST_SLICE_LIMIT, Math.min(MAX_SLICE_LIMIT, requested));
     }
 
     private long legacyActiveAssignmentCount(

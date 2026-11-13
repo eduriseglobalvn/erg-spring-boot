@@ -83,6 +83,10 @@ public class MediaService {
         return MediaPresignResponse.upload(saved.getId(), uploadUrl, storageKey);
     }
 
+    public boolean isSignedUploadAuthorized(String uploadUrl, String tenantId, String mimeType, long byteSize) {
+        return storageAdapter.isAuthorizedUpload(uploadUrl, tenantId, mimeType, byteSize);
+    }
+
     public boolean storeSignedUpload(String uploadUrl, String tenantId, String mimeType, byte[] bytes) {
         return storageAdapter.storeAuthorizedUpload(uploadUrl, tenantId, mimeType, bytes);
     }

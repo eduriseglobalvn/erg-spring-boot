@@ -59,7 +59,10 @@ public final class LmsClassWorkspaceResponses {
             String authUserId,
             String email,
             String status,
-            OffsetDateTime updatedAt
+            OffsetDateTime updatedAt,
+            // Latest hand-in per assignment, averaged; null when the student has none or the viewer lacks lms.grade.read.
+            Integer averagePercent,
+            Integer completedAssignmentCount
     ) {
     }
 

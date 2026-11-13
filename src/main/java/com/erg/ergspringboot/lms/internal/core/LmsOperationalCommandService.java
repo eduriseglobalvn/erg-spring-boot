@@ -8,6 +8,7 @@ import static com.erg.ergspringboot.lms.internal.core.LmsOperationalResponseMapp
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
@@ -28,7 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +51,7 @@ public class LmsOperationalCommandService {
     private final UserRepository users;
     private final LmsOperationalScopeGuard guard;
     private final StudentAccountProvisioner accounts;
+    private final LmsReadCacheInvalidator caches;
 
 
     public LmsOperationalCommandService(
@@ -60,7 +62,8 @@ public class LmsOperationalCommandService {
             EducationUnitRepository schools,
             UserActivityRepository activities,
             UserRepository users) {
-        this(classrooms, students, subjects, enrollments, schools, activities, users, null);
+        this(classrooms, students, subjects, enrollments, schools, activities, users, null,
+                new LmsReadCacheInvalidator(new NoOpCacheManager(), (com.erg.ergspringboot.platform.cache.CacheInvalidationService) null));
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -72,8 +75,10 @@ public class LmsOperationalCommandService {
             EducationUnitRepository schools,
             UserActivityRepository activities,
             UserRepository users,
-            StudentAccountProvisioner accounts) {
+            StudentAccountProvisioner accounts,
+            LmsReadCacheInvalidator caches) {
         this.accounts = accounts;
+        this.caches = caches;
         this.users = users;
         this.classrooms = classrooms;
         this.students = students;
@@ -85,7 +90,6 @@ public class LmsOperationalCommandService {
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public ClassResponse createClass(String schoolId, CreateClassRequest request, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
         guard.school(access, schoolId);
@@ -106,11 +110,11 @@ public class LmsOperationalCommandService {
         classroom.setStatus(status(request.status(), "ACTIVE"));
         Classroom saved = classrooms.save(classroom);
         audit(access, "LMS_CLASS_CREATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictSchool(access.tenantId(), schoolId);
         return classResponse(saved);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public ClassResponse updateClass(String schoolId, String classId, UpdateClassRequest request,
                                      UserAccessContext access) {
         guard.assertSchool(access, schoolId);
@@ -132,11 +136,11 @@ public class LmsOperationalCommandService {
         if (request.status() != null) classroom.setStatus(status(request.status(), classroom.getStatus()));
         Classroom saved = classrooms.save(classroom);
         audit(access, "LMS_CLASS_UPDATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictSchool(access.tenantId(), schoolId);
         return classResponse(saved);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public ClassResponse archiveClass(String schoolId, String classId, Long version, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
         Classroom classroom = guard.classroom(access, classId);
@@ -145,11 +149,11 @@ public class LmsOperationalCommandService {
         classroom.setStatus("ARCHIVED");
         Classroom saved = classrooms.save(classroom);
         audit(access, "LMS_CLASS_ARCHIVED", saved.getId(), Map.of("schoolId", schoolId));
+        evictSchool(access.tenantId(), schoolId);
         return classResponse(saved);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public StudentResponse createStudent(String schoolId, CreateStudentRequest request, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
         guard.school(access, schoolId);
@@ -172,11 +176,11 @@ public class LmsOperationalCommandService {
         student.setStatus(status(request.status(), "ENROLLED"));
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_CREATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictSchool(access.tenantId(), schoolId);
         return studentResponse(saved);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public StudentResponse updateStudent(String schoolId, String studentId, UpdateStudentRequest request,
                                          UserAccessContext access) {
         guard.assertSchool(access, schoolId);
@@ -198,11 +202,11 @@ public class LmsOperationalCommandService {
         if (request.status() != null) student.setStatus(status(request.status(), student.getStatus()));
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_UPDATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictSchool(access.tenantId(), schoolId);
         return studentResponse(saved);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public StudentResponse archiveStudent(String schoolId, String studentId, Long version, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
         Student student = guard.student(access, studentId);
@@ -211,11 +215,11 @@ public class LmsOperationalCommandService {
         student.setStatus("ARCHIVED");
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_ARCHIVED", saved.getId(), Map.of("schoolId", schoolId));
+        evictSchool(access.tenantId(), schoolId);
         return studentResponse(saved);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public BulkStudentImportResponse importStudents(String schoolId, BulkStudentImportRequest request,
                                                     String idempotencyKey, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
@@ -247,11 +251,11 @@ public class LmsOperationalCommandService {
             result.add(createStudent(schoolId, item, access));
         }
         audit(access, "LMS_STUDENT_IMPORT", schoolId, Map.of("requested", request.items().size(), "idempotencyKey", key == null ? "none" : key));
+        evictSchool(access.tenantId(), schoolId);
         return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayed, replayed, result);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public EnrollmentResponse enroll(EnrollStudentRequest request, String idempotencyKey, UserAccessContext access) {
         String key = normalizeKey(idempotencyKey);
         if (key != null) {
@@ -281,11 +285,11 @@ public class LmsOperationalCommandService {
         student.setStatus("ENROLLED");
         students.save(student);
         audit(access, "LMS_STUDENT_ENROLLED", student.getId(), Map.of("classId", classroom.getId(), "schoolId", student.getSchoolId()));
+        evictSchool(access.tenantId(), student.getSchoolId());
         return enrollmentResponse(saved, false);
     }
 
     @Transactional
-    @CacheEvict(cacheNames = {"lmsClassesBySchool", "lcmsSchoolOperations", "lcmsSchoolDirectory"}, allEntries = true)
     public BulkEnrollmentResponse bulkEnroll(BulkEnrollRequest request, String idempotencyKey,
                                              UserAccessContext access) {
         String root = normalizeKey(idempotencyKey);
@@ -300,6 +304,13 @@ public class LmsOperationalCommandService {
         return new BulkEnrollmentResponse(root, request.items().size(), request.items().size() - replayed, replayed, results);
     }
 
+
+    /** PERF-05: writes here stay in one school (guards reject cross-school classes); directory pages span schools. */
+    private void evictSchool(String tenantId, String schoolId) {
+        caches.evictScopesAfterCommit(tenantId, Map.of(
+                "lmsClassesBySchool", List.of(schoolId), "lcmsSchoolOperations", List.of(schoolId)));
+        caches.evictAfterCommit(tenantId, List.of("lcmsSchoolDirectory"));
+    }
 
     private void assertVersion(Long requested, Long actual, String resource) {
         if (requested == null) {

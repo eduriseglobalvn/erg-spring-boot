@@ -76,28 +76,28 @@ class QuizReportServiceTest {
     }
 
     @Test
-    void assignmentReportBucketsStatusesAndAveragesScores() {
-        List<StudentProgress> expected = List.of(
-                        progress("s1", "submitted", new BigDecimal("80")),
-                        progress("s2", "submitted", new BigDecimal("60")),
-                        progress("s3", "in_progress", null),
-                        progress("s4", "needs_review", null)
-                );
+    void assignmentReportCountsComeFromTheSummaryNotFromTheVisiblePage() {
+        List<StudentProgress> visible = List.of(
+                progress("s1", "graded", new BigDecimal("80")),
+                progress("s2", "needs_review", new BigDecimal("60")));
         when(studentProgressRepository.findByTenantIdAndAssignmentIdOrderBySubmittedAtDesc(
                 org.mockito.ArgumentMatchers.eq("tenant-a"),
                 org.mockito.ArgumentMatchers.eq("asg-1"),
                 org.mockito.ArgumentMatchers.any(Pageable.class)))
-                .thenReturn(new PageImpl<>(expected));
+                .thenReturn(new PageImpl<>(visible));
+        // Handed in = 3 (graded, needs_review, submitted); needs-review is a subset of it.
+        when(studentProgressRepository.summarizeAssignmentAggregate("tenant-a", "asg-1"))
+                .thenReturn(aggregate(4, 3, 1, 1, 70.0));
 
         AssignmentReportResponse report = service().assignmentReport("tenant-a", "asg-1");
 
         assertThat(report.totalRecipients()).isEqualTo(4);
-        assertThat(report.submittedCount()).isEqualTo(2);
+        assertThat(report.submittedCount()).isEqualTo(3);
         assertThat(report.inProgressCount()).isEqualTo(1);
         assertThat(report.needsReviewCount()).isEqualTo(1);
         assertThat(report.notStartedCount()).isZero();
         assertThat(report.averagePercent()).isEqualTo(70.0);
-        assertThat(report.students()).hasSize(4);
+        assertThat(report.students()).hasSize(2);
     }
 
     @Test
@@ -108,7 +108,7 @@ class QuizReportServiceTest {
                 org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
         when(studentProgressRepository.summarizeAssignmentAggregate("tenant-a", "asg-aggregate"))
-                .thenReturn(aggregate(5000, 4200, 600, 100, 82.5));
+                .thenReturn(aggregate(5000, 4300, 600, 100, 82.5));
 
         AssignmentReportResponse report = service().assignmentReport("tenant-a", "asg-aggregate");
 

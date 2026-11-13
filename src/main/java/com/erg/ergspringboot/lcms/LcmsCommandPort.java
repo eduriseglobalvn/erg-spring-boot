@@ -26,6 +26,7 @@ public interface LcmsCommandPort {
     DeleteQuizResponse deleteQuiz(String tenantId, String quizId);
     MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request);
     long maxMediaUploadBytes();
+    boolean isSignedMediaUploadAuthorized(String uploadUrl, String tenantId, String mimeType, long byteSize);
     boolean storeSignedMediaUpload(String uploadUrl, String tenantId, String mimeType, byte[] bytes);
     MediaCommitResponse commitMedia(String tenantId, MediaCommitRequest request);
     LcmsQuizBundleResponse exportActiveBundle(String tenantId, String quizId);

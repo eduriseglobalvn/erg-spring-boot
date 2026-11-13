@@ -73,6 +73,9 @@ public class PlatformHealthController {
         return dbReady ? ok(data, request) : serviceUnavailable(data, request);
     }
 
+    // No longer public (SEC-06) and nothing scrapes it: Prometheus reads /actuator/prometheus. Remove after the
+    // deprecation has been published, per docs/api-contract-workflow.md.
+    @Deprecated(forRemoval = true)
     @GetMapping(value = "/metrics", produces = MediaType.TEXT_PLAIN_VALUE)
     public String metrics() {
         long uptime = (System.currentTimeMillis() - startedAtMillis) / 1000;
