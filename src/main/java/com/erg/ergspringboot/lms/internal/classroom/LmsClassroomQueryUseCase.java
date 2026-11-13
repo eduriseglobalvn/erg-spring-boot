@@ -28,7 +28,8 @@ public class LmsClassroomQueryUseCase {
         return new EducationUnitListResponse(items);
     }
 
-    @Cacheable(cacheNames = "lmsClassesBySchool", key = "{#access.tenantId(), #schoolId, #access.scopeFingerprint()}")
+    // Keyed by the resolved school (blank = the caller's current one) so a school-scoped eviction reaches every entry.
+    @Cacheable(cacheNames = "lmsClassesBySchool", key = "{#access.tenantId(), #schoolId == null || #schoolId.isBlank() ? #access.currentEducationUnitId() : #schoolId.trim(), #access.scopeFingerprint()}")
     public ClassesBySchoolResponse listClassesBySchool(String schoolId, UserAccessContext access) {
         String resolved = schoolId == null || schoolId.isBlank() ? access.currentEducationUnitId() : schoolId.trim();
         if (resolved == null || resolved.isBlank()) throw new BadRequestException("schoolId is required");

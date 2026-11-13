@@ -31,7 +31,7 @@ class StudentAccountImportTest {
     private final LmsOperationalCommandService service = new LmsOperationalCommandService(
             mock(ClassroomRepository.class), students, mock(SubjectRepository.class),
             mock(StudentEnrollmentRepository.class), schools, mock(UserActivityRepository.class),
-            mock(UserRepository.class), accounts);
+            mock(UserRepository.class), accounts, mock(com.erg.ergspringboot.lms.LmsReadCacheInvalidator.class));
     private final UserAccessContext access =
             new UserAccessContext("actor-1", "tenant-1", List.of("school-1"), List.of("*"), null, null);
 

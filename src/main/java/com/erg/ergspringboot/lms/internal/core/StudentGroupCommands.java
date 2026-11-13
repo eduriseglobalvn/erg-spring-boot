@@ -37,6 +37,8 @@ public class StudentGroupCommands {
         this.studentGroupMemberRepository = studentGroupMemberRepository;
     }
 
+    // PERF-05: stays tenant-wide (ErgTieredCache.clear() only clears the caller's tenant). A group appears in lists keyed
+    // by its class, its owner, any allowed-class set containing its class, or "*", so no single scope owns it.
     @CacheEvict(cacheNames = "lmsStudentGroups", allEntries = true)
     public StudentGroupResponse createGroup(String tenantId, String userId, StudentGroupRequest request) {
         if (request == null || blankToNull(request.name()) == null) {
