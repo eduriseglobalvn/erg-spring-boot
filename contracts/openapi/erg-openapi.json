@@ -28650,6 +28650,7 @@
     },
     "/metrics": {
       "get": {
+        "deprecated": true,
         "operationId": "metrics",
         "responses": {
           "200": {
@@ -28663,7 +28664,6 @@
             "description": "OK"
           }
         },
-        "security": [],
         "tags": [
           "platform-health-controller"
         ]
