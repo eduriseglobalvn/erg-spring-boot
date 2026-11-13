@@ -19,10 +19,10 @@ import org.springframework.stereotype.Service;
 public class LmsClassWorkspaceReadUseCase {
     private final ClassroomRepository classrooms; private final StudentRepository students;
     private final AssignmentRepository assignments; private final AssignmentResourceRepository resources;
-    private final AttemptRepository attempts;
+    private final AttemptRepository attempts; private final ClassStudentScoreRepository studentScores;
     public LmsClassWorkspaceReadUseCase(ClassroomRepository classrooms, StudentRepository students,
-            AssignmentRepository assignments, AssignmentResourceRepository resources, AttemptRepository attempts) {
-        this.classrooms=classrooms; this.students=students; this.assignments=assignments; this.resources=resources; this.attempts=attempts;
+            AssignmentRepository assignments, AssignmentResourceRepository resources, AttemptRepository attempts, ClassStudentScoreRepository studentScores) {
+        this.classrooms=classrooms; this.students=students; this.assignments=assignments; this.resources=resources; this.attempts=attempts; this.studentScores=studentScores;
     }
     public Page<ClassWorkspaceProjection> schoolClasses(String tenant,String school,String status,Pageable page){return classrooms.findSchoolClassWorkspaces(tenant,school,normalize(status),page);}
     public ClassWorkspaceResponse query(String tenantId,String classId,String schoolId,String studentStatus,Integer page,Integer size,String assignmentStatus,Integer assignmentPage,Integer assignmentSize,boolean includeScore,boolean includeRisk){
@@ -34,10 +34,12 @@ public class LmsClassWorkspaceReadUseCase {
         Page<AssignmentCardProjection> cards=assignments.findClassAssignmentCards(tenant,id,LmsStatePolicy.assignmentFilter(assignmentStatus),assignmentPageable);
         ClassScoreSummaryResponse scores=includeScore?score(attempts.summarizeClassWorkspaceScores(tenant,id)):null;
         ClassRiskSummaryResponse risks=includeRisk?risk(students.summarizeClassWorkspaceRisks(tenant,id,50.0D)):null;
-        return new ClassWorkspaceResponse(tenant,classInfo(info),scores,risks,studentPage(roster),assignmentPage(cards,tenant));
+        Map<String,ClassStudentScoreProjection> perStudent=includeScore?studentScores(tenant,id,roster.getContent()):Map.of();
+        return new ClassWorkspaceResponse(tenant,classInfo(info),scores,risks,studentPage(roster,perStudent),assignmentPage(cards,tenant));
     }
     private ClassInfoResponse classInfo(ClassWorkspaceProjection p){return new ClassInfoResponse(p.id(),p.schoolId(),p.name(),p.grade(),p.academicYear(),p.status(),p.homeroomTeacherId(),p.studentCount()==null?0L:p.studentCount(),p.assignmentCount()==null?0L:p.assignmentCount(),p.updatedAt());}
-    private PageResponse<StudentRosterItemResponse> studentPage(Page<StudentRosterProjection> p){List<StudentRosterItemResponse> items=p.getContent().stream().map(x->new StudentRosterItemResponse(x.id(),x.schoolId(),x.academicClassId(),x.studentCode(),x.fullName(),x.username(),x.authUserId(),x.email(),x.status(),x.updatedAt())).toList();return page(items,p);}
+    private PageResponse<StudentRosterItemResponse> studentPage(Page<StudentRosterProjection> p,Map<String,ClassStudentScoreProjection> scores){List<StudentRosterItemResponse> items=p.getContent().stream().map(x->{ClassStudentScoreProjection s=scores.get(x.id());return new StudentRosterItemResponse(x.id(),x.schoolId(),x.academicClassId(),x.studentCode(),x.fullName(),x.username(),x.authUserId(),x.email(),x.status(),x.updatedAt(),s==null||s.averagePercent()==null?null:percent(s.averagePercent()),s==null?null:bound(s.completedAssignmentCount()));}).toList();return page(items,p);}
+    private Map<String,ClassStudentScoreProjection> studentScores(String tenant,String classId,List<StudentRosterProjection> roster){List<String> ids=roster.stream().map(StudentRosterProjection::id).filter(Objects::nonNull).toList();return studentScores.summarizeClassStudentScores(tenant,classId,ids).stream().collect(Collectors.toMap(ClassStudentScoreProjection::studentId,x->x,(a,b)->a));}
     private PageResponse<AssignmentSummaryItemResponse> assignmentPage(Page<AssignmentCardProjection> p,String tenant){Map<String,List<AssignmentResourceProjection>> by=resourceMap(tenant,p.getContent());List<AssignmentSummaryItemResponse> items=p.getContent().stream().map(x->new AssignmentSummaryItemResponse(x.id(),x.academicClassId(),x.quizId(),x.subjectId(),x.dueAt(),x.status(),x.assignedBy(),x.recipientMode(),resourceDtos(by.getOrDefault(x.id(),List.of())),x.createdAt(),x.updatedAt())).toList();return page(items,p);}
     private List<AssignmentResourceResponse> resourceDtos(List<AssignmentResourceProjection> rs){return rs.stream().sorted(Comparator.comparingInt(x->x.orderIndex()==null?0:x.orderIndex())).map(x->new AssignmentResourceResponse(x.quizId(),x.quizVersionId(),x.quizVersionLabel(),x.orderIndex()==null?0:x.orderIndex())).toList();}
     private Map<String,List<AssignmentResourceProjection>> resourceMap(String tenant,List<AssignmentCardProjection> cards){List<String> ids=cards.stream().map(AssignmentCardProjection::id).filter(x->x!=null&&!x.isBlank()).distinct().toList();if(ids.isEmpty())return Map.of();return resources.findResourceProjectionsByAssignmentIds(tenant,ids).stream().collect(Collectors.groupingBy(AssignmentResourceProjection::assignmentId));}
