@@ -26,6 +26,9 @@ COPY --from=jvm-builder --chown=erg:erg /workspace/target/erg-spring-0.0.1-SNAPS
 # Same path as the native image, so compose.native.yml's FLYWAY_LOCATIONS works for either runtime.
 COPY --from=jvm-builder --chown=erg:erg /workspace/target/classes/db/migration/postgres/ /app/db/migration/postgres/
 
+# Punch photos live on the tk-photos volume (compose.native.yml); the dir must exist owned by erg so the volume inherits it.
+RUN install -d -o erg -g erg /var/lib/erg/tk-photos
+
 USER erg
 EXPOSE 1606
 
@@ -74,6 +77,9 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=native-builder --chown=erg:erg /workspace/target/erg-spring-native /app/erg-spring
 COPY --from=native-builder --chown=erg:erg /workspace/target/classes/db/migration/postgres/ /app/db/migration/postgres/
+
+# Punch photos live on the tk-photos volume (compose.native.yml); the dir must exist owned by erg so the volume inherits it.
+RUN install -d -o erg -g erg /var/lib/erg/tk-photos
 
 USER erg
 EXPOSE 1606

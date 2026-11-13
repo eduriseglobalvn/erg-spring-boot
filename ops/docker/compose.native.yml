@@ -32,6 +32,10 @@ services:
       ERG_REDIS_STATE_ENABLED: ${ERG_REDIS_STATE_ENABLED:-true}
       ERG_REDIS_CACHE_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379
       ERG_REDIS_CACHE_ENABLED: ${ERG_REDIS_CACHE_ENABLED:-true}
+      # Local punch photos survive redeploys only on a volume (PunchPhotoStorageConfig refuses the container layer).
+      ERG_TK_PHOTOS_LOCAL_ROOT: /var/lib/erg/tk-photos
+    volumes:
+      - tk-photos:/var/lib/erg/tk-photos
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,3 +72,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+volumes:
+  tk-photos:

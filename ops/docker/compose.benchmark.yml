@@ -40,6 +40,8 @@ x-backend-environment: &backend-environment
   # prod requires a private R2 bucket for timekeeping selfies; the benchmark has none and never punches.
   TK_PHOTOS_R2__ENABLED: "false"
   TK_PHOTOS_LOCAL_ALLOWED_IN_PROD: "true"
+  ERG_TK_PHOTOS_LOCAL_ROOT: /tmp/tk-photos
+  SECRET_TK_PHOTO_URL_SIGNING_KEY: benchmark-only-tk-photo-key-0123456789-abcdef
   TENANT__ENABLED: "true"
   ERG_PROCESS_LOCAL_ENABLED: "false"
   ERG_OUTBOX_WORKER_ENABLED: "false"

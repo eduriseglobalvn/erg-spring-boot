@@ -89,6 +89,8 @@ ensure_env() { # $1 name, $2 value used only when the name is missing or empty
 }
 ensure_env SECRET_QUIZ_PACKAGE_SIGNING_KEY "$(openssl rand -hex 32)"
 ensure_env QUIZ_PACKAGE_PUBLIC_KEY_ID quiz-pkg-1
+# Signs punch-photo URLs; a new key only expires links already handed out.
+ensure_env SECRET_TK_PHOTO_URL_SIGNING_KEY "$(openssl rand -hex 32)"
 # The nightly cron runs ops/backup/backup.sh; its metrics dir is read by node-exporter (non-root).
 install -d -m 700 "$ROOT/ops/backup" && install -m 750 "$ROOT/src/ops/backup/backup.sh" "$ROOT/ops/backup/backup.sh"
 install -d -m 755 "$ROOT/ops/backup/metrics"
@@ -122,7 +124,7 @@ docker run -d --name $N-app --network $N --env-file "$ENV_FILE" \
   -e SPRING_DATASOURCE_URL=jdbc:postgresql://$N-pg:5432/erg -e SPRING_DATASOURCE_USERNAME="$RUNTIME_USER" -e SPRING_DATASOURCE_PASSWORD="$PW" \
   -e SPRING_FLYWAY_USER=erg -e SPRING_FLYWAY_PASSWORD="$PW" -e FLYWAY_LOCATIONS=filesystem:/app/db/migration/postgres \
   -e SPRING_DATA_REDIS_URL="$R" -e ERG_REDIS_STATE_URL="$R" -e ERG_REDIS_CACHE_URL="$R" \
-  -e SERVER_ADDRESS=0.0.0.0 -e SERVER_PORT=1606 -e SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED=false \
+  -e SERVER_ADDRESS=0.0.0.0 -e SERVER_PORT=1606 -e ERG_TK_PHOTOS_LOCAL_ROOT=/tmp/tk-photos -e SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED=false \
   -e ERG_SCHEDULING_ENABLED=false -e ERG_OUTBOX_WORKER_ENABLED=false -e NOTIFICATIONS__WORKER__ENABLED=false \
   -e ERG_REPORTING_WORKER_ENABLED=false -e NOTIFICATIONS__PUSH__ENABLED=false -e SPRING_MAIL_HOST=mail.invalid \
   "$IMAGE" >/dev/null
