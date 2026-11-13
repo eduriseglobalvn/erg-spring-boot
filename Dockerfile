@@ -15,11 +15,10 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:25-jre AS jvm-runtime
 
-# Password hashing loads libargon2 from the system: JNA cannot unpack its bundled copy into the noexec /tmp.
+# Password hashing calls the system libargon2 through the Foreign Function API (NativeArgon2PasswordEncoder).
 RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl libargon2-1 \
     && rm -rf /var/lib/apt/lists/* \
-    && lib="$(dpkg -L libargon2-1 | grep '/libargon2.so.1$')" && ln -s "$lib" "${lib%.1}" \
     && groupadd --system --gid 999 erg \
     && useradd --system --uid 999 --gid 999 --home-dir /app --shell /usr/sbin/nologin erg
 
@@ -37,7 +36,7 @@ EXPOSE 1606
 HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=8 \
     CMD curl --fail --silent http://127.0.0.1:1606/ready >/dev/null || exit 1
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/erg-spring.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/erg-spring.jar"]
 
 FROM --platform=$TARGETPLATFORM ghcr.io/graalvm/native-image-community:25 AS native-builder
 
