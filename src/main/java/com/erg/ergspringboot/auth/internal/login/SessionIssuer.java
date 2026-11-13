@@ -15,6 +15,7 @@ import com.erg.ergspringboot.users.persistence.auth.SecurityEventRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;
+import com.erg.ergspringboot.auth.internal.session.RememberedStudentSession;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -72,7 +73,7 @@ final class SessionIssuer {
     }
 
     AuthResponse issueTokens(
-            User user, AuthClientContext context, String loginProvider, String portal) {
+            User user, AuthClientContext context, String loginProvider, String portal, boolean rememberMe) {
         List<String> permissions = effectivePermissions(user);
         // The requested portal is a compatibility/audit hint only. Shared Auth must issue one
         // session before workspace selection; authorization is evaluated later from the verified
@@ -116,7 +117,10 @@ final class SessionIssuer {
         session.setRefreshTokenHash(tokens.hashToken(refreshToken));
         session.setTenantId(tenantId);
         session.setLastActiveAt(now);
-        session.setExpiresAt(now.plus(sessionTtl(user)));
+        // createdAt anchors the remembered session's 90-day limit, so it must equal the issue time.
+        session.setCreatedAt(now);
+        session.setExpiresAt(now.plus(RememberedStudentSession.applies(rememberMe, portals)
+                ? RememberedStudentSession.SLIDING_TTL : sessionTtl(user)));
         session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
         attemptRecorder.recordLoginAttempt(
