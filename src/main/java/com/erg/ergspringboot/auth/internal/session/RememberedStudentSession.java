@@ -12,9 +12,6 @@ import java.util.List;
 public final class RememberedStudentSession {
     public static final Duration SLIDING_TTL = Duration.ofDays(30);
     static final Duration MAX_AGE = Duration.ofDays(90);
-    // Every other session lives at most 12h, so a lifetime above a day marks a remembered one
-    // without a schema column.
-    private static final Duration REMEMBERED_THRESHOLD = Duration.ofDays(1);
 
     private RememberedStudentSession() {}
 
@@ -23,9 +20,7 @@ public final class RememberedStudentSession {
     }
 
     public static boolean isRemembered(AuthSession session) {
-        return session.getCreatedAt() != null && session.getExpiresAt() != null
-                && Duration.between(session.getCreatedAt(), session.getExpiresAt())
-                        .compareTo(REMEMBERED_THRESHOLD) > 0;
+        return session.isRememberMe() && session.getCreatedAt() != null;
     }
 
     /** Extends a remembered session on refresh; other sessions keep their absolute expiry. */

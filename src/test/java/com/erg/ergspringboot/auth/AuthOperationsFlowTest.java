@@ -139,6 +139,7 @@ class AuthOperationsFlowTest {
         assertEquals("fingerprint", session.getDeviceFingerprint());
         assertEquals("127.0.0.1", session.getIpAddress());
         assertEquals(Duration.ofHours(12), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
+        assertFalse(session.isRememberMe());
         assertNotEquals(response.refreshToken(), session.getRefreshTokenHash());
 
         assertEquals("active@example.com", response.user().email());
@@ -750,6 +751,7 @@ class AuthOperationsFlowTest {
         AuthSession session = loginStudent(true);
 
         assertEquals(Duration.ofDays(30), Duration.between(session.getCreatedAt(), session.getExpiresAt()));
+        assertTrue(session.isRememberMe());
     }
 
     @Test
@@ -822,6 +824,8 @@ class AuthOperationsFlowTest {
         session.setRefreshTokenHash(tokenService.hashToken("student-refresh"));
         session.setCreatedAt(createdAt);
         session.setExpiresAt(expiresAt);
+        // The tests that build a session living longer than a day are the remembered ones.
+        session.setRememberMe(Duration.between(createdAt, expiresAt).toDays() >= 1);
         lenient().when(sessionRepository.lockByRefreshTokenHash(session.getRefreshTokenHash()))
                 .thenReturn(Optional.of(session));
         lenient().when(sessionRepository.findByPreviousRefreshTokenHash(any(String.class)))

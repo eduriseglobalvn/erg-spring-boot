@@ -122,8 +122,9 @@ final class SessionIssuer {
         session.setLastActiveAt(now);
         // createdAt anchors the remembered session's 90-day limit, so it must equal the issue time.
         session.setCreatedAt(now);
-        session.setExpiresAt(now.plus(RememberedStudentSession.applies(rememberMe, portals)
-                ? RememberedStudentSession.SLIDING_TTL : sessionTtl(user)));
+        boolean remembered = RememberedStudentSession.applies(rememberMe, portals);
+        session.setRememberMe(remembered);
+        session.setExpiresAt(now.plus(remembered ? RememberedStudentSession.SLIDING_TTL : sessionTtl(user)));
         session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
         attemptRecorder.recordLoginAttempt(
