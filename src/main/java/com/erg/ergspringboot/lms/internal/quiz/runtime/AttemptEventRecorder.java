@@ -42,7 +42,8 @@ public class AttemptEventRecorder {
             OffsetDateTime clientCreatedAt
     ) {
         String id = storableId(attemptId, eventId);
-        if (attemptEventRepository.existsById(id)) {
+        // A server-generated id is fresh, so only a client-supplied id can be a replay.
+        if (eventId != null && !eventId.isBlank() && attemptEventRepository.existsById(id)) {
             return;
         }
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
