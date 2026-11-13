@@ -11,7 +11,6 @@ import com.erg.ergspringboot.common.response.users.UserResponses.AccountLifecycl
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
-import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
@@ -61,9 +60,12 @@ public class SessionService {
         AuthSession session = sessionRepository.findBySessionIdAndTenantId(sessionId, normalizeTenant(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("session not found"));
         boolean active = isSessionActive(session);
-        List<String> roles = session.getUser() == null || session.getUser().getRoles() == null
+        User user = session.getUser();
+        // Same role sources as currentBootstrap: direct roles plus active role assignments.
+        List<String> roles = user == null
                 ? List.of()
-                : session.getUser().getRoles().stream().map(Role::getName).toList();
+                : EffectivePermissionResolver.roleNames(user, userRoleAssignmentRepository.findActiveForUser(
+                        user.getId(), normalizeTenant(tenantId), OffsetDateTime.now()));
         return new SessionContextResponse(
                 session.getSessionId(),
                 session.getUserId(),

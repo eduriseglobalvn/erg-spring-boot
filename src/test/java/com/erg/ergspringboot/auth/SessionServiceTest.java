@@ -328,6 +328,23 @@ class SessionServiceTest {
         assertThat(response.lifecycle().nextSteps()).contains("CHANGE_PASSWORD");
     }
 
+    @Test
+    void currentSessionResolvesRolesFromRoleAssignmentsLikeTheBootstrap() {
+        SessionService service = new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
+                userPermissionOverrideRepository, userRoleAssignmentRepository);
+        User user = assignedOnlyUser("u-student-ctx");
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s-student-ctx");
+        session.setTenantId("erg");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+        when(sessionRepository.findBySessionIdAndTenantId("s-student-ctx", "erg")).thenReturn(Optional.of(session));
+        when(userRoleAssignmentRepository.findActiveForUser(eq("u-student-ctx"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment("u-student-ctx", "lms.learner", "lms.quiz.play")));
+
+        assertThat(service.currentSession("s-student-ctx", "erg").roles()).contains("lms.learner");
+    }
+
     private User assignedOnlyUser(String userId) {
         User user = new User();
         user.setId(userId);
