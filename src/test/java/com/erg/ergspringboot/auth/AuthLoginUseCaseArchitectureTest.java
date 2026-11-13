@@ -27,7 +27,7 @@ class AuthLoginUseCaseArchitectureTest {
         String useCase = login("AuthLoginUseCase");
         assertThat(useCase)
                 // Argon2 runs before the transaction opens, so a login burst never parks pooled connections on hashing.
-                .contains("CheckedPassword.check(passwords, found, request.password())")
+                .contains("CheckedPassword.check(passwords, passwordCache, found, request.password())")
                 .contains("transaction.execute(")
                 .doesNotContain("@Transactional")
                 .contains("credentialVerifier.verify(")

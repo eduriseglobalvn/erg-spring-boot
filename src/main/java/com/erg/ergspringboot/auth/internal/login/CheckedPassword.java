@@ -12,12 +12,21 @@ import java.util.Optional;
 record CheckedPassword(String verifiedHash, boolean matched) {
 
     static CheckedPassword check(PasswordService passwords, Optional<User> found, String rawPassword) {
+        return check(passwords, null, found, rawPassword);
+    }
+
+    /** With a cache, a password verified earlier today skips Argon2; only a successful hash is remembered. */
+    static CheckedPassword check(PasswordService passwords, LoginPasswordCache cache, Optional<User> found, String rawPassword) {
         String hash = found.map(User::getPasswordHash).orElse(null);
         if (hash == null || hash.isBlank()) {
             passwords.burnUnknownAccountCheck(rawPassword);
             return new CheckedPassword(null, false);
         }
-        return new CheckedPassword(hash, passwords.matches(rawPassword, hash));
+        String userId = found.get().getId();
+        if (cache != null && cache.recalls(userId, hash, rawPassword)) return new CheckedPassword(hash, true);
+        boolean matched = passwords.matches(rawPassword, hash);
+        if (matched && cache != null) cache.remember(userId, hash, rawPassword);
+        return new CheckedPassword(hash, matched);
     }
 
     /** True only for the hash that was verified: a password changed in between counts as a mismatch. */

@@ -47,8 +47,24 @@ class CheckedPasswordTest {
         verify(passwords, never()).matches(anyString(), anyString());
     }
 
+    @Test
+    void aPasswordVerifiedEarlierSkipsArgon2AndOnlySuccessIsRemembered() {
+        LoginPasswordCache cache = mock(LoginPasswordCache.class);
+        when(cache.recalls("u1", "hash-1", "secret")).thenReturn(true);
+        assertThat(CheckedPassword.check(passwords, cache, Optional.of(user("hash-1")), "secret").matches("hash-1")).isTrue();
+        verify(passwords, never()).matches(anyString(), anyString());
+
+        when(passwords.matches("other", "hash-1")).thenReturn(true);
+        when(passwords.matches("wrong", "hash-1")).thenReturn(false);
+        CheckedPassword.check(passwords, cache, Optional.of(user("hash-1")), "other");
+        CheckedPassword.check(passwords, cache, Optional.of(user("hash-1")), "wrong");
+        verify(cache).remember("u1", "hash-1", "other");
+        verify(cache, never()).remember("u1", "hash-1", "wrong");
+    }
+
     private static User user(String hash) {
         User user = new User();
+        user.setId("u1");
         user.setPasswordHash(hash);
         return user;
     }

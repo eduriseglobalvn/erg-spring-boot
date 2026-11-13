@@ -40,6 +40,7 @@ public class AuthLoginUseCase {
     private final PasswordService passwords;
     private TransactionOperations transaction = TransactionOperations.withoutTransaction();
     private AuthLoginRateLimiter rateLimiter;
+    private LoginPasswordCache passwordCache;
 
     /** Compatibility constructor retained for legacy tests and callers wiring without metrics. */
     public AuthLoginUseCase(
@@ -115,6 +116,11 @@ public class AuthLoginUseCase {
     }
 
     @Autowired(required = false)
+    void setLoginPasswordCache(LoginPasswordCache passwordCache) {
+        this.passwordCache = passwordCache;
+    }
+
+    @Autowired(required = false)
     public void setUserRoleAssignmentRepository(UserRoleAssignmentRepository roleAssignments) {
         sessionIssuer.setUserRoleAssignmentRepository(roleAssignments);
     }
@@ -133,7 +139,7 @@ public class AuthLoginUseCase {
         }
         // Argon2 runs before the transaction: a login may queue up to 10 s for a hash thread, and must not hold a
         // pooled connection meanwhile (a 2000-login burst parked up to 29 connections idle in transaction).
-        CheckedPassword password = CheckedPassword.check(passwords, found, request.password());
+        CheckedPassword password = CheckedPassword.check(passwords, passwordCache, found, request.password());
         return transaction.execute(status -> loginVerified(identifier, portal, password, context,
                 Boolean.TRUE.equals(request.rememberMe())));
     }
