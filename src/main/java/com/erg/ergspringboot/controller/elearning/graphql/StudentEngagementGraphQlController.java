@@ -28,6 +28,7 @@ import com.erg.ergspringboot.elearning.authorization.ElearningDashboardRead;
 import com.erg.ergspringboot.elearning.authorization.ElearningDiscussionModerate;
 import com.erg.ergspringboot.elearning.authorization.ElearningDiscussionWriteSelf;
 import com.erg.ergspringboot.elearning.authorization.ElearningLeaderboardManage;
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
@@ -257,6 +258,15 @@ public class StudentEngagementGraphQlController {
     public boolean acknowledgeTierPromotion(@Argument String weekStart, @Argument String tenantId) {
         ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
         return tiers.acknowledgeTierPromotion(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), weekStart);
+    }
+
+    /** Same guard as the leaderboard admin screens, narrowed to tenant-wide admins; runs for the caller's tenant only. */
+    @MutationMapping
+    @ElearningLeaderboardManage
+    public int runStudentTierUpdate(@Argument String tenantId) {
+        LeaderboardManager admin = manager(tenantId);
+        if (!admin.tenantWide()) throw new ForbiddenException("Running the tier update requires a tenant-wide admin.");
+        return tiers.runTierUpdate(admin.tenantId());
     }
 
     @SchemaMapping(typeName = "ElearningQuery", field = "leaderboardClasses")

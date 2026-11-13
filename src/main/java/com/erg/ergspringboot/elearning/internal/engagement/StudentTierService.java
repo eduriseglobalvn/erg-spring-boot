@@ -70,10 +70,11 @@ public class StudentTierService {
 
     /**
      * Standings as of {@code weekStart} 00:00 (hand-ins before it). Idempotent: the cohort's rows of that week are
-     * replaced; the previous week's stored state feeds the drop protection.
+     * replaced; the previous week's stored state (week_start < weekStart) feeds the drop protection, so a re-run never
+     * counts the same week twice towards the below-cutoff demotion counter. Returns the number of students tiered.
      */
     @Transactional
-    public void refreshCohort(Cohort cohort, LocalDate weekStart) {
+    public int refreshCohort(Cohort cohort, LocalDate weekStart) {
         LocalDate lastDay = weekStart.minusDays(1);
         String year = schoolYear(lastDay);
         List<String> ids = jdbc.queryForList("""
@@ -81,7 +82,7 @@ public class StudentTierService {
                 join academic_classes c on c.tenant_id = s.tenant_id and c.id = s.academic_class_id
                 where s.tenant_id = :t and c.school_id = :school and c.grade = :grade and %s
                 """.formatted(ACTIVE), Map.of("t", cohort.tenantId(), "school", cohort.schoolId(), "grade", cohort.grade()), String.class);
-        if (ids.isEmpty()) return;
+        if (ids.isEmpty()) return 0;
         Map<String, Candidate> xp = readXp(cohort.tenantId(), ids, yearStart(lastDay), weekStart.atStartOfDay(LeaderboardXp.ZONE), lastDay);
         Standing standing = TierMath.standings(new ArrayList<>(xp.values()));
         Map<String, Placement> placed = new HashMap<>();
@@ -123,6 +124,7 @@ public class StudentTierService {
                 insert into student_frame (tenant_id, student_id, tier_key, unlocked_at, school_year)
                 values (:t, :student, :tier, :week, :year) on conflict (tenant_id, student_id, tier_key) do nothing
                 """, frames.toArray(SqlParameterSource[]::new));
+        return ids.size();
     }
 
     private Map<String, State> previousStates(String tenantId, List<String> ids, String year, LocalDate weekStart) {

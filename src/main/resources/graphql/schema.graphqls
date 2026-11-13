@@ -1039,6 +1039,8 @@ type Mutation {
   "tierKey null = no frame; a frame that is not unlocked is rejected"
   selectFrame(tierKey: String, tenantId: String): MyFrames!
   acknowledgeTierPromotion(weekStart: String!, tenantId: String): Boolean!
+  "Admin: runs the weekly tier update now for the caller's tenant; returns the number of students tiered. Safe to repeat."
+  runStudentTierUpdate(tenantId: String): Int!
   previewTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingSchedulePreviewPayload!
   createTeachingSchedule(input: TeachingScheduleBulkInput!): TeachingScheduleBulkPayload!
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
