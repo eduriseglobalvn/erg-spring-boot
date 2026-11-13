@@ -70,6 +70,17 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void busyPasswordHashingResponseAsksClientToRetrySoon() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        ResponseEntity<ApiResponse<Void>> response = handler.handleApiException(
+                new com.erg.ergspringboot.exception.auth.AuthFailure.PasswordHashBusy(),
+                new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("2");
+    }
+
+    @Test
     void constraintViolationUsesValidationEnvelopeInsteadOfInternalServerError() {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/users");
         request.addHeader("X-Request-ID", "req-constraint");

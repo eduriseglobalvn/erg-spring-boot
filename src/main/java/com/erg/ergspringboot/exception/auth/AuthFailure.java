@@ -33,6 +33,13 @@ public abstract class AuthFailure extends ApiException {
         }
     }
 
+    /** Every password-hash slot stayed busy past the wait limit; the client should retry shortly. */
+    public static final class PasswordHashBusy extends AuthFailure {
+        public PasswordHashBusy() {
+            super(HttpStatus.TOO_MANY_REQUESTS, "AUTH_PASSWORD_HASH_BUSY", "server is busy, please try again in a moment");
+        }
+    }
+
     public static final class IpBlocked extends AuthFailure {
         public IpBlocked() {
             super(HttpStatus.FORBIDDEN, "AUTH_IP_BLOCKED", "login from this IP is blocked");

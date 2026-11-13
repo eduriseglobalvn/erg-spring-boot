@@ -85,7 +85,7 @@ class AuthOperationsFlowTest {
 
     @BeforeEach
     void setUp() {
-        passwordService = new PasswordService();
+        passwordService = new PasswordService(new com.erg.ergspringboot.platform.security.ErgAuthProperties());
         tokenService = new AuthTokenService();
         loginFlow = new AuthLoginUseCase(
                 userRepository,

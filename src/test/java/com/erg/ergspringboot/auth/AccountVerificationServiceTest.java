@@ -36,7 +36,7 @@ class AccountVerificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        passwordService = new PasswordService();
+        passwordService = new PasswordService(new com.erg.ergspringboot.platform.security.ErgAuthProperties());
         service = new AccountVerificationService(
                 userRepository, codeRepository, mailSender, passwordService, userActivityRepository);
     }

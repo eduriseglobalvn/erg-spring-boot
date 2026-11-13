@@ -201,7 +201,7 @@ Thứ tự trong chuỗi dưới đây là thứ tự logic. Lưu ý về thứ 
 | `MissingServletRequestParameterException` | 400 `INVALID_REQUEST` | mã | 79-94 |
 | `HttpMessageNotReadableException` | 400 `INVALID_REQUEST` ("invalid JSON body") | mã | 96-111 |
 | `QuizPublishService.ValidationFailedException` | 422 | mảng field | 113-130 |
-| `ApiException` | status/mã của exception; `SyncConflictException` => `errors` kiểu `Conflict`; `AUTH_TOO_MANY_ATTEMPTS` thêm `Retry-After: 60` | 132-156 |
+| `ApiException` | status/mã của exception; `SyncConflictException` => `errors` kiểu `Conflict`; `AUTH_TOO_MANY_ATTEMPTS` thêm `Retry-After: 60`; `AUTH_PASSWORD_HASH_BUSY` (hết chỗ băm Argon2, `erg.auth.password-hash-concurrency`) thêm `Retry-After: 2` | 132-156 |
 | `ObjectOptimisticLockingFailureException` / `OptimisticLockException` | 409 `STALE_WRITE` | 158-172 |
 | `DataIntegrityViolationException` | 409 `IDEMPOTENCY_CONFLICT` nếu chuỗi cause chứa "idempotency", ngược lại `DATA_CONFLICT`; không lộ tên constraint | 174-208 |
 | `AccessDeniedException` | 403 `ACCESS_DENIED` | 210-226 |
