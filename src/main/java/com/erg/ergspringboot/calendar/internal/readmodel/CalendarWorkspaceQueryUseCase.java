@@ -71,9 +71,9 @@ public final class CalendarWorkspaceQueryUseCase {
             String tenantId, List<String> schoolIds, String from, String to, String viewMode,
             List<String> teacherIds, List<String> classIds, List<String> subjectIds,
             List<String> levelIds, List<String> statuses, ErgPrincipal principal) {
+        validateBounds(from, to, schoolIds, teacherIds, classIds, subjectIds, levelIds);
         OffsetDateTime fromDateTime = dayStart(from);
         OffsetDateTime toDateTime = dayAfter(to);
-        validateBounds(from, to, schoolIds, teacherIds, classIds, subjectIds, levelIds);
         List<String> effectiveStatuses = hasValues(statuses) ? statuses : DEFAULT_STATUSES;
         List<CalendarEvent> filteredEvents = events.findLcmsWorkspaceEvents(
                 tenantId, schoolIds, toDateTime, fromDateTime, effectiveStatuses,
@@ -90,9 +90,9 @@ public final class CalendarWorkspaceQueryUseCase {
             String tenantId, String teacherUserId, String from, String to, String viewMode,
             List<String> schoolIds, List<String> classIds, List<String> subjectIds,
             List<String> levelIds, List<String> statuses, ErgPrincipal principal) {
+        validateBounds(from, to, null, null, classIds, subjectIds, levelIds);
         OffsetDateTime fromDateTime = dayStart(from);
         OffsetDateTime toDateTime = dayAfter(to);
-        validateBounds(from, to, null, null, classIds, subjectIds, levelIds);
         List<CalendarEvent> filteredEvents = events.findTeacherCalendarEventsFiltered(
                 tenantId, teacherUserId, toDateTime, fromDateTime, List.of("PUBLISHED"),
                 hasValues(schoolIds), queryValues(schoolIds),
@@ -111,6 +111,7 @@ public final class CalendarWorkspaceQueryUseCase {
             String tenantId, String studentUserId, String from, String to, String viewMode,
             List<String> subjectIds, List<String> levelIds, List<String> statuses,
             ErgPrincipal principal) {
+        validateBounds(from, to, null, null, null, subjectIds, levelIds);
         Student student = students.findFirstByTenantIdAndAuthUserId(tenantId, studentUserId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Student record not found for userId: " + studentUserId));
@@ -121,7 +122,6 @@ public final class CalendarWorkspaceQueryUseCase {
         }
         OffsetDateTime fromDateTime = dayStart(from);
         OffsetDateTime toDateTime = dayAfter(to);
-        validateBounds(from, to, null, null, null, subjectIds, levelIds);
         List<CalendarEvent> filteredEvents = events.findStudentCalendarEventsFiltered(
                 tenantId, academicClassId, toDateTime, fromDateTime, List.of("PUBLISHED"),
                 hasValues(subjectIds), queryValues(subjectIds),

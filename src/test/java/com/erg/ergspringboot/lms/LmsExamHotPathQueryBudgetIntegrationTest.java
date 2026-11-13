@@ -86,6 +86,8 @@ class LmsExamHotPathQueryBudgetIntegrationTest {
 
         Counted<StudentAssignmentListResponse> home = count(seed, () -> lms.listStudentAssignments(seed.userId(), access, 0, 20));
         Counted<QuizPackageResponse> pkg = count(seed, () -> lms.getQuizPackage(seed.quizId(), seed.assignmentId(), access));
+        // A pinned published version never changes, so the second load reads it from quizRuntimePackage.
+        Counted<QuizPackageResponse> pkgAgain = count(seed, () -> lms.getQuizPackage(seed.quizId(), seed.assignmentId(), access));
         Counted<AttemptResponse> start = count(seed, () -> lms.startAttempt(seed.userId(),
                 new StartAttemptRequest(seed.assignmentId(), seed.quizId(), pkg.value().id(), pkg.value().packageHash()),
                 "start-" + seed.suffix(), access));
@@ -119,6 +121,8 @@ class LmsExamHotPathQueryBudgetIntegrationTest {
 
         assertThat(home.statements()).as("GET students/me/assignments").isLessThanOrEqualTo(BUDGET_HOME);
         assertThat(pkg.statements()).as("GET quizzes/{id}/package").isLessThanOrEqualTo(BUDGET_PACKAGE);
+        assertThat(pkgAgain.value().packageHash()).isEqualTo(pkg.value().packageHash());
+        assertThat(pkgAgain.statements()).as("GET quizzes/{id}/package, version cached").isLessThan(pkg.statements());
         assertThat(start.statements()).as("POST attempts").isLessThanOrEqualTo(BUDGET_START);
         assertThat(draft.statements()).as("PATCH attempts/{id}/draft").isLessThanOrEqualTo(BUDGET_DRAFT);
         assertThat(submit.statements()).as("POST attempts/{id}/submit").isLessThanOrEqualTo(BUDGET_SUBMIT);

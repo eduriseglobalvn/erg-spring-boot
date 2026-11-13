@@ -74,6 +74,12 @@ public class QuizRuntimePackageService {
         return packageRepository.findByIdAndTenantId(packageId, tenantId);
     }
 
+    /** A published version is immutable; publish and quiz edits clear quizRuntimePackage (allEntries). */
+    @Cacheable(
+            cacheNames = "quizRuntimePackage",
+            key = "#tenantId + ':' + #quizId + ':v:' + #quizVersionId",
+            sync = true
+    )
     public Optional<QuizPackageResponse> packageForVersion(String tenantId, String quizId, String quizVersionId) {
         return quizVersionRepository.findByIdAndTenantId(quizVersionId, tenantId)
                 .filter(version -> quizId.equals(version.getQuizId()))

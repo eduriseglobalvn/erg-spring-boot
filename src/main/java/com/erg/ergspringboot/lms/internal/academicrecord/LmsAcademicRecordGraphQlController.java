@@ -9,12 +9,14 @@ import com.erg.ergspringboot.lms.LmsAcademicRecordOperations.AttendanceCommand;
 import com.erg.ergspringboot.lms.LmsAcademicRecordOperations.GradebookScoreCommand;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
 
 @Controller
 public class LmsAcademicRecordGraphQlController {
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private final LmsAcademicRecordOperations records;
     private final GraphQlAccessSupport access;
 
@@ -28,7 +30,7 @@ public class LmsAcademicRecordGraphQlController {
         ErgPrincipal principal = principal("lms.attendance.read", "lms.manage", "*");
         access.assertClassScope(principal, input.classId(), input.schoolId());
         String tenantId = access.verifiedTenantId(principal, input.tenantId());
-        String to = input.to() == null ? LocalDate.now().toString() : input.to();
+        String to = input.to() == null ? LocalDate.now(VIETNAM_ZONE).toString() : input.to();
         String from = input.from() == null ? LocalDate.parse(to).minusDays(31).toString() : input.from();
         return records.attendanceWorkspace(tenantId, input.classId(), input.subjectId(), from, to);
     }
