@@ -48,7 +48,7 @@ x-backend-common: &backend-common
   restart: "no"
   environment: *backend-environment
   cpus: ${BACKEND_CPUS:-4.0}
-  mem_limit: ${BACKEND_MEMORY:-4g}
+  mem_limit: ${BACKEND_MEMORY:-3g}
   read_only: true
   tmpfs:
     - /tmp:size=256m,mode=1777
@@ -108,8 +108,47 @@ services:
       - pg_stat_statements.track=all
       - -c
       - track_io_timing=on
+      # Sized for the 16 GB / 4-core / SATA SSD host (fable/03 section 4). Keep in sync with compose.yml.
+      - -c
+      - shared_buffers=3GB
+      - -c
+      - effective_cache_size=7GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - min_wal_size=512MB
+      - -c
+      - checkpoint_timeout=10min
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - synchronous_commit=on
+      - -c
+      - jit=off
+      - -c
+      - autovacuum_vacuum_scale_factor=0.05
+      - -c
+      - autovacuum_naptime=20s
+      # Runaway-query guard for the app pool. Flyway (FlywayConfig) and pg_dump set it to 0 for their own sessions.
+      - -c
+      - statement_timeout=30s
+      - -c
+      - idle_in_transaction_session_timeout=30s
+      - -c
+      - log_min_duration_statement=250ms
     cpus: ${POSTGRES_CPUS:-4.0}
     mem_limit: ${POSTGRES_MEMORY:-5g}
+    shm_size: 512m
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -128,7 +167,7 @@ services:
       REDISCLI_AUTH: ${REDIS_STATE_PASSWORD:-erg-benchmark-state}
     command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_STATE_PASSWORD:-erg-benchmark-state}"]
     cpus: ${REDIS_STATE_CPUS:-1.0}
-    mem_limit: ${REDIS_STATE_MEMORY:-1280m}
+    mem_limit: ${REDIS_STATE_MEMORY:-512m}
     volumes:
       - redis-state-data:/data
       - ./redis/state.conf:/usr/local/etc/redis/redis.conf:ro
@@ -146,7 +185,7 @@ services:
       REDISCLI_AUTH: ${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}
     command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_CACHE_PASSWORD:-erg-benchmark-cache}"]
     cpus: ${REDIS_CACHE_CPUS:-1.0}
-    mem_limit: ${REDIS_CACHE_MEMORY:-2560m}
+    mem_limit: ${REDIS_CACHE_MEMORY:-1024m}
     volumes:
       - redis-cache-data:/data
       - ./redis/cache.conf:/usr/local/etc/redis/redis.conf:ro

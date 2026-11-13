@@ -4,7 +4,7 @@ services:
     platform: linux/amd64
     restart: unless-stopped
     # The JVM sizes its heap from this (MaxRAMPercentage=75); without it the heap may grow to ~11 GB and starve Postgres.
-    mem_limit: ${BACKEND_CONTAINER_MEMORY:-4g}
+    mem_limit: ${BACKEND_CONTAINER_MEMORY:-3g}
     env_file:
       - ${ERG_SPRING_ENV_FILE:-.env.production}
     environment:
@@ -58,6 +58,7 @@ services:
         condition: service_healthy
     volumes:
       - ./nginx/native.conf:/etc/nginx/conf.d/default.conf:ro
+    mem_limit: ${NGINX_CONTAINER_MEMORY:-128m}
     ports:
       - "127.0.0.1:${ERG_HTTP_PORT:-8080}:8080"
     networks:
