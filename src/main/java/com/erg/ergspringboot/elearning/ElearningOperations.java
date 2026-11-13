@@ -53,7 +53,7 @@ public class ElearningOperations {
         return dashboard.studentDashboard(new StudentDashboardReadScope(
                 query.userId(), query.tenantId(), query.requestedTenantId(), query.requestedStudentUserId(),
                 safe(query.roles()), safe(query.permissions()), safe(query.deniedPermissions()), safe(query.portals()),
-                query.accountType(), query.accessLevel(), query.requestedClassId()));
+                query.accountType(), query.accessLevel(), query.requestedClassId(), query.assignmentLimit()));
     }
 
     public StudentDiscussionFeedResponse discussionFeed(DiscussionFeedQuery query) {

@@ -186,7 +186,7 @@ class StudentDashboardReadServiceTest {
                 "tenant-a",
                 "class-1",
                 "student-row-1",
-                PageRequest.of(0, 50)
+                PageRequest.of(0, 51)
         )).thenReturn(List.of(math, science));
         when(assignmentRepository.summarizeStudentDashboardAssignments("tenant-a", "class-1", "student-row-1"))
                 .thenReturn(new StudentDashboardAssignmentCountProjection(12L, 3L));
@@ -265,7 +265,7 @@ class StudentDashboardReadServiceTest {
                 "tenant-a",
                 "class-1",
                 "student-row-1",
-                PageRequest.of(0, 50)
+                PageRequest.of(0, 51)
         );
         verify(assignmentRepository).summarizeStudentDashboardAssignments("tenant-a", "class-1", "student-row-1");
         verify(attemptRepository).summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-1");
@@ -304,7 +304,7 @@ class StudentDashboardReadServiceTest {
                 "tenant-a",
                 null,
                 "student-row-1",
-                PageRequest.of(0, 50)
+                PageRequest.of(0, 51)
         )).thenReturn(List.of(assignment));
         when(assignmentRepository.summarizeStudentDashboardAssignments("tenant-a", null, "student-row-1"))
                 .thenReturn(new StudentDashboardAssignmentCountProjection(1L, 1L));
@@ -356,7 +356,7 @@ class StudentDashboardReadServiceTest {
         when(classroomRepository.findByTenantIdAndIdIn(eq("tenant-a"), any()))
                 .thenReturn(List.of(classA, classB));
         when(assignmentRepository.findStudentDashboardAssignments(
-                "tenant-a", "class-b", "student-row-1", PageRequest.of(0, 50)))
+                "tenant-a", "class-b", "student-row-1", PageRequest.of(0, 51)))
                 .thenReturn(List.of());
         when(attemptRepository.summarizeStudentDashboardScores("tenant-a", "student-row-1", "class-b"))
                 .thenReturn(new StudentDashboardScoreSummaryProjection(1L, 1L, 1L, 88D, 88D));
@@ -377,6 +377,44 @@ class StudentDashboardReadServiceTest {
                 .containsExactly("6A1", "CLB Robotics");
         assertThat(response.summary().scoreSummary().averagePercent()).isEqualTo(88);
         verify(assignmentRepository).summarizeStudentDashboardAssignments("tenant-a", "class-b", "student-row-1");
+    }
+
+    @Test
+    void sixtyAssignmentsShowFiftyThenTheRestWhenTheStudentAsksForMore() {
+        Student student = new Student();
+        student.setId("student-row-1");
+        student.setAuthUserId("student-1");
+        OffsetDateTime now = OffsetDateTime.now();
+        List<StudentDashboardAssignmentProjection> sixty = java.util.stream.IntStream.range(0, 60)
+                .mapToObj(i -> new StudentDashboardAssignmentProjection("assignment-" + i, "class-a", null, "math",
+                        "Mathematics", "Bài " + i, now.plusDays(i), "active", now, null, null, null, null, null))
+                .toList();
+        when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
+                .thenReturn(true);
+        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
+        when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.of(student));
+        when(assignmentRepository.findStudentDashboardAssignments("tenant-a", null, "student-row-1", PageRequest.of(0, 51)))
+                .thenReturn(sixty.subList(0, 51));
+        when(assignmentRepository.findStudentDashboardAssignments("tenant-a", null, "student-row-1", PageRequest.of(0, 101)))
+                .thenReturn(sixty);
+
+        StudentDashboardResponse first = service.studentDashboard(scope("tenant-a", "student-1", null, null));
+        assertThat(first.assignments()).hasSize(50);
+        assertThat(first.assignmentsHasMore()).isTrue();
+
+        StudentDashboardResponse more = service.studentDashboard(new StudentDashboardReadScope("student-1", "tenant-a",
+                null, null, List.of("student"), List.of("elearning.assignment.read_self"), List.of(), List.of("elearning"),
+                "student", "self", null, 100));
+        assertThat(more.assignments()).hasSize(60);
+        assertThat(more.assignmentsHasMore()).isFalse();
+    }
+
+    @Test
+    void assignmentLimitStaysBetweenFiftyAndFiveHundred() {
+        assertThat(StudentDashboardReadService.sliceLimit(null)).isEqualTo(50);
+        assertThat(StudentDashboardReadService.sliceLimit(1)).isEqualTo(50);
+        assertThat(StudentDashboardReadService.sliceLimit(100)).isEqualTo(100);
+        assertThat(StudentDashboardReadService.sliceLimit(10_000)).isEqualTo(500);
     }
 
     @Test
