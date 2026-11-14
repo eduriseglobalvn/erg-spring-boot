@@ -67,26 +67,32 @@ printf 'erg_backup_last_success_timestamp_seconds %s\nerg_backup_postgres_bytes 
   "$(date +%s)" "$(stat -c %s "$BACKUP_DIR/pg_full_$DATE.sql.gz")" > "$METRICS_DIR/erg_backup.prom.tmp"
 chmod 644 "$METRICS_DIR/erg_backup.prom.tmp" && mv "$METRICS_DIR/erg_backup.prom.tmp" "$METRICS_DIR/erg_backup.prom"
 
-# 5. Off-host copy, encrypted to an age public key (the secret key is kept off this server). Remote keeps the
-# newest 7 under daily/, 4 under weekly/ (Sunday runs) and 6 under monthly/ (runs on the 1st). Any failure
-# here leaves the local backup and its metric intact; it is reported and OffsiteBackupStale alerts after 26h.
+# 5. Off-host copy to BACKUP_RCLONE_REMOTE. With BACKUP_AGE_RECIPIENT set it is age-encrypted (secret key kept
+# off this server); without it the plain .sql.gz is uploaded, readable by anyone with access to the remote.
+# Remote keeps the newest 7 under daily/, 4 under weekly/ (Sunday runs) and 6 under monthly/ (runs on the 1st).
+# Any failure here leaves the local backup and its metric intact; it is reported and OffsiteBackupStale alerts after 26h.
 OFFSITE_TMP="$BACKUP_DIR/.offsite.age"
+OFFSITE_EXT=.sql.gz
+[[ -n "${BACKUP_AGE_RECIPIENT:-}" ]] && OFFSITE_EXT=.sql.gz.age
 offsite_copy() {
-  local name="pg_full_$DATE.sql.gz.age" tiers="daily:7" t dir
+  local name="pg_full_$DATE$OFFSITE_EXT" src="$BACKUP_DIR/pg_full_$DATE.sql.gz" tiers="daily:7" t dir
   [[ $(date -d "@$NOW" +%u) == 7 ]] && tiers+=" weekly:4"
   [[ $(date -d "@$NOW" +%d) == 01 ]] && tiers+=" monthly:6"
-  age -r "$BACKUP_AGE_RECIPIENT" -o "$OFFSITE_TMP" "$BACKUP_DIR/pg_full_$DATE.sql.gz" || return 1
+  if [[ -n "${BACKUP_AGE_RECIPIENT:-}" ]]; then
+    age -r "$BACKUP_AGE_RECIPIENT" -o "$OFFSITE_TMP" "$src" || return 1
+    src="$OFFSITE_TMP"
+  fi
   for t in $tiers; do
     dir="$BACKUP_RCLONE_REMOTE/${t%:*}"
-    rclone copyto "$OFFSITE_TMP" "$dir/$name" || return 1
+    rclone copyto "$src" "$dir/$name" || return 1
     # Prune by count, newest first by name (names sort by date): a missed night never drops an older copy early.
-    rclone lsf --files-only --include 'pg_full_*.sql.gz.age' "$dir" | sort -r | tail -n "+$((${t#*:} + 1))"       | while read -r old; do rclone deletefile "$dir/$old" || exit 1; done || return 1
+    rclone lsf --files-only --include "pg_full_*$OFFSITE_EXT" "$dir" | sort -r | tail -n "+$((${t#*:} + 1))"       | while read -r old; do rclone deletefile "$dir/$old" || exit 1; done || return 1
   done
 }
-if [[ -z "${BACKUP_AGE_RECIPIENT:-}" || -z "${BACKUP_RCLONE_REMOTE:-}" ]]; then
-  OFFSITE="bị bỏ qua: thiếu BACKUP_AGE_RECIPIENT hoặc BACKUP_RCLONE_REMOTE"
-elif ! command -v age >/dev/null || ! command -v rclone >/dev/null; then
-  OFFSITE="bị bỏ qua: máy chưa cài age hoặc rclone"
+if [[ -z "${BACKUP_RCLONE_REMOTE:-}" ]]; then
+  OFFSITE="bị bỏ qua: thiếu BACKUP_RCLONE_REMOTE"
+elif ! command -v rclone >/dev/null || { [[ -n "${BACKUP_AGE_RECIPIENT:-}" ]] && ! command -v age >/dev/null; }; then
+  OFFSITE="bị bỏ qua: máy chưa cài rclone (hoặc age khi có BACKUP_AGE_RECIPIENT)"
 elif offsite_copy; then
   OFFSITE=ok
   printf 'erg_backup_offsite_last_success_timestamp_seconds %s
@@ -97,7 +103,7 @@ else
 fi
 rm -f "$OFFSITE_TMP"
 if [[ $OFFSITE == ok ]]; then
-  echo "Off-host copy uploaded: $BACKUP_RCLONE_REMOTE/daily/pg_full_$DATE.sql.gz.age"
+  echo "Off-host copy uploaded: $BACKUP_RCLONE_REMOTE/daily/pg_full_$DATE$OFFSITE_EXT"
 else
   echo "WARNING: off-host copy $OFFSITE" >&2
   notify "⚠️ Bản sao lưu ngoài máy $OFFSITE. Bản cục bộ pg_full_$DATE.sql.gz vẫn đã tạo."
