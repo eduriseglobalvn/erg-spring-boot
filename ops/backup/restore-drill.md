@@ -18,7 +18,8 @@ release evidence; this document alone is not evidence of a successful restore.
 
 ## Restore the encrypted off-host copy (monthly)
 
-`backup.sh` uploads `pg_full_<date>.sql.gz.age` to `$BACKUP_RCLONE_REMOTE` under `daily/` (newest 7),
+`backup.sh` uploads `pg_full_<date>.sql.gz.age` (or plain `pg_full_<date>.sql.gz` when `BACKUP_AGE_RECIPIENT`
+is unset; skip the `age -d` step for those) to `$BACKUP_RCLONE_REMOTE` under `daily/` (newest 7),
 `weekly/` (Sunday runs, newest 4) and `monthly/` (runs on the 1st, newest 6). Run this on a workstation
 that holds the age secret key and a read-only rclone remote for the backup bucket, never on the server.
 
