@@ -34,7 +34,9 @@ public record StudentDashboardAssignmentProjection(
         Boolean handedInLate,
         /** Answers saved so far on the latest attempt ("Đang làm 12/20"). */
         Integer latestAnsweredCount,
-        Integer latestTotalQuestions
+        Integer latestTotalQuestions,
+        /** Correct answers on the latest handed-in attempt; null when it has no graded answer rows. */
+        Long handedInCorrectCount
 ) {
     public StudentDashboardAssignmentProjection(String assignmentId, String academicClassId, String quizId, String subjectId,
             String subjectName, String title, OffsetDateTime dueAt, String status, OffsetDateTime assignmentUpdatedAt,
@@ -43,7 +45,7 @@ public record StudentDashboardAssignmentProjection(
             Double handedInPercent, OffsetDateTime handedInAt) {
         this(assignmentId, academicClassId, quizId, subjectId, subjectName, title, dueAt, status, assignmentUpdatedAt,
                 latestAttemptId, latestAttemptStatus, latestAttemptPercent, latestAttemptSubmittedAt, latestAttemptUpdatedAt,
-                handedInPercent, handedInAt, null, null, null, null, null, null, null, null, null, null, null);
+                handedInPercent, handedInAt, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public StudentDashboardAssignmentProjection(String assignmentId, String academicClassId, String quizId, String subjectId,

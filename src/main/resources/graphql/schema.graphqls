@@ -357,7 +357,7 @@ type StudentDashboardAssignmentCard {
   "Raw score of the latest handed-in attempt and its scale"
   score: Float
   maxScore: Float
-  "Not stored per attempt yet: always null"
+  "Correct answers on the latest handed-in attempt; null when none is handed in or it has no graded answers"
   correctCount: Int
   totalQuestions: Int
   attemptCount: Int!

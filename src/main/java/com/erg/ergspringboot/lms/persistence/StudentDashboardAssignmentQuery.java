@@ -33,7 +33,10 @@ final class StudentDashboardAssignmentQuery {
                 handedIn.totalQuestions,
                 handedIn.late,
                 latestAttempt.submittedCount,
-                latestAttempt.totalQuestions
+                latestAttempt.totalQuestions,
+                (select case when count(ans.attemptId) = 0 then null
+                        else sum(case when ans.correct = true then 1 else 0 end) end
+                    from AttemptAnswerRow ans where ans.tenantId = handedIn.tenantId and ans.attemptId = handedIn.id)
             )
             from Assignment assignment
             left join Quiz quiz
