@@ -15,7 +15,7 @@ class StudentDashboardCardsAssignmentTest {
                                                                    OffsetDateTime handedInAt, Boolean late, String kind) {
         return new StudentDashboardAssignmentProjection("a1", "c1", "q1", "math", "Toán", "Bài 1", dueAt, "active", NOW.minusDays(3),
                 "t1", latestStatus, 50D, handedInAt, NOW.minusDays(1), handedInPercent, handedInAt,
-                15, "Cô Lan", kind, 20, 2L, 72.5, 100D, 22, late, 12, 20);
+                15, "Cô Lan", kind, 20, 2L, 72.5, 100D, 22, late, 12, 20, 18L);
     }
 
     @Test
@@ -46,6 +46,7 @@ class StudentDashboardCardsAssignmentTest {
         assertThat(card.score()).isEqualTo(72.5);
         assertThat(card.maxScore()).isEqualTo(100D);
         assertThat(card.totalQuestions()).isEqualTo(22);
+        assertThat(card.correctCount()).isEqualTo(18);
         assertThat(card.onTime()).isTrue();
         assertThat(card.minutesBeforeDue()).isEqualTo(4 * 24 * 60 + 60);
         assertThat(card.xpReward()).isZero();

@@ -92,7 +92,7 @@ final class StudentDashboardCards {
                 open ? p.latestAnsweredCount() : null,
                 p.handedInScore(),
                 p.handedInMaxScore(),
-                null, // no per-attempt correct count is stored yet
+                handedIn && p.handedInCorrectCount() != null ? p.handedInCorrectCount().intValue() : null,
                 p.handedInTotalQuestions(),
                 p.attemptCount() == null ? 0 : p.attemptCount().intValue(),
                 onTime,
