@@ -73,7 +73,7 @@ public class ScheduleSlotOptionsService {
             String classId, String excludeEventId) {
         String schoolName = loader.names(tenantId, "education_units", "name", Set.of(schoolId)).get(schoolId);
         if (schoolName == null) throw TeachingScheduleException.notFound("Trường không tồn tại: " + schoolId);
-        PeriodSlot slot = templates.slot(templates.templateForSchool(tenantId, schoolId), periodNo);
+        PeriodSlot slot = templates.slot(templates.templateForSchool(tenantId, schoolId, date), periodNo);
         OffsetDateTime start = date.atTime(slot.start()).atZone(ScheduleDataLoader.VN).toOffsetDateTime();
         OffsetDateTime end = date.atTime(slot.end()).atZone(ScheduleDataLoader.VN).toOffsetDateTime();
         // the asked cell as an occurrence, so travel lines and leave checks can reuse the engine helpers

@@ -12,6 +12,9 @@ public final class TeachingScheduleResponses {
 
     public record PeriodTemplateResponse(String id, String name, int periodsPerDay, List<PeriodSlotResponse> slots) {}
 
+    public record SchoolPeriodAssignmentResponse(String schoolId, String schoolName, String templateId, String templateName,
+            String effectiveFrom, boolean current) {}
+
     public record SchoolRowResponse(String schoolId, String schoolName, String schoolShortName,
             int conflictCount, boolean hasDraft, int periodCount) {}
 

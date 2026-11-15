@@ -1,7 +1,10 @@
 package com.erg.ergspringboot.calendar.internal.graphql;
 
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.TeachingScheduleException;
 import com.erg.ergspringboot.calendar.CalendarScopeService;
+import com.erg.ergspringboot.calendar.SchoolPeriodTimesInput;
+import com.erg.ergspringboot.calendar.TeachingPeriodTemplateInput;
 import com.erg.ergspringboot.calendar.TeachingScheduleOperations;
 import com.erg.ergspringboot.calendar.TeachingScheduleDraftInput;
 import com.erg.ergspringboot.calendar.authorization.CalendarCreate;
@@ -19,6 +22,7 @@ import com.erg.ergspringboot.calendar.TeachingScheduleResponses.OverviewGridResp
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.PeriodTemplateResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.ReusePreviewResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolPageResponse;
+import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolPeriodAssignmentResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SlotOptionsResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.TeacherPageResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolTravelTimeResponse;
@@ -55,6 +59,54 @@ public class TeachingScheduleGraphQlController {
     public List<PeriodTemplateResponse> teachingPeriodTemplates() {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         return schedule.periodTemplates(accessSupport.verifiedTenantId(principal, null));
+    }
+
+    /** Dated period tables per school; schoolIds null = every school the caller manages. */
+    @SchemaMapping(typeName = "LcmsQuery", field = "schoolPeriodAssignments")
+    @CalendarRead
+    public List<SchoolPeriodAssignmentResponse> schoolPeriodAssignments(@Argument List<String> schoolIds) {
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        List<String> scope = schoolIds == null || schoolIds.isEmpty() ? visibleSchools(principal)
+                : scopeService.requireManagedSchools(principal, schoolIds);
+        return schedule.schoolPeriodAssignments(accessSupport.verifiedTenantId(principal, null), scope);
+    }
+
+    /**
+     * Creates a template, or replaces one no batch uses yet. Replacing a template other schools share needs scope over
+     * all of them, and the tenant default needs scope over every school.
+     */
+    @MutationMapping
+    public PeriodTemplateResponse saveTeachingPeriodTemplate(@Argument TeachingPeriodTemplateInput input) {
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        accessSupport.assertPermission(principal, MANAGE);
+        String tenantId = accessSupport.verifiedTenantId(principal, null);
+        if (input.id() != null) {
+            if (schedule.isDefaultTemplate(tenantId, input.id()) && visibleSchools(principal) != null) {
+                throw new ForbiddenException("Bảng giờ mặc định chỉ người quản lý mọi trường được sửa.");
+            }
+            scopeService.requireManagedSchools(principal, schedule.templateSchools(tenantId, input.id()));
+        }
+        return schedule.saveTemplate(tenantId, input);
+    }
+
+    @MutationMapping
+    public SchoolPeriodAssignmentResponse assignSchoolPeriodTemplate(@Argument String schoolId, @Argument String templateId,
+            @Argument String effectiveFrom) {
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        accessSupport.assertPermission(principal, MANAGE);
+        scopeService.requireManagedSchools(principal, List.of(schoolId));
+        return schedule.assignTemplate(accessSupport.verifiedTenantId(principal, null), schoolId, templateId, effectiveFrom,
+                accessSupport.blankToNull(principal.userId()));
+    }
+
+    /** New template + assignment in one transaction: the Luu gio tiet button of the board. */
+    @MutationMapping
+    public SchoolPeriodAssignmentResponse saveSchoolPeriodTimes(@Argument SchoolPeriodTimesInput input) {
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        accessSupport.assertPermission(principal, MANAGE);
+        scopeService.requireManagedSchools(principal, List.of(input.schoolId()));
+        return schedule.saveSchoolPeriodTimes(accessSupport.verifiedTenantId(principal, null), input,
+                accessSupport.blankToNull(principal.userId()));
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "schoolTravelTimes")

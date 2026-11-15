@@ -51,7 +51,7 @@ class TeachingScheduleSetupIT extends TeachingScheduleITBase {
                 own, tenant);
         write("insert into teaching_period_template_slots (template_id, period_no, session, start_time, end_time)"
                 + " values (?, 1, 'MORNING', time '07:30', time '08:10'), (?, 2, 'MORNING', null, null)", own, own);
-        write("insert into school_period_templates (school_id, template_id) values (?, ?)", school, own);
+        write("insert into school_period_templates (school_id, tenant_id, template_id) values (?, ?, ?)", school, tenant, own);
 
         PeriodTemplate used = templates.templateForSchool(tenant, school);
 

@@ -2,10 +2,13 @@ package com.erg.ergspringboot.calendar.internal.schedule;
 
 import com.erg.ergspringboot.exception.TeachingScheduleException;
 import com.erg.ergspringboot.utils.IdGenerator;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -33,9 +36,11 @@ public class PeriodTemplateService {
     static final String DEFAULT_NAME = "THCS · 10 tiết/ngày";
 
     private final JdbcTemplate jdbc;
+    private final ObjectProvider<Clock> clock;
 
-    public PeriodTemplateService(JdbcTemplate jdbc) {
+    public PeriodTemplateService(JdbcTemplate jdbc, ObjectProvider<Clock> clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     @Transactional("postgresTransactionManager")
@@ -45,12 +50,22 @@ public class PeriodTemplateService {
                 String.class, tenantId).stream().map(this::load).toList();
     }
 
-    /** The template a school uses: its own assignment, else the tenant default (created on first use). */
+    /** The template a school uses today. */
     @Transactional("postgresTransactionManager")
     public PeriodTemplate templateForSchool(String tenantId, String schoolId) {
+        return templateForSchool(tenantId, schoolId, LocalDate.now(clock.getIfAvailable(Clock::systemUTC).withZone(ScheduleDataLoader.VN)));
+    }
+
+    /**
+     * The template a school uses on a date: its latest assignment effective on or before that date, else the tenant
+     * default (created on first use), also when the school's first table only starts later.
+     */
+    @Transactional("postgresTransactionManager")
+    public PeriodTemplate templateForSchool(String tenantId, String schoolId, LocalDate onDate) {
         List<String> assigned = jdbc.queryForList(
                 "select t.id from school_period_templates s join teaching_period_templates t on t.id = s.template_id"
-                        + " where s.school_id = ? and t.tenant_id = ?", String.class, schoolId, tenantId);
+                        + " where s.school_id = ? and s.tenant_id = ? and t.tenant_id = ? and s.effective_from <= ?"
+                        + " order by s.effective_from desc limit 1", String.class, schoolId, tenantId, tenantId, onDate);
         return load(assigned.isEmpty() ? ensureDefault(tenantId) : assigned.get(0));
     }
 

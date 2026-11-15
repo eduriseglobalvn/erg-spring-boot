@@ -153,6 +153,38 @@ class TeachingScheduleGraphQlControllerTest {
         verify(schedule).reuseWeek("tenant-a", input, "teacher-1");
     }
 
+    @Test
+    void periodTimesNeedTheManagePermissionAndTheSchoolInScope() {
+        com.erg.ergspringboot.calendar.SchoolPeriodTimesInput input = new com.erg.ergspringboot.calendar.SchoolPeriodTimesInput(
+                "school-1", "2026-11-01", "Mùa đông", List.of());
+        authenticate(principal(List.of("lms.schedule.update"), List.of("school-1")));
+        assertThatThrownBy(() -> controller.saveSchoolPeriodTimes(input)).isInstanceOf(ForbiddenException.class);
+
+        authenticate(principal(List.of("lms.schedule.manage"), List.of("school-2")));
+        assertThatThrownBy(() -> controller.saveSchoolPeriodTimes(input)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> controller.assignSchoolPeriodTemplate("school-1", "tpl-1", "2026-11-01"))
+                .isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(schedule);
+
+        authenticate(principal(List.of("lms.schedule.manage"), List.of("school-1")));
+        controller.saveSchoolPeriodTimes(input);
+        verify(schedule).saveSchoolPeriodTimes("tenant-a", input, "teacher-1");
+    }
+
+    @Test
+    void aSharedOrDefaultTemplateCannotBeReplacedByAScopedManager() {
+        authenticate(principal(List.of("lms.schedule.manage"), List.of("school-1")));
+        var update = new com.erg.ergspringboot.calendar.TeachingPeriodTemplateInput("tpl-1", "x", List.of());
+        when(schedule.isDefaultTemplate("tenant-a", "tpl-1")).thenReturn(false);
+        when(schedule.templateSchools("tenant-a", "tpl-1")).thenReturn(List.of("school-1", "school-2"));
+        assertThatThrownBy(() -> controller.saveTeachingPeriodTemplate(update)).isInstanceOf(ForbiddenException.class);
+
+        when(schedule.isDefaultTemplate("tenant-a", "tpl-2")).thenReturn(true);
+        assertThatThrownBy(() -> controller.saveTeachingPeriodTemplate(
+                new com.erg.ergspringboot.calendar.TeachingPeriodTemplateInput("tpl-2", "x", List.of())))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
     private static CalendarBatch batch(String schoolId) {
         CalendarBatch batch = new CalendarBatch();
         batch.setId(BATCH_ID);

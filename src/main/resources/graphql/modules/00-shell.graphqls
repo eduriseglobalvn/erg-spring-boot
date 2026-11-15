@@ -33,6 +33,7 @@ type LcmsQuery {
   teachingScheduleBatches(input: TeachingScheduleBatchListInput): TeachingScheduleBatchPage!
   teachingScheduleBatch(input: TeachingScheduleBatchDetailInput!): TeachingScheduleBatchDetail!
   teachingPeriodTemplates: [TeachingPeriodTemplate!]!
+  schoolPeriodAssignments(schoolIds: [ID!]): [SchoolPeriodAssignment!]!
   teachingScheduleSlotOptions(schoolId: ID!, batchId: ID, date: Date!, periodNo: Int!, classId: ID, excludeEventId: ID): TeachingSlotOptions!
   teachingScheduleDraft(batchId: ID!): TeachingScheduleDraftResult!
   previewTeachingScheduleReuse(input: TeachingScheduleReuseInput!): TeachingScheduleReusePreview!

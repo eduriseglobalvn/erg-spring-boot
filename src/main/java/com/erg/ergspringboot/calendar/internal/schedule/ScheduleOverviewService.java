@@ -116,7 +116,7 @@ public class ScheduleOverviewService {
         List<HolidayResponse> holidays = loader.loadHolidays(tenantId, week.monday(), week.monday().plusDays(6), ids).entrySet().stream()
                 .map(h -> new HolidayResponse(h.getKey().toString(), h.getValue().name(), h.getValue().kind())).toList();
         List<ConflictDetailResponse> conflicts = week.pairs().stream().filter(c -> ids.contains(c.mine().schoolId())).toList();
-        return new OverviewGridResponse(week.monday().toString(), toResponse(templates.templateForSchool(tenantId, ids.get(0))),
+        return new OverviewGridResponse(week.monday().toString(), toResponse(templates.templateForSchool(tenantId, ids.get(0), week.monday())),
                 schools.stream().sorted(Comparator.comparingInt(s -> ids.indexOf(s.id()))).map(s -> row(s, week, counters)).toList(),
                 cells, holidays, conflicts);
     }
