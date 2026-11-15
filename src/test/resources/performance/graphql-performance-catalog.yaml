@@ -1553,6 +1553,22 @@ fields:
     generation-domain: graphql-business-read
     cold-warm-scenario: authenticated-cold-warm-redis-down
     fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleDayLoads
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleDayLoads
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
   - coordinate: LcmsQuery.teachingScheduleLoadSettings
     owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleLoadSettings
     auth: tenant-and-permission

@@ -64,6 +64,7 @@ public abstract class AdminITBase {
     @TestConfiguration
     public static class ReportStub {
         @Bean
+        @Primary
         LessonReportCounter testLessonReports(JdbcTemplate jdbc) {
             return (tenantId, ids) -> ids.isEmpty() ? Set.of() : Set.copyOf(jdbc.queryForList(
                     "select id from teaching_schedule_events where tenant_id = ? and note = 'REPORTED' and id = any (?)",
