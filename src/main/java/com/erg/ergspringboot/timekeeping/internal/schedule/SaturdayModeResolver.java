@@ -43,11 +43,9 @@ public class SaturdayModeResolver {
     }
 
     /**
-     * WHO a Saturday mode applies to: the single place to change when the owner answers question 6b.
-     * Provisional default (15/11/2026): everyone whose shift that day includes Saturday, except timekeepers paid by
-     * teaching period.
-     * shortcut: "paid by teaching period" is not modelled in this branch (CBG owns it), so nobody is excluded yet;
-     * return false for them here once CBG adds the flag.
+     * WHO a Saturday mode applies to (decided 15/11/2026, Q6b): everyone whose shift that day includes Saturday.
+     * The mode only decides office attendance. It never touches teaching-period credit: that is a separate count,
+     * so a teacher who teaches that Saturday keeps their teaching credit whatever the mode says.
      */
     public static boolean appliesTo(TkShift shift, String userId) {
         return shift != null && Arrays.asList(shift.getWeekdays()).contains(DayOfWeek.SATURDAY.getValue());
