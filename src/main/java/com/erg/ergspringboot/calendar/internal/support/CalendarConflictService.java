@@ -266,7 +266,9 @@ public class CalendarConflictService {
 
             CalendarEvent existingEvent = existingEventsById.get(existingEventId);
             if (existingEvent == null) continue;
-            if (managedSchoolIds != null && !managedSchoolIds.contains(existingEvent.getSchoolId())) continue;
+            // "*" is the tenant-wide scope AccessScopeAssembler returns for super admin
+            if (managedSchoolIds != null && !managedSchoolIds.contains("*")
+                    && !managedSchoolIds.contains(existingEvent.getSchoolId())) continue;
 
             eventIdsToDelete.add(existingEventId);
             resolvedConflicts.add(conflict);

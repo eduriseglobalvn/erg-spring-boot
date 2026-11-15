@@ -1056,6 +1056,21 @@ class CalendarConflictServiceTest {
         }
 
         @Test
+        void shouldResolveAnySchoolWhenScopeIsTheTenantWideWildcard() {
+            OffsetDateTime start = OffsetDateTime.parse("2026-06-15T08:00:00+07:00");
+            OffsetDateTime end = OffsetDateTime.parse("2026-06-15T10:00:00+07:00");
+            CalendarEvent existingEvent = createEvent("evt-existing", TENANT_A, CLASS_ID, start, end);
+            existingEvent.setSchoolId("school-other");
+            when(eventRepository.findByTenantIdAndIdIn(TENANT_A, List.of("evt-existing"))).thenReturn(List.of(existingEvent));
+
+            CalendarConflictService.ResolveResult result = service.resolveConflictsByDeletion(TENANT_A, List.of(
+                    new CalendarConflictResponse("TEACHER_TIME_CONFLICT", "ERROR", "evt-new", "evt-existing", "Teacher conflict")),
+                    List.of("*"));
+
+            assertEquals(1, result.eventIdsToDelete().size());
+        }
+
+        @Test
         void shouldResolveMultipleTeacherConflicts() {
             OffsetDateTime start = OffsetDateTime.parse("2026-06-15T08:00:00+07:00");
             OffsetDateTime end = OffsetDateTime.parse("2026-06-15T10:00:00+07:00");
