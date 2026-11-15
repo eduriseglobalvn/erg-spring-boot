@@ -63,7 +63,7 @@ public class CalendarReadUseCase implements CalendarReadPort {
                 educationUnitRepository, classroomRepository, subjectRepository,
                 levelRepository, legacyUserRepository);
         this.teacherPeriods = new CalendarTeacherPeriodsQueryUseCase(
-                eventRepository, classroomRepository, subjectRepository);
+                eventRepository, eventTeacherRepository, classroomRepository, subjectRepository);
         this.eventDetails = new CalendarEventDetailQueryUseCase(
                 eventRepository, eventTeacherRepository, referenceQueries, eventResponses);
         CalendarFullCatalogQueryUseCase fullCatalogQueries = new CalendarFullCatalogQueryUseCase(

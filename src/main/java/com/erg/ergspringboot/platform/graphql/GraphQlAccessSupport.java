@@ -77,6 +77,15 @@ public class GraphQlAccessSupport {
         throw new ForbiddenException("GraphQL education unit scope is not allowed for the authenticated principal.");
     }
 
+    /** Education units the principal manages, or {@code null} when it is not restricted to any. */
+    public List<String> restrictedEducationUnitIds(ErgPrincipal principal) {
+        if (isWildcardPrincipal(principal)) {
+            return null;
+        }
+        List<String> managed = AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.EDUCATION_UNIT);
+        return managed.contains("*") ? null : managed;
+    }
+
     public void assertClassScope(ErgPrincipal principal, String classId, String schoolId) {
         if (isWildcardPrincipal(principal)) {
             return;

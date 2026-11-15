@@ -64,6 +64,32 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("to") OffsetDateTime to,
             @Param("statuses") List<String> statuses);
 
+    /** Published (so neither draft nor cancelled) events of the classes and subjects that start in [from, to). */
+    @Query("SELECT e FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.status = 'PUBLISHED' " +
+           "AND e.academicClassId IN :classIds AND e.subjectId IN :subjectIds " +
+           "AND e.startAt >= :from AND e.startAt < :to ORDER BY e.startAt")
+    List<CalendarEvent> findPublishedForClassesAndSubjects(
+            @Param("tenantId") String tenantId,
+            @Param("classIds") Collection<String> classIds,
+            @Param("subjectIds") Collection<String> subjectIds,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /** Published events of the tenant that start in [from, to). */
+    @Query("SELECT e FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.status = 'PUBLISHED' " +
+           "AND e.startAt >= :from AND e.startAt < :to ORDER BY e.startAt")
+    List<CalendarEvent> findPublishedBetween(
+            @Param("tenantId") String tenantId, @Param("from") OffsetDateTime from, @Param("to") OffsetDateTime to);
+
+    /** Published events of one class (any subject) that start in [from, to). */
+    @Query("SELECT e FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.status = 'PUBLISHED' " +
+           "AND e.academicClassId = :classId AND e.startAt >= :from AND e.startAt < :to ORDER BY e.startAt")
+    List<CalendarEvent> findPublishedForClass(
+            @Param("tenantId") String tenantId,
+            @Param("classId") String classId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
     @Query("SELECT e FROM CalendarEvent e JOIN CalendarEventTeacher et ON e.id = et.eventId " +
            "WHERE e.tenantId = :tenantId AND et.teacherUserId = :teacherUserId " +
            "AND e.startAt < :to AND e.endAt > :from AND e.status IN :statuses " +
