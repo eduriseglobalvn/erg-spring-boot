@@ -86,6 +86,13 @@ public class GraphQlAccessSupport {
         return managed.contains("*") ? null : managed;
     }
 
+    /**
+     * A class passes when it is in the principal's class scope, or its school (when the caller supplies it) is in the
+     * school scope. Design (KE_HOACH_LICH_DAY.md 2.4): the 2-week rule on finished periods only decides the
+     * schedule-derived access of teachers WITHOUT a standing scope (class lists, session unit scope), which is never
+     * part of the principal; a teacher with a standing school scope (access scope or SCHOOL role assignment) keeps
+     * the whole school, so a lapsed class of that school stays reachable on purpose.
+     */
     public void assertClassScope(ErgPrincipal principal, String classId, String schoolId) {
         if (isWildcardPrincipal(principal)) {
             return;
