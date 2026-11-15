@@ -20,7 +20,7 @@ public class NotificationMetrics {
     static final String OTHER = "other";
     /** Tag values come from request/provider data, so every tag is mapped onto a bounded set. */
     static final Set<String> EVENT_TYPES = Set.of(
-            "GENERAL_NOTICE", "SCHEDULE_PUBLISHED", "ASSIGNMENT_CREATED", "ASSIGNMENT_DUE_SOON",
+            "GENERAL_NOTICE", "SCHEDULE_PUBLISHED", "SCHEDULE_CHANGED", "SCHEDULE_CANCELLED", "ASSIGNMENT_CREATED", "ASSIGNMENT_DUE_SOON",
             "ASSIGNMENT_OVERDUE", "ATTEMPT_SUBMITTED", "SUPPORT_NEEDED_LOW_SCORE");
     static final Set<String> PORTALS = Set.of("lms", "lcms", "elearning", "admin", "teacher", "student", "parent", "crm");
     static final Set<String> TARGET_KINDS = Set.of("registration_token", "fid", "topic", "unknown");
