@@ -63,9 +63,8 @@ public class CalendarPublishedBatchProjectionAdapter implements CalendarPublishe
                         events.findByTenantIdAndBatchId(tenantId, batchId).stream()
                                 .filter(event -> CANCELLED.equals(event.getStatus()))
                                 .filter(event -> event.getStartAt().isAfter(cancelledAt))
-                                // shortcut: updatedAt window stands in for "cancelled by this very cancel"; a
-                                // single-period cancel in the second before would be listed too.
-                                .filter(event -> !event.getUpdatedAt().isBefore(cancelledAt.minusSeconds(1)))
+                                // only this batch's own cancel writes BATCH_CANCELLED (V158); single-period cancels write ADMIN_CANCEL
+                                .filter(event -> "BATCH_CANCELLED".equals(event.getCancelReason()))
                                 .toList()));
     }
 

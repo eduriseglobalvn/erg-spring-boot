@@ -34,8 +34,8 @@ public class CalendarScheduleChangeConsumer {
             log.info("Skip schedule-changed notification {}: period gone or no longer published", event.eventId());
             return;
         }
-        // shortcut: only room/note are editable on a published period, so current people = old people; upgrade
-        // when teacher swaps on a published period are allowed.
+        // Single-event edits (room/note) never change the people, so current people = old people. Teacher swaps and
+        // moved slots publish CalendarSlotsChanged instead (V157), which also tells whoever lost a period.
         ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(),
                         event.actorId(), "schedule-event-changed:" + event.calendarEventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch)
                 .forEach(notifications::enqueue);
