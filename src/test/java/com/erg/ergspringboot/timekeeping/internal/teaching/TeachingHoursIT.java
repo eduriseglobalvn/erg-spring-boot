@@ -202,6 +202,12 @@ class TeachingHoursIT extends TeachingScheduleITBase {
         assertThat(codeOf(() -> months.confirm(tenant, main, OCT, new ConfirmTeachingCommand(4, 0, 0)))).isEqualTo("MONTH_CLOSED");
         assertThat(jdbc.queryForObject("select count(*) from tk_audit_log where tenant_id = ? and action = 'CLOSE_TEACHING_MONTH'",
                 Integer.class, tenant)).isEqualTo(1);
+        // the close is audited: who, which month, how many teachers and periods were frozen
+        var audit = jdbc.queryForMap("select actor_id, target_id, detail::text as detail from tk_audit_log"
+                + " where tenant_id = ? and action = 'CLOSE_TEACHING_MONTH'", tenant);
+        assertThat(audit.get("actor_id")).isEqualTo("hr");
+        assertThat(audit.get("target_id")).isEqualTo("2026-10");
+        assertThat((String) audit.get("detail")).contains("\"teachers\": 2", "\"mainPeriods\": 3", "\"assistantPeriods\": 1");
         assertThat(hours.export(tenant, 2026).mainMonths()).extracting(m -> m.month()).contains("2026-10");
     }
 }

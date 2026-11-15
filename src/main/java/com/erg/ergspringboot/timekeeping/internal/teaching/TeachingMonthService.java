@@ -152,7 +152,12 @@ public class TeachingMonthService {
         entry.setAction("CLOSE_TEACHING_MONTH");
         entry.setTargetType("TEACHING_MONTH");
         entry.setTargetId(month.toString());
-        entry.setDetail(new LinkedHashMap<>(Map.<String, Object>of("month", month.toString(), "teachers", live.size())));
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("month", month.toString());
+        detail.put("teachers", live.size());
+        detail.put("mainPeriods", live.values().stream().mapToInt(t -> t[0]).sum());
+        detail.put("assistantPeriods", live.values().stream().mapToInt(t -> t[1]).sum());
+        entry.setDetail(detail);
         entry.setAt(clock.instant());
         audit.save(entry);
     }
