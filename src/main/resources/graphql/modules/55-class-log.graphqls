@@ -1,0 +1,40 @@
+extend type LmsQuery {
+  "Teacher's class log for one Monday-Sunday week (rows come from the published timetable)"
+  lessonLogTeacherWeek(weekStart: Date!, session: String, status: LessonLogStatus): LessonLogWeek!
+  lessonLogClassWeek(classId: ID!, weekStart: Date!): LessonLogWeek!
+  lessonLogChanges(weekStart: Date!, classId: ID): [LessonLogChange!]!
+  "Read-only curriculum framework rows of a class subject (the popup)"
+  lessonLogCurriculum(classId: ID!, subjectId: ID!): [CurriculumLessonRow!]!
+  "The caller's periods of one day, for attendance by period"
+  teacherDayPeriods(date: Date!): [LessonLogPeriod!]!
+  lessonReportMatrix(weekStart: Date!, schoolId: ID, subjectId: ID): LessonReportMatrix!
+}
+
+extend type Mutation {
+  "Errors: STALE_VERSION, MONTH_CLOSED, NOT_TEACHER_OF_PERIOD, ACTUAL_PERIOD_OUT_OF_RANGE"
+  updateLessonLogEntry(input: UpdateLessonLogEntryInput!): LessonLogPeriod!
+  "Confirms every happened, unconfirmed period of the week. Errors: MONTH_CLOSED, PERIOD_NOT_HAPPENED"
+  confirmLessonLogWeek(weekStart: Date!): LessonLogStats!
+  saveAttendanceAndLog(input: SaveAttendanceAndLogInput!): LessonLogPeriod!
+  remindLessonReport(teacherIds: [ID!]!): Int!
+}
+
+enum LessonLogStatus { PENDING CONFIRMED }
+enum LessonReportState { ON_TIME LATE MISSING NONE }
+
+input UpdateLessonLogEntryInput { eventId: ID!, date: Date!, periodNo: Int!, actualPeriod: Int!, comment: String, expectedVersion: Int }
+input SaveAttendanceAndLogInput { eventId: ID!, date: Date!, periodNo: Int!, records: [LessonLogAttendanceInput!]!, actualPeriod: Int!, comment: String, expectedVersion: Int }
+input LessonLogAttendanceInput { studentId: ID!, status: String! }
+
+type LessonLogWeek { weekStart: Date!, weekEnd: Date!, weekNo: Int!, days: [LessonLogDay!]!, stats: LessonLogStats!, lagChip: LessonLogLag }
+type LessonLogDay { date: Date!, session: String, periods: [LessonLogPeriod!]! }
+type LessonLogPeriod { eventId: ID!, date: Date!, periodNo: Int!, classId: ID!, className: String!, subjectId: ID, subjectName: String!, teacherName: String, ppctPeriod: Int!, actualPeriod: Int!, lessonTitle: String, absentees: [LessonLogAbsentee!]!, comment: String, status: LessonLogStatus!, late: Boolean!, happened: Boolean!, version: Int! }
+type LessonLogAbsentee { studentId: ID!, shortName: String!, excused: Boolean! }
+type LessonLogStats { taught: Int!, confirmed: Int!, pending: Int! }
+type LessonLogLag { classId: ID!, className: String!, lag: Int! }
+type LessonLogChange { id: ID!, at: DateTime!, actorId: ID!, actorName: String, classId: ID!, className: String!, date: Date!, periodNo: Int!, field: String!, oldValue: String, newValue: String }
+type CurriculumLessonRow { topic: String, period: Int!, title: String! }
+type LessonReportMatrix { weekStart: Date!, days: [Date!]!, stats: LessonReportStats!, rows: [LessonReportRow!]! }
+type LessonReportStats { periods: Int!, teachers: Int!, schools: Int!, onTime: Int!, late: Int!, missing: Int! }
+type LessonReportRow { teacherId: ID!, teacherName: String!, schoolName: String!, cells: [LessonReportCell!]! }
+type LessonReportCell { date: Date!, state: LessonReportState!, periods: Int! }
