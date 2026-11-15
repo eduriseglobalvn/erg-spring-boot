@@ -83,6 +83,10 @@ public class CalendarEvent extends BaseEntity {
     @Column(name = "updated_by", length = 36)
     private String updatedBy;
 
+    /** Why the event is CANCELLED: HOLIDAY, ADMIN_CANCEL, BATCH_CANCELLED, REPLACED or DRAFT_REMOVED (V158). */
+    @Column(name = "cancel_reason", length = 20)
+    private String cancelReason;
+
     @Version
     @Column(name = "record_version", nullable = false)
     private Long recordVersion;

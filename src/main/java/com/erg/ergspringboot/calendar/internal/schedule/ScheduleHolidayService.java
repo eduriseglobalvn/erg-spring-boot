@@ -97,7 +97,7 @@ public class ScheduleHolidayService implements CalendarHolidayPort {
                 dayParams(tenantId, schoolId, dates), String.class);
         if (ids.isEmpty()) return 0;
         OffsetDateTime now = OffsetDateTime.now(clock);
-        jdbc.update("update teaching_schedule_events set status = 'CANCELLED', cancelled_by_holiday_id = :holiday,"
+        jdbc.update("update teaching_schedule_events set status = 'CANCELLED', cancel_reason = 'HOLIDAY', cancelled_by_holiday_id = :holiday,"
                         + " updated_by = :actor, updated_at = :now, record_version = record_version + 1"
                         + " where tenant_id = :tenant and id in (:ids)",
                 new MapSqlParameterSource("tenant", tenantId).addValue("holiday", holidayId)
@@ -119,7 +119,7 @@ public class ScheduleHolidayService implements CalendarHolidayPort {
         if (ids.isEmpty()) return 0;
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<Restored> restored = jdbc.query("update teaching_schedule_events set status = 'PUBLISHED',"
-                        + " cancelled_by_holiday_id = null, updated_by = :actor, updated_at = :now,"
+                        + " cancelled_by_holiday_id = null, cancel_reason = null, updated_by = :actor, updated_at = :now,"
                         + " record_version = record_version + 1 where tenant_id = :tenant and id in (:ids)"
                         + " and status = 'CANCELLED' returning id, batch_id, record_version",
                 p.addValue("actor", actorId).addValue("now", Timestamp.from(now.toInstant())).addValue("ids", ids),

@@ -104,8 +104,10 @@ public class CalendarEventMutationUseCase {
         if (CANCELLED.equals(event.getStatus())) {
             return new CalendarDeletePayload(event.getId(), true, 0);
         }
-        int affected = events.updateStatusBatch(
-                tenantId, List.of(event.getId()), CANCELLED, actorId, OffsetDateTime.now());
+        // A draft was never on a teacher's sheet; a published period is an admin cancel the teacher should see.
+        String reason = DRAFT.equals(event.getStatus()) ? "DRAFT_REMOVED" : "ADMIN_CANCEL";
+        int affected = events.cancelByIds(
+                tenantId, List.of(event.getId()), reason, actorId, OffsetDateTime.now());
         return new CalendarDeletePayload(event.getId(), true, affected);
     }
 
@@ -128,17 +130,22 @@ public class CalendarEventMutationUseCase {
         OffsetDateTime from = fromDate.atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
         OffsetDateTime to = toDate.plusDays(1).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
 
-        Set<String> eventIds = new HashSet<>();
-        eventIds.addAll(eventTeachers.findEventIdsByTeacher(
+        Set<String> draftIds = new HashSet<>(eventTeachers.findEventIdsByTeacher(
                 tenantId, teacherUserId, schoolIds, from, to, DRAFT));
-        eventIds.addAll(eventTeachers.findEventIdsByTeacher(
+        Set<String> publishedIds = new HashSet<>(eventTeachers.findEventIdsByTeacher(
                 tenantId, teacherUserId, schoolIds, from, to, PUBLISHED));
-        if (eventIds.isEmpty()) {
+        if (draftIds.isEmpty() && publishedIds.isEmpty()) {
             return new CalendarDeletePayload(teacherUserId, true, 0);
         }
 
-        int affected = events.updateStatusBatch(
-                tenantId, new ArrayList<>(eventIds), CANCELLED, actorId, OffsetDateTime.now());
+        OffsetDateTime now = OffsetDateTime.now();
+        int affected = 0;
+        if (!draftIds.isEmpty()) {
+            affected += events.cancelByIds(tenantId, new ArrayList<>(draftIds), "DRAFT_REMOVED", actorId, now);
+        }
+        if (!publishedIds.isEmpty()) {
+            affected += events.cancelByIds(tenantId, new ArrayList<>(publishedIds), "ADMIN_CANCEL", actorId, now);
+        }
         return new CalendarDeletePayload(teacherUserId, true, affected);
     }
 

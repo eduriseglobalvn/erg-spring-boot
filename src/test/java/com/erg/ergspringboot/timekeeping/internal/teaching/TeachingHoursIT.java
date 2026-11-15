@@ -2,7 +2,11 @@ package com.erg.ergspringboot.timekeeping.internal.teaching;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.erg.ergspringboot.calendar.CalendarHolidayPort;
+import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.calendar.LessonReportCounter;
+import com.erg.ergspringboot.calendar.TeachingScheduleOperations;
+import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.calendar.TeachingScheduleITBase;
 import com.erg.ergspringboot.exception.ApiException;
 import com.erg.ergspringboot.timekeeping.TeachingViews.ConfirmTeachingCommand;
@@ -27,6 +31,9 @@ class TeachingHoursIT extends TeachingScheduleITBase {
     @Autowired TeachingHoursService hours;
     @Autowired TeachingMonthService months;
     @Autowired LessonReportCounter reports;
+    @Autowired CalendarOperations calendar;
+    @Autowired CalendarHolidayPort holidays;
+    @Autowired TeachingScheduleOperations schedule;
 
     private String tenant;
     private String school;
@@ -44,6 +51,54 @@ class TeachingHoursIT extends TeachingScheduleITBase {
         return event(tenant, batch, school, classId, subject, "PUBLISHED", at(date, "08:00"), 1, teacher, assistantId, null);
     }
 
+    /** «Công của tôi» cancelled[] shows lessons that fell through, never rows an edit or a draft rewrite superseded. */
+    @Test
+    void cancelledListShowsOnlyLessonsThatFellThroughAndEachCancelPathWritesItsReason() {
+        tenant = id();
+        school = school(tenant, "THCS Nguyen Du");
+        classId = classroom(tenant, school, "6A6");
+        subject = subject(tenant, "Tin hoc");
+        main = user(tenant, "Nguyen Quoc Vuong");
+        String admin = user(tenant, "Giao vu");
+        batch = batch(tenant, school, "PUBLISHED", "HK1");
+        String draftBatch = batch(tenant, school, "DRAFT", "Nhap");
+        String batch2 = batch(tenant, school, "PUBLISHED", "HK1 bis");
+        YearMonth nov = YearMonth.of(2026, 11);
+        String holiday = event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-17", "08:00"), 1, main, null, null);
+        String adminCancelled = event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-18", "08:00"), 1, main, null, null);
+        String draftDeleted = event(tenant, draftBatch, school, classId, subject, "DRAFT", at("2026-11-19", "08:00"), 1, main, null, null);
+        String replaced = event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-20", "08:00"), 1, main, null, null);
+        String batchCancelled = event(tenant, batch2, school, classId, subject, "PUBLISHED", at("2026-11-24", "08:00"), 1, main, null, null);
+        String teacherDeleted = event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-26", "08:00"), 1, main, null, null);
+        String teacherDraftDeleted = event(tenant, draftBatch, school, classId, subject, "DRAFT", at("2026-11-27", "08:00"), 1, main, null, null);
+        String kept = event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-30", "08:00"), 1, main, null, null);
+
+        holidays.cancelPeriods(tenant, school, List.of(LocalDate.of(2026, 11, 17)), id(), "Le", admin);
+        calendar.delete(tenant, new CalendarEventDeleteRequest(tenant, adminCancelled), admin);
+        calendar.delete(tenant, new CalendarEventDeleteRequest(tenant, draftDeleted), admin);
+        // a bulk create with DELETE_CONFLICTING writes REPLACED (unit-tested in CalendarCommandUseCaseTest); seed the row here
+        write("update teaching_schedule_events set status = 'CANCELLED', cancel_reason = 'REPLACED' where id = ?", replaced);
+        schedule.cancelBatch(tenant, batch2, schedule.draft(tenant, batch2).batch().version(), admin);
+        calendar.deleteTeacherSchedule(tenant, main, List.of(school), "2026-11-26", "2026-11-27", admin);
+
+        assertThat(reasonOf(holiday)).isEqualTo("HOLIDAY");
+        assertThat(reasonOf(adminCancelled)).isEqualTo("ADMIN_CANCEL");
+        assertThat(reasonOf(draftDeleted)).isEqualTo("DRAFT_REMOVED");
+        assertThat(reasonOf(batchCancelled)).isEqualTo("BATCH_CANCELLED");
+        assertThat(reasonOf(teacherDeleted)).isEqualTo("ADMIN_CANCEL");
+        assertThat(reasonOf(teacherDraftDeleted)).isEqualTo("DRAFT_REMOVED");
+        assertThat(reasonOf(kept)).isNull();
+
+        MyTeachingMonth mine = hours.my(tenant, main, nov);
+        assertThat(mine.total()).isEqualTo(1);
+        assertThat(mine.cancelled()).extracting(c -> c.eventId())
+                .containsExactlyInAnyOrder(holiday, adminCancelled, batchCancelled, teacherDeleted);
+    }
+
+    private String reasonOf(String eventId) {
+        return jdbc.queryForObject("select cancel_reason from teaching_schedule_events where id = ?", String.class, eventId);
+    }
+
     @Test
     void theMonthIsCountedPerRoleConfirmedReopenedByTheTimetableAndClosed() {
         tenant = id();
@@ -56,6 +111,7 @@ class TeachingHoursIT extends TeachingScheduleITBase {
         String first = publishedEvent("2026-10-06", main, assistant);
         String second = publishedEvent("2026-10-13", main, null);
         String cancelled = event(tenant, batch, school, classId, subject, "CANCELLED", at("2026-10-14", "08:00"), 1, main, null, null);
+        write("update teaching_schedule_events set cancel_reason = 'ADMIN_CANCEL' where id = ?", cancelled);
         event(tenant, batch, school, classId, subject, "DRAFT", at("2026-10-15", "08:00"), 1, main, null, null);
 
         // counting: cancelled and draft periods never count, the assistant has a sheet of their own

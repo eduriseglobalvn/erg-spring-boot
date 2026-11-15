@@ -28,11 +28,10 @@ class TeachingPeriodReadAdapter implements TeachingPeriodReadPort {
         if (!PUBLISHED.equals(status) && !CANCELLED.equals(status)) {
             throw new IllegalArgumentException("status must be PUBLISHED or CANCELLED");
         }
-        // CANCELLED: only periods a day off cancelled, or removed from a timetable that is still published; deleted
-        // drafts and superseded rows carry the same status but were never on a teacher's sheet.
+        // CANCELLED: only lessons that fell through for the teacher; superseded rows (REPLACED, DRAFT_REMOVED) and
+        // pre-V158 rows with no reason were never a lesson the teacher should see as cancelled.
         String onlyReal = CANCELLED.equals(status)
-                ? " and (e.cancelled_by_holiday_id is not null or exists (select 1 from teaching_schedule_batches b"
-                + " where b.id = e.batch_id and b.tenant_id = e.tenant_id and b.status = 'PUBLISHED'))"
+                ? " and e.cancel_reason in ('HOLIDAY', 'ADMIN_CANCEL', 'BATCH_CANCELLED')"
                 : "";
         return jdbc.query("""
                 select e.id, t.teacher_user_id, coalesce(u.full_name, t.display_name_snapshot, '') teacher_name, t.role,

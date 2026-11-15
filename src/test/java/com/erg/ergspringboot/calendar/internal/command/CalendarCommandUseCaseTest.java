@@ -597,8 +597,8 @@ class CalendarCommandUseCaseTest {
             assertNotNull(payload.batchId());
             assertEquals(1, payload.createdEventCount());
 
-            verify(eventRepository).updateStatusBatch(
-                    eq(TENANT_ID), eq(List.of("existing-evt-1")), eq("CANCELLED"), eq(USER_ID), any());
+            verify(eventRepository).cancelByIds(
+                    eq(TENANT_ID), eq(List.of("existing-evt-1")), eq("REPLACED"), eq(USER_ID), any());
             verify(batchRepository).save(any(CalendarBatch.class));
             verify(eventRepository).saveAll(anyList());
             verify(eventTeacherRepository).saveAll(anyList());
@@ -649,7 +649,7 @@ class CalendarCommandUseCaseTest {
             assertEquals("CLASS_TIME_CONFLICT", payload.conflicts().get(0).code());
 
             // B7: nothing may be cancelled when the replacement batch is not created.
-            verify(eventRepository, never()).updateStatusBatch(
+            verify(eventRepository, never()).cancelByIds(
                     anyString(), anyList(), anyString(), anyString(), any());
             verify(batchRepository, never()).save(any());
             verify(eventRepository, never()).saveAll(anyList());
@@ -681,7 +681,7 @@ class CalendarCommandUseCaseTest {
             CalendarBulkPayload payload = service.create(TENANT_ID, input, USER_ID);
 
             assertNull(payload.batchId());
-            verify(eventRepository, never()).updateStatusBatch(
+            verify(eventRepository, never()).cancelByIds(
                     anyString(), anyList(), anyString(), anyString(), any());
             verify(batchRepository, never()).save(any());
         }
@@ -793,7 +793,7 @@ class CalendarCommandUseCaseTest {
         void shouldCancelSingleEvent() {
             CalendarEvent event = createEvent(EVENT_ID);
             when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
-            when(eventRepository.updateStatusBatch(eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("CANCELLED"), eq(USER_ID), any()))
+            when(eventRepository.cancelByIds(eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("DRAFT_REMOVED"), eq(USER_ID), any()))
                     .thenReturn(1);
 
             CalendarEventDeleteRequest request = new CalendarEventDeleteRequest(TENANT_ID, EVENT_ID);
@@ -804,8 +804,22 @@ class CalendarCommandUseCaseTest {
             assertTrue(payload.deleted());
             assertEquals(1, payload.affectedEventCount());
 
-            verify(eventRepository).updateStatusBatch(
-                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("CANCELLED"), eq(USER_ID), any());
+            verify(eventRepository).cancelByIds(
+                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("DRAFT_REMOVED"), eq(USER_ID), any());
+        }
+
+        @Test
+        void deletingAPublishedEventIsAnAdminCancel() {
+            CalendarEvent event = createEvent(EVENT_ID);
+            event.setStatus("PUBLISHED");
+            when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(event));
+            when(eventRepository.cancelByIds(eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("ADMIN_CANCEL"), eq(USER_ID), any()))
+                    .thenReturn(1);
+
+            service.deleteEvent(TENANT_ID, new CalendarEventDeleteRequest(TENANT_ID, EVENT_ID), USER_ID);
+
+            verify(eventRepository).cancelByIds(
+                    eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("ADMIN_CANCEL"), eq(USER_ID), any());
         }
 
         @Test
@@ -818,7 +832,7 @@ class CalendarCommandUseCaseTest {
                     TENANT_ID, new CalendarEventDeleteRequest(TENANT_ID, EVENT_ID), USER_ID);
 
             assertEquals(0, payload.affectedEventCount());
-            verify(eventRepository, never()).updateStatusBatch(anyString(), anyList(), anyString(), anyString(), any());
+            verify(eventRepository, never()).cancelByIds(anyString(), anyList(), anyString(), anyString(), any());
         }
 
         @Test
@@ -850,8 +864,10 @@ class CalendarCommandUseCaseTest {
                     any(), any(), eq("PUBLISHED")))
                     .thenReturn(List.of("evt-3"));
 
-            when(eventRepository.updateStatusBatch(eq(TENANT_ID), anyList(), eq("CANCELLED"), eq(USER_ID), any()))
-                    .thenReturn(3);
+            when(eventRepository.cancelByIds(eq(TENANT_ID), argThat(ids -> ids.size() == 2), eq("DRAFT_REMOVED"), eq(USER_ID), any()))
+                    .thenReturn(2);
+            when(eventRepository.cancelByIds(eq(TENANT_ID), eq(List.of("evt-3")), eq("ADMIN_CANCEL"), eq(USER_ID), any()))
+                    .thenReturn(1);
 
             CalendarDeletePayload payload = service.deleteTeacherSchedule(
                     TENANT_ID, "teacher-1", List.of(SCHOOL_ID),
@@ -861,11 +877,11 @@ class CalendarCommandUseCaseTest {
             assertTrue(payload.deleted());
             assertEquals(3, payload.affectedEventCount());
 
-            verify(eventRepository).updateStatusBatch(
-                    eq(TENANT_ID),
-                    argThat(ids -> ids.containsAll(List.of("evt-1", "evt-2", "evt-3"))
-                            && ids.size() == 3),
-                    eq("CANCELLED"), eq(USER_ID), any());
+            verify(eventRepository).cancelByIds(
+                    eq(TENANT_ID), argThat(ids -> ids.containsAll(List.of("evt-1", "evt-2")) && ids.size() == 2),
+                    eq("DRAFT_REMOVED"), eq(USER_ID), any());
+            verify(eventRepository).cancelByIds(
+                    eq(TENANT_ID), eq(List.of("evt-3")), eq("ADMIN_CANCEL"), eq(USER_ID), any());
         }
 
         @Test
@@ -883,7 +899,7 @@ class CalendarCommandUseCaseTest {
             assertEquals(0, payload.affectedEventCount());
 
             verify(eventRepository, never())
-                    .updateStatusBatch(anyString(), anyList(), anyString(), anyString(), any());
+                    .cancelByIds(anyString(), anyList(), anyString(), anyString(), any());
         }
 
         @Test
@@ -901,7 +917,7 @@ class CalendarCommandUseCaseTest {
 
             verifyNoInteractions(eventTeacherRepository);
             verify(eventRepository, never())
-                    .updateStatusBatch(anyString(), anyList(), anyString(), anyString(), any());
+                    .cancelByIds(anyString(), anyList(), anyString(), anyString(), any());
         }
     }
 

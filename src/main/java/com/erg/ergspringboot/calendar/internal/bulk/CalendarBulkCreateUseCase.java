@@ -55,7 +55,6 @@ public class CalendarBulkCreateUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CalendarBulkCreateUseCase.class);
     private static final String DRAFT = "DRAFT";
-    private static final String CANCELLED = "CANCELLED";
     private static final ObjectMapper CANONICAL_OBJECT_MAPPER = new ObjectMapper()
             .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -220,7 +219,7 @@ public class CalendarBulkCreateUseCase {
         }
 
         if (!eventIdsToCancel.isEmpty()) {
-            eventRepository.updateStatusBatch(tenantId, eventIdsToCancel, CANCELLED, userId, OffsetDateTime.now());
+            eventRepository.cancelByIds(tenantId, eventIdsToCancel, "REPLACED", userId, OffsetDateTime.now());
         }
 
         CalendarBatch batch = new CalendarBatch();

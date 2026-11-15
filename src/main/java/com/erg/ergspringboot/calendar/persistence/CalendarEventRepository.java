@@ -189,13 +189,14 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
     long countByTenantIdAndSchoolIdAndRoomNameIgnoreCaseAndStartAtLessThanAndEndAtGreaterThanAndStatusNot(
             String tenantId, String schoolId, String roomName, OffsetDateTime endAt, OffsetDateTime startAt, String status);
 
+    /** Cancels the given events and records why; {@code reason} is one of the {@code cancel_reason} values of V158. */
     @Modifying
-    @Query("UPDATE CalendarEvent e SET e.status = :status, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
+    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.cancelReason = :reason, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
            "WHERE e.tenantId = :tenantId AND e.id IN :ids")
-    int updateStatusBatch(
+    int cancelByIds(
             @Param("tenantId") String tenantId,
             @Param("ids") List<String> ids,
-            @Param("status") String status,
+            @Param("reason") String reason,
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
 
@@ -226,9 +227,9 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
 
-    /** Cancels the events of a batch that are not cancelled yet; with {@code startsAfter} only periods not yet started. */
+    /** Cancels every not-yet-cancelled event of a draft batch (never on a teacher's sheet): DRAFT_REMOVED. */
     @Modifying
-    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
+    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.cancelReason = 'DRAFT_REMOVED', e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
            "WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status <> 'CANCELLED'")
     int cancelAllByBatch(
             @Param("tenantId") String tenantId,
@@ -236,8 +237,9 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
 
+    /** Cancels the periods of a published batch that have not started yet: BATCH_CANCELLED. */
     @Modifying
-    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
+    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.cancelReason = 'BATCH_CANCELLED', e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
            "WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status <> 'CANCELLED' AND e.startAt > :startsAfter")
     int cancelFutureByBatch(
             @Param("tenantId") String tenantId,
