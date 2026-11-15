@@ -1922,3 +1922,35 @@ fields:
     generation-domain: mutation-invalidation
     cold-warm-scenario: authenticated-write
     fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.editTeachingScheduleSlot
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.editTeachingScheduleSlot
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.swapTeachingScheduleTeacher
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.swapTeachingScheduleTeacher
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1

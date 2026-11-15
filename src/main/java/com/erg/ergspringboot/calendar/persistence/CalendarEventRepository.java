@@ -199,6 +199,19 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
 
+    /** The weekly repeats of one grid row: same class, subject, weekday and period of a batch, starting at or after {@code from}. */
+    @Query("SELECT e FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status = 'PUBLISHED' " +
+           "AND e.academicClassId = :classId AND e.subjectId = :subjectId AND e.weekday = :weekday " +
+           "AND e.periodStart = :periodStart AND e.startAt >= :from ORDER BY e.startAt")
+    List<CalendarEvent> findPublishedSiblings(
+            @Param("tenantId") String tenantId,
+            @Param("batchId") String batchId,
+            @Param("classId") String classId,
+            @Param("subjectId") String subjectId,
+            @Param("weekday") Short weekday,
+            @Param("periodStart") Short periodStart,
+            @Param("from") OffsetDateTime from);
+
     long countByTenantIdAndBatchIdAndStatus(String tenantId, String batchId, String status);
 
     /** Moves every event of a batch still in {@code fromStatus}, so a concurrent cancel is never undone (no id list). */

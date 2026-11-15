@@ -4,6 +4,7 @@ import com.erg.ergspringboot.calendar.CalendarBatchCancelled;
 import com.erg.ergspringboot.calendar.CalendarEventChanged;
 import com.erg.ergspringboot.calendar.CalendarHolidayCancelled;
 import com.erg.ergspringboot.calendar.CalendarPublishedBatchProjection;
+import com.erg.ergspringboot.calendar.CalendarSlotsChanged;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -37,6 +38,30 @@ public class CalendarScheduleChangeConsumer {
         // when teacher swaps on a published period are allowed.
         ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(),
                         event.actorId(), "schedule-event-changed:" + event.calendarEventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch)
+                .forEach(notifications::enqueue);
+    }
+
+    /**
+     * Several published periods moved, re-roomed or reassigned: whoever is on them now hears CHANGED once; whoever
+     * lost a period (old teacher, removed assistant) hears REMOVED. Keys carry the change id, so a retry never doubles.
+     */
+    @ApplicationModuleListener
+    public void on(CalendarSlotsChanged event) {
+        var batch = calendar.findChangedEvents(event.tenantId(), event.batchId(), event.calendarEventIds()).orElse(null);
+        if (batch != null && !batch.slots().isEmpty()) {
+            ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(), event.actorId(),
+                            event.eventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch)
+                    .forEach(notifications::enqueue);
+        }
+        if (batch == null || event.removed().isEmpty()) return;
+        var lost = new CalendarPublishedBatchProjection.PublishedBatch(batch.batchId(), batch.schoolId(), batch.schoolName(),
+                batch.schoolShortName(), batch.status(), batch.slots().stream().map(slot -> new CalendarPublishedBatchProjection.Slot(
+                        slot.eventId(), slot.classId(), slot.className(), slot.startAt(), slot.periodStart(), slot.periodCount(),
+                        slot.roomName(), event.removed().stream().filter(r -> r.calendarEventId().equals(slot.eventId()))
+                                .map(r -> new CalendarPublishedBatchProjection.Person(r.userId(), r.name(), r.role())).toList()))
+                .filter(slot -> !slot.people().isEmpty()).toList());
+        ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.REMOVED, event.tenantId(), event.actorId(),
+                        event.eventId() + ":removed", event.aggregateVersion(), "SCHEDULE_CHANGED", lost)
                 .forEach(notifications::enqueue);
     }
 

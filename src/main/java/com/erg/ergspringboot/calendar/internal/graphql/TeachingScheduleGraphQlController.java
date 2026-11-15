@@ -6,6 +6,7 @@ import com.erg.ergspringboot.calendar.CalendarScopeService;
 import com.erg.ergspringboot.calendar.SchoolPeriodTimesInput;
 import com.erg.ergspringboot.calendar.TeachingPeriodTemplateInput;
 import com.erg.ergspringboot.calendar.TeachingScheduleOperations;
+import com.erg.ergspringboot.calendar.TeachingScheduleSlotChanges;
 import com.erg.ergspringboot.calendar.TeachingScheduleDraftInput;
 import com.erg.ergspringboot.calendar.authorization.CalendarCreate;
 import com.erg.ergspringboot.calendar.authorization.CalendarDayLoadRead;
@@ -23,6 +24,7 @@ import com.erg.ergspringboot.calendar.TeachingScheduleResponses.PeriodTemplateRe
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.ReusePreviewResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolPageResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolPeriodAssignmentResponse;
+import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SlotChangeResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SlotOptionsResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.TeacherPageResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolTravelTimeResponse;
@@ -184,6 +186,28 @@ public class TeachingScheduleGraphQlController {
         String tenantId = accessSupport.verifiedTenantId(principal, null);
         scopeService.requireBatch(principal, tenantId, batchId);
         return schedule.renameBatch(tenantId, batchId, label, expectedVersion);
+    }
+
+    /** Move, re-room, re-subject or re-assist PUBLISHED periods; {@code dryRun} only reports conflicts and affected periods. */
+    @MutationMapping
+    @CalendarUpdate
+    public SlotChangeResponse editTeachingScheduleSlot(@Argument TeachingScheduleSlotChanges.Edit input) {
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        accessSupport.assertPermission(principal, "lms.schedule.update", "lms.schedule.manage", "lms.manage", "*");
+        String tenantId = accessSupport.verifiedTenantId(principal, null);
+        scopeService.requireEvent(principal, tenantId, input.eventId());
+        return schedule.editSlot(tenantId, input, accessSupport.blankToNull(principal.userId()));
+    }
+
+    /** Give PUBLISHED periods to another main teacher (dạy thay / đổi giáo viên). */
+    @MutationMapping
+    @CalendarUpdate
+    public SlotChangeResponse swapTeachingScheduleTeacher(@Argument TeachingScheduleSlotChanges.Swap input) {
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        accessSupport.assertPermission(principal, "lms.schedule.update", "lms.schedule.manage", "lms.manage", "*");
+        String tenantId = accessSupport.verifiedTenantId(principal, null);
+        scopeService.requireEvent(principal, tenantId, input.eventId());
+        return schedule.swapTeacher(tenantId, input, accessSupport.blankToNull(principal.userId()));
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "teachingScheduleSlotOptions")

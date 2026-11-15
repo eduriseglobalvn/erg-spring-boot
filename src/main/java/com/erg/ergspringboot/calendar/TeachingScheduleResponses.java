@@ -12,6 +12,12 @@ public final class TeachingScheduleResponses {
 
     public record PeriodTemplateResponse(String id, String name, int periodsPerDay, List<PeriodSlotResponse> slots) {}
 
+    /** Result of editTeachingScheduleSlot / swapTeachingScheduleTeacher; {@code applied} false for a dry run. */
+    public record SlotChangeResponse(boolean applied, boolean blocking, int affectedCount, List<ChangedEventResponse> events,
+            List<ConflictDetailResponse> conflicts) {}
+
+    public record ChangedEventResponse(String eventId, String date, int periodNo, Integer version) {}
+
     public record SchoolPeriodAssignmentResponse(String schoolId, String schoolName, String templateId, String templateName,
             String effectiveFrom, boolean current) {}
 

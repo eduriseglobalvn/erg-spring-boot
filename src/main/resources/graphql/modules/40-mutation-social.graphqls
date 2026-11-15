@@ -37,6 +37,8 @@ type Mutation {
   renameTeachingScheduleBatch(batchId: ID!, label: String!, expectedVersion: Int!): TeachingScheduleBatch!
   updateTeachingScheduleLoadSettings(loadWarn: Int!, loadMax: Int!): TeachingScheduleLoadSettings!
   reuseTeachingScheduleWeek(input: TeachingScheduleReuseInput!): TeachingScheduleDraftResult!
+  editTeachingScheduleSlot(input: EditTeachingScheduleSlotInput!): TeachingScheduleSlotChangeResult!
+  swapTeachingScheduleTeacher(input: SwapTeachingScheduleTeacherInput!): TeachingScheduleSlotChangeResult!
   saveTeachingPeriodTemplate(input: SaveTeachingPeriodTemplateInput!): TeachingPeriodTemplate!
   assignSchoolPeriodTemplate(schoolId: ID!, templateId: ID!, effectiveFrom: Date!): SchoolPeriodAssignment!
   saveSchoolPeriodTimes(input: SaveSchoolPeriodTimesInput!): SchoolPeriodAssignment!

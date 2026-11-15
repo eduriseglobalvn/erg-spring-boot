@@ -21,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 /** Builds one Vietnamese notification per teacher or assistant of a schedule batch (KE_HOACH_LICH_DAY.md B9). */
 final class ScheduleNotificationComposer {
 
-    enum Kind { PUBLISHED, CHANGED, CANCELLED }
+    enum Kind { PUBLISHED, CHANGED, CANCELLED, REMOVED }
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DAY_MONTH = DateTimeFormatter.ofPattern("dd/MM");
@@ -77,7 +77,12 @@ final class ScheduleNotificationComposer {
                 Slot slot = slots.get(0);
                 title = "Tiết dạy thay đổi ở " + school;
                 String room = slot.roomName() == null || slot.roomName().isBlank() ? "" : " · phòng " + slot.roomName();
-                body = "Tiết " + when + " lớp " + slot.className() + " đã được cập nhật" + room;
+                body = slots.size() == 1 ? "Tiết " + when + " lớp " + slot.className() + " đã được cập nhật" + room
+                        : periods + " tiết từ " + when + " lớp " + classNames + " đã được cập nhật";
+            }
+            case REMOVED -> {
+                title = "Tiết dạy được chuyển đi ở " + school;
+                body = periods + " tiết từ " + when + " lớp " + classNames + " không còn trong lịch của bạn";
             }
             default -> {
                 title = periods + " tiết bị hủy ở " + school;
@@ -94,6 +99,7 @@ final class ScheduleNotificationComposer {
         data.put(switch (kind) {
             case PUBLISHED -> "newPeriods";
             case CHANGED -> "changedPeriods";
+            case REMOVED -> "removedPeriods";
             case CANCELLED -> "cancelledPeriods";
         }, String.valueOf(periods));
         data.put("weekdays", JSON.writeValueAsString(slots.stream()
@@ -108,7 +114,7 @@ final class ScheduleNotificationComposer {
                 }).toList()));
         data.put("role", role);
         if (assistantPeriods > 0) data.put("assistantPeriods", String.valueOf(assistantPeriods));
-        if (kind == Kind.CHANGED) data.put("eventId", slots.get(0).eventId());
+        if (kind == Kind.CHANGED || kind == Kind.REMOVED) data.put("eventId", slots.get(0).eventId());
         if (kind == Kind.CANCELLED) data.put("reason", "BATCH_CANCELLED");
 
         return new NotificationCommand(tenantId, actorId, key, eventType, "teaching_schedule", batch.batchId(),

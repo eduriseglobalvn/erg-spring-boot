@@ -102,6 +102,14 @@ public class ScheduleDataLoader {
         return withTeachers(tenantId, rows, true, true);
     }
 
+    /** The given events (any status) of the tenant as candidates carrying their EVENT status; foreign ids are dropped. */
+    List<Occurrence> loadEvents(String tenantId, Collection<String> eventIds) {
+        if (eventIds.isEmpty()) return List.of();
+        List<Occurrence> rows = jdbc.query(EVENT_COLUMNS + " where e.tenant_id = :tenant and e.id in (:ids)",
+                new MapSqlParameterSource("tenant", tenantId).addValue("ids", eventIds), (rs, i) -> occurrence(rs, true));
+        return withTeachers(tenantId, rows, true, false);
+    }
+
     Map<String, List<Leave>> loadLeaves(String tenantId, Collection<String> teacherIds, LocalDate from, LocalDate to) {
         if (teacherIds.isEmpty()) return Map.of();
         Map<String, List<Leave>> byUser = new HashMap<>();

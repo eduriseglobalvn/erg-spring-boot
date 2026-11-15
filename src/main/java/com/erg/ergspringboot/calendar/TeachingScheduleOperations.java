@@ -6,6 +6,7 @@ import com.erg.ergspringboot.calendar.internal.schedule.PeriodTemplateService;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleLoadSettingsService;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleOverviewService;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleReuseService;
+import com.erg.ergspringboot.calendar.internal.schedule.ScheduleSlotChangeService;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleSlotOptionsService;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleTeacherOverviewService;
 import com.erg.ergspringboot.calendar.internal.schedule.TeachingScheduleDraftService;
@@ -22,6 +23,7 @@ import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolPageRespon
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolPeriodAssignmentResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolRowResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SchoolTravelTimeResponse;
+import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SlotChangeResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.SlotOptionsResponse;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.TeacherPageResponse;
 import com.erg.ergspringboot.calendar.CalendarHolidayPort.DayLoad;
@@ -44,6 +46,7 @@ public class TeachingScheduleOperations {
     private final TeachingScheduleDraftService drafts;
     private final CalendarBatchLifecycleUseCase lifecycle;
     private final ScheduleSlotOptionsService slotOptions;
+    private final ScheduleSlotChangeService slotChanges;
     private final ScheduleReuseService reuse;
     private final ScheduleOverviewService overview;
     private final ScheduleTeacherOverviewService teacherOverview;
@@ -53,6 +56,7 @@ public class TeachingScheduleOperations {
     public TeachingScheduleOperations(PeriodTemplateService templates, PeriodTemplateAdminService templateAdmin,
             TravelTimeService travelTimes,
             TeachingScheduleDraftService drafts, CalendarBatchLifecycleUseCase lifecycle, ScheduleSlotOptionsService slotOptions,
+            ScheduleSlotChangeService slotChanges,
             ScheduleReuseService reuse, ScheduleOverviewService overview, ScheduleTeacherOverviewService teacherOverview,
             ScheduleLoadSettingsService loadSettings,
             CalendarHolidayPort holidays) {
@@ -62,6 +66,7 @@ public class TeachingScheduleOperations {
         this.drafts = drafts;
         this.lifecycle = lifecycle;
         this.slotOptions = slotOptions;
+        this.slotChanges = slotChanges;
         this.reuse = reuse;
         this.overview = overview;
         this.teacherOverview = teacherOverview;
@@ -91,6 +96,16 @@ public class TeachingScheduleOperations {
     @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
     public BatchResponse renameBatch(String tenantId, String batchId, String label, int expectedVersion) {
         return lifecycle.renameBatch(tenantId, batchId, label, expectedVersion);
+    }
+
+    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    public SlotChangeResponse editSlot(String tenantId, TeachingScheduleSlotChanges.Edit input, String actorId) {
+        return slotChanges.edit(tenantId, input, actorId);
+    }
+
+    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    public SlotChangeResponse swapTeacher(String tenantId, TeachingScheduleSlotChanges.Swap input, String actorId) {
+        return slotChanges.swap(tenantId, input, actorId);
     }
 
     public List<PeriodTemplateResponse> periodTemplates(String tenantId) {

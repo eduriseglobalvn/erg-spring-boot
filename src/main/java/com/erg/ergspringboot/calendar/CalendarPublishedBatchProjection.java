@@ -22,6 +22,9 @@ public interface CalendarPublishedBatchProjection {
     /** One edited period wrapped in its batch; no slot when the period is no longer PUBLISHED. */
     Optional<PublishedBatch> findChangedEvent(String tenantId, String calendarEventId);
 
+    /** The given edited periods (those still PUBLISHED) of one batch; no slot when none is. */
+    Optional<PublishedBatch> findChangedEvents(String tenantId, String batchId, java.util.Collection<String> calendarEventIds);
+
     /** {@code role} is MAIN or ASSISTANT. */
     record Person(String userId, String name, String role) {
     }

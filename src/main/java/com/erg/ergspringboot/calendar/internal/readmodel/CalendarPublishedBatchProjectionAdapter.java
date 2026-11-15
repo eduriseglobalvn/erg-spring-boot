@@ -89,6 +89,13 @@ public class CalendarPublishedBatchProjectionAdapter implements CalendarPublishe
                                 PUBLISHED.equals(event.getStatus()) ? List.of(event) : List.of())));
     }
 
+    @Override
+    public Optional<PublishedBatch> findChangedEvents(String tenantId, String batchId, java.util.Collection<String> calendarEventIds) {
+        return batches.findByTenantIdAndId(tenantId, batchId).map(batch -> build(tenantId, batch,
+                events.findByTenantIdAndIdIn(tenantId, calendarEventIds).stream()
+                        .filter(event -> batchId.equals(event.getBatchId()) && PUBLISHED.equals(event.getStatus())).toList()));
+    }
+
     private PublishedBatch build(String tenantId, CalendarBatch batch, List<CalendarEvent> list) {
         EducationUnit school = schools.findById(batch.getSchoolId()).orElse(null);
         String schoolName = school == null || school.getName() == null ? "" : school.getName();

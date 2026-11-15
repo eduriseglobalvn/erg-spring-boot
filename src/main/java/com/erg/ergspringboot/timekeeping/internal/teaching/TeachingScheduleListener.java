@@ -3,6 +3,7 @@ package com.erg.ergspringboot.timekeeping.internal.teaching;
 import com.erg.ergspringboot.calendar.CalendarBatchCancelled;
 import com.erg.ergspringboot.calendar.CalendarBatchPublished;
 import com.erg.ergspringboot.calendar.CalendarHolidayCancelled;
+import com.erg.ergspringboot.calendar.CalendarSlotsChanged;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,12 @@ class TeachingScheduleListener {
 
     @ApplicationModuleListener
     void on(CalendarBatchCancelled event) {
+        recheck(event.tenantId());
+    }
+
+    /** A swap moves periods between teachers and an edit between days or months: totals move like a publish. */
+    @ApplicationModuleListener
+    void on(CalendarSlotsChanged event) {
         recheck(event.tenantId());
     }
 

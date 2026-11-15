@@ -185,6 +185,31 @@ class TeachingScheduleGraphQlControllerTest {
                 .isInstanceOf(ForbiddenException.class);
     }
 
+    @Test
+    void slotEditAndSwapNeedUpdatePermissionAndTheSchoolOfThePeriodInScope() {
+        var scope = new com.erg.ergspringboot.calendar.TeachingScheduleSlotChanges.Scope("THIS_ONLY", null);
+        var edit = new com.erg.ergspringboot.calendar.TeachingScheduleSlotChanges.Edit("e1", null, scope, null, 7, null, null, null, null,
+                null, null);
+        var swap = new com.erg.ergspringboot.calendar.TeachingScheduleSlotChanges.Swap("e1", null, scope, "t2", null, null, null);
+        authenticate(principal(List.of("lms.schedule.read"), List.of("school-1")));
+        assertThatThrownBy(() -> controller.editTeachingScheduleSlot(edit)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> controller.swapTeachingScheduleTeacher(swap)).isInstanceOf(ForbiddenException.class);
+
+        com.erg.ergspringboot.calendar.persistence.CalendarEvent event = new com.erg.ergspringboot.calendar.persistence.CalendarEvent();
+        event.setSchoolId("school-2");
+        when(eventRepository.findByTenantIdAndId("tenant-a", "e1")).thenReturn(Optional.of(event));
+        authenticate(principal(List.of("lms.schedule.update"), List.of("school-1")));
+        assertThatThrownBy(() -> controller.editTeachingScheduleSlot(edit)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> controller.swapTeachingScheduleTeacher(swap)).isInstanceOf(ForbiddenException.class);
+        verifyNoInteractions(schedule);
+
+        event.setSchoolId("school-1");
+        controller.editTeachingScheduleSlot(edit);
+        controller.swapTeachingScheduleTeacher(swap);
+        verify(schedule).editSlot("tenant-a", edit, "teacher-1");
+        verify(schedule).swapTeacher("tenant-a", swap, "teacher-1");
+    }
+
     private static CalendarBatch batch(String schoolId) {
         CalendarBatch batch = new CalendarBatch();
         batch.setId(BATCH_ID);
