@@ -2557,6 +2557,58 @@
         },
         "type": "object"
       },
+      "ApiResponseHolidayImportPreview": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HolidayImportPreview"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseHolidayImportResult": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HolidayImportResult"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseImportedAttemptResponse": {
         "properties": {
           "data": {
@@ -3289,6 +3341,35 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/RoleResponse"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListSaturdayModeView": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SaturdayModeView"
             },
             "type": "array"
           },
@@ -4555,6 +4636,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/RoleResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseSaturdayModeView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SaturdayModeView"
           },
           "errors": {},
           "message": {
@@ -6857,6 +6964,9 @@
       },
       "CalendarEventResponse": {
         "properties": {
+          "assistantName": {
+            "type": "string"
+          },
           "batchId": {
             "type": "string"
           },
@@ -6885,6 +6995,12 @@
             "type": "string"
           },
           "levelName": {
+            "type": "string"
+          },
+          "mainTeacherName": {
+            "type": "string"
+          },
+          "myRole": {
             "type": "string"
           },
           "note": {
@@ -6941,6 +7057,10 @@
         "properties": {
           "eventId": {
             "type": "string"
+          },
+          "expectedVersion": {
+            "format": "int32",
+            "type": "integer"
           },
           "note": {
             "type": "string"
@@ -9506,6 +9626,7 @@
               "MISSING_PUNCH",
               "ABSENT_UNPAID",
               "HOLIDAY",
+              "UNPAID_OFF",
               "OFF"
             ],
             "type": "string"
@@ -10372,14 +10493,41 @@
       },
       "HolidayCommand": {
         "properties": {
-          "date": {
+          "confirmPast": {
+            "type": "boolean"
+          },
+          "from": {
             "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
             "type": "string"
           },
           "name": {
             "type": "string"
           },
-          "schoolId": {
+          "payMode": {
+            "enum": [
+              "PAID",
+              "ANNUAL_LEAVE",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
+          "teachingAction": {
+            "enum": [
+              "CANCEL",
+              "KEEP"
+            ],
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
             "type": "string"
           }
         },
@@ -10387,6 +10535,17 @@
       },
       "HolidayConfig": {
         "properties": {
+          "affectedPeriods": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "affectedSchools": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "createdByName": {
+            "type": "string"
+          },
           "date": {
             "format": "date",
             "type": "string"
@@ -10394,10 +10553,124 @@
           "id": {
             "type": "string"
           },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
+          "payMode": {
+            "enum": [
+              "PAID",
+              "ANNUAL_LEAVE",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
           "schoolId": {
+            "type": "string"
+          },
+          "teachingAction": {
+            "enum": [
+              "CANCEL",
+              "KEEP"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportCommand": {
+        "properties": {
+          "confirmPast": {
+            "type": "boolean"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayImportRow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportPreview": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayImportPreviewRow"
+            },
+            "type": "array"
+          },
+          "savedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportPreviewRow": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
+            "type": "string"
+          },
+          "lunarDate": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportResult": {
+        "properties": {
+          "imported": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "skipped": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportRow": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
+            "type": "string"
+          },
+          "name": {
             "type": "string"
           }
         },
@@ -11301,6 +11574,7 @@
               "MISSING_PUNCH",
               "ABSENT_UNPAID",
               "HOLIDAY",
+              "UNPAID_OFF",
               "OFF"
             ],
             "type": "string"
@@ -13554,6 +13828,38 @@
         "required": [
           "expectedVersion"
         ],
+        "type": "object"
+      },
+      "SaturdayModeCommand": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "OFFICE",
+              "WFH",
+              "PAID_OFF",
+              "UNPAID_OFF"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SaturdayModeView": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "OFFICE",
+              "WFH",
+              "PAID_OFF",
+              "UNPAID_OFF"
+            ],
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "SaveAnswerRequest": {
@@ -18059,48 +18365,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCalendarEventPayload"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "calendar-rest-controller"
-        ]
-      }
-    },
-    "/api/v1/calendar/import-excel": {
-      "post": {
-        "operationId": "importExcel",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "properties": {
-                  "file": {
-                    "format": "binary",
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file",
-                  "metadata"
-                ],
-                "type": "object"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCalendarPreviewPayload"
                 }
               }
             },
@@ -25971,7 +26235,83 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseHolidayConfig"
+                  "$ref": "#/components/schemas/ApiResponseListHolidayConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/holidays/import": {
+      "post": {
+        "operationId": "importHolidays",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HolidayImportCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/holidays/import-preview": {
+      "post": {
+        "operationId": "holidayImportPreview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayImportPreview"
                 }
               }
             },
@@ -25999,6 +26339,44 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "put": {
+        "operationId": "updateHoliday",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HolidayCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayConfig"
+                }
+              }
+            },
+            "description": "OK"
           }
         },
         "tags": [
@@ -26332,6 +26710,77 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseRemoteRuleConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/saturday-modes": {
+      "get": {
+        "operationId": "saturdayModes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSaturdayModeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/saturday-modes/{date}": {
+      "put": {
+        "operationId": "setSaturdayMode",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaturdayModeCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSaturdayModeView"
                 }
               }
             },
