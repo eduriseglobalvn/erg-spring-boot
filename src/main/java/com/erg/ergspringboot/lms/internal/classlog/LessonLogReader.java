@@ -81,12 +81,15 @@ class LessonLogReader {
 
         List<Row> result = new ArrayList<>();
         for (LessonSlot slot : slots) {
+            // highest KCT period, the bound ACTUAL_PERIOD_OUT_OF_RANGE enforces; null when the KCT is not set up
+            TreeMap<Integer, CurriculumProgramRow> program = kct.framework(slot.subjectId(), slot.levelId(), slot.date());
+            Integer kctSize = program.isEmpty() ? null : program.lastKey();
             for (int k = 0; k < slot.periodCount(); k++) {
                 int periodNo = slot.periodStart() + k;
                 LessonLogEntry entry = saved.get(key(slot.eventId(), (short) periodNo));
                 int position = positions.getOrDefault(new PeriodKey(slot.eventId(), periodNo), 1);
                 int actual = entry == null ? position : entry.getActualPeriod();
-                CurriculumProgramRow lesson = kct.framework(slot.subjectId(), slot.levelId(), slot.date()).get(actual);
+                CurriculumProgramRow lesson = program.get(actual);
                 result.add(new Row(slot, entry, new LessonLogPeriod(slot.eventId(), slot.date(), periodNo, slot.classId(),
                         classNames.getOrDefault(slot.classId(), ""), slot.subjectId(), subjectNames.getOrDefault(slot.subjectId(), ""),
                         teacherName(slot, teachers),
@@ -94,7 +97,7 @@ class LessonLogReader {
                         absent.getOrDefault(absentKey(slot.classId(), slot.subjectId(), slot.date(), periodNo), List.of()),
                         entry == null ? null : entry.getComment(), entry == null ? "PENDING" : entry.getStatus(),
                         entry != null && entry.isLate(), happened(slot, periodNo, now),
-                        entry == null ? 0 : entry.getVersion().intValue())));
+                        entry == null ? 0 : entry.getVersion().intValue(), kctSize)));
             }
         }
         result.sort(Comparator.comparing((Row r) -> r.period().date()).thenComparingInt(r -> r.period().periodNo())

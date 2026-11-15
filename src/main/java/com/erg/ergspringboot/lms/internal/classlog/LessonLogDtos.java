@@ -16,7 +16,7 @@ public final class LessonLogDtos {
     public record LessonLogPeriod(String eventId, LocalDate date, int periodNo, String classId, String className,
                                   String subjectId, String subjectName, String teacherName, int ppctPeriod, int actualPeriod, String lessonTitle,
                                   List<LessonLogAbsentee> absentees, String comment, String status, boolean late,
-                                  boolean happened, int version) {}
+                                  boolean happened, int version, Integer curriculumPeriodCount) {}
 
     public record LessonLogAbsentee(String studentId, String shortName, boolean excused) {}
 

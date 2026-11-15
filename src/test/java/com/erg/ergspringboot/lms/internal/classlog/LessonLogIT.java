@@ -90,6 +90,7 @@ class LessonLogIT extends TeachingScheduleITBase {
         LessonLogWeek fresh = queries.teacherWeek(tenant, teacher, MONDAY, null, null);
         LessonLogPeriod first = fresh.days().get(0).periods().get(0);
         assertThat(fresh.days()).hasSize(5);
+        assertThat(first.curriculumPeriodCount()).isEqualTo(20);
         assertThat(first.ppctPeriod()).isEqualTo(10);
         assertThat(first.actualPeriod()).isEqualTo(10);
         assertThat(first.status()).isEqualTo("PENDING");

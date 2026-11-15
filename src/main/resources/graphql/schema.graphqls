@@ -1649,7 +1649,7 @@ input LessonLogAttendanceInput { studentId: ID!, status: String! }
 
 type LessonLogWeek { weekStart: Date!, weekEnd: Date!, weekNo: Int!, days: [LessonLogDay!]!, stats: LessonLogStats!, lagChip: LessonLogLag }
 type LessonLogDay { date: Date!, session: String, periods: [LessonLogPeriod!]! }
-type LessonLogPeriod { eventId: ID!, date: Date!, periodNo: Int!, classId: ID!, className: String!, subjectId: ID, subjectName: String!, teacherName: String, ppctPeriod: Int!, actualPeriod: Int!, lessonTitle: String, absentees: [LessonLogAbsentee!]!, comment: String, status: LessonLogStatus!, late: Boolean!, happened: Boolean!, version: Int! }
+type LessonLogPeriod { eventId: ID!, date: Date!, periodNo: Int!, classId: ID!, className: String!, subjectId: ID, subjectName: String!, teacherName: String, ppctPeriod: Int!, actualPeriod: Int!, lessonTitle: String, absentees: [LessonLogAbsentee!]!, comment: String, status: LessonLogStatus!, late: Boolean!, happened: Boolean!, version: Int!, "Highest period of the subject KCT (the limit of actualPeriod); null when the KCT is not set up" curriculumPeriodCount: Int }
 type LessonLogAbsentee { studentId: ID!, shortName: String!, excused: Boolean! }
 type LessonLogStats { taught: Int!, confirmed: Int!, pending: Int! }
 type LessonLogLag { classId: ID!, className: String!, lag: Int! }

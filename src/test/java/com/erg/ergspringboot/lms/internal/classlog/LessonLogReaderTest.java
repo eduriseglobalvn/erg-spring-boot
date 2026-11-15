@@ -14,7 +14,7 @@ class LessonLogReaderTest {
 
     private static LessonLogPeriod period(String classId, int ppct, int actual, boolean happened, String status) {
         return new LessonLogPeriod("e", LocalDate.of(2026, 11, 9), 1, classId, classId, "s1", "Tin", null, ppct, actual, null,
-                List.of(), null, status, false, happened, 0);
+                List.of(), null, status, false, happened, 0, null);
     }
 
     @Test

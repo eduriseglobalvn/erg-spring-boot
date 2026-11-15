@@ -54,7 +54,7 @@ class LessonLogCommandUseCaseTest {
 
     private Row row(LessonLogEntry entry, int ppct, int actual, int version, String comment) {
         return new Row(slot, entry, new LessonLogPeriod("e1", DAY, 1, "6A6", "6A6", "s1", "Tin", null, ppct, actual, null, List.of(),
-                comment, entry == null ? "PENDING" : entry.getStatus(), false, true, version));
+                comment, entry == null ? "PENDING" : entry.getStatus(), false, true, version, null));
     }
 
     private void given(Row row) {
