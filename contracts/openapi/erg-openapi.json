@@ -7179,6 +7179,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"

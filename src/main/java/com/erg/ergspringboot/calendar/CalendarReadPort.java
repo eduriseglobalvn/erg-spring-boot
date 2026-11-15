@@ -1,7 +1,7 @@
 package com.erg.ergspringboot.calendar;
 
-import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarBatchDetailResponse;
-import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarBatchPageResponse;
+import com.erg.ergspringboot.calendar.CalendarBatchResponses.CalendarBatchDetailResponse;
+import com.erg.ergspringboot.calendar.CalendarBatchResponses.CalendarBatchPageResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarCatalogResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOptionResponse;

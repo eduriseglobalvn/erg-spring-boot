@@ -14,6 +14,7 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CreateRoom
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.DeleteTeacherScheduleRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
+import com.erg.ergspringboot.calendar.CalendarBatchResponses.*;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
