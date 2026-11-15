@@ -88,6 +88,18 @@ class TeachingScheduleGraphQlControllerTest {
     }
 
     @Test
+    void dayLoadRangesLongerThanSixWeeksOrReversedAreRejectedWithInvalidDateRange() {
+        authenticate(principal(List.of("lms.schedule.read"), List.of("school-1")));
+
+        for (String[] range : new String[][] {{"2026-11-01", "2026-12-14"}, {"2026-11-10", "2026-11-09"}}) {
+            assertThatThrownBy(() -> controller.teachingScheduleDayLoads(range[0], range[1]))
+                    .isInstanceOfSatisfying(com.erg.ergspringboot.exception.TeachingScheduleException.class,
+                            error -> assertThat(error.getCode()).isEqualTo("INVALID_DATE_RANGE"));
+        }
+        verifyNoInteractions(schedule);
+    }
+
+    @Test
     void readOnlyPrincipalIsRejectedOnEveryLifecycleMutation() {
         authenticate(principal(List.of("lms.schedule.read"), List.of("school-1")));
 

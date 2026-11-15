@@ -65,6 +65,8 @@ public class LessonLogCommandUseCase {
         LocalDate monday = LessonLogQueryUseCase.monday(weekStart);
         Instant now = clock.instant();
         List<Row> rows = reader.rows(tenantId, schedule.teacherSlots(tenantId, actorId, monday, monday.plusDays(6)), now);
+        // a week that only holds periods still to come has nothing to confirm; a week without periods stays a no-op
+        if (!rows.isEmpty() && rows.stream().noneMatch(r -> r.period().happened())) throw LessonLogException.periodNotHappened();
         boolean sawClosed = false;
         boolean confirmedAny = false;
         for (Row row : rows) {

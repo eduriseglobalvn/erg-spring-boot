@@ -18,6 +18,10 @@ public class LessonLogException extends ApiException {
         return new LessonLogException(HttpStatus.CONFLICT, "MONTH_CLOSED", "The month of this period is closed.");
     }
 
+    public static LessonLogException periodNotHappened() {
+        return new LessonLogException(HttpStatus.CONFLICT, "PERIOD_NOT_HAPPENED", "No period of this week has taken place yet.");
+    }
+
     public static LessonLogException notTeacherOfPeriod() {
         return new LessonLogException(HttpStatus.FORBIDDEN, "NOT_TEACHER_OF_PERIOD", "You do not teach this period.");
     }

@@ -142,4 +142,32 @@ class LessonLogIT extends TeachingScheduleITBase {
         assertThat(codeOf(() -> commands.update(tenant, teacher, mondayFirst, MONDAY, 1, 8, null, null))).isEqualTo("MONTH_CLOSED");
         assertThat(friday).isNotNull();
     }
+
+    @Test
+    void aWeekWithOnlyPeriodsStillToComeCannotBeConfirmedAndAnEmptyWeekIsANoOp() {
+        setUp();
+        String school = jdbc.queryForObject("select school_id from teaching_schedule_events where id = ?", String.class, friday);
+        String subject = jdbc.queryForObject("select subject_id from teaching_schedule_events where id = ?", String.class, friday);
+        String batch = jdbc.queryForObject("select batch_id from teaching_schedule_events where id = ?", String.class, friday);
+        event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-16", "08:00"), 1, teacher, null, null);
+
+        assertThat(codeOf(() -> commands.confirmWeek(tenant, teacher, "2026-11-16"))).isEqualTo("PERIOD_NOT_HAPPENED");
+        assertThat(commands.confirmWeek(tenant, teacher, "2026-11-23").confirmed()).isZero();
+        assertThat(codeOf(() -> commands.confirmWeek(tenant, teacher, "2026-11-11"))).isEqualTo("BAD_REQUEST");
+    }
+
+    @Test
+    void anotherTeacherOrAHeadReadsTheWholeClassLogButOnlyTheOwnerWritesItsPeriods() {
+        setUp();
+        commands.update(tenant, teacher, mondayFirst, MONDAY, 1, 8, "Ghi chu cua co giao", 0);
+        String head = user(tenant, "To truong chuyen mon");
+
+        LessonLogPeriod seenByHead = queries.classWeek(tenant, classId, MONDAY).days().get(0).periods().get(0);
+        assertThat(seenByHead.comment()).isEqualTo("Ghi chu cua co giao");
+        assertThat(seenByHead.teacherName()).isEqualTo("Nguyen Quoc Vuong");
+        assertThat(codeOf(() -> commands.update(tenant, head, mondayFirst, MONDAY, 1, 9, "Sua ho", null)))
+                .isEqualTo("NOT_TEACHER_OF_PERIOD");
+        assertThat(queries.classWeek(tenant, classId, MONDAY).days().get(0).periods().get(0).comment())
+                .isEqualTo("Ghi chu cua co giao");
+    }
 }
