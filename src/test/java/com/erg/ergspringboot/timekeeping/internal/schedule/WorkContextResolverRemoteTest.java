@@ -26,7 +26,8 @@ class WorkContextResolverRemoteTest {
     private final TkRequestRepository requests = mock(TkRequestRepository.class);
     private final WorkContextResolver resolver = new WorkContextResolver(mock(UserAccessScopeRepository.class),
             mock(TkShiftRepository.class), mock(TkSiteRepository.class), mock(TkPolicyRepository.class), rules,
-            mock(TkPeriodLockRepository.class), requests);
+            mock(TkPeriodLockRepository.class), requests,
+            mock(SaturdayModeResolver.class));
 
     @Test
     void anApprovedWfhRequestIsRemoteWithoutAnyRule() {

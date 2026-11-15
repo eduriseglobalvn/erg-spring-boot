@@ -2,6 +2,7 @@ package com.erg.ergspringboot.timekeeping.internal.admin;
 
 import com.erg.ergspringboot.ErgSpringApplication;
 import com.erg.ergspringboot.calendar.CalendarReadPort;
+import com.erg.ergspringboot.calendar.LessonReportCounter;
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
 import com.erg.ergspringboot.notifications.NotificationAdminOperations;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +37,7 @@ import org.testcontainers.DockerClientFactory;
  * service tests and the admin/approval controller IT, plus small row builders.
  */
 @ActiveProfiles("test")
-@SpringBootTest(classes = {ErgSpringApplication.class, AdminITBase.FixedClock.class})
+@SpringBootTest(classes = {ErgSpringApplication.class, AdminITBase.FixedClock.class, AdminITBase.ReportStub.class})
 @AutoConfigureMockMvc
 @Transactional
 @EnabledIf("com.erg.ergspringboot.timekeeping.internal.admin.AdminITBase#postgresAvailable")
@@ -55,6 +57,17 @@ public abstract class AdminITBase {
         @Primary
         Clock fixedTimekeepingClock() {
             return Clock.fixed(NOW, ZoneOffset.UTC);
+        }
+    }
+
+    /** Stands in for the module that owns lesson reports: a period whose note is "REPORTED" has one. */
+    @TestConfiguration
+    public static class ReportStub {
+        @Bean
+        LessonReportCounter testLessonReports(JdbcTemplate jdbc) {
+            return (tenantId, ids) -> ids.isEmpty() ? Set.of() : Set.copyOf(jdbc.queryForList(
+                    "select id from teaching_schedule_events where tenant_id = ? and note = 'REPORTED' and id = any (?)",
+                    String.class, tenantId, ids.toArray(String[]::new)));
         }
     }
 

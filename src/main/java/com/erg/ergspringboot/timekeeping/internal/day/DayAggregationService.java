@@ -2,13 +2,17 @@ package com.erg.ergspringboot.timekeeping.internal.day;
 
 import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.DayStatus;
+import com.erg.ergspringboot.timekeeping.HolidayPayMode;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
 import com.erg.ergspringboot.timekeeping.PunchDirection;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.RequestType;
+import com.erg.ergspringboot.timekeeping.SaturdayMode;
+import com.erg.ergspringboot.timekeeping.internal.request.LeaveBalanceService;
 import com.erg.ergspringboot.timekeeping.internal.rules.DayInput;
 import com.erg.ergspringboot.timekeeping.internal.rules.DayResult;
 import com.erg.ergspringboot.timekeeping.internal.rules.WorkUnitCalculator;
+import com.erg.ergspringboot.timekeeping.internal.schedule.SaturdayModeResolver;
 import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
@@ -48,7 +52,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The single implementation behind {@code recomputeDay}: turns one person's day into its {@code tk_days} row.
  *
- * <p>Precedence: school or tenant-wide holiday → HOLIDAY; no shift that weekday → OFF; approved full-day LEAVE →
+ * <p>Precedence: a day off (school or tenant-wide holiday, or a Saturday set to a paid / unpaid day off) when the
+ * person has no real punch that day → paid HOLIDAY with the shift's units (L, 1 công), unpaid UNPAID_OFF (KL), or
+ * annual LEAVE (P) while the balance lasts; a day off on a day without a shift stays HOLIDAY with 0 công (never
+ * paid twice); someone who punched on a day off is worked out as on a working day. Then: no shift that weekday → OFF; approved full-day LEAVE →
  * LEAVE (ANNUAL / PAID_PERSONAL / UNPAID, 0 units, kind kept in {@code leave_kind} so the sheet shows P vs KP) or
  * SICK; approved BUSINESS → BUSINESS with the shift units; approved AM/PM leave → HALF with half the shift units
  * (half leave + half work, whether or not the person punched); otherwise the punches through
@@ -74,11 +81,13 @@ public class DayAggregationService {
     private final WorkContextResolver context;
     private final TeacherPeriodReader periods;
     private final UserRepository users;
+    private final SaturdayModeResolver saturdays;
+    private final LeaveBalanceService balances;
     private final Clock clock;
 
     DayAggregationService(TkPunchRepository punches, TkDayRepository days, TkHolidayRepository holidays,
             TkRequestRepository requests, WorkContextResolver context, TeacherPeriodReader periods, UserRepository users,
-            Clock clock) {
+            SaturdayModeResolver saturdays, LeaveBalanceService balances, Clock clock) {
         this.punches = punches;
         this.days = days;
         this.holidays = holidays;
@@ -86,6 +95,8 @@ public class DayAggregationService {
         this.context = context;
         this.periods = periods;
         this.users = users;
+        this.saturdays = saturdays;
+        this.balances = balances;
         this.clock = clock;
     }
 
@@ -116,7 +127,8 @@ public class DayAggregationService {
         List<TkPunch> dayPunches = punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date);
         String schoolId = schoolOf(dayPunches).or(() -> context.schoolOf(tenantId, userId)).orElse(null);
         if (schoolId == null) return;
-        SchoolDay school = schoolDay(tenantId, schoolId, date, holidays.findForSchool(tenantId, schoolId, date, date));
+        SchoolDay school = schoolDay(tenantId, schoolId, date, holidays.findForSchool(tenantId, schoolId, date, date),
+                saturdays.modeOn(tenantId, date));
         if (school.locked() && !evenIfLocked) {
             log.info("Skipping recompute of a locked day: tenant {} user {} date {}", tenantId, userId, date);
             return;
@@ -171,6 +183,7 @@ public class DayAggregationService {
         Map<String, TkDay> existing = days.findByTenantIdAndWorkDate(tenantId, date).stream()
                 .collect(Collectors.toMap(TkDay::getUserId, Function.identity(), (a, b) -> a));
         List<TkHoliday> dayHolidays = holidays.findByTenantIdAndHolidayDate(tenantId, date);
+        Optional<SaturdayMode> saturdayMode = saturdays.modeOn(tenantId, date);
         Map<String, SchoolDay> schools = new HashMap<>();
 
         List<TkDay> rows = new ArrayList<>();
@@ -180,7 +193,8 @@ public class DayAggregationService {
                 String schoolId = schoolOf(dayPunches).orElse(schoolOf.get(userId));
                 if (schoolId == null || (onlySchoolId != null && !onlySchoolId.equals(schoolId))) continue;
                 SchoolDay school = schools.computeIfAbsent(schoolId, id -> schoolDay(tenantId, id, date,
-                        dayHolidays.stream().filter(h -> h.getSchoolId() == null || h.getSchoolId().equals(id)).toList()));
+                        dayHolidays.stream().filter(h -> h.getSchoolId() == null || h.getSchoolId().equals(id)).toList(),
+                        saturdayMode));
                 if (school.locked()) continue;
                 build(school, userId, date, dayPunches, requestsByUser.getOrDefault(userId, List.of()),
                         existing.get(userId), true).ifPresent(rows::add);
@@ -193,12 +207,42 @@ public class DayAggregationService {
         return rows.size();
     }
 
-    private record SchoolDay(String tenantId, String schoolId, boolean holiday, boolean locked, TkShift shift,
-            TkPolicy policy) {}
+    /** {@code holidayPay}: how the school's day off is paid (null = not a holiday); {@code saturday}: the day's Saturday mode. */
+    private record SchoolDay(String tenantId, String schoolId, HolidayPayMode holidayPay, SaturdayMode saturday,
+            boolean locked, TkShift shift, TkPolicy policy) {}
 
-    private SchoolDay schoolDay(String tenantId, String schoolId, LocalDate date, List<TkHoliday> schoolHolidays) {
-        return new SchoolDay(tenantId, schoolId, !schoolHolidays.isEmpty(), context.isLocked(tenantId, schoolId, date),
+    private SchoolDay schoolDay(String tenantId, String schoolId, LocalDate date, List<TkHoliday> schoolHolidays,
+            Optional<SaturdayMode> saturday) {
+        // several rows on one day (system-wide and an old school row): the most favourable pay mode wins
+        HolidayPayMode pay = schoolHolidays.stream().map(TkHoliday::getPayMode).min(Comparator.naturalOrder()).orElse(null);
+        return new SchoolDay(tenantId, schoolId, pay, saturday.orElse(null), context.isLocked(tenantId, schoolId, date),
                 context.shiftFor(tenantId, schoolId, date).orElse(null), context.policyFor(tenantId, schoolId, date));
+    }
+
+    /** How the day off is paid for this person, or null on a working day. A holiday beats a Saturday mode. */
+    private static HolidayPayMode dayOffPay(SchoolDay school, TkShift shift, String userId) {
+        if (school.holidayPay() != null) return school.holidayPay();
+        if (school.saturday() == null || !SaturdayModeResolver.appliesTo(shift, userId)) return null;
+        return switch (school.saturday()) {
+            case PAID_OFF -> HolidayPayMode.PAID;
+            case UNPAID_OFF -> HolidayPayMode.UNPAID;
+            default -> null; // OFFICE / WFH: a normal working day (WFH only changes where punches are allowed)
+        };
+    }
+
+    /** A day off with nothing worked: L (1 công), P (annual leave, while the balance lasts) or KL. */
+    private void setDayOff(TkDay day, HolidayPayMode pay, TkShift shift, String tenantId, String userId, LocalDate date) {
+        if (shift == null) {
+            set(day, DayStatus.HOLIDAY, BigDecimal.ZERO); // a holiday on a non-working day is not paid twice
+        } else if (pay == HolidayPayMode.PAID) {
+            set(day, DayStatus.HOLIDAY, shift.getWorkUnits());
+        } else if (pay == HolidayPayMode.ANNUAL_LEAVE
+                && balances.chargedAnnualHolidays(tenantId, userId, date.getYear()).contains(date)) {
+            set(day, DayStatus.LEAVE, BigDecimal.ZERO);
+            day.setLeaveKind(LeaveKind.ANNUAL);
+        } else {
+            set(day, DayStatus.UNPAID_OFF, BigDecimal.ZERO);
+        }
     }
 
     private static Optional<String> schoolOf(List<TkPunch> dayPunches) {
@@ -235,8 +279,9 @@ public class DayAggregationService {
 
         TkRequest leave = first(approved, RequestType.LEAVE);
         TkRequest business = first(approved, RequestType.BUSINESS);
-        if (school.holiday()) {
-            set(day, DayStatus.HOLIDAY, BigDecimal.ZERO);
+        HolidayPayMode offPay = dayOffPay(school, shift, userId);
+        if (offPay != null && (shift == null || in.isEmpty() && out.isEmpty())) {
+            setDayOff(day, offPay, shift, school.tenantId(), userId, date);
         } else if (shift == null) {
             set(day, DayStatus.OFF, BigDecimal.ZERO);
         } else if (leave != null && leave.getPart() == DayPart.FULL) {

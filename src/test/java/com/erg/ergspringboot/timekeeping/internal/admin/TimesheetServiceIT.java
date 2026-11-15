@@ -36,7 +36,7 @@ class TimesheetServiceIT extends AdminITBase {
         day(T, f.school(), t, nov(6), "SICK", "0", 0, "SICK");
         day(T, f.school(), t, nov(9), "MISSING_PUNCH", "0.5", 0, null);
         day(T, f.school(), t, nov(10), "BUSINESS", "1.0", 0, null);
-        day(T, f.school(), t, nov(20), "HOLIDAY", "0", 0, null);
+        day(T, f.school(), t, nov(20), "HOLIDAY", "1.0", 0, null); // a paid day off is 1 công (B11)
         day(T, f.school(), t, nov(21), "HOLIDAY", "0", 0, null); // a Saturday: not a paid work day
         jdbc.update("insert into tk_holidays (id, tenant_id, school_id, holiday_date, name) values (?, ?, ?, ?, 'Ngày NGVN')",
                 UUID.randomUUID().toString(), T, f.school(), nov(20));
@@ -48,7 +48,7 @@ class TimesheetServiceIT extends AdminITBase {
     void mapsDayRowsToTheSheetSymbolsAndTotals() {
         Timesheet sheet = sheets.timesheet(T, f.school(), "2026-11", null, "TÊN RQ_T", 0, 50);
 
-        assertThat(sheet.standardDays()).isEqualTo(20); // 21 weekdays in 11/2026, minus Friday 20/11
+        assertThat(sheet.standardDays()).isEqualTo(21); // 21 weekdays in 11/2026; the paid holiday on Friday 20/11 stays in
         assertThat(sheet.stage()).isEqualTo(PeriodStage.COLLECT);
         assertThat(sheet.reviewUntil()).isEqualTo(LocalDate.of(2026, 12, 8));
         assertThat(sheet.issues().missingDays()).isEqualTo(1);
@@ -58,7 +58,7 @@ class TimesheetServiceIT extends AdminITBase {
         assertThat(row.days().subList(1, 10)).extracting(DayCell::code)
                 .containsExactly("X", "M", "½", "KP", "Ô", "", "", "KC", "CT");
         assertThat(row.days().get(19).code()).isEqualTo("L");
-        assertThat(row.work()).isEqualByComparingTo("4.0");
+        assertThat(row.work()).isEqualByComparingTo("5.0"); // 4.0 + the paid day off
         assertThat(row.late()).isEqualTo(1);
         assertThat(row.leave()).isEqualByComparingTo("1.5");
         assertThat(row.kpKc()).isEqualByComparingTo("2.0");

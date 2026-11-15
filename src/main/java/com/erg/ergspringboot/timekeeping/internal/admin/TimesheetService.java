@@ -10,8 +10,6 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TimesheetRow;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
-import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
-import com.erg.ergspringboot.timekeeping.persistence.TkHolidayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkShift;
 import com.erg.ergspringboot.users.persistence.EmployeeProfile;
@@ -38,8 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
  * A02 month sheet of one school. Roster = active timekeeping.self holders of the school plus anyone with a day
  * row in the month; one day-row query for the page. Symbols (plan "Ký hiệu bảng công"): X FULL, M LATE_EARLY,
  * ½ HALF, P paid leave (ANNUAL / PAID_PERSONAL), Ô SICK, CT BUSINESS, KC MISSING_PUNCH / ABSENT_UNPAID, KP UNPAID
- * leave, L HOLIDAY, "" OFF. Holidays carry 0 công and are not in {@code standardDays}, so a holiday on a
- * non-working weekday is never paid twice.
+ * leave, L HOLIDAY (a paid day off: 1 công), KL UNPAID_OFF (0 công), "" OFF. A paid day off counts 1 công and stays in
+ * {@code standardDays}; one on a weekday without a shift has no row and carries 0 công, so it is never paid twice.
  */
 @Service
 public class TimesheetService {
@@ -51,17 +49,15 @@ public class TimesheetService {
     private final EmployeeProfileRepository profiles;
     private final WorkContextResolver context;
     private final TkDayRepository days;
-    private final TkHolidayRepository holidays;
     private final TkRequestRepository requests;
     private final AdminSupport support;
 
     TimesheetService(UserRepository users, EmployeeProfileRepository profiles, WorkContextResolver context,
-            TkDayRepository days, TkHolidayRepository holidays, TkRequestRepository requests, AdminSupport support) {
+            TkDayRepository days, TkRequestRepository requests, AdminSupport support) {
         this.users = users;
         this.profiles = profiles;
         this.context = context;
         this.days = days;
-        this.holidays = holidays;
         this.requests = requests;
         this.support = support;
     }
@@ -115,13 +111,11 @@ public class TimesheetService {
                 issues, rows, pageNo, pageSize, people.size());
     }
 
-    /** Working days of the month from the school's active shift weekdays, minus holidays. */
+    /** Working days of the month from the school's shift weekdays; a paid day off is a working day worth 1 công. */
     int standardDays(String tenantId, String schoolId, YearMonth month) {
         List<TkShift> shifts = context.shiftsOf(tenantId, schoolId);
-        Set<LocalDate> off = holidays.findForSchool(tenantId, schoolId, month.atDay(1), month.atEndOfMonth()).stream()
-                .map(TkHoliday::getHolidayDate).collect(Collectors.toSet());
         return (int) month.atDay(1).datesUntil(month.atEndOfMonth().plusDays(1))
-                .filter(d -> !off.contains(d) && WorkContextResolver.shiftOn(shifts, d).isPresent()).count();
+                .filter(d -> WorkContextResolver.shiftOn(shifts, d).isPresent()).count();
     }
 
     static String code(TkDay day) {
@@ -134,6 +128,7 @@ public class TimesheetService {
             case BUSINESS -> "CT";
             case MISSING_PUNCH, ABSENT_UNPAID -> "KC";
             case HOLIDAY -> "L";
+            case UNPAID_OFF -> "KL";
             case OFF -> "";
         };
     }
@@ -166,7 +161,7 @@ public class TimesheetService {
                     if (unpaid) kpKc = kpKc.add(HALF);
                     else leave = leave.add(HALF);
                 }
-                case MISSING_PUNCH, ABSENT_UNPAID -> kpKc = kpKc.add(BigDecimal.ONE);
+                case MISSING_PUNCH, ABSENT_UNPAID, UNPAID_OFF -> kpKc = kpKc.add(BigDecimal.ONE);
                 default -> { }
             }
         }

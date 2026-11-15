@@ -140,14 +140,15 @@ class DailyCloseIT {
     void tenantWideHolidayWinsAndALockedMonthIsLeftAlone() {
         jdbc.update("insert into tk_holidays (id, tenant_id, school_id, holiday_date, name) values"
                 + " ('hol-all', ?, null, ?, 'Lễ')", TENANT, DAY);
-        aggregation.recompute(TENANT, "usr_tkc_a", DAY);
+        // usr_tkc_a punched that day, so (B11) the day is worked out as a working day; usr_tkc_b did not
+        aggregation.recompute(TENANT, "usr_tkc_b", DAY);
         entityManager.flush();
-        assertThat(rows().get("usr_tkc_a")).containsEntry("status", "HOLIDAY");
+        assertThat(rows().get("usr_tkc_b")).containsEntry("status", "HOLIDAY");
 
         jdbc.update("insert into tk_period_locks (id, tenant_id, school_id, period, locked_at, locked_by)"
                 + " values ('lock-tkc', ?, ?, '2026-11', now(), 'usr_tkc_a')", TENANT, SCHOOL);
         job.run();
-        assertThat(rows()).containsOnlyKeys("usr_tkc_a");
+        assertThat(rows()).containsOnlyKeys("usr_tkc_b");
     }
 
     @Test

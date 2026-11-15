@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.timekeeping.internal.schedule;
 
+import com.erg.ergspringboot.timekeeping.SaturdayMode;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLockRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
@@ -46,10 +47,11 @@ public class WorkContextResolver {
     private final TkRemoteRuleRepository remoteRules;
     private final TkPeriodLockRepository locks;
     private final TkRequestRepository requests;
+    private final SaturdayModeResolver saturdays;
 
     WorkContextResolver(UserAccessScopeRepository scopes, TkShiftRepository shifts, TkSiteRepository sites,
             TkPolicyRepository policies, TkRemoteRuleRepository remoteRules, TkPeriodLockRepository locks,
-            TkRequestRepository requests) {
+            TkRequestRepository requests, SaturdayModeResolver saturdays) {
         this.scopes = scopes;
         this.shifts = shifts;
         this.sites = sites;
@@ -57,6 +59,7 @@ public class WorkContextResolver {
         this.remoteRules = remoteRules;
         this.locks = locks;
         this.requests = requests;
+        this.saturdays = saturdays;
     }
 
     public Optional<String> schoolOf(String tenantId, String userId) {
@@ -127,9 +130,16 @@ public class WorkContextResolver {
         return sites.findByTenantIdAndSchoolIdAndActiveTrueOrderByNameAsc(tenantId, schoolId);
     }
 
-    /** Remote when the person has an approved WFH request covering the day, or a rule names the person or weekday. */
+    /**
+     * Remote when the person has an approved WFH request covering the day, the day is a Saturday set to WFH, or a rule
+     * names the person or weekday. A Saturday mode is the more specific choice, so it is read before the weekly rules.
+     */
     public boolean isRemote(String tenantId, String schoolId, String userId, LocalDate date, String shiftId) {
         if (requests.hasApprovedWfh(tenantId, userId, date)) return true;
+        if (saturdays.modeOn(tenantId, date).filter(mode -> mode == SaturdayMode.WFH).isPresent()
+                && SaturdayModeResolver.appliesTo(shiftFor(tenantId, schoolId, date).orElse(null), userId)) {
+            return true;
+        }
         int weekday = date.getDayOfWeek().getValue();
         for (TkRemoteRule rule : remoteRules.findByTenantIdAndSchoolIdAndActiveTrue(tenantId, schoolId)) {
             if (rule.getShiftId() != null && !rule.getShiftId().equals(shiftId)) continue;
@@ -141,6 +151,11 @@ public class WorkContextResolver {
             if (applies) return true;
         }
         return false;
+    }
+
+    /** Saturdays in the range set to a paid or unpaid day off; not working days for leave counting. */
+    public Set<LocalDate> saturdayOffDays(String tenantId, LocalDate from, LocalDate to) {
+        return saturdays.offDays(tenantId, from, to);
     }
 
     public boolean isLocked(String tenantId, String schoolId, LocalDate date) {

@@ -2,6 +2,7 @@ package com.erg.ergspringboot.timekeeping;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.erg.ergspringboot.calendar.CalendarHolidayPort;
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.notifications.NotificationAdminOperations;
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
@@ -28,6 +29,7 @@ class TimekeepingModuleTest {
 
     // Collaborators from other modules and from platform (not a module), outside the standalone slice.
     @MockitoBean CalendarReadPort calendar;
+    @MockitoBean CalendarHolidayPort holidayPeriods;
     @MockitoBean NotificationAdminOperations notifications;
     @MockitoBean EducationUnitRepository educationUnits;
     @MockitoBean UserAccessScopeRepository accessScopes;

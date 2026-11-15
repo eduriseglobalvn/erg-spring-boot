@@ -13,6 +13,9 @@ import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.calendar.TeacherPeriod;
 import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.DayStatus;
+import com.erg.ergspringboot.timekeeping.HolidayPayMode;
+import com.erg.ergspringboot.timekeeping.internal.request.LeaveBalanceService;
+import com.erg.ergspringboot.timekeeping.internal.schedule.SaturdayModeResolver;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
 import com.erg.ergspringboot.timekeeping.Missing;
 import com.erg.ergspringboot.timekeeping.PunchDirection;
@@ -63,6 +66,8 @@ class DayAggregationServiceTest {
     private final WorkContextResolver context = mock(WorkContextResolver.class);
     private final CalendarReadPort calendar = mock(CalendarReadPort.class);
     private final UserRepository users = mock(UserRepository.class);
+    private final SaturdayModeResolver saturdays = mock(SaturdayModeResolver.class);
+    private final LeaveBalanceService balances = mock(LeaveBalanceService.class);
     private final TkShift shift = shift();
 
     @BeforeEach
@@ -133,17 +138,65 @@ class DayAggregationServiceTest {
         assertThat(day.getWorkUnits().scale()).isEqualTo(1);
     }
 
+    // B11 (2.6 point 4): a paid day off is 1 công (was 0), and a real punch on it is worked out as a working day.
     @Test
-    void holidayWinsOverPunchesAndLeave() {
+    void paidHolidayIsOneCongAndBeatsLeaveWhenNobodyPunched() {
         when(holidays.findForSchool(T, SCHOOL, DAY, DAY)).thenReturn(List.of(holiday(null)));
         approved(leave(LeaveKind.ANNUAL, DayPart.FULL));
-        punched(punch(PunchDirection.IN, "2026-11-12T00:25:00Z"));
+
+        TkDay day = recompute();
+
+        assertThat(day.getStatus()).isEqualTo(DayStatus.HOLIDAY);
+        assertThat(day.getWorkUnits()).isEqualByComparingTo("1");
+        assertThat(day.getLeaveKind()).isNull();
+    }
+
+    @Test
+    void aPunchOnAHolidayIsWorkedOutLikeAWorkingDay() {
+        when(holidays.findForSchool(T, SCHOOL, DAY, DAY)).thenReturn(List.of(holiday(null)));
+        punched(punch(PunchDirection.IN, "2026-11-12T00:25:00Z"), punch(PunchDirection.OUT, "2026-11-12T04:35:00Z"));
+
+        TkDay day = recompute();
+
+        assertThat(day.getStatus()).isEqualTo(DayStatus.FULL);
+        assertThat(day.getWorkUnits()).isEqualByComparingTo("1");
+    }
+
+    @Test
+    void holidayOnADayWithoutAShiftStaysZeroCong() {
+        when(holidays.findForSchool(T, SCHOOL, DAY, DAY)).thenReturn(List.of(holiday(null)));
+        when(context.shiftFor(eq(T), eq(SCHOOL), any())).thenReturn(Optional.empty());
 
         TkDay day = recompute();
 
         assertThat(day.getStatus()).isEqualTo(DayStatus.HOLIDAY);
         assertThat(day.getWorkUnits()).isEqualByComparingTo("0");
-        assertThat(day.getLeaveKind()).isNull();
+    }
+
+    @Test
+    void unpaidDayOffIsKlWithZeroCong() {
+        when(holidays.findForSchool(T, SCHOOL, DAY, DAY)).thenReturn(List.of(holiday(null, HolidayPayMode.UNPAID)));
+
+        TkDay day = recompute();
+
+        assertThat(day.getStatus()).isEqualTo(DayStatus.UNPAID_OFF);
+        assertThat(day.getWorkUnits()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void annualLeaveDayOffIsPWhileTheBalanceLastsThenKl() {
+        when(holidays.findForSchool(T, SCHOOL, DAY, DAY)).thenReturn(List.of(holiday(null, HolidayPayMode.ANNUAL_LEAVE)));
+        when(balances.chargedAnnualHolidays(T, U, 2026)).thenReturn(java.util.Set.of(DAY));
+
+        TkDay covered = recompute();
+
+        assertThat(covered.getStatus()).isEqualTo(DayStatus.LEAVE);
+        assertThat(covered.getLeaveKind()).isEqualTo(LeaveKind.ANNUAL);
+        assertThat(covered.getWorkUnits()).isEqualByComparingTo("0");
+
+        org.mockito.Mockito.clearInvocations(days);
+        when(balances.chargedAnnualHolidays(T, U, 2026)).thenReturn(java.util.Set.of());
+        assertThat(recompute().getStatus()).isEqualTo(DayStatus.UNPAID_OFF);
     }
 
     @Test
@@ -353,7 +406,7 @@ class DayAggregationServiceTest {
     private DayAggregationService service(Instant now) {
         return new DayAggregationService(punches, days, holidays, requests, context,
                 new TeacherPeriodReader(calendar, mock(PlatformTransactionManager.class)), users,
-                Clock.fixed(now, ZoneOffset.UTC));
+                saturdays, balances, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private void approved(TkRequest... approvedRequests) {
@@ -403,7 +456,12 @@ class DayAggregationServiceTest {
     }
 
     private static TkHoliday holiday(String schoolId) {
+        return holiday(schoolId, HolidayPayMode.PAID);
+    }
+
+    private static TkHoliday holiday(String schoolId, HolidayPayMode pay) {
         TkHoliday h = new TkHoliday();
+        h.setPayMode(pay);
         h.setTenantId(T);
         h.setSchoolId(schoolId);
         h.setHolidayDate(DAY);
