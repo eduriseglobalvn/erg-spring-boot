@@ -35,6 +35,20 @@ class HolidayImportParsingTest {
                 HolidayKind.COMPENSATORY, HolidayKind.STATE, HolidayKind.STATE, HolidayKind.STATE);
     }
 
+    /** No saved file ships with the application (L7): the preview of a year without an upload is a clean empty state. */
+    @Test
+    void withoutAnUploadAndWithoutASavedFileThePreviewIsEmptyWithSourceNone() {
+        HolidayImportService service = new HolidayImportService(org.mockito.Mockito.mock(HolidayService.class));
+
+        var preview = service.preview("tenant", 2031, null);
+
+        assertThat(preview.source()).isEqualTo("NONE");
+        assertThat(preview.savedOn()).isNull();
+        assertThat(preview.rows()).isEmpty();
+        assertThatThrownBy(() -> service.preview("tenant", 1999, null))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getCode()).isEqualTo("INVALID_YEAR"));
+    }
+
     @Test
     void aFileThatIsNotICalendarIsRejectedWithItsOwnCode() {
         assertThatThrownBy(() -> HolidayImportService.days("tên,ngày\nLễ,2026-01-01", 2026))
