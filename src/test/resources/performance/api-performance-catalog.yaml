@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 609
+  route-count: 617
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -965,6 +965,30 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/teaching/export => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.teachingExport
+      classification: persistent-read
+      statement-budget: 30
+      row-budget: 50000
+      payload-budget-bytes: 8388608
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/teaching/months/{month} => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.monthSheet
+      classification: persistent-read
+      statement-budget: 20
+      row-budget: 5000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/teaching/periods => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.periods
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 10000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
     - route: GET /api/v1/timekeeping/admin/timesheet => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.timesheet
       classification: persistent-read
       statement-budget: 16
@@ -1017,6 +1041,22 @@ rest:
       classification: persistent-read
       statement-budget: 20
       row-budget: 1000
+      payload-budget-bytes: 524288
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/me/teaching/{month}/periods => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.myPeriods
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 10000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/timekeeping/me/teaching/{month} => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.myMonth
+      classification: persistent-read
+      statement-budget: 20
+      row-budget: 2000
       payload-budget-bytes: 524288
       state-owner: postgresql
       cache-policy: none
@@ -4368,6 +4408,14 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/teaching/months/{month}/close => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.close
+      classification: persistent-write
+      statement-budget: 30
+      row-budget: 5000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/timekeeping/approvals/bulk-approve => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.bulkApprove
       classification: persistent-write
       statement-budget: 600
@@ -4405,6 +4453,22 @@ rest:
       statement-budget: 30
       row-budget: 200
       payload-budget-bytes: 3145728
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/me/teaching/{month}/confirm => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.confirm
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/me/teaching/{month}/issue => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.reportIssue
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 10
+      payload-budget-bytes: 65536
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none

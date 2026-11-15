@@ -15,6 +15,7 @@ const MODULES = [
   ["40-mutation-social.graphqls", "mutation and learner collaboration inputs"],
   ["45-school-operations-mutations.graphqls", "school operations command mutations"],
   ["50-calendar.graphqls", "calendar bounded context"],
+  ["55-class-log.graphqls", "electronic class log and lesson reports"],
 ];
 
 function readModules() {

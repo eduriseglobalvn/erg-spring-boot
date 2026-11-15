@@ -3722,6 +3722,32 @@
         },
         "type": "object"
       },
+      "ApiResponseMyTeachingMonth": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MyTeachingMonth"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNotificationItemResponse": {
         "properties": {
           "data": {
@@ -5130,6 +5156,110 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SyncRunResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingConfirmationView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingConfirmationView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingExport": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingExport"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingMonthSheet": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingMonthSheet"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingPeriodPage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingPeriodPage"
           },
           "errors": {},
           "message": {
@@ -7583,6 +7713,29 @@
         },
         "type": "object"
       },
+      "CancelledPeriod": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "periodCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodStart": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CertificateResponse": {
         "properties": {
           "certificateNumber": {
@@ -7827,6 +7980,23 @@
           },
           "tenantId": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfirmTeachingCommand": {
+        "properties": {
+          "assistantTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "expectedVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -11529,6 +11699,35 @@
         },
         "type": "object"
       },
+      "MissingReport": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "periodCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodStart": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MonthContext": {
         "properties": {
           "approvedExplanations": {
@@ -11627,6 +11826,66 @@
           },
           "standardUnits": {
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "MyTeachingMonth": {
+        "properties": {
+          "assistantRows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingRow"
+            },
+            "type": "array"
+          },
+          "assistantTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "cancelled": {
+            "items": {
+              "$ref": "#/components/schemas/CancelledPeriod"
+            },
+            "type": "array"
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmation": {
+            "$ref": "#/components/schemas/TeachingConfirmationView"
+          },
+          "deadline": {
+            "format": "date",
+            "type": "string"
+          },
+          "missingReports": {
+            "items": {
+              "$ref": "#/components/schemas/MissingReport"
+            },
+            "type": "array"
+          },
+          "month": {
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingRow"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingWeek"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -13366,6 +13625,14 @@
             "type": "object"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReportTeachingIssueCommand": {
+        "properties": {
+          "note": {
             "type": "string"
           }
         },
@@ -15246,6 +15513,250 @@
           },
           "updatedAt": {
             "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingConfirmationView": {
+        "properties": {
+          "confirmedAssistantTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "issueNote": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingExport": {
+        "properties": {
+          "assistantMonths": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingMonthSheet"
+            },
+            "type": "array"
+          },
+          "assistantPeriods": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingPeriodRow"
+            },
+            "type": "array"
+          },
+          "mainMonths": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingMonthSheet"
+            },
+            "type": "array"
+          },
+          "mainPeriods": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingPeriodRow"
+            },
+            "type": "array"
+          },
+          "year": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingMonthRow": {
+        "properties": {
+          "classNames": {
+            "type": "string"
+          },
+          "confirmation": {
+            "$ref": "#/components/schemas/TeachingConfirmationView"
+          },
+          "note": {
+            "type": "string"
+          },
+          "schoolName": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "teacherId": {
+            "type": "string"
+          },
+          "teacherName": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weekTotals": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingMonthSheet": {
+        "properties": {
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "month": {
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingMonthRow"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "teacherCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingWeek"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingPeriodPage": {
+        "properties": {
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingPeriodRow"
+            },
+            "type": "array"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingPeriodRow": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "lessonContent": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "periodNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "schoolName": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "teacherName": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "weekday": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingRow": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "schoolName": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weekTotals": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingWeek": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "index": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
             "type": "string"
           }
         },
@@ -27030,6 +27541,189 @@
         ]
       }
     },
+    "/api/v1/timekeeping/admin/teaching/export": {
+      "get": {
+        "operationId": "teachingExport",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingExport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/months/{month}": {
+      "get": {
+        "operationId": "monthSheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "MAIN",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingMonthSheet"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/months/{month}/close": {
+      "post": {
+        "operationId": "close",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingMonthSheet"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/periods": {
+      "get": {
+        "operationId": "periods",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "MAIN",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "teacherId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingPeriodPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
     "/api/v1/timekeeping/admin/timesheet": {
       "get": {
         "operationId": "timesheet",
@@ -27578,6 +28272,165 @@
         },
         "tags": [
           "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}": {
+      "get": {
+        "operationId": "myMonth",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyTeachingMonth"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}/confirm": {
+      "post": {
+        "operationId": "confirm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTeachingCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingConfirmationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}/issue": {
+      "post": {
+        "operationId": "reportIssue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportTeachingIssueCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingConfirmationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}/periods": {
+      "get": {
+        "operationId": "myPeriods",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "MAIN",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingPeriodPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
         ]
       }
     },
