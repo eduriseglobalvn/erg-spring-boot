@@ -12,9 +12,13 @@ import com.erg.ergspringboot.timekeeping.persistence.TkShift;
 import com.erg.ergspringboot.timekeeping.persistence.TkShiftRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkSite;
 import com.erg.ergspringboot.timekeeping.persistence.TkSiteRepository;
+import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
+import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScope;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -41,6 +45,7 @@ public class WorkContextResolver {
     private static final DateTimeFormatter PERIOD = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final UserAccessScopeRepository scopes;
+    private final UserRoleAssignmentRepository assignments;
     private final TkShiftRepository shifts;
     private final TkSiteRepository sites;
     private final TkPolicyRepository policies;
@@ -49,10 +54,11 @@ public class WorkContextResolver {
     private final TkRequestRepository requests;
     private final SaturdayModeResolver saturdays;
 
-    WorkContextResolver(UserAccessScopeRepository scopes, TkShiftRepository shifts, TkSiteRepository sites,
+    WorkContextResolver(UserAccessScopeRepository scopes, UserRoleAssignmentRepository assignments, TkShiftRepository shifts, TkSiteRepository sites,
             TkPolicyRepository policies, TkRemoteRuleRepository remoteRules, TkPeriodLockRepository locks,
             TkRequestRepository requests, SaturdayModeResolver saturdays) {
         this.scopes = scopes;
+        this.assignments = assignments;
         this.shifts = shifts;
         this.sites = sites;
         this.policies = policies;
@@ -62,16 +68,15 @@ public class WorkContextResolver {
         this.saturdays = saturdays;
     }
 
+    /**
+     * The school a person belongs to for timekeeping: the first of their schools (access scopes, then active
+     * school-level role assignments, the model accounts are provisioned with today) that has a shift or a site.
+     */
     public Optional<String> schoolOf(String tenantId, String userId) {
-        List<String> units = scopes.findByUserIdOrderByCreatedAtAsc(userId).stream()
-                .map(UserAccessScope::getEducationUnitId).distinct().toList();
-        return units.stream()
-                .filter(unit -> shifts.existsByTenantIdAndSchoolId(tenantId, unit)
-                        || sites.existsByTenantIdAndSchoolIdAndActiveTrue(tenantId, unit))
-                .findFirst();
+        return Optional.ofNullable(schoolsOf(tenantId, List.of(userId)).get(userId));
     }
 
-    /** {@link #schoolOf} for many people in three queries (daily close); people without a school are left out. */
+    /** {@link #schoolOf} for many people in a few queries (daily close); people without a school are left out. */
     public Map<String, String> schoolsOf(String tenantId, Collection<String> userIds) {
         if (userIds.isEmpty()) return Map.of();
         Set<String> configured = new HashSet<>();
@@ -81,6 +86,12 @@ public class WorkContextResolver {
         for (UserAccessScope scope : scopes.findByUserIdInOrderByCreatedAtAsc(userIds)) {
             if (configured.contains(scope.getEducationUnitId())) {
                 schools.putIfAbsent(scope.getUserId(), scope.getEducationUnitId());
+            }
+        }
+        for (UserRoleAssignment assignment : assignments.findActiveForUsers(tenantId, userIds, OffsetDateTime.now())) {
+            if (AccessScopeAssembler.isEducationUnitScopeType(assignment.getScopeType())
+                    && configured.contains(assignment.getScopeId())) {
+                schools.putIfAbsent(assignment.getUserId(), assignment.getScopeId());
             }
         }
         return schools;

@@ -25,6 +25,7 @@ class WorkContextResolverRemoteTest {
     private final TkRemoteRuleRepository rules = mock(TkRemoteRuleRepository.class);
     private final TkRequestRepository requests = mock(TkRequestRepository.class);
     private final WorkContextResolver resolver = new WorkContextResolver(mock(UserAccessScopeRepository.class),
+            mock(com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository.class),
             mock(TkShiftRepository.class), mock(TkSiteRepository.class), mock(TkPolicyRepository.class), rules,
             mock(TkPeriodLockRepository.class), requests,
             mock(SaturdayModeResolver.class));

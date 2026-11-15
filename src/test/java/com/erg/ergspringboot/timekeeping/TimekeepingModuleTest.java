@@ -38,6 +38,7 @@ class TimekeepingModuleTest {
     @MockitoBean LessonReportNotifier lessonReportNotifier;
     @MockitoBean NotificationAdminOperations notifications;
     @MockitoBean EducationUnitRepository educationUnits;
+    @MockitoBean com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository roleAssignments;
     @MockitoBean UserAccessScopeRepository accessScopes;
     @MockitoBean ClusterJobLock jobLock;
     @MockitoBean ErgPolicyService policy;
