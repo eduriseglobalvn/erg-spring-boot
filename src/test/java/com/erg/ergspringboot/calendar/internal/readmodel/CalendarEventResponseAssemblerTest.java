@@ -39,6 +39,18 @@ class CalendarEventResponseAssemblerTest {
     }
 
     @Test
+    void theRecordVersionIsExposedForStaleEditDetectionAndSurvivesTheViewerRewrite() {
+        CalendarEvent event = eventAtUtc("2026-11-13T01:00:00Z", "2026-11-13T01:45:00Z");
+        event.setRecordVersion(7L);
+
+        CalendarEventResponse response = assembler.response(event, List.of(),
+                new CalendarReferenceMaps(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of()));
+
+        assertThat(response.version()).isEqualTo(7);
+        assertThat(response.withViewer("anyone").version()).isEqualTo(7);
+    }
+
+    @Test
     void assistantViewerSeesMainTeacherAndMainViewerSeesAssistant() {
         CalendarEventResponse base = new CalendarEventResponse("e1", "b1", "t", null, null, null, null, null,
                 "s1", "S", "c1", "9A4", null, null, null, null, null, null, 1, 1,

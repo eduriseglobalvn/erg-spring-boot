@@ -51,7 +51,8 @@ public class CalendarEventResponseAssembler {
                 event.getRoomId(), event.getRoomName(),
                 event.getPeriodStart() != null ? event.getPeriodStart() : 0,
                 event.getPeriodCount() != null ? event.getPeriodCount() : 0,
-                teacherResponses, event.getStatus(), event.getNote(), colorGroup(event.getSubjectId()));
+                teacherResponses, event.getStatus(), event.getNote(), colorGroup(event.getSubjectId()), null, null, null,
+                event.getRecordVersion() == null ? 0 : event.getRecordVersion().intValue());
     }
 
     // shortcut: fixed Vietnam zone, not read from tenant config; upgrade when a tenant outside UTC+7 exists.

@@ -79,8 +79,22 @@ public final class CalendarResponses {
             CalendarColorGroupResponse colorGroup,
             String myRole,
             String mainTeacherName,
-            String assistantName
+            String assistantName,
+            int version
     ) {
+        /** Without the optimistic-lock version (0): fixtures and summaries that are never edited. */
+        public CalendarEventResponse(
+                String id, String batchId, String title, String startAt, String endAt, String date,
+                String startTime, String endTime, String schoolId, String schoolName, String classId,
+                String className, String subjectId, String subjectName, String levelId, String levelName,
+                String roomId, String roomName, int periodStart, int periodCount,
+                List<CalendarTeacherAssignmentResponse> teachers, String status, String note,
+                CalendarColorGroupResponse colorGroup, String myRole, String mainTeacherName, String assistantName) {
+            this(id, batchId, title, startAt, endAt, date, startTime, endTime, schoolId, schoolName, classId,
+                    className, subjectId, subjectName, levelId, levelName, roomId, roomName, periodStart,
+                    periodCount, teachers, status, note, colorGroup, myRole, mainTeacherName, assistantName, 0);
+        }
+
         /** Admin view: the viewer is not one of the teachers, so the role is MAIN and only the assistant is named. */
         public CalendarEventResponse(
                 String id, String batchId, String title, String startAt, String endAt, String date,
@@ -91,7 +105,7 @@ public final class CalendarResponses {
                 CalendarColorGroupResponse colorGroup) {
             this(id, batchId, title, startAt, endAt, date, startTime, endTime, schoolId, schoolName, classId,
                     className, subjectId, subjectName, levelId, levelName, roomId, roomName, periodStart,
-                    periodCount, teachers, status, note, colorGroup, null, null, null);
+                    periodCount, teachers, status, note, colorGroup, null, null, null, 0);
         }
 
         /** Re-derives the viewer fields for a teacher looking at their own calendar. */
@@ -105,7 +119,7 @@ public final class CalendarResponses {
                     schoolId, schoolName, classId, className, subjectId, subjectName, levelId, levelName,
                     roomId, roomName, periodStart, periodCount, teachers, status, note, colorGroup,
                     role, "ASSISTANT".equals(role) ? firstName("MAIN") : null,
-                    "MAIN".equals(role) ? firstName("ASSISTANT") : null);
+                    "MAIN".equals(role) ? firstName("ASSISTANT") : null, version);
         }
 
         private String firstName(String role) {
