@@ -7,6 +7,8 @@ final class TimekeepingPaths {
     static final String REQUESTS = "/api/v1/timekeeping/requests";
     static final String ADMIN = "/api/v1/timekeeping/admin";
     static final String APPROVALS = "/api/v1/timekeeping/approvals";
+    static final String ME_TEACHING = ME + "/teaching";
+    static final String ADMIN_TEACHING = ADMIN + "/teaching";
 
     /** Under {@link #ADMIN}. */
     static final String HOLIDAYS = "/holidays";
