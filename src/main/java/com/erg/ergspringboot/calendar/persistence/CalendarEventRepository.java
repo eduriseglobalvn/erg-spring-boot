@@ -30,7 +30,7 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
 
     @Query("SELECT DISTINCT e FROM CalendarEvent e LEFT JOIN CalendarEventTeacher et ON e.id = et.eventId " +
            "WHERE e.tenantId = :tenantId " +
-           "AND e.schoolId IN :schoolIds " +
+           "AND (:schoolFiltered = false OR e.schoolId IN :schoolIds) " +
            "AND e.startAt < :to AND e.endAt > :from " +
            "AND e.status IN :statuses " +
            "AND (:teacherFiltered = false OR et.teacherUserId IN :teacherIds) " +
@@ -40,6 +40,7 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
            "ORDER BY e.startAt")
     List<CalendarEvent> findLcmsWorkspaceEvents(
             @Param("tenantId") String tenantId,
+            @Param("schoolFiltered") boolean schoolFiltered,
             @Param("schoolIds") Collection<String> schoolIds,
             @Param("to") OffsetDateTime to,
             @Param("from") OffsetDateTime from,
@@ -163,7 +164,7 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             String tenantId, String schoolId, String roomName, OffsetDateTime endAt, OffsetDateTime startAt, String status);
 
     @Modifying
-    @Query("UPDATE CalendarEvent e SET e.status = :status, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt " +
+    @Query("UPDATE CalendarEvent e SET e.status = :status, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
            "WHERE e.tenantId = :tenantId AND e.id IN :ids")
     int updateStatusBatch(
             @Param("tenantId") String tenantId,
@@ -172,15 +173,47 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
 
-    /** Transitions only rows still in {@code fromStatus}, so a concurrent cancel is never undone. */
+    long countByTenantIdAndBatchIdAndStatus(String tenantId, String batchId, String status);
+
+    /** Moves every event of a batch still in {@code fromStatus}, so a concurrent cancel is never undone (no id list). */
     @Modifying
-    @Query("UPDATE CalendarEvent e SET e.status = :status, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt " +
-           "WHERE e.tenantId = :tenantId AND e.id IN :ids AND e.status = :fromStatus")
-    int updateStatusBatchFromStatus(
+    @Query("UPDATE CalendarEvent e SET e.status = :status, e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
+           "WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status = :fromStatus")
+    int updateStatusByBatchFromStatus(
             @Param("tenantId") String tenantId,
-            @Param("ids") List<String> ids,
+            @Param("batchId") String batchId,
             @Param("fromStatus") String fromStatus,
             @Param("status") String status,
             @Param("updatedBy") String updatedBy,
             @Param("updatedAt") OffsetDateTime updatedAt);
+
+    /** Cancels the events of a batch that are not cancelled yet; with {@code startsAfter} only periods not yet started. */
+    @Modifying
+    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
+           "WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status <> 'CANCELLED'")
+    int cancelAllByBatch(
+            @Param("tenantId") String tenantId,
+            @Param("batchId") String batchId,
+            @Param("updatedBy") String updatedBy,
+            @Param("updatedAt") OffsetDateTime updatedAt);
+
+    @Modifying
+    @Query("UPDATE CalendarEvent e SET e.status = 'CANCELLED', e.updatedBy = :updatedBy, e.updatedAt = :updatedAt, e.recordVersion = e.recordVersion + 1 " +
+           "WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status <> 'CANCELLED' AND e.startAt > :startsAfter")
+    int cancelFutureByBatch(
+            @Param("tenantId") String tenantId,
+            @Param("batchId") String batchId,
+            @Param("startsAfter") OffsetDateTime startsAfter,
+            @Param("updatedBy") String updatedBy,
+            @Param("updatedAt") OffsetDateTime updatedAt);
+
+    /** Drops the teacher links of a batch's draft events before the drafts are replaced. */
+    @Modifying
+    @Query("DELETE FROM CalendarEventTeacher t WHERE t.tenantId = :tenantId AND t.eventId IN "
+            + "(SELECT e.id FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status = 'DRAFT')")
+    int deleteDraftTeachersByBatch(@Param("tenantId") String tenantId, @Param("batchId") String batchId);
+
+    @Modifying
+    @Query("DELETE FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.batchId = :batchId AND e.status = 'DRAFT'")
+    int deleteDraftsByBatch(@Param("tenantId") String tenantId, @Param("batchId") String batchId);
 }

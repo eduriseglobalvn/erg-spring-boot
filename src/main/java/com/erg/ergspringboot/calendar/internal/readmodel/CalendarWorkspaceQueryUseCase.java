@@ -76,7 +76,7 @@ public final class CalendarWorkspaceQueryUseCase {
         OffsetDateTime toDateTime = dayAfter(to);
         List<String> effectiveStatuses = hasValues(statuses) ? statuses : DEFAULT_STATUSES;
         List<CalendarEvent> filteredEvents = events.findLcmsWorkspaceEvents(
-                tenantId, schoolIds, toDateTime, fromDateTime, effectiveStatuses,
+                tenantId, hasValues(schoolIds), queryValues(schoolIds), toDateTime, fromDateTime, effectiveStatuses,
                 hasValues(teacherIds), queryValues(teacherIds),
                 hasValues(classIds), queryValues(classIds),
                 hasValues(subjectIds), queryValues(subjectIds),
@@ -104,7 +104,7 @@ public final class CalendarWorkspaceQueryUseCase {
                 : filteredEvents.stream().map(CalendarEvent::getSchoolId).collect(Collectors.toSet());
         return response(
                 tenantId, from, to, viewMode, new ArrayList<>(effectiveSchoolIds),
-                fromDateTime, toDateTime, filteredEvents, principal);
+                fromDateTime, toDateTime, filteredEvents, principal, teacherUserId);
     }
 
     public CalendarWorkspaceResponse student(
@@ -137,6 +137,14 @@ public final class CalendarWorkspaceQueryUseCase {
             String tenantId, String from, String to, String viewMode, List<String> schoolIds,
             OffsetDateTime fromDateTime, OffsetDateTime toDateTime,
             List<CalendarEvent> filteredEvents, ErgPrincipal principal) {
+        return response(tenantId, from, to, viewMode, schoolIds, fromDateTime, toDateTime, filteredEvents,
+                principal, null);
+    }
+
+    private CalendarWorkspaceResponse response(
+            String tenantId, String from, String to, String viewMode, List<String> schoolIds,
+            OffsetDateTime fromDateTime, OffsetDateTime toDateTime,
+            List<CalendarEvent> filteredEvents, ErgPrincipal principal, String viewerUserId) {
         List<CalendarEventTeacher> assignments = loadAssignments(tenantId, filteredEvents);
         Map<String, List<CalendarEventTeacher>> assignmentsByEvent = assignments.stream()
                 .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
@@ -144,6 +152,7 @@ public final class CalendarWorkspaceQueryUseCase {
         List<CalendarEventResponse> responses = filteredEvents.stream()
                 .map(event -> eventMapper.map(
                         event, assignmentsByEvent.getOrDefault(event.getId(), List.of()), referenceMaps))
+                .map(event -> viewerUserId == null ? event : event.withViewer(viewerUserId))
                 .toList();
         CalendarFilterOptionsResponse filters = filterMapper.map(
                 filteredEvents, assignmentsByEvent, referenceMaps, viewMode);

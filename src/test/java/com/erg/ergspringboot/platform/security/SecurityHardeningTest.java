@@ -332,8 +332,7 @@ class SecurityHardeningTest {
                 "lms.schedule.create",
                 "lms.schedule.update",
                 "lms.schedule.delete",
-                "lms.schedule.publish",
-                "lms.schedule.import"
+                "lms.schedule.publish"
         );
     }
 

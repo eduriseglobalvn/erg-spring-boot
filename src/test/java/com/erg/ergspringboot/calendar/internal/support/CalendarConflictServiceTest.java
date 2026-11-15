@@ -13,7 +13,6 @@ import static org.mockito.Mockito.verify;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
-import com.erg.ergspringboot.calendar.persistence.CalendarConflictRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import java.time.OffsetDateTime;
@@ -45,14 +44,12 @@ class CalendarConflictServiceTest {
     private CalendarEventRepository eventRepository;
     @Mock
     private CalendarEventTeacherRepository eventTeacherRepository;
-    @Mock
-    private CalendarConflictRepository conflictRepository;
 
     private CalendarConflictService service;
 
     @BeforeEach
     void setUp() {
-        service = new CalendarConflictService(eventRepository, eventTeacherRepository, conflictRepository);
+        service = new CalendarConflictService(eventRepository, eventTeacherRepository);
     }
 
     // -------------------------------------------------------------------------
@@ -633,7 +630,7 @@ class CalendarConflictServiceTest {
 
             boolean hasTeacherConflict = conflicts.stream()
                     .anyMatch(c -> "TEACHER_TIME_CONFLICT".equals(c.code())
-                            && "Giao vien co lich trung nhau trong danh sach".equals(c.message()));
+                            && "Giáo viên có lịch trùng nhau trong danh sách".equals(c.message()));
             assertTrue(hasTeacherConflict,
                     "Expected cross-row TEACHER_TIME_CONFLICT with in-batch message");
         }

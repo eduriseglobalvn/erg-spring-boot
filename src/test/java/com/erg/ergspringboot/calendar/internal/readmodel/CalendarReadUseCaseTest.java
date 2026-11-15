@@ -198,7 +198,7 @@ class CalendarReadUseCaseTest {
 
     private void stubLcmsWorkspaceEvents(List<String> schoolIds, List<CalendarEvent> events) {
         when(eventRepository.findLcmsWorkspaceEvents(
-                eq(TENANT_ID), eq(schoolIds),
+                eq(TENANT_ID), anyBoolean(), eq(schoolIds),
                 any(OffsetDateTime.class), any(OffsetDateTime.class),
                 eq(List.of("DRAFT", "PUBLISHED")),
                 anyBoolean(), any(), anyBoolean(), any(),

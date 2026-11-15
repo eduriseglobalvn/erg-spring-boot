@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class CalendarEventResponseAssembler {
 
+    private static final java.time.ZoneId ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
     private static final List<String> COLOR_KEYS = List.of(
             "blue", "green", "orange", "purple", "red", "teal", "pink", "indigo");
 
@@ -38,11 +40,10 @@ public class CalendarEventResponseAssembler {
                 event.getId(), event.getBatchId(), event.getTitle(),
                 event.getStartAt() != null ? event.getStartAt().toString() : null,
                 event.getEndAt() != null ? event.getEndAt().toString() : null,
-                event.getStartAt() != null ? event.getStartAt().toLocalDate().toString() : null,
-                event.getStartAt() != null
-                        ? event.getStartAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
+                event.getStartAt() != null ? localStart(event).toLocalDate().toString() : null,
+                event.getStartAt() != null ? localStart(event).toLocalTime().format(HH_MM) : null,
                 event.getEndAt() != null
-                        ? event.getEndAt().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")) : null,
+                        ? event.getEndAt().atZoneSameInstant(ZONE).toLocalTime().format(HH_MM) : null,
                 event.getSchoolId(), schoolName(event.getSchoolId(), references),
                 event.getAcademicClassId(), className(event.getAcademicClassId(), references),
                 event.getSubjectId(), subjectName(event.getSubjectId(), references),
@@ -51,6 +52,11 @@ public class CalendarEventResponseAssembler {
                 event.getPeriodStart() != null ? event.getPeriodStart() : 0,
                 event.getPeriodCount() != null ? event.getPeriodCount() : 0,
                 teacherResponses, event.getStatus(), event.getNote(), colorGroup(event.getSubjectId()));
+    }
+
+    // shortcut: fixed Vietnam zone, not read from tenant config; upgrade when a tenant outside UTC+7 exists.
+    private static java.time.ZonedDateTime localStart(CalendarEvent event) {
+        return event.getStartAt().atZoneSameInstant(ZONE);
     }
 
     private String schoolName(String id, CalendarReferenceMaps references) {

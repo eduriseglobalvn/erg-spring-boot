@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -81,4 +82,8 @@ public class CalendarEvent extends BaseEntity {
 
     @Column(name = "updated_by", length = 36)
     private String updatedBy;
+
+    @Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion;
 }

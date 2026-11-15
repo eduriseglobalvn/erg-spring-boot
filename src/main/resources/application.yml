@@ -204,6 +204,9 @@ scalar:
 
 
 erg:
+  calendar:
+    travel:
+      default-minutes: ${ERG_CALENDAR_TRAVEL_DEFAULT_MINUTES:50}
   mail:
     from: ${ERG_MAIL_FROM:${SMTP__FROM:${spring.mail.username:noreply@erg.edu.vn}}}
   observability:

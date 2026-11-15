@@ -10,6 +10,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @Documented
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-@PreAuthorize("@methodAuthorization.isAllowedAny(authentication, 'lms.schedule.import', 'lms.schedule.manage', 'lms.manage', '*')")
-public @interface CalendarImport {
+@PreAuthorize("@methodAuthorization.isAllowedAny(authentication, 'timekeeping.manage', 'lms.schedule.read', 'lms.schedule.manage', 'lms.manage', '*')")
+public @interface CalendarDayLoadRead {
 }

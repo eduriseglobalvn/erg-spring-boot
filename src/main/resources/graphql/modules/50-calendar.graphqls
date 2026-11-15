@@ -7,17 +7,16 @@ input MyTeachingCalendarInput { tenantId: String, from: String!, to: String!, vi
 input MyStudentCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
 input TeachingScheduleBulkInput { tenantId: String, idempotencyKey: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode, rows: [TeachingScheduleBulkRowInput!]! }
 input TeachingScheduleBulkRowInput { clientRowId: String!, classIds: [String!]!, weekday: Int!, session: String, periodStart: Int!, periodCount: Int!, startTime: String!, endTime: String!, subjectId: String!, levelId: String, roomId: String, roomName: String, mainTeacherIds: [String!]!, assistantTeacherIds: [String!], note: String }
-input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String }
+input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String, expectedVersion: Int }
 input TeachingScheduleEventDeleteInput { tenantId: String, eventId: String! }
 input DeleteTeacherScheduleInput { tenantId: String, teacherUserId: String!, schoolIds: [String!], dateFrom: String, dateTo: String }
 input CreateRoomInput { tenantId: String, schoolId: String!, roomName: String! }
-input TeachingScheduleExcelImportInput { tenantId: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode }
 input TeachingScheduleBatchListInput { tenantId: String, schoolId: String, status: TeachingScheduleStatus, page: Int, size: Int }
 input TeachingScheduleBatchDetailInput { tenantId: String, batchId: String! }
 enum TeachingScheduleResolveMode { REJECT DELETE_CONFLICTING }
 
 type TeachingCalendarWorkspace { tenantId: String!, from: String!, to: String!, viewMode: TeachingCalendarViewMode!, events: [TeachingCalendarEvent!]!, filterOptions: TeachingCalendarFilterOptions!, laneSummaries: [TeachingCalendarLaneSummary!]!, catalog: TeachingScheduleCatalog!, permissions: TeachingCalendarPermissions!, generatedAt: String! }
-type TeachingCalendarEvent { id: String!, batchId: String, title: String!, startAt: String!, endAt: String!, date: String!, startTime: String!, endTime: String!, schoolId: String!, schoolName: String!, classId: String!, className: String!, subjectId: String, subjectName: String, levelId: String, levelName: String, roomId: String, roomName: String, periodStart: Int!, periodCount: Int!, teachers: [TeachingScheduleTeacherAssignment!]!, status: TeachingScheduleStatus!, note: String, colorGroup: TeachingCalendarColorGroup! }
+type TeachingCalendarEvent { id: String!, batchId: String, title: String!, startAt: String!, endAt: String!, date: String!, startTime: String!, endTime: String!, schoolId: String!, schoolName: String!, classId: String!, className: String!, subjectId: String, subjectName: String, levelId: String, levelName: String, roomId: String, roomName: String, periodStart: Int!, periodCount: Int!, teachers: [TeachingScheduleTeacherAssignment!]!, status: TeachingScheduleStatus!, note: String, colorGroup: TeachingCalendarColorGroup!, myRole: TeachingScheduleRole!, mainTeacherName: String, assistantName: String }
 type TeachingScheduleTeacherAssignment { userId: String!, displayName: String!, role: TeachingScheduleTeacherRole!, colorKey: String }
 type TeachingCalendarFilterOptions { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarFilterOption!]!, teachers: [TeachingCalendarFilterOption!]!, subjects: [TeachingCalendarFilterOption!]!, levels: [TeachingCalendarFilterOption!]! }
 type TeachingCalendarFilterOption { id: String!, label: String!, count: Int!, colorKey: String }
@@ -42,3 +41,240 @@ type TeachingScheduleBatchDetail { id: String!, tenantId: String!, schoolId: Str
 type TeachingScheduleRowResult { clientRowId: String!, valid: Boolean!, eventCount: Int!, teacherScheduleCount: Int!, errors: [TeachingScheduleRowMessage!]!, warnings: [TeachingScheduleRowMessage!]! }
 type TeachingScheduleRowMessage { code: String!, field: String, message: String! }
 type TeachingScheduleConflict { code: String!, severity: String!, clientRowId: String, existingEventId: String, message: String! }
+
+# --- Lich day v2 (KE_HOACH_LICH_DAY.md muc 4.2). Date = yyyy-MM-dd, DateTime = ISO-8601 offset date-time. ---
+scalar Date
+scalar DateTime
+
+enum TeachingScheduleConflictKind { TEACHER_TIME CLASS_TIME ROOM_TIME TRAVEL_TIME TEACHER_ON_LEAVE }
+enum TeachingScheduleSeverity { ERROR WARNING }
+enum TeachingSession { MORNING AFTERNOON }
+enum TeachingScheduleFixKind { CHANGE_TEACHER CHANGE_ROOM CHANGE_PREVIOUS_TEACHER }
+enum TeachingAccessState { EXISTING NEW REVOKE }
+enum TeachingSlotOptionState { SUGGESTED FREE BUSY TRAVEL LEAVE }
+enum TeachingScheduleRole { MAIN ASSISTANT }
+
+type TeachingScheduleBatch { id: ID!, schoolId: ID!, label: String!, status: TeachingScheduleStatus!, version: Int!, periodTemplateId: ID, applyFrom: Date, repeatWeeks: Int, publishedAt: DateTime, affectedEventCount: Int! }
+
+type TeachingPeriodSlot { periodNo: Int!, session: TeachingSession!, startTime: String, endTime: String }
+type TeachingPeriodTemplate { id: ID!, name: String!, periodsPerDay: Int!, slots: [TeachingPeriodSlot!]! }
+
+type TeachingScheduleSide {
+  eventId: ID
+  teacherId: ID
+  teacherName: String
+  classId: ID
+  className: String
+  roomId: ID
+  roomName: String
+  schoolId: ID!
+  schoolName: String!
+  schoolShortName: String!
+  subjectName: String
+  batchId: ID
+  batchLabel: String
+  batchStatus: String
+  createdByName: String
+  createdByRole: String
+  createdAt: DateTime
+  periodNo: Int
+  startTime: String
+  endTime: String
+}
+type TeachingScheduleTravelGap {
+  fromSchoolId: ID!
+  fromSchoolShortName: String!
+  fromSchoolName: String!
+  toSchoolId: ID!
+  toSchoolShortName: String!
+  toSchoolName: String!
+  previousEndTime: String!
+  gapMinutes: Int!
+  requiredMinutes: Int!
+}
+type TeachingScheduleFixSuggestion {
+  kind: TeachingScheduleFixKind!
+  targetEventId: ID
+  targetClientRowId: String
+  targetClassName: String
+  teacherId: ID
+  teacherName: String
+  roomId: ID
+  roomName: String
+  reason: String!
+}
+type TeachingScheduleLeaveInfo { fromDate: Date!, toDate: Date!, part: String! }
+type TeachingScheduleConflictDetail {
+  id: ID!
+  kind: TeachingScheduleConflictKind!
+  severity: TeachingScheduleSeverity!
+  clientRowId: String
+  weekday: Int!
+  periodNo: Int!
+  startTime: String
+  endTime: String
+  firstDate: Date!
+  affectedWeeks: Int!
+  totalWeeks: Int!
+  mine: TeachingScheduleSide!
+  other: TeachingScheduleSide
+  travel: TeachingScheduleTravelGap
+  leave: TeachingScheduleLeaveInfo
+  fix: TeachingScheduleFixSuggestion
+  message: String!
+}
+
+type TeachingAccessClassChange { classId: ID!, className: String!, state: TeachingAccessState!, revokeOn: Date }
+type TeachingAccessChange {
+  teacherId: ID!
+  teacherName: String!
+  weeklyPeriods: Int!
+  lastPeriodDate: Date
+  schoolId: ID!
+  schoolState: TeachingAccessState!
+  schoolRevokeOn: Date
+  classes: [TeachingAccessClassChange!]!
+}
+
+input TeachingScheduleDraftRowInput {
+  clientRowId: String!
+  eventId: ID
+  weekday: Int!
+  periodNo: Int!
+  classId: ID!
+  roomId: ID
+  newRoomName: String
+  teacherId: ID
+  assistantId: ID
+  note: String
+}
+input SaveTeachingScheduleDraftInput {
+  batchId: ID
+  schoolId: ID!
+  subjectId: ID
+  levelId: ID
+  applyFrom: Date!
+  repeatUntil: Date!
+  periodTemplateId: ID!
+  expectedVersion: Int
+  rows: [TeachingScheduleDraftRowInput!]!
+}
+type TeachingScheduleRowIdPair { clientRowId: String!, eventId: ID! }
+type TeachingScheduleDraftResult {
+  batch: TeachingScheduleBatch!
+  version: Int!
+  savedAt: DateTime!
+  rowIdMap: [TeachingScheduleRowIdPair!]!
+  conflicts: [TeachingScheduleConflictDetail!]!
+  accessChanges: [TeachingAccessChange!]!
+}
+
+type TeachingSlotClassOption { classId: ID!, className: String!, grade: Int, state: TeachingSlotOptionState!, busy: TeachingScheduleSide }
+type TeachingSlotTeacherOption {
+  teacherId: ID!
+  teacherName: String!
+  initials: String!
+  state: TeachingSlotOptionState!
+  weeklyPeriods: Int!
+  sameSchoolNeighbor: TeachingScheduleSide
+  taughtHereLastWeek: Boolean!
+  classAccess: TeachingAccessState!
+  busy: TeachingScheduleSide
+  travel: TeachingScheduleTravelGap
+  leave: TeachingScheduleLeaveInfo
+}
+type TeachingSlotRoomOption { roomId: ID!, roomName: String!, seatCount: Int, state: TeachingSlotOptionState!, usualForClass: Boolean!, busy: TeachingScheduleSide }
+type TeachingSlotOptions {
+  schoolName: String!
+  grade: Int
+  classes: [TeachingSlotClassOption!]!
+  teachers: [TeachingSlotTeacherOption!]!
+  rooms: [TeachingSlotRoomOption!]!
+}
+
+input TeachingScheduleReuseInput {
+  sourceSchoolId: ID!
+  sourceWeekStart: Date!
+  mode: String!
+  weekStarts: [Date!]
+  repeatUntil: Date
+  skipHolidays: Boolean!
+  keepRoomAndAssistant: Boolean!
+}
+enum TeachingHolidayKind { STATE COMPANY COMPENSATORY }
+type TeachingHolidayInfo { date: Date!, name: String!, kind: TeachingHolidayKind! }
+# Published periods of one day, for the days-off month calendar. Days without a published period are left out.
+type TeachingDayLoad { date: Date!, periods: Int!, schools: Int! }
+type TeachingTeacherCount { teacherId: ID!, teacherName: String!, periods: Int! }
+type TeachingScheduleReuseWeek {
+  weekStart: Date!
+  weekEnd: Date!
+  toCreate: Int!
+  skipped: Int!
+  conflicts: Int!
+  holidays: [TeachingHolidayInfo!]!
+  conflictDetails: [TeachingScheduleConflictDetail!]!
+}
+type TeachingScheduleReusePreview {
+  sourcePeriods: Int!
+  perTeacher: [TeachingTeacherCount!]!
+  excludedConflicts: [TeachingScheduleConflictDetail!]!
+  weeks: [TeachingScheduleReuseWeek!]!
+  totalToCreate: Int!
+}
+
+type TeachingOverviewQuickCounts { conflicts: Int!, travel: Int!, drafts: Int!, empty: Int! }
+type TeachingOverviewSchoolRow { schoolId: ID!, schoolName: String!, schoolShortName: String!, conflictCount: Int!, hasDraft: Boolean!, periodCount: Int! }
+type TeachingOverviewSchoolPage { total: Int!, items: [TeachingOverviewSchoolRow!]!, quickCounts: TeachingOverviewQuickCounts! }
+type TeachingOverviewCell {
+  schoolId: ID!
+  weekday: Int!
+  periodNo: Int!
+  eventId: ID
+  className: String
+  roomName: String
+  teacherName: String
+  assistantName: String
+  status: String
+  conflictKinds: [TeachingScheduleConflictKind!]!
+  note: String
+  batchLabel: String
+}
+type TeachingOverviewGrid {
+  weekStart: Date!
+  template: TeachingPeriodTemplate!
+  schools: [TeachingOverviewSchoolRow!]!
+  cells: [TeachingOverviewCell!]!
+  holidays: [TeachingHolidayInfo!]!
+  conflicts: [TeachingScheduleConflictDetail!]!
+}
+type TeachingOverviewTeacherSlot {
+  weekday: Int!
+  periodNo: Int!
+  eventIds: [ID!]!
+  classNames: [String!]!
+  schoolShortNames: [String!]!
+  conflict: Boolean!
+  travel: Boolean!
+  onLeave: Boolean!
+  status: String
+  roles: [TeachingScheduleRole!]!
+}
+type TeachingScheduleLoadSettings { loadWarn: Int!, loadMax: Int!, updatedAt: DateTime }
+type TeachingOverviewTeacherDay { weekday: Int!, schoolShortNames: [String!]!, multiSchoolSameSession: Boolean!, travel: TeachingScheduleTravelGap, onLeave: Boolean! }
+type TeachingOverviewTeacherRow {
+  teacherId: ID!
+  teacherName: String!
+  initials: String!
+  schoolCount: Int!
+  conflictCount: Int!
+  weeklyPeriods: Int!
+  maxPeriods: Int!
+  leave: TeachingScheduleLeaveInfo
+  revokeNotice: TeachingAccessChange
+  days: [TeachingOverviewTeacherDay!]!
+  slots: [TeachingOverviewTeacherSlot!]!
+}
+type TeachingOverviewTeacherQuickCounts { conflicts: Int!, travel: Int!, multiSchool: Int!, overload: Int!, empty: Int! }
+type TeachingOverviewTeacherPage { total: Int!, items: [TeachingOverviewTeacherRow!]!, quickCounts: TeachingOverviewTeacherQuickCounts! }
+type SchoolTravelTime { schoolA: TeachingOverviewSchoolRow!, schoolB: TeachingOverviewSchoolRow!, minutes: Int!, updatedAt: DateTime }

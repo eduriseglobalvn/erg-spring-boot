@@ -1,49 +1,118 @@
 package com.erg.ergspringboot.calendar.internal.readmodel;
 
 import com.erg.ergspringboot.calendar.CalendarPublishedBatchProjection;
+import com.erg.ergspringboot.calendar.SchoolShortName;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
-import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
-import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatchRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
+import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.lms.persistence.Classroom;
+import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
+import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
+import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /** Calendar-owned adapter that keeps repositories behind the public projection boundary. */
 @Component
 public class CalendarPublishedBatchProjectionAdapter implements CalendarPublishedBatchProjection {
 
+    private static final String PUBLISHED = "PUBLISHED";
+    private static final String CANCELLED = "CANCELLED";
+
     private final CalendarBatchRepository batches;
     private final CalendarEventRepository events;
     private final CalendarEventTeacherRepository assignments;
+    private final EducationUnitRepository schools;
+    private final ClassroomRepository classes;
 
     public CalendarPublishedBatchProjectionAdapter(
             CalendarBatchRepository batches,
             CalendarEventRepository events,
-            CalendarEventTeacherRepository assignments
+            CalendarEventTeacherRepository assignments,
+            EducationUnitRepository schools,
+            ClassroomRepository classes
     ) {
         this.batches = batches;
         this.events = events;
         this.assignments = assignments;
+        this.schools = schools;
+        this.classes = classes;
     }
 
     @Override
     public Optional<PublishedBatch> findPublishedBatch(String tenantId, String batchId) {
-        Optional<CalendarBatch> batch = batches.findByTenantIdAndId(tenantId, batchId);
-        if (batch.isEmpty()) {
-            return Optional.empty();
+        return batches.findByTenantIdAndId(tenantId, batchId).map(batch -> build(tenantId, batch,
+                events.findByTenantIdAndBatchId(tenantId, batchId).stream()
+                        .filter(event -> PUBLISHED.equals(event.getStatus())).toList()));
+    }
+
+    @Override
+    public Optional<PublishedBatch> findCancelledBatch(String tenantId, String batchId, OffsetDateTime cancelledAt) {
+        return batches.findByTenantIdAndId(tenantId, batchId)
+                .filter(batch -> batch.getPublishedAt() != null)
+                .map(batch -> build(tenantId, batch,
+                        events.findByTenantIdAndBatchId(tenantId, batchId).stream()
+                                .filter(event -> CANCELLED.equals(event.getStatus()))
+                                .filter(event -> event.getStartAt().isAfter(cancelledAt))
+                                // shortcut: updatedAt window stands in for "cancelled by this very cancel"; a
+                                // single-period cancel in the second before would be listed too.
+                                .filter(event -> !event.getUpdatedAt().isBefore(cancelledAt.minusSeconds(1)))
+                                .toList()));
+    }
+
+    @Override
+    public List<PublishedBatch> findCancelledEvents(String tenantId, java.util.Collection<String> calendarEventIds) {
+        if (calendarEventIds.isEmpty()) return List.of();
+        Map<String, List<CalendarEvent>> byBatch = events.findByTenantIdAndIdIn(tenantId, calendarEventIds).stream()
+                .filter(event -> CANCELLED.equals(event.getStatus()))
+                .collect(Collectors.groupingBy(CalendarEvent::getBatchId, java.util.TreeMap::new, Collectors.toList()));
+        return byBatch.entrySet().stream()
+                .flatMap(entry -> batches.findByTenantIdAndId(tenantId, entry.getKey()).stream()
+                        .map(batch -> build(tenantId, batch, entry.getValue())))
+                .toList();
+    }
+
+    @Override
+    public Optional<PublishedBatch> findChangedEvent(String tenantId, String calendarEventId) {
+        return events.findByTenantIdAndId(tenantId, calendarEventId)
+                .flatMap(event -> batches.findByTenantIdAndId(tenantId, event.getBatchId())
+                        .map(batch -> build(tenantId, batch,
+                                PUBLISHED.equals(event.getStatus()) ? List.of(event) : List.of())));
+    }
+
+    private PublishedBatch build(String tenantId, CalendarBatch batch, List<CalendarEvent> list) {
+        EducationUnit school = schools.findById(batch.getSchoolId()).orElse(null);
+        String schoolName = school == null || school.getName() == null ? "" : school.getName();
+        if (list.isEmpty()) {
+            return new PublishedBatch(batch.getId(), batch.getSchoolId(), schoolName,
+                    SchoolShortName.of(schoolName), batch.getStatus(), List.of());
         }
-        List<CalendarEvent> calendarEvents = events.findByTenantIdAndBatchId(tenantId, batchId);
-        List<String> eventIds = calendarEvents.stream().map(CalendarEvent::getId).toList();
-        List<String> teacherIds = eventIds.isEmpty()
-                ? List.of()
-                : assignments.findByTenantIdAndEventIdIn(tenantId, eventIds).stream()
-                        .map(CalendarEventTeacher::getTeacherUserId)
-                        .filter(value -> value != null && !value.isBlank())
-                        .distinct()
-                        .toList();
-        return Optional.of(new PublishedBatch(batchId, batch.get().getSchoolId(), calendarEvents.size(), teacherIds));
+        Map<String, List<CalendarEventTeacher>> byEvent = assignments
+                .findByTenantIdAndEventIdIn(tenantId, list.stream().map(CalendarEvent::getId).toList()).stream()
+                .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
+        List<String> classIds = list.stream().map(CalendarEvent::getAcademicClassId).distinct().toList();
+        Map<String, Classroom> classMap = classes.findAllById(classIds).stream()
+                .collect(Collectors.toMap(Classroom::getId, Function.identity()));
+        List<Slot> slots = list.stream().sorted(Comparator.comparing(CalendarEvent::getStartAt)).map(event -> {
+            Classroom classroom = classMap.get(event.getAcademicClassId());
+            List<Person> people = byEvent.getOrDefault(event.getId(), List.of()).stream()
+                    .filter(t -> t.getTeacherUserId() != null && !t.getTeacherUserId().isBlank())
+                    .map(t -> new Person(t.getTeacherUserId(), t.getDisplayNameSnapshot(),
+                            "ASSISTANT".equals(t.getRole()) ? "ASSISTANT" : "MAIN"))
+                    .toList();
+            return new Slot(event.getId(), event.getAcademicClassId(), classroom == null ? "" : classroom.getName(),
+                    event.getStartAt(), event.getPeriodStart(), event.getPeriodCount(), event.getRoomName(), people);
+        }).toList();
+        return new PublishedBatch(batch.getId(), batch.getSchoolId(), schoolName, SchoolShortName.of(schoolName),
+                batch.getStatus(), slots);
     }
 }

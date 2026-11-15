@@ -31,6 +31,9 @@ public class ErgGraphQlExceptionResolver extends DataFetcherExceptionResolverAda
         String requestId = context == null ? null : context.requestId();
         Descriptor descriptor = describe(exception, requestId);
         Map<String, Object> extensions = new LinkedHashMap<>();
+        if (unwrap(exception) instanceof com.erg.ergspringboot.exception.TeachingScheduleException schedule) {
+            extensions.putAll(schedule.extensions());
+        }
         extensions.put("code", descriptor.code());
         extensions.put("status", descriptor.status());
         if (requestId != null && !requestId.isBlank()) extensions.put("request_id", requestId);
@@ -49,6 +52,11 @@ public class ErgGraphQlExceptionResolver extends DataFetcherExceptionResolverAda
         Throwable exception = unwrap(throwable);
         if (exception instanceof ApiException api) {
             return new Descriptor(api.getCode(), api.getMessage(), api.getStatus().value(),
+                    ErrorType.DataFetchingException, List.of(), false);
+        }
+        if (exception instanceof org.springframework.orm.ObjectOptimisticLockingFailureException
+                || exception instanceof jakarta.persistence.OptimisticLockException) {
+            return new Descriptor("STALE_VERSION", "The record changed since it was read; reload and retry.", 409,
                     ErrorType.DataFetchingException, List.of(), false);
         }
         if (exception instanceof ConstraintViolationException validation) {

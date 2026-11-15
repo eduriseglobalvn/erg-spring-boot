@@ -237,7 +237,6 @@ public class CalendarBulkCreateUseCase {
         batch.setNote(input.note());
         batch.setCreatedBy(userId);
         batchRepository.save(batch);
-        if (!conflicts.isEmpty()) conflictService.persistConflicts(tenantId, batchId, conflicts);
         List<CalendarEvent> savedEvents = eventRepository.saveAll(allEvents);
         teacherRepository.saveAll(allAssignments);
         int totalPeriodCount = allEvents.stream()

@@ -32,6 +32,16 @@ type LcmsQuery {
   teachingCalendarWorkspace(input: TeachingCalendarWorkspaceInput!): TeachingCalendarWorkspace!
   teachingScheduleBatches(input: TeachingScheduleBatchListInput): TeachingScheduleBatchPage!
   teachingScheduleBatch(input: TeachingScheduleBatchDetailInput!): TeachingScheduleBatchDetail!
+  teachingPeriodTemplates: [TeachingPeriodTemplate!]!
+  teachingScheduleSlotOptions(schoolId: ID!, batchId: ID, date: Date!, periodNo: Int!, classId: ID, excludeEventId: ID): TeachingSlotOptions!
+  teachingScheduleDraft(batchId: ID!): TeachingScheduleDraftResult!
+  previewTeachingScheduleReuse(input: TeachingScheduleReuseInput!): TeachingScheduleReusePreview!
+  teachingScheduleOverviewSchools(weekStart: Date!, search: String, quick: String, page: Int!, size: Int!): TeachingOverviewSchoolPage!
+  teachingScheduleOverviewGrid(weekStart: Date!, schoolIds: [ID!]!): TeachingOverviewGrid!
+  teachingScheduleOverviewTeachers(weekStart: Date!, search: String, quick: String, sort: String, page: Int!, size: Int!): TeachingOverviewTeacherPage!
+  teachingScheduleLoadSettings: TeachingScheduleLoadSettings!
+  teachingScheduleDayLoads(from: Date!, to: Date!): [TeachingDayLoad!]!
+  schoolTravelTimes(search: String, page: Int!, size: Int!): [SchoolTravelTime!]!
   quizWorkspace(input: QuizWorkspaceInput): QuizWorkspace!
   quizDraft(quizId: String!): QuizDraftDocument!
   quizVersions(quizId: String!): QuizVersionHistory!

@@ -4,6 +4,7 @@ import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import lombok.AllArgsConstructor;
@@ -57,4 +58,15 @@ public class CalendarBatch extends BaseEntity {
 
     @Column(name = "published_at")
     private OffsetDateTime publishedAt;
+
+    /** Optimistic lock; clients echo it back as expectedVersion. */
+    @Version
+    @Column(name = "record_version", nullable = false)
+    private Long recordVersion;
+
+    @Column(name = "label", length = 80)
+    private String label;
+
+    @Column(name = "period_template_id", length = 36)
+    private String periodTemplateId;
 }

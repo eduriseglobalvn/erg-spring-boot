@@ -22,6 +22,24 @@ class ErgGraphQlExceptionResolverTest {
     }
 
     @Test
+    void optimisticLockFailureBecomesStaleVersion() {
+        var descriptor = resolver.describe(new jakarta.persistence.OptimisticLockException("row changed"), "req-9");
+
+        assertThat(descriptor.code()).isEqualTo("STALE_VERSION");
+        assertThat(descriptor.status()).isEqualTo(409);
+        assertThat(descriptor.internal()).isFalse();
+    }
+
+    @Test
+    void teachingScheduleExceptionKeepsItsOwnCode() {
+        var descriptor = resolver.describe(
+                com.erg.ergspringboot.exception.TeachingScheduleException.notFound("Batch not found"), "req-10");
+
+        assertThat(descriptor.code()).isEqualTo("NOT_FOUND");
+        assertThat(descriptor.status()).isEqualTo(404);
+    }
+
+    @Test
     void accessDeniedUsesSameSafeContractAsRest() {
         var descriptor = resolver.describe(new AccessDeniedException("sensitive policy detail"), "req-2");
 
