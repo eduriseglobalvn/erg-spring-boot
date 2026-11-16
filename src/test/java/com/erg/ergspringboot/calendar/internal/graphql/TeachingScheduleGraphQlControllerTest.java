@@ -213,6 +213,9 @@ class TeachingScheduleGraphQlControllerTest {
         authenticate(principal(List.of("lms.schedule.update"), List.of("school-1")));
         assertThatThrownBy(() -> controller.editTeachingScheduleSlot(edit)).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> controller.swapTeachingScheduleTeacher(swap)).isInstanceOf(ForbiddenException.class);
+        authenticate(principal(List.of("lms.schedule.manage"), List.of("school-1")));
+        assertThatThrownBy(() -> controller.editTeachingScheduleSlot(edit)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> controller.swapTeachingScheduleTeacher(swap)).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(schedule);
 
         event.setSchoolId("school-1");
