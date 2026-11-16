@@ -49,7 +49,7 @@ class BusinessRoleCatalogTest {
         Set<String> pdt = role("role_pdt_operator").permissions();
         assertThat(pdt).noneMatch(n -> n.startsWith("crm.") || n.startsWith("audit."))
                 .doesNotContain("users.activity.read", "api-keys.manage", "*", "crm.workspace.access");
-        assertThat(pdt).contains("admin.workspace.access", "elearning.student.preview", "users.manage", "rbac.role.assign");
+        assertThat(pdt).contains("admin.workspace.access", "teacher.workspace.access", "elearning.student.preview", "users.manage", "rbac.role.assign");
     }
 
     @Test

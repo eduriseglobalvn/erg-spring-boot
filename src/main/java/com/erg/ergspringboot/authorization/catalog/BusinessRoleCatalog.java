@@ -64,14 +64,15 @@ public final class BusinessRoleCatalog {
             new BusinessRole(PDT, "pdt_operator", "Phòng đào tạo",
                     "Toàn quyền vận hành đào tạo và quản lý tài khoản trong phạm vi cho phép, trừ CRM và nhật ký.",
                     List.of("Quản lý trường, lớp, học sinh, lịch dạy, điểm, chương trình, chấm công, thông báo",
-                            "Quản lý tài khoản Phòng đào tạo, Vận hành, Giáo viên, Học sinh"),
+                            "Quản lý tài khoản Phòng đào tạo, Vận hành, Giáo viên, Học sinh",
+                            "Dùng cổng giáo viên"),
                     List.of("Dùng CRM", "Xem nhật ký hệ thống", "Tác động lên Quản trị, Giám đốc, Tuyển sinh"), false,
                     union(select(d -> d.kind() != PermissionKind.WORKSPACE
                                     && d.function() != PermissionFunction.CRM
                                     && !d.name().startsWith("audit.")
                                     && !d.name().equals("users.activity.read")
                                     && !d.name().equals("api-keys.manage")),
-                            Set.of("admin.workspace.access", "elearning.student.preview"), SELF_SERVICE)),
+                            Set.of("admin.workspace.access", "teacher.workspace.access", "elearning.student.preview"), SELF_SERVICE)),
             new BusinessRole(OPERATIONS, "operations", "Vận hành",
                     "Chỉ xem phần LMS, không thêm, sửa hay xoá.",
                     List.of("Xem trường, lớp, học sinh, lịch dạy, điểm, chương trình, chấm công, thông báo"),

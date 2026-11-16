@@ -182,6 +182,7 @@ rbac.permission.read
 rbac.role.assign
 rbac.role.read
 seo.manage
+teacher.workspace.access
 timekeeping.approve
 timekeeping.manage
 timekeeping.read

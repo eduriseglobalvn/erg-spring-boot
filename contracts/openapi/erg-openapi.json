@@ -6431,6 +6431,12 @@
           },
           "user": {
             "$ref": "#/components/schemas/ProfileResponse"
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "type": "object"
