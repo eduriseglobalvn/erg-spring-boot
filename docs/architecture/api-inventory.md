@@ -8,9 +8,9 @@ statement, row, payload, state-owner, cache and pagination metadata. The existin
 `RequestMappingHandlerMapping`; a new production mapping therefore fails CI until it is
 explicitly inventoried.
 
-REST route count: `605`
+REST route count: `617`
 
-GraphQL mapped field count: `44`
+GraphQL mapped field count: `43`
 
 ## Route metadata contract
 
@@ -124,7 +124,7 @@ an owner and permission decision:
 `assignmentProgressWorkspace`, `studentGroups`, `myTeachingCalendar`, `myStudentCalendar`,
 `previewTeachingSchedule`, `createTeachingSchedule`, `updateTeachingScheduleEvent`,
 `deleteTeachingScheduleEvent`, `deleteTeacherSchedule`, `publishTeachingScheduleBatch`,
-`cancelTeachingScheduleBatch`, `createRoom`, `importTeachingScheduleFromExcel`, `lms`
+`cancelTeachingScheduleBatch`, `createRoom`, `lms`
 
 ### `lcms` / `school`
 

@@ -17,7 +17,7 @@ public final class JpaRegistrationCatalog {
 
     private static final List<Module> MODULES = List.of(
             owned("audit", 1, 1),
-            owned("calendar", 5, 5),
+            owned("calendar", 4, 4),
             ownedPartiallyManaged("content", 4, 1, ContentLifecycleTransition.class.getName()),
             owned("crm", 6, 6),
             owned("curriculum", 7, 7),
@@ -26,12 +26,12 @@ public final class JpaRegistrationCatalog {
             owned("learningcontent", 4, 5),
             owned("learningoutcomes", 7, 7),
             owned("learningstandards", 4, 4),
-            owned("lms", 12, 15),
+            owned("lms", 14, 17),
             owned("notifications", 8, 8),
             owned("outbox", "auth", 1, 1),
             owned("reporting", 1, 1),
             owned("school", 3, 4),
-            owned("timekeeping", 14, 14),
+            owned("timekeeping", 18, 18),
             owned("users", 19, 17)
     );
 

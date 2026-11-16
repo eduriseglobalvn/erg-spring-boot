@@ -76,8 +76,57 @@ public final class CalendarResponses {
             List<CalendarTeacherAssignmentResponse> teachers,
             String status,
             String note,
-            CalendarColorGroupResponse colorGroup
+            CalendarColorGroupResponse colorGroup,
+            String myRole,
+            String mainTeacherName,
+            String assistantName,
+            int version
     ) {
+        /** Without the optimistic-lock version (0): fixtures and summaries that are never edited. */
+        public CalendarEventResponse(
+                String id, String batchId, String title, String startAt, String endAt, String date,
+                String startTime, String endTime, String schoolId, String schoolName, String classId,
+                String className, String subjectId, String subjectName, String levelId, String levelName,
+                String roomId, String roomName, int periodStart, int periodCount,
+                List<CalendarTeacherAssignmentResponse> teachers, String status, String note,
+                CalendarColorGroupResponse colorGroup, String myRole, String mainTeacherName, String assistantName) {
+            this(id, batchId, title, startAt, endAt, date, startTime, endTime, schoolId, schoolName, classId,
+                    className, subjectId, subjectName, levelId, levelName, roomId, roomName, periodStart,
+                    periodCount, teachers, status, note, colorGroup, myRole, mainTeacherName, assistantName, 0);
+        }
+
+        /** Admin view: the viewer is not one of the teachers, so the role is MAIN and only the assistant is named. */
+        public CalendarEventResponse(
+                String id, String batchId, String title, String startAt, String endAt, String date,
+                String startTime, String endTime, String schoolId, String schoolName, String classId,
+                String className, String subjectId, String subjectName, String levelId, String levelName,
+                String roomId, String roomName, int periodStart, int periodCount,
+                List<CalendarTeacherAssignmentResponse> teachers, String status, String note,
+                CalendarColorGroupResponse colorGroup) {
+            this(id, batchId, title, startAt, endAt, date, startTime, endTime, schoolId, schoolName, classId,
+                    className, subjectId, subjectName, levelId, levelName, roomId, roomName, periodStart,
+                    periodCount, teachers, status, note, colorGroup, null, null, null, 0);
+        }
+
+        /** Re-derives the viewer fields for a teacher looking at their own calendar. */
+        public CalendarEventResponse withViewer(String viewerUserId) {
+            boolean assistant = teachers.stream().anyMatch(t -> "ASSISTANT".equals(t.role())
+                    && java.util.Objects.equals(viewerUserId, t.userId()));
+            boolean main = teachers.stream().anyMatch(t -> "MAIN".equals(t.role())
+                    && java.util.Objects.equals(viewerUserId, t.userId()));
+            String role = assistant && !main ? "ASSISTANT" : "MAIN";
+            return new CalendarEventResponse(id, batchId, title, startAt, endAt, date, startTime, endTime,
+                    schoolId, schoolName, classId, className, subjectId, subjectName, levelId, levelName,
+                    roomId, roomName, periodStart, periodCount, teachers, status, note, colorGroup,
+                    role, "ASSISTANT".equals(role) ? firstName("MAIN") : null,
+                    "MAIN".equals(role) ? firstName("ASSISTANT") : null, version);
+        }
+
+        private String firstName(String role) {
+            return teachers.stream().filter(t -> role.equals(t.role()))
+                    .map(CalendarTeacherAssignmentResponse::displayName).findFirst().orElse(null);
+        }
+
         public CalendarEventResponse {
             id = nonBlankOr(id, batchId);
             title = nonBlankOr(title, id);
@@ -95,6 +144,11 @@ public final class CalendarResponses {
             colorGroup = colorGroup == null
                     ? new CalendarColorGroupResponse("default", "default", "subject")
                     : colorGroup;
+            myRole = nonBlankOr(myRole, "MAIN");
+            if (assistantName == null && "MAIN".equals(myRole)) {
+                assistantName = teachers.stream().filter(t -> "ASSISTANT".equals(t.role()))
+                        .map(CalendarTeacherAssignmentResponse::displayName).findFirst().orElse(null);
+            }
         }
     }
 
@@ -288,49 +342,6 @@ public final class CalendarResponses {
             String batchId,
             String status,
             int affectedEventCount
-    ) {}
-
-    public record CalendarBatchPageResponse(
-            List<CalendarBatchSummaryResponse> items,
-            int page,
-            int size,
-            long totalItems,
-            int totalPages,
-            boolean hasNext,
-            boolean hasPrevious
-    ) {}
-
-    public record CalendarBatchSummaryResponse(
-            String id,
-            String tenantId,
-            String schoolId,
-            String academicYear,
-            String applyFrom,
-            Integer repeatWeeks,
-            String status,
-            String source,
-            String note,
-            String createdBy,
-            String publishedBy,
-            String publishedAt,
-            String createdAt
-    ) {}
-
-    public record CalendarBatchDetailResponse(
-            String id,
-            String tenantId,
-            String schoolId,
-            String academicYear,
-            String applyFrom,
-            Integer repeatWeeks,
-            String status,
-            String source,
-            String note,
-            String createdBy,
-            String publishedBy,
-            String publishedAt,
-            String createdAt,
-            int eventCount
     ) {}
 
     public record CalendarRowResultResponse(

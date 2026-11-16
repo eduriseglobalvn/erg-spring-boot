@@ -21,7 +21,7 @@ class CalendarEventMutationArchitectureTest {
                 .contains("eventMutations.update(")
                 .contains("eventMutations.delete(")
                 .contains("eventMutations.deleteTeacherSchedule(")
-                .doesNotContain("eventRepository.updateStatusBatch(tenantId, List.of(event.getId()")
+                .doesNotContain("eventRepository.cancelByIds(tenantId, List.of(event.getId()")
                 .doesNotContain("eventRepository.save(event);");
     }
 }

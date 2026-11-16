@@ -73,6 +73,29 @@ class TimekeepingAdminControllerIT extends AdminITBase {
     }
 
     @Test
+    void cancellingTaughtPeriodsAnswers409WithTheImpactInData() throws Exception {
+        jdbc.update("insert into academic_classes (id, tenant_id, school_id, name, created_at, updated_at)"
+                + " values ('cls_aw', ?, ?, '6A1', now(), now())", T, f.school());
+        jdbc.update("insert into lms_subjects (id, tenant_id, name, created_at, updated_at) values ('sub_aw', ?, 'Tin', now(), now())", T);
+        jdbc.update("insert into teaching_schedule_batches (id, tenant_id, school_id, apply_from, repeat_weeks, status, label)"
+                + " values ('batch_aw', ?, ?, date '2026-11-02', 10, 'PUBLISHED', 'Đợt 1')", T, f.school());
+        java.time.OffsetDateTime start = LocalDate.of(2026, 11, 10).atTime(7, 0)
+                .atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime();
+        jdbc.update("insert into teaching_schedule_events (id, tenant_id, batch_id, school_id, academic_class_id, subject_id,"
+                + " start_at, end_at, weekday, period_start, period_count, status, note) values ('ev_aw', ?, 'batch_aw', ?,"
+                + " 'cls_aw', 'sub_aw', ?, ?, 2, 1, 1, 'PUBLISHED', 'REPORTED')", T, f.school(),
+                java.sql.Timestamp.from(start.toInstant()), java.sql.Timestamp.from(start.plusMinutes(45).toInstant()));
+        mvc.perform(as(post(ADMIN + "/holidays").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"from\":\"2026-11-10\",\"name\":\"Nghỉ\",\"kind\":\"COMPANY\",\"payMode\":\"PAID\","
+                        + "\"teachingAction\":\"CANCEL\"}"), "admin", "timekeeping.manage"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errors").value("HOLIDAY_AFFECTS_PAST_PERIODS"))
+                .andExpect(jsonPath("$.data.taughtPeriods").value(1))
+                .andExpect(jsonPath("$.data.reportedPeriods").value(1))
+                .andExpect(jsonPath("$.data.dates[0]").value("2026-11-10"));
+    }
+
+    @Test
     void anApproverWhoIsNotOnTheRequestGets404AndRejectNeedsAComment() throws Exception {
         String id = request(T, f.school(), f.teacher(), "LEAVE", "SICK", LocalDate.of(2026, 11, 16),
                 LocalDate.of(2026, 11, 16), "PENDING");

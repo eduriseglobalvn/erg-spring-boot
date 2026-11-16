@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 605
+  route-count: 617
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -941,6 +941,14 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/saturday-modes => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.saturdayModes
+      classification: persistent-read
+      statement-budget: 3
+      row-budget: 10
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: GET /api/v1/timekeeping/admin/shifts => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.shifts
       classification: persistent-read
       statement-budget: 4
@@ -957,6 +965,30 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/teaching/export => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.teachingExport
+      classification: persistent-read
+      statement-budget: 30
+      row-budget: 50000
+      payload-budget-bytes: 8388608
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/teaching/months/{month} => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.monthSheet
+      classification: persistent-read
+      statement-budget: 20
+      row-budget: 5000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/admin/teaching/periods => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.periods
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 10000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
     - route: GET /api/v1/timekeeping/admin/timesheet => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.timesheet
       classification: persistent-read
       statement-budget: 16
@@ -1009,6 +1041,22 @@ rest:
       classification: persistent-read
       statement-budget: 20
       row-budget: 1000
+      payload-budget-bytes: 524288
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: GET /api/v1/timekeeping/me/teaching/{month}/periods => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.myPeriods
+      classification: persistent-read
+      statement-budget: 16
+      row-budget: 10000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/timekeeping/me/teaching/{month} => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.myMonth
+      classification: persistent-read
+      statement-budget: 20
+      row-budget: 2000
       payload-budget-bytes: 524288
       state-owner: postgresql
       cache-policy: none
@@ -3460,14 +3508,6 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: POST /api/v1/calendar/import-excel => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.importExcel
-      classification: persistent-write
-      statement-budget: 25
-      row-budget: 1000
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-outbox
-      cache-policy: post-commit-tenant-generation
-      pagination-policy: none
     - route: POST /api/v1/calendar/preview => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.preview
       classification: persistent-write
       statement-budget: 25
@@ -4296,6 +4336,22 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/holidays/import => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.importHolidays
+      classification: persistent-write
+      statement-budget: 400
+      row-budget: 200
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/holidays/import-preview => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.holidayImportPreview
+      classification: persistent-read
+      statement-budget: 4
+      row-budget: 500
+      payload-budget-bytes: 131072
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/timekeeping/admin/periods/{period}/lock => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.lock
       classification: persistent-write
       statement-budget: 8
@@ -4352,6 +4408,14 @@ rest:
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
+    - route: POST /api/v1/timekeeping/admin/teaching/months/{month}/close => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.close
+      classification: persistent-write
+      statement-budget: 30
+      row-budget: 5000
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: POST /api/v1/timekeeping/approvals/bulk-approve => com.erg.ergspringboot.timekeeping.web.TimekeepingApprovalController.bulkApprove
       classification: persistent-write
       statement-budget: 600
@@ -4389,6 +4453,22 @@ rest:
       statement-budget: 30
       row-budget: 200
       payload-budget-bytes: 3145728
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/me/teaching/{month}/confirm => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.confirm
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 50
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: POST /api/v1/timekeeping/me/teaching/{month}/issue => com.erg.ergspringboot.timekeeping.web.TimekeepingTeachingController.reportIssue
+      classification: persistent-write
+      statement-budget: 8
+      row-budget: 10
+      payload-budget-bytes: 65536
       state-owner: postgresql
       cache-policy: none
       pagination-policy: none
@@ -4774,6 +4854,14 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
+    - route: PUT /api/v1/timekeeping/admin/holidays/{id} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.updateHoliday
+      classification: persistent-write
+      statement-budget: 20
+      row-budget: 20
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
     - route: PUT /api/v1/timekeeping/admin/policies/{schoolId} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.savePolicy
       classification: persistent-write
       statement-budget: 8
@@ -4786,6 +4874,14 @@ rest:
       classification: persistent-write
       statement-budget: 6
       row-budget: 600
+      payload-budget-bytes: 65536
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: none
+    - route: PUT /api/v1/timekeeping/admin/saturday-modes/{date} => com.erg.ergspringboot.timekeeping.web.TimekeepingAdminController.setSaturdayMode
+      classification: persistent-write
+      statement-budget: 10
+      row-budget: 20
       payload-budget-bytes: 65536
       state-owner: postgresql
       cache-policy: none
@@ -5135,7 +5231,7 @@ rest:
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
 graphql:
-  mapped-method-count: 44
+  mapped-method-count: 43
   fields:
     - studentDashboard
     - learningResourceLibrary
@@ -5165,7 +5261,6 @@ graphql:
     - publishTeachingScheduleBatch
     - cancelTeachingScheduleBatch
     - createRoom
-    - importTeachingScheduleFromExcel
     - lms
     - lcms
     - crm

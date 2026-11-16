@@ -4,31 +4,26 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBu
 import com.erg.ergspringboot.calendar.CalendarOperations;
 import com.erg.ergspringboot.calendar.authorization.CalendarCreate;
 import com.erg.ergspringboot.calendar.authorization.CalendarDelete;
-import com.erg.ergspringboot.calendar.authorization.CalendarImport;
 import com.erg.ergspringboot.calendar.authorization.CalendarPublish;
 import com.erg.ergspringboot.calendar.authorization.CalendarRead;
 import com.erg.ergspringboot.calendar.authorization.CalendarSelfRead;
 import com.erg.ergspringboot.calendar.authorization.CalendarUpdate;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventDeleteRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarEventUpdateRequest;
-import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarExcelImportRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CreateRoomRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.DeleteTeacherScheduleRequest;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.*;
+import com.erg.ergspringboot.calendar.CalendarBatchResponses.*;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.exception.NotImplementedException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.calendar.CalendarScopeService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -40,8 +35,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/calendar")
@@ -49,7 +42,6 @@ public class CalendarRestController {
 
     private final CalendarOperations calendar;
     private final CalendarScopeService scopeService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public CalendarRestController(
             CalendarOperations calendar,
@@ -169,7 +161,7 @@ public class CalendarRestController {
         ErgPrincipal principal = getRequiredPrincipal();
         String tenantId = verifiedTenantId(principal, body.tenantId());
         CalendarEventUpdateRequest input = new CalendarEventUpdateRequest(
-                tenantId, eventId, body.roomId(), body.roomName(), body.note());
+                tenantId, eventId, body.roomId(), body.roomName(), body.note(), body.expectedVersion());
         scopeService.requireEvent(principal, tenantId, eventId);
         return ok("Event updated", calendar.update(tenantId, input, principal.userId()), request);
     }
@@ -239,52 +231,6 @@ public class CalendarRestController {
                 tenantId, body.schoolId(), body.roomName(), principal.userId()), request);
     }
 
-    /**
-     * STUB: Imports a teaching schedule from an Excel file.
-     * <p>
-     * Accepts a multipart Excel file upload along with metadata parameters.
-     * Future implementation will:
-     * <ol>
-     *   <li>Validate the file extension (.xlsx, .xls)</li>
-     *   <li>Parse the Excel workbook using Apache POI</li>
-     *   <li>Convert rows into {@code CalendarBulkRowRequest} entries</li>
-     *   <li>Construct a {@code CalendarBulkCreateRequest} and delegate to
-     *       {@link CalendarOperations#preview(String, CalendarBulkCreateRequest, String)}</li>
-     * </ol>
-     *
-     * @param file        the uploaded Excel file (.xlsx or .xls)
-     * @param schoolId    the school identifier
-     * @param applyFrom   the start date (ISO format) for the schedule
-     * @param repeatWeeks number of weeks to repeat
-     * @param tenantId    optional tenant identifier
-     * @param note        optional note for the batch
-     * @param overrideConflicts whether to override conflicting events
-     * @param resolveMode conflict resolution strategy
-     * @param request     the HTTP servlet request
-     * @return a preview payload with parsed results
-     */
-    @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @CalendarImport
-    public ApiResponse<CalendarPreviewPayload> importExcel(
-            @RequestPart("file") MultipartFile file,
-            @RequestPart("metadata") String metadata,
-            HttpServletRequest request) {
-
-        ErgPrincipal principal = getRequiredPrincipal();
-        CalendarExcelImportRequest input = parseImportMetadata(metadata);
-        String effectiveTenantId = verifiedTenantId(principal, input.tenantId());
-        requireManagedSchool(principal, input.schoolId());
-
-        throw new NotImplementedException(
-                "CALENDAR_EXCEL_IMPORT_NOT_IMPLEMENTED",
-                "Excel import is not yet available. Use the bulk schedule preview/create flow. "
-                        + "File received: name=" + file.getOriginalFilename()
-                        + ", size=" + file.getSize() + " bytes"
-                        + ", schoolId=" + input.schoolId()
-                        + ", applyFrom=" + input.applyFrom()
-                        + ", tenantId=" + effectiveTenantId);
-    }
-
     private <T> ApiResponse<T> ok(String message, T data, HttpServletRequest request) {
         return ApiResponse.success(200, message, data, request.getRequestURI(), requestId(request));
     }
@@ -338,14 +284,6 @@ public class CalendarRestController {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private CalendarExcelImportRequest parseImportMetadata(String metadata) {
-        try {
-            return objectMapper.readValue(metadata, CalendarExcelImportRequest.class);
-        } catch (IOException ex) {
-            throw new BadRequestException("Invalid metadata JSON for calendar Excel import.");
-        }
     }
 
 }

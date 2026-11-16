@@ -657,7 +657,7 @@ fields:
     cold-warm-scenario: authenticated-cold-warm-redis-down
     fixture-id: graphql-heavy-read-v1
   - coordinate: Mutation.cancelTeachingScheduleBatch
-    owner: com.erg.ergspringboot.controller.calendar.graphql.CalendarMutationGraphQlController.cancelTeachingScheduleBatch
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.cancelTeachingScheduleBatch
     auth: tenant-and-permission
     classification: persistent-write
     risk: bounded-write
@@ -736,22 +736,6 @@ fields:
     generation-domain: mutation-invalidation
     cold-warm-scenario: authenticated-write
     fixture-id: graphql-calendar-write-v1
-  - coordinate: Mutation.importTeachingScheduleFromExcel
-    owner: com.erg.ergspringboot.controller.calendar.graphql.CalendarMutationGraphQlController.importTeachingScheduleFromExcel
-    auth: tenant-and-permission
-    classification: persistent-write
-    risk: bounded-write
-    statement-budget: 25
-    row-budget: 500
-    payload-budget-bytes: 2097152
-    selection-scenario: bounded-mutation-input
-    latency-budget-ms: 1000
-    cacheability: none
-    cache-ttl-seconds: 0
-    cache-scope: none
-    generation-domain: mutation-invalidation
-    cold-warm-scenario: authenticated-write
-    fixture-id: graphql-calendar-write-v1
   - coordinate: Mutation.previewTeachingSchedule
     owner: com.erg.ergspringboot.controller.calendar.graphql.CalendarMutationGraphQlController.previewTeachingSchedule
     auth: tenant-and-permission
@@ -769,7 +753,7 @@ fields:
     cold-warm-scenario: authenticated-write
     fixture-id: graphql-calendar-write-v1
   - coordinate: Mutation.publishTeachingScheduleBatch
-    owner: com.erg.ergspringboot.controller.calendar.graphql.CalendarMutationGraphQlController.publishTeachingScheduleBatch
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.publishTeachingScheduleBatch
     auth: tenant-and-permission
     classification: persistent-write
     risk: bounded-write
@@ -1457,3 +1441,516 @@ fields:
     generation-domain: mutation-invalidation
     cold-warm-scenario: authenticated-write
     fixture-id: graphql-student-discussion-moderation-v1
+  - coordinate: LcmsQuery.teachingPeriodTemplates
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingPeriodTemplates
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleSlotOptions
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleSlotOptions
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleDraft
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleDraft
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.previewTeachingScheduleReuse
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.previewTeachingScheduleReuse
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleOverviewSchools
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleOverviewSchools
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleOverviewGrid
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleOverviewGrid
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleOverviewTeachers
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleOverviewTeachers
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleDayLoads
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleDayLoads
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.teachingScheduleLoadSettings
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.teachingScheduleLoadSettings
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LcmsQuery.schoolTravelTimes
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.schoolTravelTimes
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: Mutation.saveTeachingScheduleDraft
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.saveTeachingScheduleDraft
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.renameTeachingScheduleBatch
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.renameTeachingScheduleBatch
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.updateTeachingScheduleLoadSettings
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.updateTeachingScheduleLoadSettings
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.reuseTeachingScheduleWeek
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.reuseTeachingScheduleWeek
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.upsertSchoolTravelTime
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.upsertSchoolTravelTime
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.deleteSchoolTravelTime
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.deleteSchoolTravelTime
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+
+  - coordinate: LmsQuery.lessonLogTeacherWeek
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.lessonLogTeacherWeek
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 30
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LmsQuery.lessonLogClassWeek
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.lessonLogClassWeek
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 30
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LmsQuery.lessonLogChanges
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.lessonLogChanges
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 30
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LmsQuery.lessonLogCurriculum
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.lessonLogCurriculum
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 30
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LmsQuery.teacherDayPeriods
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.teacherDayPeriods
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 30
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: LmsQuery.lessonReportMatrix
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.lessonReportMatrix
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 30
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: Mutation.updateLessonLogEntry
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.updateLessonLogEntry
+    auth: tenant-class-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-lms-attendance-write-v1
+  - coordinate: Mutation.confirmLessonLogWeek
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.confirmLessonLogWeek
+    auth: tenant-class-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-lms-attendance-write-v1
+  - coordinate: Mutation.saveAttendanceAndLog
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.saveAttendanceAndLog
+    auth: tenant-class-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-lms-attendance-write-v1
+  - coordinate: Mutation.remindLessonReport
+    owner: com.erg.ergspringboot.lms.internal.classlog.LessonLogGraphQlController.remindLessonReport
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-lms-attendance-write-v1
+  - coordinate: LcmsQuery.schoolPeriodAssignments
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.schoolPeriodAssignments
+    auth: tenant-and-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 25
+    row-budget: 5000
+    payload-budget-bytes: 2097152
+    selection-scenario: explicit-selection-and-alias
+    latency-budget-ms: 1000
+    cacheability: tenant-user-scope
+    cache-ttl-seconds: 60
+    cache-scope: tenant-user-permission-scope-selection-input
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm-redis-down
+    fixture-id: graphql-heavy-read-v1
+  - coordinate: Mutation.saveTeachingPeriodTemplate
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.saveTeachingPeriodTemplate
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.assignSchoolPeriodTemplate
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.assignSchoolPeriodTemplate
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.saveSchoolPeriodTimes
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.saveSchoolPeriodTimes
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.editTeachingScheduleSlot
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.editTeachingScheduleSlot
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1
+  - coordinate: Mutation.swapTeachingScheduleTeacher
+    owner: com.erg.ergspringboot.calendar.internal.graphql.TeachingScheduleGraphQlController.swapTeachingScheduleTeacher
+    auth: tenant-and-permission
+    classification: persistent-write
+    risk: bounded-write
+    statement-budget: 25
+    row-budget: 500
+    payload-budget-bytes: 2097152
+    selection-scenario: bounded-mutation-input
+    latency-budget-ms: 1000
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: mutation-invalidation
+    cold-warm-scenario: authenticated-write
+    fixture-id: graphql-calendar-write-v1

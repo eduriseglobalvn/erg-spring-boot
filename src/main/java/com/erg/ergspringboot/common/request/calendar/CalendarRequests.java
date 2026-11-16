@@ -87,8 +87,13 @@ public final class CalendarRequests {
             String eventId,
             String roomId,
             String roomName,
-            String note
-    ) {}
+            String note,
+            Integer expectedVersion
+    ) {
+        public CalendarEventUpdateRequest(String tenantId, String eventId, String roomId, String roomName, String note) {
+            this(tenantId, eventId, roomId, roomName, note, null);
+        }
+    }
 
     public record CalendarEventDeleteRequest(
             String tenantId,
@@ -128,33 +133,6 @@ public final class CalendarRequests {
             String tenantId,
             String schoolId,
             String roomName
-    ) {}
-
-    /**
-     * Request DTO for Excel-based teaching schedule import.
-     * This is a stub/framework record for future Excel import support.
-     * The actual file data (byte[]) and fileName are used by the REST endpoint
-     * which receives the Excel file via MultipartFile. The GraphQL mutation
-     * only accepts metadata fields; the file upload flows through the REST endpoint.
-     *
-     * Future implementation will:
-     * 1. Validate file extension (.xlsx, .xls)
-     * 2. Parse Excel workbook into rows
-     * 3. Validate column headers (classIds, weekday, period, time, subject, teachers)
-     * 4. Convert rows to CalendarBulkRowRequest entries
-     * 5. Delegate to the standard bulk create/preview pipeline
-     */
-    public record CalendarExcelImportRequest(
-            String tenantId,
-            String schoolId,
-            String academicYear,
-            String applyFrom,
-            int repeatWeeks,
-            String note,
-            boolean overrideConflicts,
-            String resolveMode,
-            byte[] fileData,
-            String fileName
     ) {}
 
     public enum CalendarResolveMode {

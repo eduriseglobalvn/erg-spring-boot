@@ -22,7 +22,8 @@ class GraphQlModuleAssemblyContractTest {
                 "35-learning-outcomes.graphqls",
                 "40-mutation-social.graphqls",
                 "45-school-operations-mutations.graphqls",
-                "50-calendar.graphqls");
+                "50-calendar.graphqls",
+                "55-class-log.graphqls");
         String assembled = files.stream()
                 .map(file -> read(MODULES.resolve(file)))
                 .reduce((left, right) -> left + "\n" + right)

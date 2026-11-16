@@ -99,9 +99,9 @@ class CalendarEventRepositoryTest {
     }
 
     @Test
-    void updateStatusBatchIsModifyingQuery() throws Exception {
+    void cancelByIdsIsModifyingQuery() throws Exception {
         Method method = CalendarEventRepository.class.getMethod(
-                "updateStatusBatch",
+                "cancelByIds",
                 String.class,
                 List.class,
                 String.class,
@@ -115,7 +115,7 @@ class CalendarEventRepositoryTest {
         assertThat(query).isNotNull();
         assertThat(query.value())
                 .contains("UPDATE CalendarEvent e")
-                .contains("SET e.status = :status")
+                .contains("SET e.status = 'CANCELLED', e.cancelReason = :reason")
                 .contains("e.tenantId = :tenantId")
                 .contains("e.updatedBy = :updatedBy")
                 .contains("e.updatedAt = :updatedAt")

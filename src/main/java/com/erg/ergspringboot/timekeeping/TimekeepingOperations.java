@@ -6,6 +6,10 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ApprovalPage;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.BulkApproveResult;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayImportCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayImportPreview;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayImportResult;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SaturdayModeView;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PeriodLockView;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyConfig;
@@ -34,6 +38,9 @@ import com.erg.ergspringboot.timekeeping.TimekeepingViews.PunchCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.PunchResult;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.TodayView;
 import com.erg.ergspringboot.timekeeping.internal.admin.ApprovalInboxService;
+import com.erg.ergspringboot.timekeeping.internal.admin.HolidayImportService;
+import com.erg.ergspringboot.timekeeping.internal.admin.HolidayService;
+import com.erg.ergspringboot.timekeeping.internal.admin.SaturdayModeService;
 import com.erg.ergspringboot.timekeeping.internal.admin.PeriodLockService;
 import com.erg.ergspringboot.timekeeping.internal.admin.PunchReviewService;
 import com.erg.ergspringboot.timekeeping.internal.admin.SiteShiftConfigService;
@@ -73,18 +80,24 @@ public class TimekeepingOperations {
     private final ApprovalService approvals;
     private final Clock clock;
     private final Admin admin;
+    private final DayOffs dayOffs;
 
     /** The admin (A01–A05) use cases, grouped so the facade constructor stays readable. */
     record Admin(TodayDashboardService today, TimesheetService timesheet, PeriodLockService locks,
             PunchReviewService reviews, SiteShiftConfigService sitesShifts, TimekeepingConfigService config,
             ApprovalInboxService inbox) {}
 
+    /** Days off and Saturday modes (B11). */
+    record DayOffs(HolidayService holidays, HolidayImportService imports, SaturdayModeService saturdays) {}
+
     TimekeepingOperations(PunchService punches, SelfViewService views, DayAggregationService days,
             FaceConsentService consents, ObjectProvider<LocalPrivateObjectStorage> localPhotos, RequestService requests,
             ApprovalService approvals, Clock clock, TodayDashboardService today, TimesheetService timesheet,
             PeriodLockService locks, PunchReviewService reviews, SiteShiftConfigService sitesShifts,
-            TimekeepingConfigService config, ApprovalInboxService inbox) {
+            TimekeepingConfigService config, ApprovalInboxService inbox, HolidayService holidays,
+            HolidayImportService imports, SaturdayModeService saturdays) {
         this.admin = new Admin(today, timesheet, locks, reviews, sitesShifts, config, inbox);
+        this.dayOffs = new DayOffs(holidays, imports, saturdays);
         this.punches = punches;
         this.views = views;
         this.days = days;
@@ -242,15 +255,36 @@ public class TimekeepingOperations {
     }
 
     public List<HolidayConfig> holidays(ErgPrincipal p, String schoolId, Integer year) {
-        return admin.config().holidays(p.tenantId(), schoolId, year);
+        return dayOffs.holidays().holidays(p.tenantId(), schoolId, year);
     }
 
-    public HolidayConfig createHoliday(ErgPrincipal p, HolidayCommand command) {
-        return admin.config().createHoliday(p.tenantId(), p.userId(), command);
+    public List<HolidayConfig> createHoliday(ErgPrincipal p, HolidayCommand command) {
+        return dayOffs.holidays().createHoliday(p.tenantId(), p.userId(), command);
+    }
+
+    public HolidayConfig updateHoliday(ErgPrincipal p, String id, HolidayCommand command) {
+        return dayOffs.holidays().updateHoliday(p.tenantId(), p.userId(), id, command);
     }
 
     public void deleteHoliday(ErgPrincipal p, String id) {
-        admin.config().deleteHoliday(p.tenantId(), p.userId(), id);
+        dayOffs.holidays().deleteHoliday(p.tenantId(), p.userId(), id);
+    }
+
+    /** @param file the uploaded .ics, or null to read the copy saved for the year */
+    public HolidayImportPreview holidayImportPreview(ErgPrincipal p, int year, byte[] file) {
+        return dayOffs.imports().preview(p.tenantId(), year, file);
+    }
+
+    public HolidayImportResult importHolidays(ErgPrincipal p, HolidayImportCommand command) {
+        return dayOffs.imports().importHolidays(p.tenantId(), p.userId(), command);
+    }
+
+    public List<SaturdayModeView> saturdayModes(ErgPrincipal p, String month) {
+        return dayOffs.saturdays().saturdayModes(p.tenantId(), month);
+    }
+
+    public SaturdayModeView setSaturdayMode(ErgPrincipal p, LocalDate date, SaturdayMode mode) {
+        return dayOffs.saturdays().setSaturdayMode(p.tenantId(), p.userId(), date, mode);
     }
 
     public List<RemoteRuleConfig> remoteRules(ErgPrincipal p, String schoolId) {

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
+import com.erg.ergspringboot.notifications.internal.ScheduleNotificationFixtures;
 import com.erg.ergspringboot.notifications.internal.NotificationDeviceService;
 import com.erg.ergspringboot.notifications.internal.NotificationOutboxWorker;
 import com.erg.ergspringboot.notifications.internal.NotificationService;
@@ -62,16 +63,15 @@ class CalendarPublishedScenarioTest {
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.ScheduledCampaignDispatchJob campaignJob;
 
     @Test
-    void publishedEventEventuallyEnqueuesOneIdempotentNotification(Scenario scenario) {
+    void publishedEventEventuallyEnqueuesOneIdempotentNotificationPerTeacher(Scenario scenario) {
         when(calendar.findPublishedBatch("tenant-1", "batch-1"))
-                .thenReturn(Optional.of(new CalendarPublishedBatchProjection.PublishedBatch(
-                        "batch-1", "school-1", 1, List.of("teacher-1"))));
+                .thenReturn(Optional.of(ScheduleNotificationFixtures.published()));
         CalendarBatchPublished event = new CalendarBatchPublished(
                 "schedule-published:batch-1", "tenant-1", "batch-1", "user-1", OffsetDateTime.now(), 1);
 
         scenario.publish(event)
                 .andWaitAtMost(Duration.ofSeconds(5))
-                .andWaitForStateChange(() -> mockingDetails(notifications).getInvocations().size(), count -> count == 1)
-                .andVerify(count -> assertThat(count).isEqualTo(1));
+                .andWaitForStateChange(() -> mockingDetails(notifications).getInvocations().size(), count -> count == 2)
+                .andVerify(count -> assertThat(count).isEqualTo(2));
     }
 }

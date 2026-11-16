@@ -77,6 +77,22 @@ public class GraphQlAccessSupport {
         throw new ForbiddenException("GraphQL education unit scope is not allowed for the authenticated principal.");
     }
 
+    /** Education units the principal manages, or {@code null} when it is not restricted to any. */
+    public List<String> restrictedEducationUnitIds(ErgPrincipal principal) {
+        if (isWildcardPrincipal(principal)) {
+            return null;
+        }
+        List<String> managed = AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.EDUCATION_UNIT);
+        return managed.contains("*") ? null : managed;
+    }
+
+    /**
+     * A class passes when it is in the principal's class scope, or its school (when the caller supplies it) is in the
+     * school scope. Design (KE_HOACH_LICH_DAY.md 2.4): the 2-week rule on finished periods only decides the
+     * schedule-derived access of teachers WITHOUT a standing scope (class lists, session unit scope), which is never
+     * part of the principal; a teacher with a standing school scope (access scope or SCHOOL role assignment) keeps
+     * the whole school, so a lapsed class of that school stays reachable on purpose.
+     */
     public void assertClassScope(ErgPrincipal principal, String classId, String schoolId) {
         if (isWildcardPrincipal(principal)) {
             return;

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.exception.ApiException;
+import com.erg.ergspringboot.timekeeping.HolidayKind;
+import com.erg.ergspringboot.timekeeping.HolidayPayMode;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.ReviewDecision;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayCommand;
@@ -30,6 +32,7 @@ class TimekeepingConfigServiceIT extends AdminITBase {
     private static final String T = "tk-config-it";
 
     @Autowired TimekeepingConfigService config;
+    @Autowired HolidayService holidays;
     @Autowired SiteShiftConfigService sitesShifts;
     @Autowired PunchReviewService reviews;
     @Autowired DayAggregationService aggregation;
@@ -143,14 +146,17 @@ class TimekeepingConfigServiceIT extends AdminITBase {
         jdbc.update("insert into tk_period_locks (id, tenant_id, school_id, period, locked_at, locked_by)"
                 + " values ('lock-cf', ?, ?, '2026-10', now(), 'admin')", T, f.school());
         LocalDate oct5 = LocalDate.of(2026, 10, 5);
-        assertConflict(() -> config.createHoliday(T, "admin", new HolidayCommand(f.school(), oct5, "Lễ")));
-        assertConflict(() -> config.createHoliday(T, "admin", new HolidayCommand(null, oct5, "Lễ"))); // tenant-wide
+        assertConflict(() -> holidays.createHoliday(T, "admin", holiday(oct5, "Lễ"))); // locked for one school = locked for all
 
         LocalDate tue = LocalDate.of(2026, 11, 10);
         day(T, f.school(), f.teacher(), tue, "ABSENT_UNPAID", "0", 0, null);
-        config.createHoliday(T, "admin", new HolidayCommand(null, tue, "Nghỉ bù"));
+        holidays.createHoliday(T, "admin", holiday(tue, "Nghỉ bù"));
         flush();
         assertThat(dayRow(tue).get("status")).isEqualTo("HOLIDAY");
+    }
+
+    private static HolidayCommand holiday(LocalDate date, String name) {
+        return new HolidayCommand(date, null, name, HolidayKind.COMPENSATORY, HolidayPayMode.PAID, null, null);
     }
 
     private Map<String, Object> dayRow(LocalDate date) {

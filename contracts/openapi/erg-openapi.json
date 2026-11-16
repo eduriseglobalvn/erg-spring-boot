@@ -2557,6 +2557,58 @@
         },
         "type": "object"
       },
+      "ApiResponseHolidayImportPreview": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HolidayImportPreview"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseHolidayImportResult": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HolidayImportResult"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseImportedAttemptResponse": {
         "properties": {
           "data": {
@@ -3313,6 +3365,35 @@
         },
         "type": "object"
       },
+      "ApiResponseListSaturdayModeView": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SaturdayModeView"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListShiftConfig": {
         "properties": {
           "data": {
@@ -3619,6 +3700,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/MonthView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseMyTeachingMonth": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MyTeachingMonth"
           },
           "errors": {},
           "message": {
@@ -4577,6 +4684,32 @@
         },
         "type": "object"
       },
+      "ApiResponseSaturdayModeView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SaturdayModeView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseSaveDraftResponse": {
         "properties": {
           "data": {
@@ -5023,6 +5156,110 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SyncRunResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingConfirmationView": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingConfirmationView"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingExport": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingExport"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingMonthSheet": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingMonthSheet"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseTeachingPeriodPage": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TeachingPeriodPage"
           },
           "errors": {},
           "message": {
@@ -6857,6 +7094,9 @@
       },
       "CalendarEventResponse": {
         "properties": {
+          "assistantName": {
+            "type": "string"
+          },
           "batchId": {
             "type": "string"
           },
@@ -6885,6 +7125,12 @@
             "type": "string"
           },
           "levelName": {
+            "type": "string"
+          },
+          "mainTeacherName": {
+            "type": "string"
+          },
+          "myRole": {
             "type": "string"
           },
           "note": {
@@ -6933,6 +7179,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6941,6 +7191,10 @@
         "properties": {
           "eventId": {
             "type": "string"
+          },
+          "expectedVersion": {
+            "format": "int32",
+            "type": "integer"
           },
           "note": {
             "type": "string"
@@ -7463,6 +7717,29 @@
         },
         "type": "object"
       },
+      "CancelledPeriod": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "periodCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodStart": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CertificateResponse": {
         "properties": {
           "certificateNumber": {
@@ -7707,6 +7984,23 @@
           },
           "tenantId": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfirmTeachingCommand": {
+        "properties": {
+          "assistantTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "expectedVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -9506,6 +9800,7 @@
               "MISSING_PUNCH",
               "ABSENT_UNPAID",
               "HOLIDAY",
+              "UNPAID_OFF",
               "OFF"
             ],
             "type": "string"
@@ -10372,14 +10667,41 @@
       },
       "HolidayCommand": {
         "properties": {
-          "date": {
+          "confirmPast": {
+            "type": "boolean"
+          },
+          "from": {
             "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
             "type": "string"
           },
           "name": {
             "type": "string"
           },
-          "schoolId": {
+          "payMode": {
+            "enum": [
+              "PAID",
+              "ANNUAL_LEAVE",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
+          "teachingAction": {
+            "enum": [
+              "CANCEL",
+              "KEEP"
+            ],
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
             "type": "string"
           }
         },
@@ -10387,6 +10709,17 @@
       },
       "HolidayConfig": {
         "properties": {
+          "affectedPeriods": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "affectedSchools": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "createdByName": {
+            "type": "string"
+          },
           "date": {
             "format": "date",
             "type": "string"
@@ -10394,10 +10727,124 @@
           "id": {
             "type": "string"
           },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
+            "type": "string"
+          },
           "name": {
             "type": "string"
           },
+          "payMode": {
+            "enum": [
+              "PAID",
+              "ANNUAL_LEAVE",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
           "schoolId": {
+            "type": "string"
+          },
+          "teachingAction": {
+            "enum": [
+              "CANCEL",
+              "KEEP"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportCommand": {
+        "properties": {
+          "confirmPast": {
+            "type": "boolean"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayImportRow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportPreview": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayImportPreviewRow"
+            },
+            "type": "array"
+          },
+          "savedOn": {
+            "format": "date",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportPreviewRow": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
+            "type": "string"
+          },
+          "lunarDate": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportResult": {
+        "properties": {
+          "imported": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "skipped": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "HolidayImportRow": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "STATE",
+              "COMPANY",
+              "COMPENSATORY"
+            ],
+            "type": "string"
+          },
+          "name": {
             "type": "string"
           }
         },
@@ -11256,6 +11703,35 @@
         },
         "type": "object"
       },
+      "MissingReport": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "periodCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodStart": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MonthContext": {
         "properties": {
           "approvedExplanations": {
@@ -11301,6 +11777,7 @@
               "MISSING_PUNCH",
               "ABSENT_UNPAID",
               "HOLIDAY",
+              "UNPAID_OFF",
               "OFF"
             ],
             "type": "string"
@@ -11353,6 +11830,66 @@
           },
           "standardUnits": {
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "MyTeachingMonth": {
+        "properties": {
+          "assistantRows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingRow"
+            },
+            "type": "array"
+          },
+          "assistantTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "cancelled": {
+            "items": {
+              "$ref": "#/components/schemas/CancelledPeriod"
+            },
+            "type": "array"
+          },
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmation": {
+            "$ref": "#/components/schemas/TeachingConfirmationView"
+          },
+          "deadline": {
+            "format": "date",
+            "type": "string"
+          },
+          "missingReports": {
+            "items": {
+              "$ref": "#/components/schemas/MissingReport"
+            },
+            "type": "array"
+          },
+          "month": {
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingRow"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingWeek"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -13097,6 +13634,14 @@
         },
         "type": "object"
       },
+      "ReportTeachingIssueCommand": {
+        "properties": {
+          "note": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RequestCommand": {
         "properties": {
           "explanationReason": {
@@ -13554,6 +14099,38 @@
         "required": [
           "expectedVersion"
         ],
+        "type": "object"
+      },
+      "SaturdayModeCommand": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "OFFICE",
+              "WFH",
+              "PAID_OFF",
+              "UNPAID_OFF"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SaturdayModeView": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "OFFICE",
+              "WFH",
+              "PAID_OFF",
+              "UNPAID_OFF"
+            ],
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "SaveAnswerRequest": {
@@ -14940,6 +15517,250 @@
           },
           "updatedAt": {
             "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingConfirmationView": {
+        "properties": {
+          "confirmedAssistantTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedTotal": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "issueNote": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingExport": {
+        "properties": {
+          "assistantMonths": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingMonthSheet"
+            },
+            "type": "array"
+          },
+          "assistantPeriods": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingPeriodRow"
+            },
+            "type": "array"
+          },
+          "mainMonths": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingMonthSheet"
+            },
+            "type": "array"
+          },
+          "mainPeriods": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingPeriodRow"
+            },
+            "type": "array"
+          },
+          "year": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingMonthRow": {
+        "properties": {
+          "classNames": {
+            "type": "string"
+          },
+          "confirmation": {
+            "$ref": "#/components/schemas/TeachingConfirmationView"
+          },
+          "note": {
+            "type": "string"
+          },
+          "schoolName": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "teacherId": {
+            "type": "string"
+          },
+          "teacherName": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weekTotals": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingMonthSheet": {
+        "properties": {
+          "closedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "confirmedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "month": {
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingMonthRow"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "teacherCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingWeek"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingPeriodPage": {
+        "properties": {
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TeachingPeriodRow"
+            },
+            "type": "array"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingPeriodRow": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "lessonContent": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "periodNo": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "schoolName": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "teacherName": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "weekday": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingRow": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string"
+          },
+          "schoolName": {
+            "type": "string"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "total": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "weekTotals": {
+            "items": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TeachingWeek": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "type": "string"
+          },
+          "index": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
             "type": "string"
           }
         },
@@ -18059,48 +18880,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCalendarEventPayload"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "calendar-rest-controller"
-        ]
-      }
-    },
-    "/api/v1/calendar/import-excel": {
-      "post": {
-        "operationId": "importExcel",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "properties": {
-                  "file": {
-                    "format": "binary",
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "file",
-                  "metadata"
-                ],
-                "type": "object"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCalendarPreviewPayload"
                 }
               }
             },
@@ -25971,7 +26750,83 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseHolidayConfig"
+                  "$ref": "#/components/schemas/ApiResponseListHolidayConfig"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/holidays/import": {
+      "post": {
+        "operationId": "importHolidays",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HolidayImportCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/holidays/import-preview": {
+      "post": {
+        "operationId": "holidayImportPreview",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayImportPreview"
                 }
               }
             },
@@ -25999,6 +26854,44 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      },
+      "put": {
+        "operationId": "updateHoliday",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HolidayCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseHolidayConfig"
+                }
+              }
+            },
+            "description": "OK"
           }
         },
         "tags": [
@@ -26343,6 +27236,77 @@
         ]
       }
     },
+    "/api/v1/timekeeping/admin/saturday-modes": {
+      "get": {
+        "operationId": "saturdayModes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSaturdayModeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/saturday-modes/{date}": {
+      "put": {
+        "operationId": "setSaturdayMode",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaturdayModeCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSaturdayModeView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-admin-controller"
+        ]
+      }
+    },
     "/api/v1/timekeeping/admin/shifts": {
       "get": {
         "operationId": "shifts",
@@ -26578,6 +27542,189 @@
         },
         "tags": [
           "timekeeping-admin-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/export": {
+      "get": {
+        "operationId": "teachingExport",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingExport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/months/{month}": {
+      "get": {
+        "operationId": "monthSheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "MAIN",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingMonthSheet"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/months/{month}/close": {
+      "post": {
+        "operationId": "close",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingMonthSheet"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/admin/teaching/periods": {
+      "get": {
+        "operationId": "periods",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "MAIN",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "teacherId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingPeriodPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
         ]
       }
     },
@@ -27129,6 +28276,165 @@
         },
         "tags": [
           "timekeeping-self-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}": {
+      "get": {
+        "operationId": "myMonth",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMyTeachingMonth"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}/confirm": {
+      "post": {
+        "operationId": "confirm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmTeachingCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingConfirmationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}/issue": {
+      "post": {
+        "operationId": "reportIssue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportTeachingIssueCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingConfirmationView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/me/teaching/{month}/periods": {
+      "get": {
+        "operationId": "myPeriods",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "MAIN",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTeachingPeriodPage"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-teaching-controller"
         ]
       }
     },

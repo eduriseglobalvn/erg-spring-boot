@@ -107,6 +107,20 @@ public interface ClassroomRepository extends JpaRepository<Classroom, String> {
                           and assignment.academicClassId = classroom.id
                           and assignment.assignedBy = :userId
                     )
+                    or exists (
+                        select 1
+                        from CalendarEvent event
+                        where event.tenantId = :tenantId
+                          and event.academicClassId = classroom.id
+                          and event.status = 'PUBLISHED'
+                          and event.endAt >= :#{T(com.erg.ergspringboot.lms.persistence.ScheduleAccessWindow).since()}
+                          and exists (
+                              select 1
+                              from CalendarEventTeacher link
+                              where link.eventId = event.id
+                                and link.teacherUserId = :userId
+                          )
+                    )
               )
             order by classroom.schoolId asc
             """)
@@ -131,6 +145,20 @@ public interface ClassroomRepository extends JpaRepository<Classroom, String> {
                         where assignment.tenantId = :tenantId
                           and assignment.academicClassId = classroom.id
                           and assignment.assignedBy = :teacherId
+                    )
+                    or exists (
+                        select 1
+                        from CalendarEvent event
+                        where event.tenantId = :tenantId
+                          and event.academicClassId = classroom.id
+                          and event.status = 'PUBLISHED'
+                          and event.endAt >= :#{T(com.erg.ergspringboot.lms.persistence.ScheduleAccessWindow).since()}
+                          and exists (
+                              select 1
+                              from CalendarEventTeacher link
+                              where link.eventId = event.id
+                                and link.teacherUserId = :teacherId
+                          )
                     )
               )
             order by classroom.name asc

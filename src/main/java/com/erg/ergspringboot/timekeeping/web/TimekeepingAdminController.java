@@ -6,6 +6,11 @@ import static com.erg.ergspringboot.timekeeping.web.TimekeepingSelfController.pr
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayConfig;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayImportCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayImportPreview;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayImportResult;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SaturdayModeCommand;
+import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SaturdayModeView;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PeriodLockCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PeriodLockView;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyCommand;
@@ -38,6 +43,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -171,20 +178,59 @@ public class TimekeepingAdminController {
         return ok("Policy scheduled", timekeeping.savePolicy(principal(), schoolId, command), request);
     }
 
-    @GetMapping("/holidays")
+    @GetMapping(TimekeepingPaths.HOLIDAYS)
     @TimekeepingManage
     public ApiResponse<List<HolidayConfig>> holidays(@RequestParam(required = false) String schoolId,
             @RequestParam(required = false) Integer year, HttpServletRequest request) {
         return ok("Holidays loaded", timekeeping.holidays(principal(), schoolId, year), request);
     }
 
-    @PostMapping("/holidays")
+    @PostMapping(TimekeepingPaths.HOLIDAYS)
     @TimekeepingManage
-    public ApiResponse<HolidayConfig> createHoliday(@RequestBody HolidayCommand command, HttpServletRequest request) {
-        return ok("Holiday created", timekeeping.createHoliday(principal(), command), request);
+    public ApiResponse<List<HolidayConfig>> createHoliday(@RequestBody HolidayCommand command, HttpServletRequest request) {
+        return ok("Holidays created", timekeeping.createHoliday(principal(), command), request);
     }
 
-    @DeleteMapping("/holidays/{id}")
+    @PutMapping(TimekeepingPaths.HOLIDAY_BY_ID)
+    @TimekeepingManage
+    public ApiResponse<HolidayConfig> updateHoliday(@PathVariable String id, @RequestBody HolidayCommand command,
+            HttpServletRequest request) {
+        return ok("Holiday updated", timekeeping.updateHoliday(principal(), id, command), request);
+    }
+
+    /** The year's holidays from the uploaded .ics, or from the copy saved with the application when no file is sent. */
+    @PostMapping(value = TimekeepingPaths.HOLIDAY_IMPORT_PREVIEW, consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @TimekeepingManage
+    public ApiResponse<HolidayImportPreview> holidayImportPreview(@RequestParam int year,
+            @RequestPart(name = "file", required = false) MultipartFile file, HttpServletRequest request)
+            throws java.io.IOException {
+        byte[] bytes = file == null || file.isEmpty() ? null : file.getBytes();
+        return ok("Holiday import previewed", timekeeping.holidayImportPreview(principal(), year, bytes), request);
+    }
+
+    @PostMapping(TimekeepingPaths.HOLIDAY_IMPORT)
+    @TimekeepingManage
+    public ApiResponse<HolidayImportResult> importHolidays(@RequestBody HolidayImportCommand command,
+            HttpServletRequest request) {
+        return ok("Holidays imported", timekeeping.importHolidays(principal(), command), request);
+    }
+
+    @GetMapping(TimekeepingPaths.SATURDAY_MODES)
+    @TimekeepingManage
+    public ApiResponse<List<SaturdayModeView>> saturdayModes(@RequestParam String month, HttpServletRequest request) {
+        return ok("Saturday modes loaded", timekeeping.saturdayModes(principal(), month), request);
+    }
+
+    @PutMapping(TimekeepingPaths.SATURDAY_MODE_BY_DATE)
+    @TimekeepingManage
+    public ApiResponse<SaturdayModeView> setSaturdayMode(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestBody SaturdayModeCommand command, HttpServletRequest request) {
+        return ok("Saturday mode saved", timekeeping.setSaturdayMode(principal(), date,
+                command == null ? null : command.mode()), request);
+    }
+
+    @DeleteMapping(TimekeepingPaths.HOLIDAY_BY_ID)
     @TimekeepingManage
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteHoliday(@PathVariable String id) {

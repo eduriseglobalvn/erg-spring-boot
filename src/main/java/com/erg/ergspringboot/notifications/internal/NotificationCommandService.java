@@ -101,7 +101,7 @@ public class NotificationCommandService {
         message.setChannel("push");
         message.setVisibility("private");
         message.setDedupeKey(dedupeKey);
-        message.setCreatedBy(trimToNull(command.createdBy()));
+        message.setCreatedBy(actorOrNull(command.createdBy()));
         message.setPayloadData(command.data() == null ? Map.of() : command.data());
         NotificationMessageEntity savedMessage = messageRepository.saveAndFlush(message);
 
@@ -200,7 +200,7 @@ public class NotificationCommandService {
             message.setPriority(delivery.priority().name());
             message.setChannel(delivery.pushEnabled() ? "push" : "inbox");
             message.setVisibility("private");
-            message.setCreatedBy(trimToNull(delivery.createdBy()));
+            message.setCreatedBy(actorOrNull(delivery.createdBy()));
             message.setPayloadData(data);
             messages.put(userId, message);
         }
@@ -378,5 +378,11 @@ public class NotificationCommandService {
 
     private String sanitize(String value) {
         return firstText(value, "unknown").toLowerCase().replaceAll("[^a-z0-9_\\-]", "_");
+    }
+
+    /** "system" marks a job, not a users row; created_by is a nullable FK to users. */
+    private String actorOrNull(String actor) {
+        String trimmed = trimToNull(actor);
+        return "system".equals(trimmed) ? null : trimmed;
     }
 }

@@ -26,13 +26,16 @@ class CalendarAuthorizationPolicyContractTest {
 
         assertThat(rest)
                 .contains("@CalendarRead", "@CalendarCreate", "@CalendarUpdate",
-                        "@CalendarDelete", "@CalendarPublish", "@CalendarImport")
+                        "@CalendarDelete", "@CalendarPublish")
                 .doesNotContain("assertPermission(", "private boolean isAllowed(");
         assertThat(lcmsQuery).contains("@CalendarRead");
         assertThat(lmsQuery).contains("@CalendarSelfRead");
         assertThat(mutation)
-                .contains("@CalendarCreate", "@CalendarUpdate", "@CalendarDelete",
-                        "@CalendarPublish", "@CalendarImport");
+                .contains("@CalendarCreate", "@CalendarUpdate", "@CalendarDelete");
+        // publish / cancel / rename of batches moved with the versioned lifecycle mutations
+        assertThat(Files.readString(Path.of(
+                "src/main/java/com/erg/ergspringboot/calendar/internal/graphql/TeachingScheduleGraphQlController.java")))
+                .contains("@CalendarPublish", "@CalendarDelete", "@CalendarUpdate");
     }
 
     @Test
@@ -44,7 +47,6 @@ class CalendarAuthorizationPolicyContractTest {
         assertPolicy("CalendarUpdate", "lms.schedule.update", "lms.schedule.manage", "lms.manage");
         assertPolicy("CalendarDelete", "lms.schedule.delete", "lms.schedule.manage", "lms.manage");
         assertPolicy("CalendarPublish", "lms.schedule.publish", "lms.schedule.manage", "lms.manage");
-        assertPolicy("CalendarImport", "lms.schedule.import", "lms.schedule.manage", "lms.manage");
     }
 
     @Test

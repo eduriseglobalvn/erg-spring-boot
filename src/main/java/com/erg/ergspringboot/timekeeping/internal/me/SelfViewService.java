@@ -23,8 +23,6 @@ import com.erg.ergspringboot.timekeeping.internal.rules.ExplanationSuggester;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
-import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
-import com.erg.ergspringboot.timekeeping.persistence.TkHolidayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunch;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
@@ -43,7 +41,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -61,7 +58,6 @@ public class SelfViewService {
     private final TkPunchRepository punches;
     private final TkDayRepository days;
     private final TkSiteRepository sites;
-    private final TkHolidayRepository holidays;
     private final TkRequestRepository requests;
     private final FaceConsentService consents;
     private final PunchPhotoService photos;
@@ -70,13 +66,12 @@ public class SelfViewService {
     private final Clock clock;
 
     SelfViewService(WorkContextResolver context, TkPunchRepository punches, TkDayRepository days, TkSiteRepository sites,
-            TkHolidayRepository holidays, TkRequestRepository requests, FaceConsentService consents,
+            TkRequestRepository requests, FaceConsentService consents,
             PunchPhotoService photos, CalendarReadPort calendar, LeaveBalanceService leaveBalance, Clock clock) {
         this.context = context;
         this.punches = punches;
         this.days = days;
         this.sites = sites;
-        this.holidays = holidays;
         this.requests = requests;
         this.consents = consents;
         this.photos = photos;
@@ -168,14 +163,11 @@ public class SelfViewService {
                 day.map(TkDay::getLeaveKind).orElse(null));
     }
 
-    /** Working days of the month (shift weekdays minus holidays) times the shift's units. */
+    /** Working days of the month (every shift weekday; a paid day off counts) times the shift's units. */
     private BigDecimal standardUnits(String tenantId, String schoolId, LocalDate from, LocalDate to) {
-        Set<LocalDate> off = holidays.findForSchool(tenantId, schoolId, from, to).stream()
-                .map(TkHoliday::getHolidayDate).collect(Collectors.toSet());
         List<TkShift> schoolShifts = context.shiftsOf(tenantId, schoolId);
         BigDecimal total = BigDecimal.ZERO;
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
-            if (off.contains(d)) continue;
             Optional<TkShift> shift = WorkContextResolver.shiftOn(schoolShifts, d);
             if (shift.isPresent()) total = total.add(shift.get().getWorkUnits());
         }

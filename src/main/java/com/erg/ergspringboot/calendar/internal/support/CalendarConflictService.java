@@ -1,10 +1,8 @@
 package com.erg.ergspringboot.calendar.internal.support;
 
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
-import com.erg.ergspringboot.calendar.persistence.CalendarConflict;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
-import com.erg.ergspringboot.calendar.persistence.CalendarConflictRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import java.time.OffsetDateTime;
@@ -18,21 +16,22 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Legacy conflict check kept for the bulk preview/create flow of the old schedule dialog. New code uses
+ * {@link ScheduleConflictEngine}; remove this class together with the old flow (F4/B10).
+ */
+@Deprecated
 @Service
 public class CalendarConflictService {
 
     private final CalendarEventRepository eventRepository;
     private final CalendarEventTeacherRepository eventTeacherRepository;
-    private final CalendarConflictRepository conflictRepository;
 
     public CalendarConflictService(CalendarEventRepository eventRepository,
-                                    CalendarEventTeacherRepository eventTeacherRepository,
-                                    CalendarConflictRepository conflictRepository) {
+                                    CalendarEventTeacherRepository eventTeacherRepository) {
         this.eventRepository = eventRepository;
         this.eventTeacherRepository = eventTeacherRepository;
-        this.conflictRepository = conflictRepository;
     }
 
     public record ResolveResult(
@@ -139,7 +138,7 @@ public class CalendarConflictService {
                     if (Objects.equals(existing.getId(), eventId) || !isOverlapping(event, existing)) continue;
                     conflicts.add(new CalendarConflictResponse(
                             "CLASS_TIME_CONFLICT", "ERROR", clientRowId, existing.getId(),
-                            "Lop hoc da co lich trung gio: " + event.getAcademicClassId()));
+                            "Lớp học đã có lịch trùng giờ: " + event.getAcademicClassId()));
                 }
 
                 for (String teacherId : eventTeacherMap.getOrDefault(eventId, List.of())) {
@@ -149,7 +148,7 @@ public class CalendarConflictService {
                                 && isOverlapping(event, conflictEvent)) {
                             conflicts.add(new CalendarConflictResponse(
                                     "TEACHER_TIME_CONFLICT", "ERROR", clientRowId,
-                                    conflictEvent.getId(), "Giao vien da co lich trung gio"));
+                                    conflictEvent.getId(), "Giáo viên đã có lịch trùng giờ"));
                         }
                     }
                 }
@@ -163,7 +162,7 @@ public class CalendarConflictService {
                                 && isOverlapping(event, existing)) {
                             conflicts.add(new CalendarConflictResponse(
                                     "ROOM_TIME_CONFLICT", "WARNING", clientRowId, existing.getId(),
-                                    "Phong hoc da co lich su dung: " + event.getRoomName()));
+                                    "Phòng học đã có lịch sử dụng: " + event.getRoomName()));
                         }
                     }
                 }
@@ -175,7 +174,7 @@ public class CalendarConflictService {
                 .collect(Collectors.groupingBy(CalendarEvent::getAcademicClassId))
                 .values()) {
             addPairwiseConflicts(classEvents, conflicts, clientRowIdByEventId, "CLASS_TIME_CONFLICT", "ERROR",
-                    "Lop hoc co lich trung nhau trong danh sach");
+                    "Lớp học có lịch trùng nhau trong danh sách");
         }
 
         for (List<CalendarEvent> roomEvents : candidateEvents.stream()
@@ -183,7 +182,7 @@ public class CalendarConflictService {
                 .collect(Collectors.groupingBy(CalendarConflictService::roomKey))
                 .values()) {
             addPairwiseConflicts(roomEvents, conflicts, clientRowIdByEventId, "ROOM_TIME_CONFLICT", "WARNING",
-                    "Phong hoc co lich trung nhau trong danh sach");
+                    "Phòng học có lịch trùng nhau trong danh sách");
         }
 
         for (Map.Entry<String, Set<String>> entry : teacherEventIds.entrySet()) {
@@ -192,7 +191,7 @@ public class CalendarConflictService {
                     .filter(Objects::nonNull)
                     .toList();
             addPairwiseConflicts(teacherEvents, conflicts, clientRowIdByEventId, "TEACHER_TIME_CONFLICT", "ERROR",
-                    "Giao vien co lich trung nhau trong danh sach");
+                    "Giáo viên có lịch trùng nhau trong danh sách");
         }
 
         Map<ConflictKey, CalendarConflictResponse> unique = new LinkedHashMap<>();
@@ -267,7 +266,9 @@ public class CalendarConflictService {
 
             CalendarEvent existingEvent = existingEventsById.get(existingEventId);
             if (existingEvent == null) continue;
-            if (managedSchoolIds != null && !managedSchoolIds.contains(existingEvent.getSchoolId())) continue;
+            // "*" is the tenant-wide scope AccessScopeAssembler returns for super admin
+            if (managedSchoolIds != null && !managedSchoolIds.contains("*")
+                    && !managedSchoolIds.contains(existingEvent.getSchoolId())) continue;
 
             eventIdsToDelete.add(existingEventId);
             resolvedConflicts.add(conflict);
@@ -284,45 +285,4 @@ public class CalendarConflictService {
         return a.getStartAt().isBefore(b.getEndAt()) && a.getEndAt().isAfter(b.getStartAt());
     }
 
-    @Transactional("postgresTransactionManager")
-    public List<CalendarConflictResponse> persistConflicts(String tenantId, String batchId,
-                                                            List<CalendarConflictResponse> conflicts) {
-        if (conflicts == null || conflicts.isEmpty()) {
-            return conflicts;
-        }
-
-        List<CalendarConflict> entities = conflicts.stream().map(c -> {
-            CalendarConflict entity = new CalendarConflict();
-            entity.setTenantId(tenantId);
-            entity.setBatchId(batchId);
-            entity.setEventId(c.clientRowId());
-            entity.setConflictingEventId(c.existingEventId());
-            entity.setConflictType(c.code());
-            entity.setSeverity(c.severity());
-            entity.setMessage(c.message());
-            entity.setClientRowId(c.clientRowId());
-            entity.setResolved(false);
-            return entity;
-        }).collect(Collectors.toList());
-
-        conflictRepository.saveAll(entities);
-
-        return conflicts;
-    }
-
-    @Transactional("postgresTransactionManager")
-    public void markConflictsResolved(String tenantId, String batchId, String resolvedBy) {
-        List<CalendarConflict> unresolved = conflictRepository.findByTenantIdAndBatchIdAndResolved(
-                tenantId, batchId, false);
-        if (unresolved.isEmpty()) {
-            return;
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        for (CalendarConflict conflict : unresolved) {
-            conflict.setResolved(true);
-            conflict.setResolvedBy(resolvedBy);
-            conflict.setResolvedAt(now);
-        }
-        conflictRepository.saveAll(unresolved);
-    }
 }

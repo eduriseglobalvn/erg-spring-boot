@@ -31,10 +31,20 @@ type Mutation {
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
   deleteTeachingScheduleEvent(input: TeachingScheduleEventDeleteInput!): TeachingScheduleDeletePayload!
   deleteTeacherSchedule(input: DeleteTeacherScheduleInput!): TeachingScheduleDeletePayload!
-  publishTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
-  cancelTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
+  saveTeachingScheduleDraft(input: SaveTeachingScheduleDraftInput!): TeachingScheduleDraftResult!
+  publishTeachingScheduleBatch(batchId: ID!, expectedVersion: Int!): TeachingScheduleBatch!
+  cancelTeachingScheduleBatch(batchId: ID!, expectedVersion: Int!): TeachingScheduleBatch!
+  renameTeachingScheduleBatch(batchId: ID!, label: String!, expectedVersion: Int!): TeachingScheduleBatch!
+  updateTeachingScheduleLoadSettings(loadWarn: Int!, loadMax: Int!): TeachingScheduleLoadSettings!
+  reuseTeachingScheduleWeek(input: TeachingScheduleReuseInput!): TeachingScheduleDraftResult!
+  editTeachingScheduleSlot(input: EditTeachingScheduleSlotInput!): TeachingScheduleSlotChangeResult!
+  swapTeachingScheduleTeacher(input: SwapTeachingScheduleTeacherInput!): TeachingScheduleSlotChangeResult!
+  saveTeachingPeriodTemplate(input: SaveTeachingPeriodTemplateInput!): TeachingPeriodTemplate!
+  assignSchoolPeriodTemplate(schoolId: ID!, templateId: ID!, effectiveFrom: Date!): SchoolPeriodAssignment!
+  saveSchoolPeriodTimes(input: SaveSchoolPeriodTimesInput!): SchoolPeriodAssignment!
+  upsertSchoolTravelTime(schoolAId: ID!, schoolBId: ID!, minutes: Int!): SchoolTravelTime!
+  deleteSchoolTravelTime(schoolAId: ID!, schoolBId: ID!): Boolean!
   createRoom(input: CreateRoomInput!): TeachingScheduleRoomOption!
-  importTeachingScheduleFromExcel(input: TeachingScheduleExcelImportInput!): TeachingSchedulePreviewPayload!
 }
 
 input AttendanceWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String!, from: String, to: String }

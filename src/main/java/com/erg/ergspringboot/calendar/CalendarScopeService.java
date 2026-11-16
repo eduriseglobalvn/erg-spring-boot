@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.calendar;
 
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.exception.TeachingScheduleException;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
@@ -64,7 +65,7 @@ public class CalendarScopeService {
      */
     public CalendarEvent requireEvent(ErgPrincipal principal, String tenantId, String eventId) {
         CalendarEvent event = eventRepository.findByTenantIdAndId(tenantId, eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found: " + eventId));
+                .orElseThrow(() -> TeachingScheduleException.notFound("Event not found: " + eventId));
         accessSupport.assertEducationUnitScope(principal, event.getSchoolId());
         return event;
     }
@@ -75,7 +76,7 @@ public class CalendarScopeService {
      */
     public CalendarBatch requireBatch(ErgPrincipal principal, String tenantId, String batchId) {
         CalendarBatch batch = batchRepository.findByTenantIdAndId(tenantId, batchId)
-                .orElseThrow(() -> new IllegalArgumentException("Batch not found: " + batchId));
+                .orElseThrow(() -> TeachingScheduleException.notFound("Batch not found: " + batchId));
         accessSupport.assertEducationUnitScope(principal, batch.getSchoolId());
         return batch;
     }

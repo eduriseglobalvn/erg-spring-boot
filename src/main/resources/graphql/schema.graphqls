@@ -32,6 +32,17 @@ type LcmsQuery {
   teachingCalendarWorkspace(input: TeachingCalendarWorkspaceInput!): TeachingCalendarWorkspace!
   teachingScheduleBatches(input: TeachingScheduleBatchListInput): TeachingScheduleBatchPage!
   teachingScheduleBatch(input: TeachingScheduleBatchDetailInput!): TeachingScheduleBatchDetail!
+  teachingPeriodTemplates: [TeachingPeriodTemplate!]!
+  schoolPeriodAssignments(schoolIds: [ID!]): [SchoolPeriodAssignment!]!
+  teachingScheduleSlotOptions(schoolId: ID!, batchId: ID, date: Date!, periodNo: Int!, classId: ID, excludeEventId: ID): TeachingSlotOptions!
+  teachingScheduleDraft(batchId: ID!): TeachingScheduleDraftResult!
+  previewTeachingScheduleReuse(input: TeachingScheduleReuseInput!): TeachingScheduleReusePreview!
+  teachingScheduleOverviewSchools(weekStart: Date!, search: String, quick: String, page: Int!, size: Int!): TeachingOverviewSchoolPage!
+  teachingScheduleOverviewGrid(weekStart: Date!, schoolIds: [ID!]!): TeachingOverviewGrid!
+  teachingScheduleOverviewTeachers(weekStart: Date!, search: String, quick: String, sort: String, page: Int!, size: Int!): TeachingOverviewTeacherPage!
+  teachingScheduleLoadSettings: TeachingScheduleLoadSettings!
+  teachingScheduleDayLoads(from: Date!, to: Date!): [TeachingDayLoad!]!
+  schoolTravelTimes(search: String, page: Int!, size: Int!): [SchoolTravelTime!]!
   quizWorkspace(input: QuizWorkspaceInput): QuizWorkspace!
   quizDraft(quizId: String!): QuizDraftDocument!
   quizVersions(quizId: String!): QuizVersionHistory!
@@ -1058,10 +1069,20 @@ type Mutation {
   updateTeachingScheduleEvent(input: TeachingScheduleEventUpdateInput!): TeachingScheduleEventPayload!
   deleteTeachingScheduleEvent(input: TeachingScheduleEventDeleteInput!): TeachingScheduleDeletePayload!
   deleteTeacherSchedule(input: DeleteTeacherScheduleInput!): TeachingScheduleDeletePayload!
-  publishTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
-  cancelTeachingScheduleBatch(batchId: String!): TeachingScheduleBatchPayload!
+  saveTeachingScheduleDraft(input: SaveTeachingScheduleDraftInput!): TeachingScheduleDraftResult!
+  publishTeachingScheduleBatch(batchId: ID!, expectedVersion: Int!): TeachingScheduleBatch!
+  cancelTeachingScheduleBatch(batchId: ID!, expectedVersion: Int!): TeachingScheduleBatch!
+  renameTeachingScheduleBatch(batchId: ID!, label: String!, expectedVersion: Int!): TeachingScheduleBatch!
+  updateTeachingScheduleLoadSettings(loadWarn: Int!, loadMax: Int!): TeachingScheduleLoadSettings!
+  reuseTeachingScheduleWeek(input: TeachingScheduleReuseInput!): TeachingScheduleDraftResult!
+  editTeachingScheduleSlot(input: EditTeachingScheduleSlotInput!): TeachingScheduleSlotChangeResult!
+  swapTeachingScheduleTeacher(input: SwapTeachingScheduleTeacherInput!): TeachingScheduleSlotChangeResult!
+  saveTeachingPeriodTemplate(input: SaveTeachingPeriodTemplateInput!): TeachingPeriodTemplate!
+  assignSchoolPeriodTemplate(schoolId: ID!, templateId: ID!, effectiveFrom: Date!): SchoolPeriodAssignment!
+  saveSchoolPeriodTimes(input: SaveSchoolPeriodTimesInput!): SchoolPeriodAssignment!
+  upsertSchoolTravelTime(schoolAId: ID!, schoolBId: ID!, minutes: Int!): SchoolTravelTime!
+  deleteSchoolTravelTime(schoolAId: ID!, schoolBId: ID!): Boolean!
   createRoom(input: CreateRoomInput!): TeachingScheduleRoomOption!
-  importTeachingScheduleFromExcel(input: TeachingScheduleExcelImportInput!): TeachingSchedulePreviewPayload!
 }
 
 input AttendanceWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String!, from: String, to: String }
@@ -1286,17 +1307,16 @@ input MyTeachingCalendarInput { tenantId: String, from: String!, to: String!, vi
 input MyStudentCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
 input TeachingScheduleBulkInput { tenantId: String, idempotencyKey: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode, rows: [TeachingScheduleBulkRowInput!]! }
 input TeachingScheduleBulkRowInput { clientRowId: String!, classIds: [String!]!, weekday: Int!, session: String, periodStart: Int!, periodCount: Int!, startTime: String!, endTime: String!, subjectId: String!, levelId: String, roomId: String, roomName: String, mainTeacherIds: [String!]!, assistantTeacherIds: [String!], note: String }
-input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String }
+input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String, expectedVersion: Int }
 input TeachingScheduleEventDeleteInput { tenantId: String, eventId: String! }
 input DeleteTeacherScheduleInput { tenantId: String, teacherUserId: String!, schoolIds: [String!], dateFrom: String, dateTo: String }
 input CreateRoomInput { tenantId: String, schoolId: String!, roomName: String! }
-input TeachingScheduleExcelImportInput { tenantId: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode }
 input TeachingScheduleBatchListInput { tenantId: String, schoolId: String, status: TeachingScheduleStatus, page: Int, size: Int }
 input TeachingScheduleBatchDetailInput { tenantId: String, batchId: String! }
 enum TeachingScheduleResolveMode { REJECT DELETE_CONFLICTING }
 
 type TeachingCalendarWorkspace { tenantId: String!, from: String!, to: String!, viewMode: TeachingCalendarViewMode!, events: [TeachingCalendarEvent!]!, filterOptions: TeachingCalendarFilterOptions!, laneSummaries: [TeachingCalendarLaneSummary!]!, catalog: TeachingScheduleCatalog!, permissions: TeachingCalendarPermissions!, generatedAt: String! }
-type TeachingCalendarEvent { id: String!, batchId: String, title: String!, startAt: String!, endAt: String!, date: String!, startTime: String!, endTime: String!, schoolId: String!, schoolName: String!, classId: String!, className: String!, subjectId: String, subjectName: String, levelId: String, levelName: String, roomId: String, roomName: String, periodStart: Int!, periodCount: Int!, teachers: [TeachingScheduleTeacherAssignment!]!, status: TeachingScheduleStatus!, note: String, colorGroup: TeachingCalendarColorGroup! }
+type TeachingCalendarEvent { id: String!, batchId: String, title: String!, startAt: String!, endAt: String!, date: String!, startTime: String!, endTime: String!, schoolId: String!, schoolName: String!, classId: String!, className: String!, subjectId: String, subjectName: String, levelId: String, levelName: String, roomId: String, roomName: String, periodStart: Int!, periodCount: Int!, teachers: [TeachingScheduleTeacherAssignment!]!, status: TeachingScheduleStatus!, note: String, colorGroup: TeachingCalendarColorGroup!, myRole: TeachingScheduleRole!, mainTeacherName: String, assistantName: String, version: Int! }
 type TeachingScheduleTeacherAssignment { userId: String!, displayName: String!, role: TeachingScheduleTeacherRole!, colorKey: String }
 type TeachingCalendarFilterOptions { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarFilterOption!]!, teachers: [TeachingCalendarFilterOption!]!, subjects: [TeachingCalendarFilterOption!]!, levels: [TeachingCalendarFilterOption!]! }
 type TeachingCalendarFilterOption { id: String!, label: String!, count: Int!, colorKey: String }
@@ -1321,3 +1341,321 @@ type TeachingScheduleBatchDetail { id: String!, tenantId: String!, schoolId: Str
 type TeachingScheduleRowResult { clientRowId: String!, valid: Boolean!, eventCount: Int!, teacherScheduleCount: Int!, errors: [TeachingScheduleRowMessage!]!, warnings: [TeachingScheduleRowMessage!]! }
 type TeachingScheduleRowMessage { code: String!, field: String, message: String! }
 type TeachingScheduleConflict { code: String!, severity: String!, clientRowId: String, existingEventId: String, message: String! }
+
+# --- Lich day v2 (KE_HOACH_LICH_DAY.md muc 4.2). Date = yyyy-MM-dd, DateTime = ISO-8601 offset date-time. ---
+scalar Date
+scalar DateTime
+
+enum TeachingScheduleConflictKind { TEACHER_TIME CLASS_TIME ROOM_TIME TRAVEL_TIME TEACHER_ON_LEAVE }
+enum TeachingScheduleSeverity { ERROR WARNING }
+enum TeachingSession { MORNING AFTERNOON EVENING }
+enum TeachingScheduleFixKind { CHANGE_TEACHER CHANGE_ROOM CHANGE_PREVIOUS_TEACHER }
+enum TeachingAccessState { EXISTING NEW REVOKE }
+enum TeachingSlotOptionState { SUGGESTED FREE BUSY TRAVEL LEAVE }
+enum TeachingScheduleRole { MAIN ASSISTANT }
+
+type TeachingScheduleBatch { id: ID!, schoolId: ID!, label: String!, status: TeachingScheduleStatus!, version: Int!, periodTemplateId: ID, applyFrom: Date, repeatWeeks: Int, publishedAt: DateTime, affectedEventCount: Int! }
+
+type TeachingPeriodSlot { periodNo: Int!, session: TeachingSession!, startTime: String, endTime: String }
+type TeachingPeriodTemplate { id: ID!, name: String!, periodsPerDay: Int!, slots: [TeachingPeriodSlot!]! }
+enum TeachingScheduleChangeScopeKind { THIS_ONLY FROM_DATE_TO_END SELECTED_DATES }
+enum TeachingScheduleSwapReason { TIME_CONFLICT TEACHER_ON_LEAVE REASSIGNMENT }
+# THIS_ONLY: the period eventId. FROM_DATE_TO_END: the weekly repeats of that period from its date to the batch end. SELECTED_DATES: the repeats on dates.
+input TeachingScheduleChangeScopeInput { kind: TeachingScheduleChangeScopeKind!, dates: [Date!] }
+# Patch of a PUBLISHED period: null = unchanged. newDate needs scope THIS_ONLY. dryRun reports conflicts and affected periods without writing.
+input EditTeachingScheduleSlotInput {
+  eventId: ID!
+  expectedVersion: Int
+  scope: TeachingScheduleChangeScopeInput!
+  dryRun: Boolean
+  periodNo: Int
+  newDate: Date
+  roomId: ID
+  subjectId: ID
+  assistantId: ID
+  removeAssistant: Boolean
+  reason: String
+}
+input SwapTeachingScheduleTeacherInput {
+  eventId: ID!
+  expectedVersion: Int
+  scope: TeachingScheduleChangeScopeInput!
+  newTeacherId: ID!
+  reason: TeachingScheduleSwapReason
+  note: String
+  dryRun: Boolean
+}
+type TeachingScheduleChangedEvent { eventId: ID!, date: Date!, periodNo: Int!, version: Int }
+type TeachingScheduleSlotChangeResult {
+  applied: Boolean!
+  blocking: Boolean!
+  affectedCount: Int!
+  events: [TeachingScheduleChangedEvent!]!
+  conflicts: [TeachingScheduleConflictDetail!]!
+}
+# One dated table of a school ("Áp dụng từ 01/11/2026"); effectiveFrom is null for the table that predates dating.
+type SchoolPeriodAssignment { schoolId: ID!, schoolName: String!, templateId: ID!, templateName: String!, effectiveFrom: Date, current: Boolean! }
+input TeachingPeriodSlotInput { periodNo: Int!, session: TeachingSession!, startTime: String, endTime: String }
+input SaveTeachingPeriodTemplateInput { id: ID, name: String!, slots: [TeachingPeriodSlotInput!]! }
+input SaveSchoolPeriodTimesInput { schoolId: ID!, effectiveFrom: Date!, name: String!, slots: [TeachingPeriodSlotInput!]! }
+
+type TeachingScheduleSide {
+  eventId: ID
+  teacherId: ID
+  teacherName: String
+  classId: ID
+  className: String
+  roomId: ID
+  roomName: String
+  schoolId: ID!
+  schoolName: String!
+  schoolShortName: String!
+  subjectName: String
+  batchId: ID
+  batchLabel: String
+  batchStatus: String
+  createdByName: String
+  createdByRole: String
+  createdAt: DateTime
+  periodNo: Int
+  startTime: String
+  endTime: String
+}
+type TeachingScheduleTravelGap {
+  fromSchoolId: ID!
+  fromSchoolShortName: String!
+  fromSchoolName: String!
+  toSchoolId: ID!
+  toSchoolShortName: String!
+  toSchoolName: String!
+  previousEndTime: String!
+  gapMinutes: Int!
+  requiredMinutes: Int!
+}
+type TeachingScheduleFixSuggestion {
+  kind: TeachingScheduleFixKind!
+  targetEventId: ID
+  targetClientRowId: String
+  targetClassName: String
+  teacherId: ID
+  teacherName: String
+  roomId: ID
+  roomName: String
+  reason: String!
+}
+type TeachingScheduleLeaveInfo { fromDate: Date!, toDate: Date!, part: String! }
+type TeachingScheduleConflictDetail {
+  id: ID!
+  kind: TeachingScheduleConflictKind!
+  severity: TeachingScheduleSeverity!
+  clientRowId: String
+  weekday: Int!
+  periodNo: Int!
+  startTime: String
+  endTime: String
+  firstDate: Date!
+  affectedWeeks: Int!
+  totalWeeks: Int!
+  mine: TeachingScheduleSide!
+  other: TeachingScheduleSide
+  travel: TeachingScheduleTravelGap
+  leave: TeachingScheduleLeaveInfo
+  fix: TeachingScheduleFixSuggestion
+  message: String!
+}
+
+type TeachingAccessClassChange { classId: ID!, className: String!, state: TeachingAccessState!, revokeOn: Date }
+type TeachingAccessChange {
+  teacherId: ID!
+  teacherName: String!
+  weeklyPeriods: Int!
+  lastPeriodDate: Date
+  schoolId: ID!
+  schoolState: TeachingAccessState!
+  schoolRevokeOn: Date
+  classes: [TeachingAccessClassChange!]!
+}
+
+input TeachingScheduleDraftRowInput {
+  clientRowId: String!
+  eventId: ID
+  weekday: Int!
+  periodNo: Int!
+  classId: ID!
+  roomId: ID
+  newRoomName: String
+  teacherId: ID
+  assistantId: ID
+  note: String
+}
+input SaveTeachingScheduleDraftInput {
+  batchId: ID
+  schoolId: ID!
+  subjectId: ID
+  levelId: ID
+  applyFrom: Date!
+  repeatUntil: Date!
+  periodTemplateId: ID!
+  expectedVersion: Int
+  rows: [TeachingScheduleDraftRowInput!]!
+}
+type TeachingScheduleRowIdPair { clientRowId: String!, eventId: ID! }
+type TeachingScheduleDraftResult {
+  batch: TeachingScheduleBatch!
+  version: Int!
+  savedAt: DateTime!
+  rowIdMap: [TeachingScheduleRowIdPair!]!
+  conflicts: [TeachingScheduleConflictDetail!]!
+  accessChanges: [TeachingAccessChange!]!
+}
+
+type TeachingSlotClassOption { classId: ID!, className: String!, grade: Int, state: TeachingSlotOptionState!, busy: TeachingScheduleSide }
+type TeachingSlotTeacherOption {
+  teacherId: ID!
+  teacherName: String!
+  initials: String!
+  state: TeachingSlotOptionState!
+  weeklyPeriods: Int!
+  sameSchoolNeighbor: TeachingScheduleSide
+  taughtHereLastWeek: Boolean!
+  classAccess: TeachingAccessState!
+  busy: TeachingScheduleSide
+  travel: TeachingScheduleTravelGap
+  leave: TeachingScheduleLeaveInfo
+}
+type TeachingSlotRoomOption { roomId: ID!, roomName: String!, seatCount: Int, state: TeachingSlotOptionState!, usualForClass: Boolean!, busy: TeachingScheduleSide }
+type TeachingSlotOptions {
+  schoolName: String!
+  grade: Int
+  classes: [TeachingSlotClassOption!]!
+  teachers: [TeachingSlotTeacherOption!]!
+  rooms: [TeachingSlotRoomOption!]!
+}
+
+input TeachingScheduleReuseInput {
+  sourceSchoolId: ID!
+  sourceWeekStart: Date!
+  mode: String!
+  weekStarts: [Date!]
+  repeatUntil: Date
+  skipHolidays: Boolean!
+  keepRoomAndAssistant: Boolean!
+}
+enum TeachingHolidayKind { STATE COMPANY COMPENSATORY }
+type TeachingHolidayInfo { date: Date!, name: String!, kind: TeachingHolidayKind! }
+# Published periods of one day, for the days-off month calendar. Days without a published period are left out.
+type TeachingDayLoad { date: Date!, periods: Int!, schools: Int! }
+type TeachingTeacherCount { teacherId: ID!, teacherName: String!, periods: Int! }
+type TeachingScheduleReuseWeek {
+  weekStart: Date!
+  weekEnd: Date!
+  toCreate: Int!
+  skipped: Int!
+  conflicts: Int!
+  holidays: [TeachingHolidayInfo!]!
+  conflictDetails: [TeachingScheduleConflictDetail!]!
+}
+type TeachingScheduleReusePreview {
+  sourcePeriods: Int!
+  perTeacher: [TeachingTeacherCount!]!
+  excludedConflicts: [TeachingScheduleConflictDetail!]!
+  weeks: [TeachingScheduleReuseWeek!]!
+  totalToCreate: Int!
+}
+
+type TeachingOverviewQuickCounts { conflicts: Int!, travel: Int!, drafts: Int!, empty: Int! }
+type TeachingOverviewSchoolRow { schoolId: ID!, schoolName: String!, schoolShortName: String!, conflictCount: Int!, hasDraft: Boolean!, periodCount: Int! }
+type TeachingOverviewSchoolPage { total: Int!, items: [TeachingOverviewSchoolRow!]!, quickCounts: TeachingOverviewQuickCounts! }
+type TeachingOverviewCell {
+  schoolId: ID!
+  weekday: Int!
+  periodNo: Int!
+  eventId: ID
+  className: String
+  roomName: String
+  teacherName: String
+  assistantName: String
+  status: String
+  conflictKinds: [TeachingScheduleConflictKind!]!
+  note: String
+  batchLabel: String
+}
+type TeachingOverviewGrid {
+  weekStart: Date!
+  template: TeachingPeriodTemplate!
+  schools: [TeachingOverviewSchoolRow!]!
+  cells: [TeachingOverviewCell!]!
+  holidays: [TeachingHolidayInfo!]!
+  conflicts: [TeachingScheduleConflictDetail!]!
+}
+type TeachingOverviewTeacherSlot {
+  weekday: Int!
+  periodNo: Int!
+  eventIds: [ID!]!
+  classNames: [String!]!
+  schoolShortNames: [String!]!
+  conflict: Boolean!
+  travel: Boolean!
+  onLeave: Boolean!
+  status: String
+  roles: [TeachingScheduleRole!]!
+}
+type TeachingScheduleLoadSettings { loadWarn: Int!, loadMax: Int!, updatedAt: DateTime }
+type TeachingOverviewTeacherDay { weekday: Int!, schoolShortNames: [String!]!, multiSchoolSameSession: Boolean!, travel: TeachingScheduleTravelGap, onLeave: Boolean! }
+type TeachingOverviewTeacherRow {
+  teacherId: ID!
+  teacherName: String!
+  initials: String!
+  schoolCount: Int!
+  conflictCount: Int!
+  weeklyPeriods: Int!
+  maxPeriods: Int!
+  leave: TeachingScheduleLeaveInfo
+  revokeNotice: TeachingAccessChange
+  days: [TeachingOverviewTeacherDay!]!
+  slots: [TeachingOverviewTeacherSlot!]!
+}
+type TeachingOverviewTeacherQuickCounts { conflicts: Int!, travel: Int!, multiSchool: Int!, overload: Int!, empty: Int! }
+type TeachingOverviewTeacherPage { total: Int!, items: [TeachingOverviewTeacherRow!]!, quickCounts: TeachingOverviewTeacherQuickCounts! }
+type SchoolTravelTime { schoolA: TeachingOverviewSchoolRow!, schoolB: TeachingOverviewSchoolRow!, minutes: Int!, updatedAt: DateTime }
+
+extend type LmsQuery {
+  "Teacher's class log for one Monday-Sunday week (rows come from the published timetable)"
+  lessonLogTeacherWeek(weekStart: Date!, session: String, status: LessonLogStatus): LessonLogWeek!
+  lessonLogClassWeek(classId: ID!, weekStart: Date!): LessonLogWeek!
+  lessonLogChanges(weekStart: Date!, classId: ID): [LessonLogChange!]!
+  "Read-only curriculum framework rows of a class subject (the popup)"
+  lessonLogCurriculum(classId: ID!, subjectId: ID!): [CurriculumLessonRow!]!
+  "The caller's periods of one day, for attendance by period"
+  teacherDayPeriods(date: Date!): [LessonLogPeriod!]!
+  lessonReportMatrix(weekStart: Date!, schoolId: ID, subjectId: ID): LessonReportMatrix!
+}
+
+extend type Mutation {
+  "Errors: STALE_VERSION, MONTH_CLOSED, NOT_TEACHER_OF_PERIOD, ACTUAL_PERIOD_OUT_OF_RANGE"
+  updateLessonLogEntry(input: UpdateLessonLogEntryInput!): LessonLogPeriod!
+  "Confirms every happened, unconfirmed period of the week. Errors: MONTH_CLOSED, PERIOD_NOT_HAPPENED"
+  confirmLessonLogWeek(weekStart: Date!): LessonLogStats!
+  saveAttendanceAndLog(input: SaveAttendanceAndLogInput!): LessonLogPeriod!
+  remindLessonReport(teacherIds: [ID!]!): Int!
+}
+
+enum LessonLogStatus { PENDING CONFIRMED }
+enum LessonReportState { ON_TIME LATE MISSING NONE }
+
+input UpdateLessonLogEntryInput { eventId: ID!, date: Date!, periodNo: Int!, actualPeriod: Int!, comment: String, expectedVersion: Int }
+input SaveAttendanceAndLogInput { eventId: ID!, date: Date!, periodNo: Int!, records: [LessonLogAttendanceInput!]!, actualPeriod: Int!, comment: String, expectedVersion: Int }
+input LessonLogAttendanceInput { studentId: ID!, status: String! }
+
+type LessonLogWeek { weekStart: Date!, weekEnd: Date!, weekNo: Int!, days: [LessonLogDay!]!, stats: LessonLogStats!, lagChip: LessonLogLag }
+type LessonLogDay { date: Date!, session: String, periods: [LessonLogPeriod!]! }
+type LessonLogPeriod { eventId: ID!, date: Date!, periodNo: Int!, classId: ID!, className: String!, subjectId: ID, subjectName: String!, teacherName: String, ppctPeriod: Int!, actualPeriod: Int!, lessonTitle: String, absentees: [LessonLogAbsentee!]!, comment: String, status: LessonLogStatus!, late: Boolean!, happened: Boolean!, version: Int!, "Highest period of the subject KCT (the limit of actualPeriod); null when the KCT is not set up" curriculumPeriodCount: Int }
+type LessonLogAbsentee { studentId: ID!, shortName: String!, excused: Boolean! }
+type LessonLogStats { taught: Int!, confirmed: Int!, pending: Int! }
+type LessonLogLag { classId: ID!, className: String!, lag: Int! }
+type LessonLogChange { id: ID!, at: DateTime!, actorId: ID!, actorName: String, classId: ID!, className: String!, date: Date!, periodNo: Int!, field: String!, oldValue: String, newValue: String }
+type CurriculumLessonRow { topic: String, period: Int!, title: String! }
+type LessonReportMatrix { weekStart: Date!, days: [Date!]!, stats: LessonReportStats!, rows: [LessonReportRow!]! }
+type LessonReportStats { periods: Int!, teachers: Int!, schools: Int!, onTime: Int!, late: Int!, missing: Int! }
+type LessonReportRow { teacherId: ID!, teacherName: String!, schoolName: String!, cells: [LessonReportCell!]! }
+type LessonReportCell { date: Date!, state: LessonReportState!, periods: Int! }

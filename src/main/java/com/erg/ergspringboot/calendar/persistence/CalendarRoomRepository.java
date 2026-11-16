@@ -10,6 +10,8 @@ public interface CalendarRoomRepository extends JpaRepository<CalendarRoom, Stri
 
     Optional<CalendarRoom> findBySchoolIdAndNameIgnoreCase(String schoolId, String name);
 
+    Optional<CalendarRoom> findByTenantIdAndSchoolIdAndNameIgnoreCase(String tenantId, String schoolId, String name);
+
     List<CalendarRoom> findByTenantIdAndSchoolIdAndStatus(String tenantId, String schoolId, String status);
 
     List<CalendarRoom> findByTenantIdAndSchoolIdInAndStatus(String tenantId, List<String> schoolIds, String status);

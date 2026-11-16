@@ -4,6 +4,7 @@ import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.RequestStatus;
 import com.erg.ergspringboot.timekeeping.internal.rules.LeaveDayCounter;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
+import com.erg.ergspringboot.timekeeping.HolidayPayMode;
 import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
 import com.erg.ergspringboot.timekeeping.persistence.TkHolidayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
@@ -27,7 +28,8 @@ import org.springframework.stereotype.Service;
  * Annual leave: entitlement = policy {@code annual_leave_days} + one day per full {@code seniority_step_years},
  * the years counted whole from the join date ({@code EmployeeProfile.joinedAt}) to 31/12 of the year, so a join on
  * 01/08/2016 gives 14 for 2026. No join date: base days only; joined after that 31/12: 0 (no proration).
- * Used = APPROVED ANNUAL leave inside the year; a leave across year-end is recounted per year on its overlap
+ * Used = APPROVED ANNUAL leave inside the year plus the holidays paid from annual leave that the balance covered (see
+ * {@link #chargedAnnualHolidays}); a leave across year-end is recounted per year on its overlap
  * (school workdays, holidays). The policy is the one in force on 31/12 of the year.
  */
 @Service
@@ -47,12 +49,36 @@ public class LeaveBalanceService {
     }
 
     public BigDecimal annualBalance(String tenantId, String userId, int year) {
+        return entitlement(tenantId, userId, year).subtract(requestsUsed(tenantId, userId, year))
+                .subtract(BigDecimal.valueOf(chargedAnnualHolidays(tenantId, userId, year).size()));
+    }
+
+    private BigDecimal requestsUsed(String tenantId, String userId, int year) {
         LocalDate first = LocalDate.of(year, 1, 1);
         LocalDate last = LocalDate.of(year, 12, 31);
-        BigDecimal used = requests.findApprovedAnnualLeaveOverlapping(tenantId, userId, first, last).stream()
+        return requests.findApprovedAnnualLeaveOverlapping(tenantId, userId, first, last).stream()
                 .map(r -> daysInside(r, first, last))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return entitlement(tenantId, userId, year).subtract(used);
+    }
+
+    /**
+     * Days off paid from annual leave (pay mode ANNUAL_LEAVE) on which the person has a shift, taken out of the
+     * balance in date order while at least one day is left; a day the balance no longer covers becomes unpaid (KL).
+     */
+    public Set<LocalDate> chargedAnnualHolidays(String tenantId, String userId, int year) {
+        String school = context.schoolOf(tenantId, userId).orElse(null);
+        if (school == null) return Set.of();
+        List<TkShift> shifts = context.shiftsOf(tenantId, school);
+        BigDecimal left = entitlement(tenantId, userId, year).subtract(requestsUsed(tenantId, userId, year));
+        Set<LocalDate> charged = new HashSet<>();
+        holidays.findForSchool(tenantId, school, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)).stream()
+                .filter(h -> h.getPayMode() == HolidayPayMode.ANNUAL_LEAVE)
+                .map(TkHoliday::getHolidayDate).distinct().sorted()
+                .filter(d -> WorkContextResolver.shiftOn(shifts, d).isPresent())
+                .forEach(d -> {
+                    if (left.subtract(BigDecimal.valueOf(charged.size())).compareTo(BigDecimal.ONE) >= 0) charged.add(d);
+                });
+        return charged;
     }
 
     /**
@@ -74,6 +100,7 @@ public class LeaveBalanceService {
         List<TkShift> shifts = context.shiftsOf(tenantId, schoolId);
         Set<LocalDate> offDays = holidays.findForSchool(tenantId, schoolId, from, to).stream()
                 .map(TkHoliday::getHolidayDate).collect(Collectors.toCollection(HashSet::new));
+        offDays.addAll(context.saturdayOffDays(tenantId, from, to));
         from.datesUntil(to.plusDays(1)).filter(d -> WorkContextResolver.shiftOn(shifts, d).isEmpty())
                 .forEach(offDays::add);
         return LeaveDayCounter.count(from, to, part, EnumSet.allOf(DayOfWeek.class), offDays);

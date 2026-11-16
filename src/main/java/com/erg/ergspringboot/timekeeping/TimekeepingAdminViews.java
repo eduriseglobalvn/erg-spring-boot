@@ -113,10 +113,38 @@ public final class TimekeepingAdminViews {
     /** {@code next}: the version scheduled for the next period, if any. */
     public record PolicyVersions(PolicyConfig current, PolicyConfig next) {}
 
-    /** {@code schoolId} null = every school of the tenant. */
-    public record HolidayCommand(String schoolId, LocalDate date, String name) {}
+    /**
+     * Days off (KE_HOACH_LICH_DAY.md 2.6). {@code to} defaults to {@code from} (one day per row for a range). New days
+     * off are always system-wide, so there is no school. {@code payMode} is required; {@code teachingAction} defaults to
+     * CANCEL; {@code confirmPast} acknowledges cancelling periods that were already taught.
+     */
+    public record HolidayCommand(LocalDate from, LocalDate to, String name, HolidayKind kind, HolidayPayMode payMode,
+            HolidayTeachingAction teachingAction, Boolean confirmPast) {}
 
-    public record HolidayConfig(String id, String schoolId, LocalDate date, String name) {}
+    /**
+     * {@code schoolId} is set only on rows from before days off became system-wide. {@code affectedPeriods} /
+     * {@code affectedSchools}: published periods on that day plus those this day off already cancelled.
+     */
+    public record HolidayConfig(String id, String schoolId, LocalDate date, String name, HolidayKind kind,
+            HolidayPayMode payMode, HolidayTeachingAction teachingAction, String createdByName, int affectedPeriods,
+            int affectedSchools) {}
+
+    /** {@code status}: NEW, EXISTS (already a day off) or VERIFY (check against the official announcement). */
+    public record HolidayImportPreviewRow(LocalDate date, String lunarDate, String name, HolidayKind kind, String status) {}
+
+    /** {@code source}: where the rows came from (UPLOAD, SAVED or NONE when no saved file exists for the year). */
+    public record HolidayImportPreview(String source, LocalDate savedOn, List<HolidayImportPreviewRow> rows) {}
+
+    public record HolidayImportRow(LocalDate date, String name, HolidayKind kind) {}
+
+    /** The rows the user ticked; every one becomes PAID with its periods cancelled. */
+    public record HolidayImportCommand(List<HolidayImportRow> rows, Boolean confirmPast) {}
+
+    public record HolidayImportResult(int imported, int skipped) {}
+
+    public record SaturdayModeCommand(SaturdayMode mode) {}
+
+    public record SaturdayModeView(LocalDate date, SaturdayMode mode) {}
 
     public record RemoteRuleCommand(String schoolId, RemoteRuleKind kind, List<String> userIds, Integer weekday,
             String shiftId, Boolean active) {}
