@@ -25,6 +25,8 @@ class LessonLogIT extends TeachingScheduleITBase {
     private String tenant;
     private String teacher;
     private String classId;
+    private String schoolId;
+    private String curriculumSubject;
     private String mondayFirst;
     private String mondaySecond;
     private String friday;
@@ -35,7 +37,9 @@ class LessonLogIT extends TeachingScheduleITBase {
         tenant = id();
         String school = school(tenant, "THCS Nguyen Du");
         classId = classroom(tenant, school, "6A6");
+        schoolId = school;
         String subject = subject(tenant, "Tin hoc");
+        curriculumSubject = subject;
         teacher = user(tenant, "Nguyen Quoc Vuong");
         String level = id();
         write("insert into curriculum_subjects (id, tenant_id, code, name, created_at, updated_at)"
@@ -141,6 +145,22 @@ class LessonLogIT extends TeachingScheduleITBase {
         write("insert into tk_teaching_months (id, tenant_id, month, status, version) values (?, ?, '2026-11', 'CLOSED', 0)", id(), tenant);
         assertThat(codeOf(() -> commands.update(tenant, teacher, mondayFirst, MONDAY, 1, 8, null, null))).isEqualTo("MONTH_CLOSED");
         assertThat(friday).isNotNull();
+    }
+
+    @Test
+    void aTimetableSubjectWithoutAProgramReadsTheKctOfTheSubjectAllocatedToTheClass() {
+        setUp();
+        String other = subject(tenant, "Tieng Anh");
+        write("update teaching_schedule_events set subject_id = ?, level_id = null where tenant_id = ?", other, tenant);
+
+        assertThat(queries.teacherWeek(tenant, teacher, MONDAY, null, null).days().get(0).periods().get(0).lessonTitle()).isNull();
+
+        write("insert into curriculum_class_subject_allocations (id, tenant_id, school_id, academic_year, academic_class_id, subject_id, version, created_at, updated_at)"
+                + " values (?, ?, ?, '2026-2027', ?, ?, 1, now(), now())", id(), tenant, schoolId, classId, curriculumSubject);
+        LessonLogPeriod first = queries.teacherWeek(tenant, teacher, MONDAY, null, null).days().get(0).periods().get(0);
+        assertThat(first.curriculumPeriodCount()).as("kct size").isEqualTo(20);
+        assertThat(first.actualPeriod()).as("actual").isEqualTo(10);
+        assertThat(first.lessonTitle()).isEqualTo("KCT 10");
     }
 
     @Test

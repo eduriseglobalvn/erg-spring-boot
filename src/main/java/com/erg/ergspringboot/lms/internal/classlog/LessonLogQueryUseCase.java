@@ -129,7 +129,7 @@ public class LessonLogQueryUseCase {
         String levelId = schedule.classSlots(tenantId, classroom.getId(), today.minusDays(30), today.plusDays(30)).stream()
                 .filter(s -> subjectId.equals(s.subjectId()) && s.levelId() != null)
                 .map(LessonScheduleReadPort.LessonSlot::levelId).findFirst().orElse(null);
-        return reader.frameworkRows(tenantId, subjectId, levelId, today).stream()
+        return reader.frameworkRows(tenantId, classroom.getSchoolId(), classroom.getId(), subjectId, levelId, today).stream()
                 .map(r -> new CurriculumLessonRow(r.getTopic(), r.getPeriod(), r.getTitle())).toList();
     }
 }

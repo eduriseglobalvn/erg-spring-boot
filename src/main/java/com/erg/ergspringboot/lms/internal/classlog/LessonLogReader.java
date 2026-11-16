@@ -82,7 +82,7 @@ class LessonLogReader {
         List<Row> result = new ArrayList<>();
         for (LessonSlot slot : slots) {
             // highest KCT period, the bound ACTUAL_PERIOD_OUT_OF_RANGE enforces; null when the KCT is not set up
-            TreeMap<Integer, CurriculumProgramRow> program = kct.framework(slot.subjectId(), slot.levelId(), slot.date());
+            TreeMap<Integer, CurriculumProgramRow> program = kct.framework(slot.schoolId(), slot.classId(), slot.subjectId(), slot.levelId(), slot.date());
             Integer kctSize = program.isEmpty() ? null : program.lastKey();
             for (int k = 0; k < slot.periodCount(); k++) {
                 int periodNo = slot.periodStart() + k;
@@ -108,12 +108,12 @@ class LessonLogReader {
     /** Highest KCT period of the slot's program, 0 when the KCT is not set up. */
     int frameworkSize(String tenantId, LessonSlot slot) {
         TreeMap<Integer, CurriculumProgramRow> rows = curriculum.scope(tenantId)
-                .framework(slot.subjectId(), slot.levelId(), slot.date());
+                .framework(slot.schoolId(), slot.classId(), slot.subjectId(), slot.levelId(), slot.date());
         return rows.isEmpty() ? 0 : rows.lastKey();
     }
 
-    List<CurriculumProgramRow> frameworkRows(String tenantId, String subjectId, String levelId, LocalDate date) {
-        return List.copyOf(curriculum.scope(tenantId).framework(subjectId, levelId, date).values());
+    List<CurriculumProgramRow> frameworkRows(String tenantId, String schoolId, String classId, String subjectId, String levelId, LocalDate date) {
+        return List.copyOf(curriculum.scope(tenantId).framework(schoolId, classId, subjectId, levelId, date).values());
     }
 
     LessonLogWeek week(LocalDate weekStart, List<Row> rows, String session, String status) {
