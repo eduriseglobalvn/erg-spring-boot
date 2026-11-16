@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
  * <p>Version 2 pseudonymises with HMAC-SHA256 under {@code erg.audit.redaction.hmac-secret}
  * (low-entropy values such as Vietnamese phone numbers cannot be reversed by brute force
  * without the key) and covers e-mail/name/birth-date/national-id/client-address keys.
- * The secret is mandatory in the {@code prod} profile (fail-closed at startup).</p>
+ * The secret is mandatory in every profile except {@code dev}/{@code test} (fail-closed at startup).</p>
  */
 @Component
 public class AuditRedactionPolicy {
@@ -70,9 +70,9 @@ public class AuditRedactionPolicy {
         if (configured != null && !configured.isBlank()) {
             return configured;
         }
-        if (environment != null && environment.acceptsProfiles(Profiles.of("prod"))) {
+        if (environment != null && !environment.acceptsProfiles(Profiles.of("dev", "test"))) {
             throw new IllegalStateException(
-                    "erg.audit.redaction.hmac-secret (AUDIT_REDACTION_HMAC_SECRET) is required in prod");
+                    "erg.audit.redaction.hmac-secret (AUDIT_REDACTION_HMAC_SECRET) is required outside dev/test profiles");
         }
         log.warn("erg.audit.redaction.hmac-secret is not configured; using a development-only key");
         return DEV_ONLY_KEY;

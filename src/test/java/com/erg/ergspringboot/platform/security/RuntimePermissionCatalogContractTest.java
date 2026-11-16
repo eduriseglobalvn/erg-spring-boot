@@ -21,7 +21,12 @@ class RuntimePermissionCatalogContractTest {
     @Test
     void everyRuntimePermissionIsSeededAndRegisteredAsAnEnforcedBinding() throws Exception {
         Set<String> runtime = runtimePermissions();
-        Set<String> seeded = valuesFromFiles(MIGRATIONS, ".sql");
+        // PermissionCatalog is written to the database at startup (BusinessRoleSynchronizer); older ones are seeded by SQL.
+        Set<String> catalog = com.erg.ergspringboot.authorization.catalog.PermissionCatalog.all().stream()
+                .map(com.erg.ergspringboot.authorization.catalog.PermissionCatalog.PermissionDef::name)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> seeded = new LinkedHashSet<>(valuesFromFiles(MIGRATIONS, ".sql"));
+        seeded.addAll(catalog);
         String catalogMigrations;
         try (Stream<Path> files = Files.walk(MIGRATIONS)) {
             catalogMigrations = files
@@ -33,7 +38,8 @@ class RuntimePermissionCatalogContractTest {
 
         assertThat(seeded).containsAll(runtime);
         assertThat(runtime)
-                .allSatisfy(permission -> assertThat(catalogMigrations).contains("'" + permission + "'"));
+                .allSatisfy(permission -> assertThat(catalog.contains(permission) || catalogMigrations.contains("'" + permission + "'"))
+                        .as(permission).isTrue());
     }
 
     private Set<String> runtimePermissions() throws IOException {

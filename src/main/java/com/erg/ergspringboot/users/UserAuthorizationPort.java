@@ -8,7 +8,6 @@ public interface UserAuthorizationPort {
 
     Optional<UserAuthorizationProjection> find(String userId, String tenantId);
 
-    List<UserPermissionOverrideProjection> findOverrides(String userId, String tenantId);
 
     /**
      * What a bearer session for this user would carry now, built like ErgPrincipalService: role names from direct

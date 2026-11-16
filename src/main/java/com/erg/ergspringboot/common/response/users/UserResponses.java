@@ -106,13 +106,6 @@ public final class UserResponses {
     public record ActivityListResponse(List<ActivityResponse> items, Meta meta) {
     }
 
-    public record PermissionOverrideResponse(
-            String userId,
-            List<String> permissions,
-            String grantType
-    ) {
-    }
-
     public record BulkOperationResponse(@JsonProperty("modified_count") long modifiedCount) {
     }
 

@@ -34,12 +34,13 @@ class ScopedRoleAssignmentServiceTest {
     @Mock private RoleRepository roleRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuthorizationMutationAuditService mutationAuditService;
+    @Mock private com.erg.ergspringboot.platform.security.AccountActionGuard guard;
     private ScopedRoleAssignmentService service;
 
     @BeforeEach
     void setUp() {
         service = new ScopedRoleAssignmentService(
-                assignmentRepository, roleRepository, userRepository, mutationAuditService);
+                assignmentRepository, roleRepository, userRepository, mutationAuditService, guard);
     }
 
     @Test
@@ -108,6 +109,30 @@ class ScopedRoleAssignmentServiceTest {
                 new com.erg.ergspringboot.users.UserAuditContext(
                         "admin-1", "request-1", "127.0.0.1", "JUnit")
         );
+    }
+
+    @Test
+    void revokeGoesThroughGuard() {
+        User user = new User(); user.setId("user-1"); user.setTenantId("tenant-a");
+        Role role = new Role(); role.setId("role-teacher"); role.setName("lms_teacher");
+        UserRoleAssignment assignment = new UserRoleAssignment();
+        assignment.setId("assignment-1"); assignment.setUserId("user-1"); assignment.setTenantId("tenant-a");
+        assignment.setRoleId("role-teacher"); assignment.setRole(role);
+        assignment.setScopeType("SCHOOL"); assignment.setScopeId("school-1");
+        ErgPrincipal actor = new ErgPrincipal("admin-1", "session-1", "tenant-a", List.of("admin"),
+                List.of("rbac.role.assign"), List.of(), List.of("lcms"), "erg", "admin", Map.of());
+        when(userRepository.findByIdAndTenantId("user-1", "tenant-a")).thenReturn(Optional.of(user));
+        when(assignmentRepository.findWithRoleById("assignment-1")).thenReturn(Optional.of(assignment));
+        when(guard.currentRoleIds(actor, "user-1")).thenReturn(new java.util.LinkedHashSet<>(List.of("role-teacher", "role-x")));
+        org.mockito.Mockito.doThrow(new com.erg.ergspringboot.exception.ForbiddenException("denied"))
+                .when(guard).assertCanAssign(actor, "user-1", java.util.Set.of("role-x"), "SCHOOL", "school-1");
+
+        assertThatThrownBy(() -> service.revoke("user-1", "assignment-1", "tenant-a",
+                new RevokeScopedRoleRequest("x"), actor, null))
+                .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
+
+        assertThat(assignment.getRevokedAt()).isNull();
+        org.mockito.Mockito.verify(assignmentRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test

@@ -3,16 +3,12 @@ package com.erg.ergspringboot.authorization;
 import com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase;
 import com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase;
 import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
-import com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase;
 import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
-import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AddPermissionOverrideRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignScopedRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.BulkAssignRoleRequest;
-import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.CreateRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.EffectivePermissionsResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.FeatureConfigResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionGroupResponse;
-import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionOverrideResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionPageResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PermissionResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PreviewChangesRequest;
@@ -20,7 +16,6 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.PreviewC
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RevokeScopedRoleRequest;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.RoleResponse;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.ScopedRoleAssignmentResponse;
-import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.authorization.internal.assignment.ScopedRoleAssignmentService;
@@ -35,20 +30,17 @@ public class AuthorizationCommandOperations {
     private final AuthorizationRoleDefinitionUseCase roles;
     private final AuthorizationAccessQueryUseCase access;
     private final AuthorizationDirectRoleUseCase directRoles;
-    private final AuthorizationPermissionOverrideUseCase overrides;
     private ScopedRoleAssignmentService scoped;
 
     public AuthorizationCommandOperations(
             AuthorizationPermissionCatalogUseCase catalog,
             AuthorizationRoleDefinitionUseCase roles,
             AuthorizationAccessQueryUseCase access,
-            AuthorizationDirectRoleUseCase directRoles,
-            AuthorizationPermissionOverrideUseCase overrides) {
+            AuthorizationDirectRoleUseCase directRoles) {
         this.catalog = catalog;
         this.roles = roles;
         this.access = access;
         this.directRoles = directRoles;
-        this.overrides = overrides;
     }
 
     @Autowired(required = false)
@@ -62,19 +54,6 @@ public class AuthorizationCommandOperations {
 
     public RoleResponse getRole(String roleId) {
         return roles.get(roleId);
-    }
-
-    public RoleResponse createRole(CreateRoleRequest request, ErgPrincipal actor, AuthorizationAuditContext context) {
-        return roles.create(request, actor, context.toLegacy());
-    }
-
-    public RoleResponse updateRole(String roleId, UpdateRoleRequest request, ErgPrincipal actor,
-            AuthorizationAuditContext context) {
-        return roles.update(roleId, request, actor, context.toLegacy());
-    }
-
-    public void deleteRole(String roleId, ErgPrincipal actor, AuthorizationAuditContext context) {
-        roles.delete(roleId, actor, context.toLegacy());
     }
 
     public List<PermissionResponse> listPermissions() {
@@ -121,30 +100,12 @@ public class AuthorizationCommandOperations {
         return scoped.revoke(userId, assignmentId, tenantId, request, actor, context.toLegacy());
     }
 
-    public PermissionOverrideResponse addPermissionOverride(String userId, AddPermissionOverrideRequest request,
-            String actorId, String tenantId, AuthorizationAuditContext context) {
-        return overrides.add(userId, request, actorId, tenantId, context.toLegacy());
-    }
-
-    public void deletePermissionOverride(String userId, String overrideId, String tenantId,
-            AuthorizationAuditContext context) {
-        overrides.delete(userId, overrideId, tenantId, context.toLegacy());
-    }
-
     public EffectivePermissionsResponse effectivePermissions(String userId) {
         return effectivePermissions(userId, currentTenant());
     }
 
     public EffectivePermissionsResponse effectivePermissions(String userId, String tenantId) {
         return access.effective(userId, normalizeTenant(tenantId));
-    }
-
-    public List<PermissionOverrideResponse> listPermissionOverrides(String userId) {
-        return listPermissionOverrides(userId, currentTenant());
-    }
-
-    public List<PermissionOverrideResponse> listPermissionOverrides(String userId, String tenantId) {
-        return access.listOverrides(userId, normalizeTenant(tenantId));
     }
 
     public FeatureConfigResponse featureConfig(String userId) {

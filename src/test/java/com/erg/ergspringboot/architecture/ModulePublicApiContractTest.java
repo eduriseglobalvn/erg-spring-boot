@@ -30,7 +30,6 @@ import com.erg.ergspringboot.authorization.AuthorizationCommandOperations;
 import com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase;
 import com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase;
 import com.erg.ergspringboot.authorization.internal.catalog.AuthorizationPermissionCatalogUseCase;
-import com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase;
 import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import com.erg.ergspringboot.users.UserOperations;
 import com.erg.ergspringboot.users.internal.create.UserProvisioningUseCase;
@@ -69,8 +68,7 @@ class ModulePublicApiContractTest {
                 AuthorizationPermissionCatalogUseCase.class,
                 AuthorizationRoleDefinitionUseCase.class,
                 AuthorizationAccessQueryUseCase.class,
-                AuthorizationDirectRoleUseCase.class,
-                AuthorizationPermissionOverrideUseCase.class))
+                AuthorizationDirectRoleUseCase.class))
                 .isNotNull();
         assertThat(UserOperations.class.getDeclaredConstructor(
                 UserQueryUseCase.class,
@@ -79,7 +77,8 @@ class ModulePublicApiContractTest {
                 UserSessionUseCase.class,
                 UserProvisioningUseCase.class,
                 UserLifecycleUseCase.class,
-                UserRoleAssignmentUseCase.class))
+                UserRoleAssignmentUseCase.class,
+                com.erg.ergspringboot.platform.security.AccountActionGuard.class))
                 .isNotNull();
         assertThat(CalendarCommandUseCase.class).isAssignableTo(CalendarCommandPort.class);
         assertThat(CalendarReadUseCase.class).isAssignableTo(CalendarReadPort.class);

@@ -94,13 +94,12 @@ public class OidcPrincipalBridgeFilter extends OncePerRequestFilter {
                     || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
                 SecurityContextHolder.clearContext();
             } else {
-                List<String> roles = roleNames(user);
-                if (!mfaPolicy.satisfied(roles, oidcUser.getClaims())) {
+                ErgPrincipal principal = principal(user, request.getSession().getId());
+                if (!mfaPolicy.satisfied(java.util.Set.copyOf(principal.permissions()), oidcUser.getClaims())) {
                     SecurityContextHolder.clearContext();
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "MFA_REQUIRED");
                     return;
                 }
-                ErgPrincipal principal = principal(user, request.getSession().getId());
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                         principal,
                         authentication.getCredentials(),

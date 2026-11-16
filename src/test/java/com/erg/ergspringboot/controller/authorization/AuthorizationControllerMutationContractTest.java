@@ -30,7 +30,7 @@ class AuthorizationControllerMutationContractTest {
 
     @Test
     void revokeScopedRolePassesAuthenticatedTenantAndRequestAuditContext() {
-        AuthorizationCommandOperations operations = new AuthorizationCommandOperations(null, null, null, null, null);
+        AuthorizationCommandOperations operations = new AuthorizationCommandOperations(null, null, null, null);
         ScopedRoleAssignmentService scopedService = mock(ScopedRoleAssignmentService.class);
         operations.setScopedRoleAssignmentService(scopedService);
         AuthorizationController controller = new AuthorizationController(operations);

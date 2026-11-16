@@ -16,7 +16,7 @@ class AuthorizationCapabilityPolicyTest {
     void derivesAllWorkspacesFromVerifiedMultiRoleGrants() {
         ErgPrincipal principal = principal(
                 List.of("admin", "teacher", "student", "crm_manager"),
-                List.of("admin.content.read", "lms.schedule.read", "elearning.dashboard.read", "crm.lead.read"),
+                List.of("admin.workspace.access", "teacher.workspace.access", "student.workspace.access", "crm.workspace.access"),
                 List.of(), List.of("*")
         );
 
@@ -32,7 +32,7 @@ class AuthorizationCapabilityPolicyTest {
     @Test
     void learnerReachesLmsApisWithoutBecomingATeacher() {
         ErgPrincipal learner = principal(
-                List.of("lms.learner"), List.of("lms.quiz.play", "lms.assignment.submit"), List.of(), List.of()
+                List.of("lms.learner"), List.of("student.workspace.access", "lms.quiz.play"), List.of(), List.of()
         );
 
         assertThat(WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
@@ -55,7 +55,7 @@ class AuthorizationCapabilityPolicyTest {
     @Test
     void teacherDoesNotGainTheStudentApiFromTheSharedLmsApi() {
         ErgPrincipal teacher = principal(
-                List.of("lms.instructor"), List.of("lms.class.read"), List.of(), List.of()
+                List.of("lms.instructor"), List.of("teacher.workspace.access", "lms.class.read"), List.of(), List.of()
         );
 
         assertThat(policy.hasWorkspace(teacher, "lms")).isTrue();
@@ -71,8 +71,8 @@ class AuthorizationCapabilityPolicyTest {
                 List.of("teacher"), List.of("*"), List.of(), List.of("*")
         );
         ErgPrincipal denied = principal(
-                List.of("admin", "teacher"), List.of("admin.content.read", "lms.schedule.read"),
-                List.of("admin.*"), List.of("*")
+                List.of("admin", "teacher"), List.of("admin.workspace.access", "teacher.workspace.access"),
+                List.of("admin.workspace.access"), List.of("*")
         );
 
         assertThat(policy.isPlatformWide(system)).isTrue();

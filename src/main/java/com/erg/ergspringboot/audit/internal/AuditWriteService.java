@@ -37,7 +37,7 @@ public class AuditWriteService {
             AuditHashChain hashChain,
             EntityManager entityManager,
             ApplicationEventPublisher events,
-            @Value("${erg.audit.retention.default-days:365}") int defaultRetentionDays
+            @Value("${erg.audit.retention.default-days:1825}") int defaultRetentionDays
     ) {
         if (defaultRetentionDays < 1 || defaultRetentionDays > 3650) {
             throw new IllegalArgumentException("audit retention must be between 1 and 3650 days");
@@ -67,10 +67,11 @@ public class AuditWriteService {
             return existing;
         }
 
-        OffsetDateTime occurredAt = request.occurredAt() == null
-                ? OffsetDateTime.now(clock) : request.occurredAt().withOffsetSameInstant(ZoneOffset.UTC);
+        // occurredAt is server-set: a caller-supplied (back-dated) time would fork the hash chain.
+        OffsetDateTime occurredAt = OffsetDateTime.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS); // DB precision, so re-hash matches
+        OffsetDateTime policyUntil = occurredAt.plusDays(defaultRetentionDays);
         OffsetDateTime retentionUntil = request.retentionUntil() == null
-                ? occurredAt.plusDays(defaultRetentionDays) : request.retentionUntil();
+                || request.retentionUntil().isBefore(policyUntil) ? policyUntil : request.retentionUntil();
         AuditEvent event = new AuditEvent();
         event.setTenantId(request.tenantId());
         event.setActorId(normalize(request.actorId()));

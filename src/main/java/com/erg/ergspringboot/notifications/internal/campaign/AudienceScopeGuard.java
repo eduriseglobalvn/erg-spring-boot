@@ -2,24 +2,23 @@ package com.erg.ergspringboot.notifications.internal.campaign;
 
 import com.erg.ergspringboot.lms.LmsAudienceReadPort;
 import com.erg.ergspringboot.notifications.CampaignAudience;
-import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
 import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
-import java.util.Collection;
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.List;
 import java.util.Set;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 /**
- * Who may send to whom: tenant-wide admins to anyone in the tenant; unit-scoped admins (the platform's exact-name
- * unit-admin roles, e.g. lms.admin) only to schools, classes and students of the education units they manage;
+ * Who may send to whom: tenant-wide admins to anyone in the tenant; unit-scoped admins (holders of notifications.manage
+ * without the wildcard) only to schools, classes and students of the education units they manage;
  * teachers only to their own classes' students.
  */
 @Service
 public class AudienceScopeGuard {
+
+    private static final String NOTIFICATIONS_MANAGE = "notifications.manage";
 
     private final LmsAudienceReadPort lms;
     private final UserAuthorizationPort authorizations;
@@ -81,22 +80,15 @@ public class AudienceScopeGuard {
         }
     }
 
-    public boolean isAdmin(Collection<String> actorRoles) {
-        return workspacesOf(actorRoles).contains("ADMIN");
-    }
-
-    public boolean isTeacher(Collection<String> actorRoles) {
-        return workspacesOf(actorRoles).contains("TEACHER");
-    }
-
-    /** ADMIN never comes from permissions: roles only (plus the platform-wide "admin" CampaignActor adds). */
+    /** Tenant-wide: only the platform-wide principal (the wildcard, held by the super admin alone). */
     public boolean isAdmin(CampaignActor actor) {
-        return isAdmin(actor.roles());
+        return WorkspaceCapabilityMapper.isPlatformWide(
+                List.copyOf(actor.roles()), actor.permissions(), actor.deniedPermissions());
     }
 
-    /** Unit-scoped admin: role names only (never permissions), the same exact-name rule as session bootstrap. */
+    /** Unit-scoped admin: {@code notifications.manage} without the tenant-wide wildcard; reach comes from their units. */
     public boolean isUnitAdmin(CampaignActor actor) {
-        return !isAdmin(actor) && actor.roles().stream().anyMatch(AccessScopeAssembler::isEducationUnitAdminRole);
+        return !isAdmin(actor) && holds(actor, NOTIFICATIONS_MANAGE);
     }
 
     /** Every class of the units a unit-scoped admin manages; empty for anyone else. */
@@ -104,10 +96,14 @@ public class AudienceScopeGuard {
         return isUnitAdmin(actor) ? classesOf(actor.tenantId(), managedUnitIds(actor)) : List.of();
     }
 
-    /** TEACHER follows the platform rule over verified roles + permissions minus denies (fail closed when empty). */
+    /** TEACHER follows the platform rule over verified permissions minus denies (fail closed when empty). */
     public boolean isTeacher(CampaignActor actor) {
         return WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
                 List.copyOf(actor.roles()), actor.permissions(), actor.deniedPermissions()).contains("TEACHER");
+    }
+
+    private static boolean holds(CampaignActor actor, String permission) {
+        return actor.permissions().contains(permission) && !actor.deniedPermissions().contains(permission);
     }
 
     private List<String> managedUnitIds(CampaignActor actor) {
@@ -116,13 +112,6 @@ public class AudienceScopeGuard {
 
     private List<String> classesOf(String tenantId, List<String> unitIds) {
         return unitIds.isEmpty() ? List.of() : List.copyOf(lms.classIdsOf(tenantId, unitIds, List.of()));
-    }
-
-    /** Single source of truth for admin/teacher detection; null roles count as none (fail closed). */
-    private static List<String> workspacesOf(Collection<String> actorRoles) {
-        return WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
-                actorRoles == null ? List.of() : actorRoles.stream().filter(Objects::nonNull).toList(),
-                List.of(), List.of());
     }
 
     private static void requireWithinLimit(int count) {

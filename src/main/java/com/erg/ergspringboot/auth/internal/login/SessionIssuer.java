@@ -4,7 +4,6 @@ import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.common.response.auth.AuthResponses.AuthResponse;
 import com.erg.ergspringboot.exception.auth.AuthFailure;
-import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.auth.SecurityEvent;
@@ -24,7 +23,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 
@@ -124,7 +122,7 @@ final class SessionIssuer {
         session.setCreatedAt(now);
         boolean remembered = RememberedStudentSession.applies(rememberMe, portals);
         session.setRememberMe(remembered);
-        session.setExpiresAt(now.plus(remembered ? RememberedStudentSession.SLIDING_TTL : sessionTtl(user)));
+        session.setExpiresAt(now.plus(remembered ? RememberedStudentSession.SLIDING_TTL : sessionTtl(permissions)));
         session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
         attemptRecorder.recordLoginAttempt(
@@ -158,13 +156,8 @@ final class SessionIssuer {
                         user.getId(), firstNonBlank(user.getTenantId(), DEFAULT_TENANT), now());
     }
 
-    private Duration sessionTtl(User user) {
-        boolean privileged = user.getRoles() != null && user.getRoles().stream()
-                .map(Role::getName)
-                .filter(Objects::nonNull)
-                .map(name -> name.toLowerCase(Locale.ROOT))
-                .anyMatch(name -> name.contains("admin") || name.contains("manager")
-                        || name.contains("coordinator"));
+    static Duration sessionTtl(List<String> permissions) {
+        boolean privileged = permissions.contains("admin.workspace.access") || permissions.contains("*");
         return privileged ? PRIVILEGED_SESSION_TTL : STANDARD_SESSION_TTL;
     }
 

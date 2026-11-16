@@ -12,12 +12,6 @@ public final class AuthorizationDtos {
     private AuthorizationDtos() {
     }
 
-    public record CreateRoleRequest(@NotBlank String name, String description, List<String> permissions) {
-    }
-
-    public record UpdateRoleRequest(String name, String description, List<String> permissions) {
-    }
-
     public record RoleResponse(
             String id,
             String name,
@@ -82,9 +76,6 @@ public final class AuthorizationDtos {
     ) {
     }
 
-    public record AssignRolesRequest(@NotEmpty List<String> roleIds) {
-    }
-
     public record AssignScopedRoleRequest(
             @NotBlank String roleId,
             @NotBlank String scopeType,
@@ -114,26 +105,6 @@ public final class AuthorizationDtos {
     }
 
     public record BulkAssignRoleRequest(@NotEmpty List<String> userIds, @NotBlank String roleId) {
-    }
-
-    public record AddPermissionOverrideRequest(
-            @JsonProperty("grant_type") @NotBlank String grantType,
-            @NotBlank String permission,
-            String reason,
-            @JsonProperty("expires_at") OffsetDateTime expiresAt
-    ) {
-    }
-
-    public record PermissionOverrideResponse(
-            String id,
-            @JsonProperty("user_id") String userId,
-            String permission,
-            @JsonProperty("grant_type") String grantType,
-            String reason,
-            @JsonProperty("expires_at") OffsetDateTime expiresAt,
-            @JsonProperty("created_by") String createdBy,
-            OffsetDateTime createdAt
-    ) {
     }
 
     public record PreviewChangesRequest(Map<String, Object> changes) {

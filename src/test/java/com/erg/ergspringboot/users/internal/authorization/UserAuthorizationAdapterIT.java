@@ -53,10 +53,10 @@ class UserAuthorizationAdapterIT {
         entityManager.flush();
         // cycle: center -> school-a -> annex -> center
         entityManager.find(EducationUnit.class, "center").setParentId("annex");
-        assign("u-1", "role_lms_admin", "center", null, null);
-        assign("u-1", "role_lms_admin", "foreign", null, null);
-        assign("u-1", "role_lms_admin", "revoked-root", OffsetDateTime.now().minusDays(1), null);
-        assign("u-1", "role_lms_admin", "expired-root", null, OffsetDateTime.now().minusDays(1));
+        assign("u-1", "role_pdt_operator", "center", null, null);
+        assign("u-1", "role_pdt_operator", "foreign", null, null);
+        assign("u-1", "role_pdt_operator", "revoked-root", OffsetDateTime.now().minusDays(1), null);
+        assign("u-1", "role_pdt_operator", "expired-root", null, OffsetDateTime.now().minusDays(1));
         entityManager.flush();
         entityManager.clear();
 
@@ -67,25 +67,26 @@ class UserAuthorizationAdapterIT {
     }
 
     @Test
-    void effectiveGrantsIncludeActiveAssignmentRolesAndApplyDenies() {
+    void effectiveGrantsIncludeActiveAssignmentRolesAndIgnoreRetiredOverrides() {
         entityManager.persist(user("u-2", TENANT));
         entityManager.persist(user("granter", TENANT));
         unit("school-x", TENANT, null);
         entityManager.flush();
-        assign("u-2", "role_lms_admin", "school-x", null, null);
-        assign("u-2", "role_lms_teacher_standard", "school-x", OffsetDateTime.now().minusDays(1), null);
-        assign("u-2", "role_lms_teacher_lead", "school-x", null, OffsetDateTime.now().minusDays(1));
+        assign("u-2", "role_pdt_operator", "school-x", null, null);
+        assign("u-2", "role_lms_teacher", "school-x", OffsetDateTime.now().minusDays(1), null);
+        assign("u-2", "role_operations", "school-x", null, OffsetDateTime.now().minusDays(1));
         entityManager.persist(new UserPermissionOverride("ov-1", "u-2", null, "lms.read", null, "deny", "test", null, "granter", OffsetDateTime.now()));
         entityManager.flush();
         entityManager.clear();
 
         UserAuthorizationProjection effective = port.findEffective("u-2", TENANT).orElseThrow();
 
-        assertThat(effective.roleNames()).containsExactly("lms.admin");
-        assertThat(effective.effectivePermissions()).contains("notification.campaign.send").doesNotContain("lms.read");
-        assertThat(effective.deniedPermissions()).contains("lms.read");
+        assertThat(effective.roleNames()).containsExactly("pdt_operator");
+        // per-user overrides are retired: the stored deny row has no effect
+        assertThat(effective.effectivePermissions()).contains("notifications.manage", "lms.read");
+        assertThat(effective.deniedPermissions()).isEmpty();
         // the plain role snapshot does not see assignment-only roles; findEffective does
-        assertThat(port.find("u-2", TENANT).orElseThrow().roleNames()).doesNotContain("lms.admin");
+        assertThat(port.find("u-2", TENANT).orElseThrow().roleNames()).doesNotContain("pdt_operator");
         assertThat(port.findEffective("u-2", "tenant-other")).isEmpty();
     }
 

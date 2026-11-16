@@ -34,7 +34,7 @@ public class ScheduleDataLoader {
     private static final String EVENT_COLUMNS = """
             select e.id, e.batch_id, b.label batch_label, b.status batch_status, b.created_at batch_created_at,
                    (select u.full_name from users u where u.id = b.created_by) created_by_name,
-                   (select min(r.name) from user_roles ur join roles r on r.id = ur.role_id
+                   (select min(coalesce(nullif(r.description, ''), r.name)) from user_roles ur join roles r on r.id = ur.role_id
                      where ur.user_id = b.created_by) created_by_role,
                    e.school_id, su.name school_name, e.academic_class_id, c.name class_name, e.room_id,
                    coalesce(rm.name, e.room_name) room_name, s.name subject_name,

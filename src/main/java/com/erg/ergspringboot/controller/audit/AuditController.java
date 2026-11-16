@@ -8,6 +8,7 @@ import com.erg.ergspringboot.audit.AuditQuery;
 import com.erg.ergspringboot.audit.authorization.AuditExport;
 import com.erg.ergspringboot.audit.authorization.AuditManage;
 import com.erg.ergspringboot.audit.authorization.AuditRead;
+import com.erg.ergspringboot.utils.CsvCells;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
@@ -164,7 +165,7 @@ public class AuditController {
     }
 
     private String cell(Object value) {
-        String text = value == null ? "" : String.valueOf(value);
+        String text = CsvCells.safe(value == null ? "" : String.valueOf(value));
         return "\"" + text.replace("\"", "\"\"").replace("\r", "\\r").replace("\n", "\\n") + "\"";
     }
 

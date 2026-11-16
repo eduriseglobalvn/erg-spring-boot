@@ -119,7 +119,8 @@ class AuthOperationsFlowTest {
         lcmsPublish.setName("lcms.quiz.publish");
         Role role = new Role();
         role.setName("teacher");
-        role.setPermissions(new java.util.LinkedHashSet<>(List.of(lmsRead, lcmsPublish)));
+        role.setPermissions(new java.util.LinkedHashSet<>(List.of(lmsRead, lcmsPublish,
+                perm("admin.workspace.access"), perm("teacher.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
         when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
 
@@ -139,7 +140,7 @@ class AuthOperationsFlowTest {
         assertEquals("Chrome", session.getDeviceName());
         assertEquals("fingerprint", session.getDeviceFingerprint());
         assertEquals("127.0.0.1", session.getIpAddress());
-        assertEquals(Duration.ofHours(12), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
+        assertEquals(Duration.ofHours(8), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
         assertFalse(session.isRememberMe());
         assertNotEquals(response.refreshToken(), session.getRefreshTokenHash());
 
@@ -152,7 +153,8 @@ class AuthOperationsFlowTest {
         assertEquals(900, response.expiresIn());
         assertEquals(1L, user.getLoginCount());
         assertNotNull(user.getLastLoginAt());
-        assertEquals(List.of("lcms.quiz.publish", "lms.classes.read"), response.permissions());
+        assertEquals(List.of("admin.workspace.access", "lcms.quiz.publish", "lms.classes.read", "teacher.workspace.access"),
+                response.permissions());
         assertEquals(List.of("lcms", "lms"), response.portals());
     }
 
@@ -299,7 +301,8 @@ class AuthOperationsFlowTest {
         user.setMustChangePassword(true);
         user.setRecoveryEmailVerified(false);
         Permission permission = new Permission(); permission.setName("lms.assignment.read_self");
-        Role role = new Role(); role.setName("lms.learner"); role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission)));
+        Role role = new Role(); role.setName("lms.learner");
+        role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission, perm("student.workspace.access"))));
         UserRoleAssignment assignment = new UserRoleAssignment(); assignment.setRole(role);
         when(userRepository.findForLogin("hs@example.com")).thenReturn(Optional.of(user));
         when(userRoleAssignmentRepository.findActiveForUser(eq("user-student"), eq("erg"), any(OffsetDateTime.class)))
@@ -338,7 +341,7 @@ class AuthOperationsFlowTest {
         permission.setName("lms.classes.read");
         Role role = new Role();
         role.setName("teacher");
-        role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission)));
+        role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission, perm("teacher.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
         when(userRepository.findForLogin("lms-only@example.com")).thenReturn(Optional.of(user));
 
@@ -504,7 +507,8 @@ class AuthOperationsFlowTest {
         lcmsRead.setName("lcms.workspace.read");
         Role role = new Role();
         role.setName("teacher");
-        role.setPermissions(new java.util.LinkedHashSet<>(List.of(lmsRead, lcmsRead)));
+        role.setPermissions(new java.util.LinkedHashSet<>(List.of(lmsRead, lcmsRead,
+                perm("admin.workspace.access"), perm("teacher.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
         AuthSession existingLms = session("session-lms", "user-1", "erg");
         existingLms.setDeviceId("browser-1");
@@ -804,10 +808,17 @@ class AuthOperationsFlowTest {
         assertEquals(createdAt.plusDays(90), session.getExpiresAt());
     }
 
+    private static Permission perm(String name) {
+        Permission permission = new Permission();
+        permission.setName(name);
+        return permission;
+    }
+
     private AuthSession loginStudent(boolean rememberMe) {
         User user = activeUser("student-1", "hs001@example.com", "secret123");
         Role role = new Role();
         role.setName("student");
+        role.setPermissions(new java.util.LinkedHashSet<>(List.of(perm("student.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
         when(userRepository.findForLogin("hs001@example.com")).thenReturn(Optional.of(user));
 

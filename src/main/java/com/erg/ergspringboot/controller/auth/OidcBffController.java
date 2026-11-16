@@ -113,9 +113,9 @@ public class OidcBffController {
         List<String> permissions = safe(principal.permissions());
         List<String> deniedPermissions = safe(principal.deniedPermissions());
         List<String> portals = WorkspaceCapabilityMapper.legacyPortalsFor(
-                safe(principal.portals()), roles, permissions);
+                List.of(), roles, permissions);
         List<String> workspaces = WorkspaceCapabilityMapper.canonicalWorkspaces(
-                safe(principal.portals()), roles, permissions);
+                List.of(), roles, permissions);
         AccessScopeSet scopes = AccessScopeAssembler.from(principal);
         return new BffSessionResponse(
                 principal.userId(),

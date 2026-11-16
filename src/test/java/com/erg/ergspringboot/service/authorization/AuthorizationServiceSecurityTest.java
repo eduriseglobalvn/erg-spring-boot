@@ -9,17 +9,13 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.authorization.internal.access.AuthorizationAccessQueryUseCase;
 import com.erg.ergspringboot.authorization.internal.assignment.AuthorizationDirectRoleUseCase;
-import com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase;
 import com.erg.ergspringboot.authorization.internal.roledefinition.AuthorizationRoleDefinitionUseCase;
 import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.BulkAssignRoleRequest;
-import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.UpdateRoleRequest;
-import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.authorization.PermissionRepository;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
-import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
 import java.util.List;
@@ -36,7 +32,6 @@ class AuthorizationServiceSecurityTest {
 
     @Mock private RoleRepository roleRepository;
     @Mock private PermissionRepository permissionRepository;
-    @Mock private UserPermissionOverrideRepository overrideRepository;
     @Mock private UserRepository userRepository;
     @Mock private UserAuthorizationPort userAuthorizationPort;
 
@@ -45,14 +40,13 @@ class AuthorizationServiceSecurityTest {
 
     private AuthorizationRoleDefinitionUseCase roles;
     private AuthorizationDirectRoleUseCase directRoles;
-    private AuthorizationPermissionOverrideUseCase overrides;
     private AuthorizationAccessQueryUseCase access;
 
     @BeforeEach
     void setUp() {
-        roles = new AuthorizationRoleDefinitionUseCase(roleRepository, permissionRepository);
-        directRoles = new AuthorizationDirectRoleUseCase(userRepository, roleRepository, null);
-        overrides = new AuthorizationPermissionOverrideUseCase(userRepository, permissionRepository, overrideRepository, null);
+        roles = new AuthorizationRoleDefinitionUseCase(roleRepository);
+        directRoles = new AuthorizationDirectRoleUseCase(userRepository, roleRepository, null,
+                org.mockito.Mockito.mock(com.erg.ergspringboot.platform.security.AccountActionGuard.class));
         access = new AuthorizationAccessQueryUseCase(userAuthorizationPort);
     }
 
@@ -66,7 +60,7 @@ class AuthorizationServiceSecurityTest {
         assertThatThrownBy(() -> directRoles.bulk(
                         new BulkAssignRoleRequest(List.of("foreign-user"), "role-teacher"),
                         "tenant-a",
-                        null,
+                        actor(),
                         NO_ACTOR
                 ))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -95,41 +89,6 @@ class AuthorizationServiceSecurityTest {
         assertThatThrownBy(() -> access.effective("foreign-user", "tenant-a"))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(userAuthorizationPort, never()).findOverrides(any(), any());
-    }
-
-    @Test
-    void overrideDeletionRejectsForeignUserBeforeDeletingRecord() {
-        when(userRepository.findByIdAndTenantId("foreign-user", "tenant-a"))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> overrides.delete(
-                        "foreign-user", "override-1", "tenant-a", NO_ACTOR
-                ))
-                .isInstanceOf(ResourceNotFoundException.class);
-
-        verify(overrideRepository, never()).delete(any());
-    }
-
-    @Test
-    void protectedRoleDefinitionCannotBeUpdatedWithoutPlatformWildcard() {
-        assertThatThrownBy(() -> roles.update(
-                        "role-system.rbac_admin",
-                        new UpdateRoleRequest(null, "escalated definition", null),
-                        null,
-                        NO_ACTOR
-                ))
-                .isInstanceOf(ForbiddenException.class);
-
-        verify(roleRepository, never()).save(any());
-    }
-
-    @Test
-    void protectedRoleDefinitionCannotBeDeletedWithoutPlatformWildcard() {
-        assertThatThrownBy(() -> roles.delete("role-system.rbac_admin", null, NO_ACTOR))
-                .isInstanceOf(ForbiddenException.class);
-
-        verify(roleRepository, never()).delete(any());
     }
 
     @Test
@@ -139,6 +98,12 @@ class AuthorizationServiceSecurityTest {
 
         assertThat(roles.list()).extracting(response -> response.name())
                 .containsExactly("lms_teacher");
+    }
+
+    /** An authenticated actor holding no permissions: may grant only roles that carry none (no escalation). */
+    private static com.erg.ergspringboot.platform.security.ErgPrincipal actor() {
+        return com.erg.ergspringboot.platform.security.ErgPrincipal.authenticated("actor-1", "session-1", "tenant-a",
+                List.of("hr"), List.of(), List.of(), List.of(), "employee", "admin", Map.of());
     }
 
     private Role role(String name) {

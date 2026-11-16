@@ -3,18 +3,22 @@ package com.erg.ergspringboot.users.internal.lifecycle;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.request.users.UserRequests.BulkDeleteRequest;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -23,11 +27,12 @@ class UserLifecycleUseCaseSoftDeleteTest {
 
     private final UserRepository users = mock(UserRepository.class);
     private final AuthSessionRepository sessions = mock(AuthSessionRepository.class);
+    private final UserSoftDeleteStore store = mock(UserSoftDeleteStore.class);
     private final UserLifecycleUseCase useCase =
-            new UserLifecycleUseCase(users, sessions, mock(UserActivityRepository.class));
+            new UserLifecycleUseCase(users, sessions, mock(UserActivityRepository.class), store);
 
     @Test
-    void deleteKeepsTheRowButDisablesAndAnonymisesTheAccount() {
+    void deleteIsSoftAndRestorableWithin30Days() {
         User user = user("usr_1");
         AuthSession session = new AuthSession();
         when(users.findByIdAndTenantId("usr_1", "erg")).thenReturn(Optional.of(user));
@@ -38,17 +43,40 @@ class UserLifecycleUseCaseSoftDeleteTest {
         verify(users, never()).delete(any());
         verify(users, never()).deleteAll(any());
         assertThat(user.getStatus()).isEqualTo("DELETED");
-        assertThat(user.getEmail()).isEqualTo("deleted-usr_1@deleted.invalid");
-        assertThat(user.getUsername()).isNull();
         assertThat(user.getPasswordHash()).isNull();
-        assertThat(user.getFullName()).isEqualTo("Deleted user");
-        assertThat(user.getPhone()).isNull();
-        assertThat(user.getAddress()).isNull();
-        assertThat(user.getDateOfBirth()).isNull();
-        assertThat(user.getRecoveryEmail()).isNull();
+        // PII is kept for the restore window; the purge job anonymises it afterwards.
+        assertThat(user.getEmail()).isEqualTo("usr_1@example.test");
+        assertThat(user.getFullName()).isEqualTo("Some Person");
         assertThat(user.getAuthzVersion()).isEqualTo(2L);
         assertThat(session.getRevokedAt()).isNotNull();
         assertThat(session.getRevokedReason()).isEqualTo("status_changed_deleted");
+        verify(store).mark(eq(List.of("usr_1")), any(OffsetDateTime.class),
+                org.mockito.ArgumentMatchers.argThat(purge -> purge.isAfter(OffsetDateTime.now(ZoneOffset.UTC).plusDays(29))));
+    }
+
+    @Test
+    void restoreWithinWindowBringsAccountBackInactive() {
+        User user = user("usr_1");
+        user.setStatus("DELETED");
+        when(users.findByIdAndTenantId("usr_1", "erg")).thenReturn(Optional.of(user));
+        when(store.purgeAfter("usr_1")).thenReturn(Optional.of(OffsetDateTime.now(ZoneOffset.UTC).plusDays(5)));
+
+        useCase.restore("usr_1", "erg", null);
+
+        assertThat(user.getStatus()).isEqualTo("INACTIVE");
+        assertThat(user.getMustChangePassword()).isTrue();
+        verify(store).restore("usr_1");
+    }
+
+    @Test
+    void restoreAfterWindowIsRejected() {
+        User user = user("usr_1");
+        user.setStatus("DELETED");
+        when(users.findByIdAndTenantId("usr_1", "erg")).thenReturn(Optional.of(user));
+        when(store.purgeAfter("usr_1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.restore("usr_1", "erg", null)).isInstanceOf(BadRequestException.class);
+        verify(store, never()).restore(any());
     }
 
     @Test
@@ -61,6 +89,7 @@ class UserLifecycleUseCaseSoftDeleteTest {
         useCase.bulkDelete("erg", new BulkDeleteRequest(List.of("usr_1", "usr_2")));
 
         verify(users, never()).deleteAll(any());
+        verify(store).mark(eq(List.of("usr_1", "usr_2")), any(), any());
         assertThat(List.of(first.getStatus(), second.getStatus())).containsOnly("DELETED");
     }
 
@@ -71,6 +100,23 @@ class UserLifecycleUseCaseSoftDeleteTest {
         when(users.findByIdAndTenantId("usr_1", "erg")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> useCase.delete("usr_1", "erg")).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void purgeJobAnonymisesAccountsPastTheWindowOnly() {
+        User user = user("usr_1");
+        user.setStatus("DELETED");
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        when(store.dueForPurge(now)).thenReturn(List.of("usr_1"));
+        when(users.findById("usr_1")).thenReturn(Optional.of(user));
+
+        assertThat(new UserPurgeJob(users, store).purgeDue(now)).isEqualTo(1);
+
+        assertThat(user.getEmail()).isEqualTo("deleted-usr_1@deleted.invalid");
+        assertThat(user.getFullName()).isEqualTo("Deleted user");
+        assertThat(user.getPhone()).isNull();
+        assertThat(user.getRecoveryEmail()).isNull();
+        verify(store).finishPurge("usr_1");
     }
 
     private static User user(String id) {

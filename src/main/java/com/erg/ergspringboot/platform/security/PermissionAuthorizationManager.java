@@ -30,7 +30,7 @@ public class PermissionAuthorizationManager {
         if (!(authentication.getPrincipal() instanceof ErgPrincipal principal)) {
             return new AuthorizationDecision(false);
         }
-        String portal = SecurityUtils.portalFromPath(context.getRequest().getRequestURI());
+        String portal = null; // permissions decide access; the portal is not derived from the path
         return new AuthorizationDecision(authorization.isAllowed(principal, permission, portal, principal.tenantId()));
     }
 
@@ -46,7 +46,7 @@ public class PermissionAuthorizationManager {
         if (!(authentication.getPrincipal() instanceof ErgPrincipal principal)) {
             return new AuthorizationDecision(false);
         }
-        String portal = SecurityUtils.portalFromPath(context.getRequest().getRequestURI());
+        String portal = null; // permissions decide access; the portal is not derived from the path
         return new AuthorizationDecision(authorization.isAllowedAny(principal, portal, principal.tenantId(), permissions));
     }
 }

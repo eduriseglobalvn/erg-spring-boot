@@ -18,6 +18,7 @@ import com.erg.ergspringboot.calendar.CalendarBatchResponses.*;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.calendar.CalendarScopeService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -264,7 +265,9 @@ public class CalendarRestController {
             requireManagedSchool(principal, requested);
             return requested;
         }
-        if (principal != null && principal.permissions() != null && principal.permissions().contains("*")) {
+        if (principal != null && principal.roles() != null && principal.permissions() != null
+                && WorkspaceCapabilityMapper.isPlatformWide(
+                        principal.roles(), principal.permissions(), principal.deniedPermissions())) {
             return null;
         }
         List<String> managed = scopeService.requireManagedSchools(principal, List.of());

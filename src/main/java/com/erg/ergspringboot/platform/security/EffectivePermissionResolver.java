@@ -18,13 +18,9 @@ import java.util.stream.Stream;
  * The single definition of a user's effective permissions, shared by login, bearer-session
  * principals and the OIDC bridge.
  *
- * <ol>
- *   <li>Grants come from directly assigned roles and from active scoped role assignments.</li>
- *   <li>Unexpired direct overrides are applied last: {@code grant}/{@code allow} (or blank) add
- *       the permission; every other grant type ({@code deny}, {@code revoke}, unknown) denies it.
- *       An explicit deny therefore always wins over a role grant.</li>
- *   <li>Names are trimmed and lower-cased; results are sorted.</li>
- * </ol>
+ * <p>Grants come only from directly assigned roles and active scoped role assignments. Per-user permission
+ * overrides are retired: the {@code overrides} argument is accepted for source compatibility and ignored.
+ * Names are trimmed and lower-cased; results are sorted.</p>
  */
 public final class EffectivePermissionResolver {
 
@@ -54,7 +50,7 @@ public final class EffectivePermissionResolver {
         if (user == null) {
             return new Result(List.of(), List.of());
         }
-        return resolve(user.getRoles(), user.getPermissionOverrides(), activeAssignments, now);
+        return resolve(user.getRoles(), null, activeAssignments, now);
     }
 
     public static Result resolve(
@@ -64,7 +60,6 @@ public final class EffectivePermissionResolver {
             OffsetDateTime now
     ) {
         Set<String> granted = new TreeSet<>();
-        Set<String> denied = new TreeSet<>();
         Stream<Role> assignedRoles = activeAssignments == null ? Stream.empty()
                 : activeAssignments.stream().filter(Objects::nonNull).map(UserRoleAssignment::getRole);
         Stream.concat(roles == null ? Stream.empty() : roles.stream(), assignedRoles)
@@ -75,32 +70,7 @@ public final class EffectivePermissionResolver {
                 .map(EffectivePermissionResolver::normalize)
                 .filter(Objects::nonNull)
                 .forEach(granted::add);
-        if (overrides != null) {
-            for (UserPermissionOverride override : overrides) {
-                String permission = override == null ? null : normalize(override.getPermission());
-                if (permission == null || isExpired(override, now)) {
-                    continue;
-                }
-                if (isGrant(override.getGrantType())) {
-                    granted.add(permission);
-                    denied.remove(permission);
-                } else {
-                    denied.add(permission);
-                    granted.remove(permission);
-                }
-            }
-        }
-        return new Result(List.copyOf(granted), List.copyOf(denied));
-    }
-
-    public static boolean isGrant(String grantType) {
-        return grantType == null || grantType.isBlank()
-                || "grant".equalsIgnoreCase(grantType.trim())
-                || "allow".equalsIgnoreCase(grantType.trim());
-    }
-
-    private static boolean isExpired(UserPermissionOverride override, OffsetDateTime now) {
-        return override.getExpiresAt() != null && now != null && !override.getExpiresAt().isAfter(now);
+        return new Result(List.copyOf(granted), List.of());
     }
 
     private static String normalize(String value) {

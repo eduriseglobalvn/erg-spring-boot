@@ -24,7 +24,8 @@ class UserOperationsTest {
         UserOperations operations = new UserOperations(queries,
                 mock(UserProfileUseCase.class), mock(UserPasswordUseCase.class),
                 mock(UserSessionUseCase.class), mock(UserProvisioningUseCase.class),
-                mock(UserLifecycleUseCase.class), mock(UserRoleAssignmentUseCase.class));
+                mock(UserLifecycleUseCase.class), mock(UserRoleAssignmentUseCase.class),
+                org.mockito.Mockito.mock(com.erg.ergspringboot.platform.security.AccountActionGuard.class));
 
         assertThat(operations.current("user-1", "tenant-1")).isSameAs(expected);
     }

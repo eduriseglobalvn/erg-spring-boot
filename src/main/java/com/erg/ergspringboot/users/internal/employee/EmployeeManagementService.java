@@ -25,6 +25,7 @@ import com.erg.ergspringboot.common.dto.authorization.AuthorizationDtos.AssignSc
 import com.erg.ergspringboot.users.ScopedRoleAssigner;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.users.UserOperations;
+import com.erg.ergspringboot.platform.security.AccountActionGuard;
 import com.erg.ergspringboot.platform.security.SecurityUtils;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.auth.SecurityEventRepository;
@@ -54,6 +55,7 @@ public class EmployeeManagementService {
     private final SecurityEventRepository securityEventRepository;
     private final UserRoleAssignmentRepository roleAssignmentRepository;
     private final ScopedRoleAssigner scopedRoleAssignmentService;
+    private final AccountActionGuard guard;
 
     public EmployeeManagementService(
             UserOperations userOperations,
@@ -63,7 +65,8 @@ public class EmployeeManagementService {
             AuthSessionRepository sessionRepository,
             SecurityEventRepository securityEventRepository,
             UserRoleAssignmentRepository roleAssignmentRepository,
-            ScopedRoleAssigner scopedRoleAssignmentService
+            ScopedRoleAssigner scopedRoleAssignmentService,
+            AccountActionGuard guard
     ) {
         this.userOperations = userOperations;
         this.profileRepository = profileRepository;
@@ -73,6 +76,7 @@ public class EmployeeManagementService {
         this.securityEventRepository = securityEventRepository;
         this.roleAssignmentRepository = roleAssignmentRepository;
         this.scopedRoleAssignmentService = scopedRoleAssignmentService;
+        this.guard = guard;
     }
 
     @Transactional(readOnly = true)
@@ -171,6 +175,7 @@ public class EmployeeManagementService {
         String normalizedTenant = normalizeTenant(tenantId);
         User user = userRepository.findByIdAndTenantId(userId, normalizedTenant)
                 .orElseThrow(() -> new ResourceNotFoundException("employee not found"));
+        guard.assertCanActOn(SecurityUtils.principal(), userId, AccountActionGuard.AccountAction.EDIT_EMPLOYEE);
         Map<String, Object> before = snapshot(user, null);
         if (request.fullName() != null) user.setFullName(request.fullName().trim());
         if (request.phone() != null) user.setPhone(trimToNull(request.phone()));

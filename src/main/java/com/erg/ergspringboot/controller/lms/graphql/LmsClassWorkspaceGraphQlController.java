@@ -3,6 +3,7 @@ package com.erg.ergspringboot.controller.lms.graphql;
 import com.erg.ergspringboot.common.response.lms.LmsClassWorkspaceResponses.ClassWorkspaceResponse;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.lms.LmsAcademicRecordOperations;
 import com.erg.ergspringboot.lms.LmsQueryOperations;
 import com.erg.ergspringboot.lms.authorization.LmsClassRead;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -14,13 +15,16 @@ public class LmsClassWorkspaceGraphQlController {
 
     private final LmsQueryOperations queries;
     private final GraphQlAccessSupport accessSupport;
+    private final LmsAcademicRecordOperations records;
 
     public LmsClassWorkspaceGraphQlController(
             LmsQueryOperations queries,
-            GraphQlAccessSupport accessSupport
+            GraphQlAccessSupport accessSupport,
+            LmsAcademicRecordOperations records
     ) {
         this.queries = queries;
         this.accessSupport = accessSupport;
+        this.records = records;
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "classWorkspace")
@@ -30,8 +34,10 @@ public class LmsClassWorkspaceGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.class.read", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, safeInput.tenantId());
-        accessSupport.assertClassScope(principal, safeInput.classId(), safeInput.schoolId());
-        accessSupport.assertEducationUnitScope(principal, safeInput.schoolId());
+        // Scope is checked against the class's real school, never the client-supplied schoolId;
+        // assertClassScope accepts either the class itself or that school.
+        String schoolId = records.schoolOfClass(tenantId, safeInput.classId());
+        accessSupport.assertClassScope(principal, safeInput.classId(), schoolId);
         boolean includeScoreSummary = accessSupport.isAllowed(principal, "lms.grade.read", "lms.manage", "*");
         boolean includeRiskSummary = accessSupport.isAllowed(
                 principal,

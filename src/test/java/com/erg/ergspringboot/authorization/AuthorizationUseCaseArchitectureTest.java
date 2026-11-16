@@ -47,14 +47,4 @@ class AuthorizationUseCaseArchitectureTest {
                 "src/main/java/com/erg/ergspringboot/authorization/AuthorizationCommandOperations.java"));
         assertThat(facade).doesNotContain("userRepository.findByIdAndTenantId(");
     }
-
-    @Test
-    void permissionOverridesHaveAnInternalUseCase() throws Exception {
-        assertThatCode(() -> Class.forName(
-                "com.erg.ergspringboot.authorization.internal.override.AuthorizationPermissionOverrideUseCase"))
-                .doesNotThrowAnyException();
-        String facade = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/authorization/AuthorizationCommandOperations.java"));
-        assertThat(facade).doesNotContain("overrideRepository.findById(");
-    }
 }

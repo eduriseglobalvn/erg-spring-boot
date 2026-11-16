@@ -7,6 +7,10 @@ import java.math.BigDecimal;
 public interface LmsAcademicRecordOperations {
     AttendanceWorkspaceResponse attendanceWorkspace(String tenantId, String classId, String subjectId, String from, String to);
     GradebookWorkspaceResponse gradebookWorkspace(String tenantId, String classId, String subjectId);
+    /** School of the class, or null when the class does not exist in the tenant. */
+    String schoolOfClass(String tenantId, String classId);
+    /** Throws ForbiddenException unless the student belongs to the class. */
+    void assertStudentInClass(String tenantId, String classId, String studentId);
     AttendanceRecordResponse upsertAttendance(AttendanceCommand command);
     GradebookScoreResponse upsertGradebookScore(GradebookScoreCommand command);
 

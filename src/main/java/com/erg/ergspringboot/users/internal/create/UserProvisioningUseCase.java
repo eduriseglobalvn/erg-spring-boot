@@ -69,6 +69,8 @@ public class UserProvisioningUseCase {
         if (assignedRoles.size() != requestedRoles.size())
             throw new BadRequestException("one or more role groups were not found");
         rolePolicy.assertCanGrant(actor, assignedRoles);
+        com.erg.ergspringboot.platform.security.AccountActionGuard.assertRoleCombination(
+                assignedRoles.stream().map(Role::getId).toList());
         Set<String> requestedSet = new LinkedHashSet<>(requestedRoles);
         if (request.policies().stream().anyMatch(policy -> !requestedSet.contains(policy.roleGroup())))
             throw new BadRequestException("policy role group must be assigned to the user");

@@ -43,7 +43,7 @@ class PermissionCatalogServiceTest {
             permissionRepository, roleRepository, overrideRepository
     );
     private final AuthorizationRoleDefinitionUseCase roles = new AuthorizationRoleDefinitionUseCase(
-            roleRepository, permissionRepository
+            roleRepository
     );
 
     {

@@ -241,7 +241,7 @@ public class ErgPrincipalService {
         EffectivePermissionResolver.Result resolved =
                 EffectivePermissionResolver.resolve(user, assignments, OffsetDateTime.now());
         PermissionEnvelope permissions = new PermissionEnvelope(resolved.granted(), resolved.denied());
-        List<String> managedEducationUnitIds = managedEducationUnitIds(user, permissions, assignments);
+        List<String> managedEducationUnitIds = managedEducationUnitIds(user, roles, permissions, assignments);
         return ErgPrincipal.authenticated(
                 user.getId(),
                 session.getSessionId(),
@@ -299,10 +299,11 @@ public class ErgPrincipalService {
 
     private List<String> managedEducationUnitIds(
             User user,
+            List<String> roles,
             PermissionEnvelope permissions,
             List<UserRoleAssignment> assignments
     ) {
-        if (permissions.granted().contains("*")) {
+        if (WorkspaceCapabilityMapper.isPlatformWide(roles, permissions.granted(), permissions.denied())) {
             return List.of("*");
         }
         Set<String> managedIds = new LinkedHashSet<>();

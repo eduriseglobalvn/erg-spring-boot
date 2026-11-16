@@ -31,7 +31,6 @@ import com.erg.ergspringboot.elearning.authorization.ElearningLeaderboardManage;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.platform.security.WorkspaceCapabilityMapper;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -304,12 +303,10 @@ public class StudentEngagementGraphQlController {
         return new LeaderboardManager(scope.tenantId(), scope.userId(), scope.tenantWide());
     }
 
-    /** Tenant-wide admins (ADMIN workspace role or platform-wide principal) open every class; others only classes taught. */
+    /** Only the platform-wide principal opens every class; the permission holders below only their taught classes. */
     private DiscussionModerator scope(String requestedTenantId, String permission) {
         ErgPrincipal principal = requirePrincipal(permission);
-        boolean tenantWide = accessSupport.isWildcardPrincipal(principal)
-                || WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(principal.roles(), List.of(), List.of())
-                        .contains("ADMIN");
+        boolean tenantWide = accessSupport.isWildcardPrincipal(principal);
         return new DiscussionModerator(accessSupport.verifiedTenantId(principal, requestedTenantId), principal.userId(), tenantWide);
     }
 

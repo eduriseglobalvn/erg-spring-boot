@@ -48,21 +48,6 @@ public final class SecurityUtils {
         return null;
     }
 
-    public static String portalFromPath(String path) {
-        String normalized = path == null ? "" : path.toLowerCase();
-        if (normalized.startsWith("/api/v1/admin") || normalized.startsWith("/api/admin")) return "admin";
-        if (normalized.startsWith("/api/v1/users") || normalized.startsWith("/api/users")) {
-            if (normalized.startsWith("/api/v1/users/me") || normalized.equals("/api/v1/users/onboarding")) return null;
-            return "admin";
-        }
-        if (normalized.startsWith("/api/lms/access-management") || normalized.startsWith("/api/lms/auth/accounts")) return "admin";
-        if (normalized.startsWith("/api/content") || normalized.startsWith("/api/curriculum")) return "lcms";
-        if (normalized.startsWith("/api/v1/elearning") || normalized.startsWith("/api/elearning")) return "elearning";
-        if (normalized.startsWith("/api/v1/lms") || normalized.startsWith("/api/lms")) return "lms";
-        if (normalized.startsWith("/api/v1/sessions") || normalized.startsWith("/api/v1/users/me")) return null;
-        return null;
-    }
-
     public static String normalizeTenant(String tenantId) {
         return isBlank(tenantId) ? DEFAULT_TENANT : tenantId.trim();
     }

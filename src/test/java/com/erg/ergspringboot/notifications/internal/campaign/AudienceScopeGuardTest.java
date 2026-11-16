@@ -23,7 +23,10 @@ class AudienceScopeGuardTest {
 
     private static final String TENANT = "t1";
     private static final String TEACHER = "gv1";
-    private static final Set<String> TEACHER_ROLES = Set.of("teacher");
+    private static final CampaignActor TEACHER_ACTOR =
+            new CampaignActor(TENANT, TEACHER, Set.of("teacher"), List.of("teacher.workspace.access"), List.of());
+    private static final CampaignActor SUPER_ADMIN =
+            new CampaignActor(TENANT, "ad1", Set.of("system.super_admin"), List.of("*"), List.of());
 
     private final LmsAudienceReadPort lms = mock(LmsAudienceReadPort.class);
     private final UserAuthorizationPort authorizations = mock(UserAuthorizationPort.class);
@@ -43,13 +46,13 @@ class AudienceScopeGuardTest {
     }
 
     private void teacherSends(CampaignAudience audience) {
-        guard.assertAllowed(TENANT, TEACHER, TEACHER_ROLES, audience);
+        guard.assertAllowed(TEACHER_ACTOR, audience);
     }
 
     @Test
     void seededTeacherRoleIsATeacherThroughItsVerifiedPermissions() {
         CampaignActor seeded = new CampaignActor(TENANT, TEACHER, Set.of("lms_teacher_standard"),
-                List.of("lms.assignment.read", "notification.campaign.send"), List.of());
+                List.of("teacher.workspace.access", "notification.campaign.send"), List.of());
 
         assertThat(guard.isTeacher(seeded)).isTrue();
         assertThat(guard.isAdmin(seeded)).isFalse();
@@ -74,7 +77,7 @@ class AudienceScopeGuardTest {
     @Test
     void deniedTeacherWorkspaceFailsClosed() {
         CampaignActor denied = new CampaignActor(TENANT, TEACHER, Set.of("lms_teacher_standard"),
-                List.of("lms.assignment.read"), List.of("workspace.*"));
+                List.of("teacher.workspace.access"), List.of("teacher.workspace.access"));
 
         assertThat(guard.isTeacher(denied)).isFalse();
         assertThat(guard.isTeacher(new CampaignActor(TENANT, TEACHER, null, null, null))).isFalse();
@@ -130,7 +133,7 @@ class AudienceScopeGuardTest {
         CampaignAudience everything = new CampaignAudience(
                 true, List.of("sch"), List.of("7"), List.of("8A"), List.of("g"), List.of("STAFF"), List.of("anyone"));
 
-        assertThatCode(() -> guard.assertAllowed(TENANT, "ad1", Set.of("admin"), everything))
+        assertThatCode(() -> guard.assertAllowed(SUPER_ADMIN, everything))
                 .doesNotThrowAnyException();
     }
 
@@ -167,7 +170,7 @@ class AudienceScopeGuardTest {
                 .thenAnswer(call -> ((Collection<String>) call.getArgument(2)).stream()
                         .filter("s9"::equals).toList());
         CampaignActor lmsAdmin = new CampaignActor(TENANT, "la1", Set.of("lms.admin"),
-                List.of("perm_lms_manage", "notification.campaign.send"), List.of());
+                List.of("notifications.manage", "notification.campaign.send"), List.of());
 
         assertThat(guard.isAdmin(lmsAdmin)).isFalse();
         assertThat(guard.isUnitAdmin(lmsAdmin)).isTrue();
@@ -198,11 +201,13 @@ class AudienceScopeGuardTest {
     }
 
     @Test
-    void unitAdminRoleNamesAreExactAndNeverComeFromPermissions() {
-        assertThat(guard.isUnitAdmin(new CampaignActor(TENANT, "x", Set.of("vice_principal")))).isFalse();
+    void unitAdminComesFromNotificationsManageNeverFromRoleNames() {
+        assertThat(guard.isUnitAdmin(new CampaignActor(TENANT, "x", Set.of("vice_principal", "lms.admin")))).isFalse();
         assertThat(guard.isUnitAdmin(new CampaignActor(TENANT, "x", Set.of(), List.of("lms.admin"), List.of()))).isFalse();
-        // tenant-wide admins keep tenant-wide reach even when they also hold a unit role
-        CampaignActor both = new CampaignActor(TENANT, "x", Set.of("admin", "principal"));
+        assertThat(guard.isUnitAdmin(new CampaignActor(TENANT, "x", Set.of(), List.of("notifications.manage"), List.of()))).isTrue();
+        // tenant-wide admins keep tenant-wide reach even when they also hold notifications.manage
+        CampaignActor both = new CampaignActor(TENANT, "x", Set.of("system.super_admin"),
+                List.of("*", "notifications.manage"), List.of());
         assertThat(guard.isUnitAdmin(both)).isFalse();
         assertThatCode(() -> guard.assertAllowed(both, new CampaignAudience(true, null, null, null, null, null, null)))
                 .doesNotThrowAnyException();

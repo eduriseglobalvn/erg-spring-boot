@@ -27,39 +27,24 @@ class WorkspaceCapabilityMapperTest {
     }
 
     @Test
-    void projectsAllCapabilitiesForAnAuthenticatedMultiRoleAccount() {
-        assertEquals(
-                java.util.List.of("ADMIN", "CRM", "STUDENT", "TEACHER"),
-                WorkspaceCapabilityMapper.canonicalWorkspaces(
-                        java.util.List.of("lms"),
-                        java.util.List.of("teacher", "student"),
-                        java.util.List.of("crm.lead.read", "admin.content.read", "elearning.dashboard.read")));
-    }
-
-    @Test
-    void studentPreviewPermissionProjectsStudentWorkspaceWithoutOtherWorkspaces() {
-        assertEquals(
-                java.util.List.of("STUDENT", "TEACHER"),
-                WorkspaceCapabilityMapper.canonicalWorkspaces(
-                        java.util.List.of(), java.util.List.of("lms_teacher_standard"),
-                        java.util.List.of("lms.class.read", "elearning.student.preview")));
-        assertEquals(
-                java.util.List.of("STUDENT"),
+    void workspacesComeFromWorkspacePermissionsOnly() {
+        // roles and ordinary permission prefixes no longer open a workspace
+        assertEquals(java.util.List.of(), WorkspaceCapabilityMapper.canonicalWorkspaces(
+                java.util.List.of(), java.util.List.of("teacher", "admin", "student", "lms.instructor"),
+                java.util.List.of("crm.lead.read", "admin.content.read", "elearning.dashboard.read", "lms.class.read")));
+        assertEquals(java.util.List.of(), WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                java.util.List.of("system.admin", "lms.learner"),
+                java.util.List.of("lms.quiz.play", "elearning.student.preview"), java.util.List.of()));
+        // each *.workspace.access opens exactly its own workspace
+        assertEquals(java.util.List.of("ADMIN", "CRM", "STUDENT", "TEACHER"),
                 WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
-                        java.util.List.of(), java.util.List.of("elearning.student.preview"), java.util.List.of()));
-    }
-
-    @Test
-    void learnerRoleAndGrantsProjectOnlyTheStudentWorkspace() {
-        java.util.List<String> roles = java.util.List.of("lms.learner");
-        java.util.List<String> permissions = java.util.List.of(
-                "lms.assignment.read_self", "lms.assignment.submit", "lms.quiz.play", "elearning.dashboard.read");
-        assertEquals(java.util.List.of("STUDENT"), WorkspaceCapabilityMapper.canonicalWorkspaces(java.util.List.of(), roles, permissions));
-        assertEquals(java.util.List.of("STUDENT"),
-                WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(roles, permissions, java.util.List.of()));
-        // A teacher keeps the teacher workspace through its own lms grants.
-        assertEquals(java.util.List.of("STUDENT", "TEACHER"), WorkspaceCapabilityMapper.canonicalWorkspaces(
-                java.util.List.of(), java.util.List.of("lms.instructor"), java.util.List.of("lms.class.read", "lms.quiz.play")));
+                        java.util.List.of(), java.util.List.of("admin.workspace.access", "teacher.workspace.access",
+                                "student.workspace.access", "CRM.workspace.access"), java.util.List.of()));
+        assertEquals(java.util.List.of("TEACHER"), WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                java.util.List.of(), java.util.List.of("teacher.workspace.access", "admin.workspace.access"),
+                java.util.List.of("admin.workspace.access")));
+        assertEquals(java.util.List.of("lcms", "lms"), WorkspaceCapabilityMapper.legacyPortalsFor(
+                java.util.List.of(), java.util.List.of(), java.util.List.of("admin.workspace.access", "teacher.workspace.access")));
     }
 
     @Test
@@ -68,6 +53,8 @@ class WorkspaceCapabilityMapperTest {
                 java.util.List.of("ADMIN", "CRM", "STUDENT", "TEACHER"),
                 WorkspaceCapabilityMapper.canonicalWorkspaces(
                         java.util.List.of(), java.util.List.of("system.super_admin"), java.util.List.of("*")));
+        assertEquals(java.util.List.of(), WorkspaceCapabilityMapper.canonicalWorkspaces(
+                java.util.List.of(), java.util.List.of("global_admin", "erg_super_admin"), java.util.List.of("*")));
         assertEquals(java.util.List.of("*"), WorkspaceCapabilityMapper.legacyPortalsFor(
                 java.util.List.of(), java.util.List.of("system.super_admin"), java.util.List.of("*")));
     }

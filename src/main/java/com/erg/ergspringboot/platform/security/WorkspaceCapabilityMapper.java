@@ -40,8 +40,10 @@ public final class WorkspaceCapabilityMapper {
         if (isPlatformWide(roles, permissions, List.of())) {
             capabilities.addAll(EnumSet.allOf(WorkspaceCapability.class));
         } else {
-            addTokens(capabilities, portals);
-            addTokens(capabilities, roles);
+            if (portals != null) {
+                portals.stream().map(WorkspaceCapabilityMapper::fromLegacyPortal)
+                        .flatMap(Optional::stream).forEach(capabilities::add);
+            }
             addTokens(capabilities, permissions);
         }
         return capabilities.stream().map(Enum::name).sorted().toList();
@@ -60,8 +62,7 @@ public final class WorkspaceCapabilityMapper {
         if (isPlatformWide(roles, permissions, deniedPermissions)) {
             capabilities.addAll(EnumSet.allOf(WorkspaceCapability.class));
         } else {
-            addVerifiedTokens(capabilities, roles);
-            addVerifiedTokens(capabilities, permissions);
+            addTokens(capabilities, permissions);
         }
         removeDenied(capabilities, deniedPermissions);
         return capabilities.stream().map(Enum::name).sorted().toList();
@@ -96,15 +97,7 @@ public final class WorkspaceCapabilityMapper {
     private static void addTokens(Set<WorkspaceCapability> capabilities, List<String> values) {
         if (values == null) return;
         values.stream()
-                .map(WorkspaceCapabilityMapper::fromCapabilityToken)
-                .flatMap(Optional::stream)
-                .forEach(capabilities::add);
-    }
-
-    private static void addVerifiedTokens(Set<WorkspaceCapability> capabilities, List<String> values) {
-        if (values == null) return;
-        values.stream()
-                .map(WorkspaceCapabilityMapper::fromVerifiedCapabilityToken)
+                .map(WorkspaceCapabilityMapper::fromWorkspaceAccess)
                 .flatMap(Optional::stream)
                 .forEach(capabilities::add);
     }
@@ -112,10 +105,10 @@ public final class WorkspaceCapabilityMapper {
     private static void removeDenied(Set<WorkspaceCapability> capabilities, List<String> deniedPermissions) {
         if (deniedPermissions == null) return;
         deniedPermissions.stream()
-                .map(WorkspaceCapabilityMapper::fromVerifiedCapabilityToken)
+                .map(WorkspaceCapabilityMapper::fromWorkspaceAccess)
                 .flatMap(Optional::stream)
                 .forEach(capabilities::remove);
-        if (containsNormalized(deniedPermissions, "workspace.*", "*")) {
+        if (containsNormalized(deniedPermissions, "*")) {
             capabilities.clear();
         }
     }
@@ -125,7 +118,7 @@ public final class WorkspaceCapabilityMapper {
      * denies it. Any other {@code *}, including a client-sent portal value, grants no workspace.
      */
     public static boolean isPlatformWide(List<String> roles, List<String> permissions, List<String> deniedPermissions) {
-        return containsNormalized(roles, "system.super_admin", "erg_super_admin", "global_admin")
+        return containsNormalized(roles, "system.super_admin")
                 && containsNormalized(permissions, "*")
                 && !containsNormalized(deniedPermissions, "*");
     }
@@ -139,70 +132,15 @@ public final class WorkspaceCapabilityMapper {
     }
 
 
-    /**
-     * The learner role and the grants it holds share the {@code lms.} prefix with teacher grants
-     * (V4, V116); they mean the student workspace, never the teacher one.
-     */
-    private static boolean isLearnerLmsToken(String normalized) {
-        return normalized.equals("lms.learner")
-                || normalized.equals("lms.quiz.play")
-                || normalized.equals("lms.assignment.submit")
-                || (normalized.startsWith("lms.") && normalized.endsWith("_self"));
-    }
-
-    private static Optional<WorkspaceCapability> fromCapabilityToken(String value) {
-        if (value == null || value.isBlank()) return Optional.empty();
-        String normalized = value.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return switch (normalized) {
-            case "admin", "administrator", "super_admin", "erg_admin", "erg_super_admin", "global_admin", "lms_admin" -> Optional.of(WorkspaceCapability.ADMIN);
-            case "lcms" -> Optional.of(WorkspaceCapability.ADMIN);
-            case "lms", "teacher", "instructor", "teacher_role" -> Optional.of(WorkspaceCapability.TEACHER);
-            case "student", "learner", "elearning" -> Optional.of(WorkspaceCapability.STUDENT);
-            case "crm", "crm_manager" -> Optional.of(WorkspaceCapability.CRM);
-            default -> {
-                if (normalized.startsWith("admin.") || normalized.startsWith("lcms.")) {
-                    yield Optional.of(WorkspaceCapability.ADMIN);
-                }
-                if (normalized.startsWith("crm.")) {
-                    yield Optional.of(WorkspaceCapability.CRM);
-                }
-                if (normalized.startsWith("elearning.") || normalized.startsWith("student.") || isLearnerLmsToken(normalized)) {
-                    yield Optional.of(WorkspaceCapability.STUDENT);
-                }
-                if (normalized.startsWith("lms.") || normalized.startsWith("teacher.") || normalized.startsWith("instructor.")) {
-                    yield Optional.of(WorkspaceCapability.TEACHER);
-                }
-                yield Optional.empty();
-            }
-        };
-    }
-
-    private static Optional<WorkspaceCapability> fromVerifiedCapabilityToken(String value) {
-        if (value == null || value.isBlank()) return Optional.empty();
-        String normalized = value.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        return switch (normalized) {
-            case "admin", "administrator", "super_admin", "erg_admin", "erg_super_admin",
-                    "global_admin", "lms_admin", "rbac.*", "roles.*", "content.*",
-                    "curriculum.*", "media.*", "workspace.admin", "admin.*" -> Optional.of(WorkspaceCapability.ADMIN);
-            case "lms", "teacher", "instructor", "teacher_role", "workspace.teacher" -> Optional.of(WorkspaceCapability.TEACHER);
-            case "student", "learner", "elearning", "workspace.student" -> Optional.of(WorkspaceCapability.STUDENT);
-            case "crm", "crm_manager", "workspace.crm" -> Optional.of(WorkspaceCapability.CRM);
-            default -> {
-                if (normalized.startsWith("admin.") || normalized.startsWith("lcms.")
-                        || normalized.startsWith("rbac.") || normalized.startsWith("content.")
-                        || normalized.startsWith("curriculum.") || normalized.startsWith("media.")) {
-                    yield Optional.of(WorkspaceCapability.ADMIN);
-                }
-                if (normalized.startsWith("crm.")) yield Optional.of(WorkspaceCapability.CRM);
-                if (normalized.startsWith("elearning.") || normalized.startsWith("student.") || isLearnerLmsToken(normalized)) {
-                    yield Optional.of(WorkspaceCapability.STUDENT);
-                }
-                if (normalized.startsWith("lms.") || normalized.startsWith("teacher.")
-                        || normalized.startsWith("instructor.")) {
-                    yield Optional.of(WorkspaceCapability.TEACHER);
-                }
-                yield Optional.empty();
-            }
+    /** A workspace is opened only by its own {@code *.workspace.access} permission; no role or prefix guessing. */
+    private static Optional<WorkspaceCapability> fromWorkspaceAccess(String value) {
+        if (value == null) return Optional.empty();
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "admin.workspace.access" -> Optional.of(WorkspaceCapability.ADMIN);
+            case "teacher.workspace.access" -> Optional.of(WorkspaceCapability.TEACHER);
+            case "student.workspace.access" -> Optional.of(WorkspaceCapability.STUDENT);
+            case "crm.workspace.access" -> Optional.of(WorkspaceCapability.CRM);
+            default -> Optional.empty();
         };
     }
 }

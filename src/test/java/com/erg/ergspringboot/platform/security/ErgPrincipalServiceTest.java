@@ -176,6 +176,9 @@ class ErgPrincipalServiceTest {
         ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);
         Role role = new Role();
         role.setName("admin");
+        Permission adminAccess = new Permission();
+        adminAccess.setName("admin.workspace.access");
+        role.setPermissions(new LinkedHashSet<>(List.of(adminAccess)));
         User user = new User();
         user.setId("u-local-admin");
         user.setStatus("ACTIVE");

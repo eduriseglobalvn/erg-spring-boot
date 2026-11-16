@@ -55,7 +55,7 @@ class OidcPrincipalBridgeFilterTest {
                     assertThat(ergPrincipal.userId()).isEqualTo("user-1");
                     assertThat(ergPrincipal.sessionId()).isEqualTo(request.getSession().getId());
                     assertThat(ergPrincipal.roles()).containsExactly("lms.teacher");
-                    assertThat(ergPrincipal.permissions()).containsExactly("lms.quiz.read");
+                    assertThat(ergPrincipal.permissions()).containsExactlyInAnyOrder("lms.quiz.read", "teacher.workspace.access");
                     assertThat(ergPrincipal.portals()).containsExactly("lms");
                     assertThat(ergPrincipal.permissions()).doesNotContain("*");
                 }
@@ -263,7 +263,9 @@ class OidcPrincipalBridgeFilterTest {
         permission.setName("lms.quiz.read");
         Role role = new Role();
         role.setName("lms.teacher");
-        role.setPermissions(Set.of(permission));
+        Permission workspace = new Permission();
+        workspace.setName("teacher.workspace.access");
+        role.setPermissions(Set.of(permission, workspace));
         User user = new User();
         user.setId("user-1");
         user.setUsername("staff-01");

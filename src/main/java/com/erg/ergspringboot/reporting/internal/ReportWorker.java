@@ -193,7 +193,7 @@ public class ReportWorker {
 
     private String csvCell(Object value) {
         if (value == null) return "";
-        String text = String.valueOf(value);
+        String text = com.erg.ergspringboot.utils.CsvCells.safe(String.valueOf(value));
         return "\"" + text.replace("\"", "\"\"") + "\"";
     }
 

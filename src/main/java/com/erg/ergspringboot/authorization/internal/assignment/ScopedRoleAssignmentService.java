@@ -10,6 +10,7 @@ import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.platform.security.AccountActionGuard;
 import com.erg.ergspringboot.platform.security.ProtectedRolePolicy;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
@@ -19,8 +20,10 @@ import com.erg.ergspringboot.users.ScopedRoleAssigner;
 import com.erg.ergspringboot.users.UserAuditContext;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,18 +34,21 @@ public class ScopedRoleAssignmentService implements ScopedRoleAssigner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final AuthorizationMutationAuditService mutationAuditService;
+    private final AccountActionGuard guard;
     private final ProtectedRolePolicy protectedRolePolicy = new ProtectedRolePolicy();
 
     public ScopedRoleAssignmentService(
             UserRoleAssignmentRepository assignmentRepository,
             RoleRepository roleRepository,
             UserRepository userRepository,
-            AuthorizationMutationAuditService mutationAuditService
+            AuthorizationMutationAuditService mutationAuditService,
+            AccountActionGuard guard
     ) {
         this.assignmentRepository = assignmentRepository;
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.mutationAuditService = mutationAuditService;
+        this.guard = guard;
     }
 
     @Transactional
@@ -77,6 +83,9 @@ public class ScopedRoleAssignmentService implements ScopedRoleAssigner {
         if (!List.of("SYSTEM", "TENANT").contains(scopeType) && scopeId == null) {
             throw new BadRequestException("scope id is required");
         }
+        Set<String> rolesAfter = new LinkedHashSet<>(guard.currentRoleIds(actor, userId));
+        rolesAfter.add(role.getId());
+        guard.assertCanAssign(actor, userId, rolesAfter, scopeType, scopeId);
         if (request.expiresAt() != null && !request.expiresAt().isAfter(OffsetDateTime.now())) {
             throw new BadRequestException("role assignment expiry must be in the future");
         }
@@ -126,6 +135,9 @@ public class ScopedRoleAssignmentService implements ScopedRoleAssigner {
         if (assignment.getRevokedAt() != null) {
             return toResponse(assignment, role);
         }
+        Set<String> rolesAfter = new LinkedHashSet<>(guard.currentRoleIds(actor, userId));
+        rolesAfter.remove(role.getId());
+        guard.assertCanAssign(actor, userId, rolesAfter, assignment.getScopeType(), assignment.getScopeId());
         UserAuditContext context = auditContext == null ? actorContext(actor) : auditContext;
         if (context.actorUserId() == null || context.actorUserId().isBlank()) {
             throw new BadRequestException("revocation actor is required");

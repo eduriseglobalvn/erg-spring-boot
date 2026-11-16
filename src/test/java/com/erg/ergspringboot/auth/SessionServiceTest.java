@@ -58,7 +58,7 @@ class SessionServiceTest {
                 userPermissionOverrideRepository,
                 userRoleAssignmentRepository
         );
-        User user = userWithRole("u-teacher", "teacher");
+        User user = userWithRole("u-teacher", "teacher", "teacher.workspace.access");
         AuthSession session = new AuthSession();
         session.setUser(user);
         session.setSessionId("s1");
@@ -134,7 +134,7 @@ class SessionServiceTest {
                 userPermissionOverrideRepository,
                 userRoleAssignmentRepository
         );
-        User user = userWithRole("u-local-admin", "admin");
+        User user = userWithRole("u-local-admin", "admin", "admin.workspace.access");
         user.setIsProfileCompleted(true);
         user.setRecoveryEmailVerified(true);
         AuthSession session = new AuthSession();
@@ -195,9 +195,14 @@ class SessionServiceTest {
                 .hasMessageContaining("classes");
     }
 
-    private User userWithRole(String userId, String roleName) {
+    private User userWithRole(String userId, String roleName, String... permissions) {
         Role role = new Role();
         role.setName(roleName);
+        role.setPermissions(new LinkedHashSet<>(java.util.Arrays.stream(permissions).map(name -> {
+            Permission permission = new Permission();
+            permission.setName(name);
+            return permission;
+        }).toList()));
         User user = new User();
         user.setId(userId);
         user.setFullName("Teacher");
@@ -250,9 +255,10 @@ class SessionServiceTest {
     }
 
     @Test
-    void onlyExactEducationUnitAdminRoleNamesExpandToDescendantUnits() {
+    void onlyRolesHoldingClassManageExpandToDescendantUnits() {
         SessionService service = new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
                 userPermissionOverrideRepository, userRoleAssignmentRepository);
+        // Expansion follows the lms.class.manage permission now, not the role name.
         for (String roleName : List.of("vice_principal", "principal")) {
             User user = userWithRole("u-" + roleName, "staff");
             AuthSession session = new AuthSession();
@@ -262,6 +268,11 @@ class SessionServiceTest {
             session.setExpiresAt(OffsetDateTime.now().plusHours(1));
             Role role = new Role();
             role.setName(roleName);
+            if ("principal".equals(roleName)) {
+                Permission classManage = new Permission();
+                classManage.setName("lms.class.manage");
+                role.setPermissions(new LinkedHashSet<>(List.of(classManage)));
+            }
             UserRoleAssignment assignment = new UserRoleAssignment();
             assignment.setUserId(user.getId());
             assignment.setRoleId("role-" + roleName);
@@ -298,7 +309,7 @@ class SessionServiceTest {
         user.setRecoveryEmailVerified(false);
         stubSession(user, "s-student");
         when(userRoleAssignmentRepository.findActiveForUser(eq("u-student"), eq("erg"), any(OffsetDateTime.class)))
-                .thenReturn(List.of(assignment("u-student", "lms.learner", "lms.quiz.play", "lms.assignment.submit")));
+                .thenReturn(List.of(assignment("u-student", "lms.learner", "lms.quiz.play", "lms.assignment.submit", "student.workspace.access")));
 
         SessionBootstrapResponse response = service.currentBootstrap("s-student", "erg",
                 new UserAccessContext("u-student", "erg", List.of(), List.of(), null, null));
@@ -318,7 +329,7 @@ class SessionServiceTest {
         user.setMustChangePassword(true);
         stubSession(user, "s-assigned-teacher");
         when(userRoleAssignmentRepository.findActiveForUser(eq("u-assigned-teacher"), eq("erg"), any(OffsetDateTime.class)))
-                .thenReturn(List.of(assignment("u-assigned-teacher", "teacher", "lms.classes.read")));
+                .thenReturn(List.of(assignment("u-assigned-teacher", "teacher", "lms.classes.read", "teacher.workspace.access")));
 
         SessionBootstrapResponse response = service.currentBootstrap("s-assigned-teacher", "erg",
                 new UserAccessContext("u-assigned-teacher", "erg", List.of(), List.of(), null, null));

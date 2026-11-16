@@ -1,6 +1,9 @@
 package com.erg.ergspringboot.controller.lms.graphql;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -12,6 +15,7 @@ import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.controller.lms.graphql.LmsClassWorkspaceGraphQlController.ClassWorkspaceInput;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
+import com.erg.ergspringboot.lms.LmsAcademicRecordOperations;
 import com.erg.ergspringboot.lms.LmsQueryOperations;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -31,13 +35,19 @@ class LmsClassWorkspaceGraphQlControllerTest {
     @Mock
     private LmsQueryOperations lmsReadModelService;
 
+    @Mock
+    private LmsAcademicRecordOperations records;
+
     private LmsClassWorkspaceGraphQlController controller;
 
     @BeforeEach
     void setUp() {
         controller = new LmsClassWorkspaceGraphQlController(
                 lmsReadModelService,
-                new GraphQlAccessSupport(new com.erg.ergspringboot.platform.security.ErgPolicyService()));
+                new GraphQlAccessSupport(new com.erg.ergspringboot.platform.security.ErgPolicyService()),
+                records);
+        lenient().when(records.schoolOfClass(any(), eq("class-1"))).thenReturn("school-1");
+        lenient().when(records.schoolOfClass(any(), eq("class-9"))).thenReturn("school-9");
     }
 
     @AfterEach
@@ -82,7 +92,7 @@ class LmsClassWorkspaceGraphQlControllerTest {
     }
 
     @Test
-    void classWorkspaceRejectsSchoolScopeWithoutSchoolBoundInputBeforeRepositoryRead() {
+    void classWorkspaceChecksSchoolScopeAgainstTheClassRealSchoolNotTheRequest() {
         authenticate(principal(
                 "tenant-a",
                 List.of("lms.class.read"),
@@ -91,8 +101,9 @@ class LmsClassWorkspaceGraphQlControllerTest {
                 List.of("school-1")
         ));
 
+        // class-9 belongs to school-9: claiming school-1 in the request must not unlock it.
         assertThatThrownBy(() -> controller.classWorkspace(
-                new ClassWorkspaceInput(null, "class-1", null, null, null, null, null, null, null)
+                new ClassWorkspaceInput(null, "class-9", "school-1", null, null, null, null, null, null)
         )).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(lmsReadModelService);
     }
@@ -124,7 +135,7 @@ class LmsClassWorkspaceGraphQlControllerTest {
         ));
 
         assertThatThrownBy(() -> controller.classWorkspace(
-                new ClassWorkspaceInput(null, "class-1", "school-2", null, null, null, null, null, null)
+                new ClassWorkspaceInput(null, "class-9", "school-2", null, null, null, null, null, null)
         )).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(lmsReadModelService);
     }

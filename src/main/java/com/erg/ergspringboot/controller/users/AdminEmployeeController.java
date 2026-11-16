@@ -32,6 +32,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import com.erg.ergspringboot.authorization.authorization.UsersRead;
+import com.erg.ergspringboot.authorization.authorization.UsersActivityRead;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,7 +60,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping({"", "/"})
-    @UsersManage
+    @UsersRead
     public ResponseEntity<ApiResponse<EmployeeListResponse>> listUsers(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer limit,
@@ -72,7 +74,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/security-feed")
-    @UsersManage
+    @UsersActivityRead
     public ResponseEntity<ApiResponse<SecurityFeedPageResponse>> securityFeed(
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String sourceType,
@@ -97,7 +99,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}")
-    @UsersManage
+    @UsersRead
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> getEmployee(
             @PathVariable String userId,
             HttpServletRequest request
@@ -146,7 +148,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}/activity")
-    @UsersManage
+    @UsersActivityRead
     public ResponseEntity<ApiResponse<ActivityListResponse>> activity(
             @PathVariable String userId,
             @RequestParam(required = false) Integer page,
@@ -157,7 +159,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}/security-events")
-    @UsersManage
+    @UsersActivityRead
     public ResponseEntity<ApiResponse<SecurityEventPageResponse>> securityEvents(
             @PathVariable String userId,
             @RequestParam(required = false) Integer page,
@@ -168,7 +170,7 @@ public class AdminEmployeeController {
     }
 
     @GetMapping("/{userId}/sessions")
-    @UsersManage
+    @UsersActivityRead
     public ResponseEntity<ApiResponse<SessionListResponse>> sessions(
             @PathVariable String userId,
             HttpServletRequest request

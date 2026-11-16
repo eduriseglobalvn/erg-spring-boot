@@ -162,7 +162,8 @@ class ContentLifecycleOperationsTest {
 
     private void authenticate(String... permissions) {
         ErgPrincipal principal = ErgPrincipal.authenticated(
-                "user-1", "session-1", "tenant-a", List.of("admin"), List.of(permissions),
+                "user-1", "session-1", "tenant-a", List.of("admin"),
+                java.util.stream.Stream.concat(java.util.Arrays.stream(permissions), java.util.stream.Stream.of("admin.workspace.access")).toList(),
                 List.of(), List.of("admin"), "employee", "admin", Map.of());
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));

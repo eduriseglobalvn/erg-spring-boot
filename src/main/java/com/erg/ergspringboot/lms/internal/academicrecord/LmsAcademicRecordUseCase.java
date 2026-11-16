@@ -4,6 +4,7 @@ import static com.erg.ergspringboot.lms.LmsAcademicRecordResponses.*;
 import static com.erg.ergspringboot.lms.LmsAcademicRecordOperations.*;
 
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.SyncConflictException;
 import com.erg.ergspringboot.lms.LmsAcademicRecordOperations;
 import com.erg.ergspringboot.common.response.sync.SyncMutationResponses.ConflictPayload;
@@ -86,6 +87,29 @@ public class LmsAcademicRecordUseCase implements LmsAcademicRecordOperations {
                 rs.getBigDecimal("max_score"), rs.getInt("version"), rs.getObject("updated_at", OffsetDateTime.class)
         ), tenantId, classId, subjectId);
         return new GradebookWorkspaceResponse(tenantId, classId, subjectId, columns, scores);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String schoolOfClass(String tenantId, String classId) {
+        return jdbc.query("select school_id from academic_classes where tenant_id = ? and id = ?",
+                (rs, row) -> rs.getString(1), tenantId, classId).stream().findFirst().orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void assertStudentInClass(String tenantId, String classId, String studentId) {
+        Boolean member = jdbc.queryForObject("""
+                select exists (select 1 from lms_students s
+                  where s.tenant_id = ? and s.id = ?
+                    and (s.academic_class_id = ?
+                         or exists (select 1 from lms_student_enrollments e
+                                    where e.tenant_id = s.tenant_id and e.student_id = s.id
+                                      and e.class_id = ? and upper(e.status) = 'ENROLLED')))
+                """, Boolean.class, tenantId, studentId, classId, classId);
+        if (!Boolean.TRUE.equals(member)) {
+            throw new ForbiddenException("Student does not belong to this class.");
+        }
     }
 
     @Transactional

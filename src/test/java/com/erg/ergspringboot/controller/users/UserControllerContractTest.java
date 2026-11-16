@@ -23,7 +23,6 @@ import com.erg.ergspringboot.common.response.users.UserResponses.ActivityRespons
 import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.Meta;
 import com.erg.ergspringboot.common.response.users.UserResponses.OnboardingResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.PermissionOverrideResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.GlobalExceptionHandler;
 import com.erg.ergspringboot.platform.web.RequestIdFilter;
@@ -178,16 +177,6 @@ class UserControllerContractTest {
     }
 
     @Test
-    void onboardingRoutesAreSelfServiceInsteadOfAdminWorkspaceRoutes() {
-        org.junit.jupiter.api.Assertions.assertNull(
-                com.erg.ergspringboot.platform.security.SecurityUtils.portalFromPath("/api/v1/users/me/onboarding"));
-        org.junit.jupiter.api.Assertions.assertNull(
-                com.erg.ergspringboot.platform.security.SecurityUtils.portalFromPath("/api/v1/users/onboarding"));
-        org.junit.jupiter.api.Assertions.assertEquals("admin",
-                com.erg.ergspringboot.platform.security.SecurityUtils.portalFromPath("/api/v1/users/user-2"));
-    }
-
-    @Test
     void missingUserHeaderReturnsUnauthorized() throws Exception {
         MockMvc mockMvc = mockMvc(mock(UserOperations.class));
         SecurityContextHolder.clearContext();
@@ -202,7 +191,8 @@ class UserControllerContractTest {
         UserOperations userService = mock(UserOperations.class);
         when(userService.bulkUpdateStatus(eq("erg"), org.mockito.ArgumentMatchers.any(BulkStatusRequest.class)))
                 .thenReturn(new BulkOperationResponse(2));
-        when(userService.bulkDelete(eq("erg"), org.mockito.ArgumentMatchers.any(BulkDeleteRequest.class)))
+        when(userService.bulkDelete(eq("erg"), org.mockito.ArgumentMatchers.any(BulkDeleteRequest.class),
+                org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))
                 .thenReturn(new BulkOperationResponse(2));
         when(userService.assignRoles(eq("user-1"), eq("erg"),
                 org.mockito.ArgumentMatchers.any(AdminAssignRolesRequest.class),
@@ -249,7 +239,7 @@ class UserControllerContractTest {
     }
 
     @Test
-    void adminActivityAndPermissionOverridesUseVersionedRoutes() throws Exception {
+    void adminActivityUsesVersionedRoute() throws Exception {
         UserOperations userService = mock(UserOperations.class);
         when(userService.listActivity(eq("user-1"), eq("erg"), eq(1), eq(20)))
                 .thenReturn(new ActivityListResponse(
@@ -265,10 +255,6 @@ class UserControllerContractTest {
                         )),
                         new Meta(1, 20, 1, 1)
                 ));
-        when(userService.assignPermissions(eq("user-1"), eq("erg"),
-                org.mockito.ArgumentMatchers.any(AdminAssignPermissionsRequest.class),
-                org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))
-                .thenReturn(new PermissionOverrideResponse("user-1", List.of("users.read"), "GRANT"));
         MockMvc mockMvc = mockMvc(userService);
 
         mockMvc.perform(get("/api/v1/users/user-1/activity")
@@ -278,20 +264,6 @@ class UserControllerContractTest {
                         .header("X-Tenant-ID", "erg"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].action").value("USER_STATUS_UPDATED"));
-
-        mockMvc.perform(post("/api/v1/users/user-1/permissions")
-                        .contentType("application/json")
-                        .header("X-User-ID", "admin-1")
-                        .header("X-Tenant-ID", "erg")
-                        .content("""
-                                {
-                                  "permissions": ["users.read"],
-                                  "grant_type": "GRANT"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userId").value("user-1"))
-                .andExpect(jsonPath("$.data.grantType").value("GRANT"));
     }
 
     private MockMvc mockMvc(UserOperations userService) {

@@ -31,13 +31,32 @@ class AccessScopeAssemblerTest {
     @Test
     void wildcardPermissionProducesWildcardLegacyScopes() {
         ErgPrincipal principal = new ErgPrincipal(
-                "admin", "session-1", "tenant-1", List.of("admin"), List.of("*"),
+                "admin", "session-1", "tenant-1", List.of("system.super_admin"), List.of("*"),
                 List.of(), List.of("*"), "admin", "admin", Map.of());
 
         AccessScopeSet scopes = AccessScopeAssembler.from(principal);
 
         assertThat(scopes.managedIds(AccessScopeSet.EDUCATION_UNIT)).containsExactly("*");
         assertThat(scopes.managedIds(AccessScopeSet.CLASS)).containsExactly("*");
+    }
+
+    @Test
+    void wildcardIsUnlimitedScopeOnlyForSuperAdmin() {
+        ErgPrincipal tenantAdmin = new ErgPrincipal(
+                "u-2", "session-2", "tenant-1", List.of("director"), List.of("*"),
+                List.of(), List.of(), "erg", "user", Map.of("managedEducationUnitIds", List.of("unit-1")));
+
+        AccessScopeSet scopes = AccessScopeAssembler.from(tenantAdmin);
+
+        assertThat(scopes.managedIds(AccessScopeSet.EDUCATION_UNIT)).containsExactly("unit-1");
+        assertThat(scopes.managedIds(AccessScopeSet.CLASS)).isEmpty();
+    }
+
+    @Test
+    void classManagePermissionMakesAUnitAdmin() {
+        assertThat(AccessScopeAssembler.isEducationUnitAdmin(List.of("lms.class.manage"))).isTrue();
+        assertThat(AccessScopeAssembler.isEducationUnitAdmin(List.of("lms.class.read"))).isFalse();
+        assertThat(AccessScopeAssembler.isEducationUnitAdmin(null)).isFalse();
     }
 
     @Test

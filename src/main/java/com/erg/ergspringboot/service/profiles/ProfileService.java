@@ -26,20 +26,16 @@ public class ProfileService {
         this.userRepository = userRepository;
     }
 
+    /** {@code withInternalNote} is true only for a manager reading someone else's profile. */
     @Transactional(readOnly = true)
-    public ProfileResponse getProfile(String userId) {
-        return toResponse(findByUserId(userId));
-    }
-
-    @Transactional(readOnly = true)
-    public ProfileResponse getCurrentProfile(String userId) {
-        return getProfile(userId);
+    public ProfileResponse getProfile(String userId, String tenantId, boolean withInternalNote) {
+        requireUserInTenant(userId, tenantId);
+        return toResponse(findByUserId(userId), withInternalNote);
     }
 
     @Transactional
-    public ProfileResponse createProfile(CreateProfileRequest request) {
-        userRepository.findById(request.userId())
-                .orElseThrow(() -> new ResourceNotFoundException("user not found"));
+    public ProfileResponse createProfile(CreateProfileRequest request, String tenantId, boolean withInternalNote) {
+        requireUserInTenant(request.userId(), tenantId);
         if (profileRepository.findByUserId(request.userId()).isPresent()) {
             throw new ConflictException("profile already exists");
         }
@@ -47,24 +43,36 @@ public class ProfileService {
         profile.setId(IdGenerator.newId());
         profile.setUserId(request.userId());
         apply(profile, request);
+        if (!withInternalNote) profile.setInternalNote(null);
         profile.setIsProfileCompleted(isCompleted(profile));
         profileRepository.save(profile);
-        return toResponse(profile);
+        return toResponse(profile, withInternalNote);
     }
 
     @Transactional
-    public ProfileResponse updateProfile(String userId, UpdateProfileRequest request) {
+    public ProfileResponse updateProfile(String userId, UpdateProfileRequest request, String tenantId,
+                                         boolean withInternalNote) {
+        requireUserInTenant(userId, tenantId);
         Profile profile = findByUserId(userId);
+        String keptNote = profile.getInternalNote();
         apply(profile, request);
+        if (!withInternalNote) profile.setInternalNote(keptNote);
         profile.setIsProfileCompleted(isCompleted(profile));
         profileRepository.save(profile);
-        return toResponse(profile);
+        return toResponse(profile, withInternalNote);
     }
 
     @Transactional
-    public void deleteProfile(String userId) {
+    public void deleteProfile(String userId, String tenantId) {
+        requireUserInTenant(userId, tenantId);
         Profile profile = findByUserId(userId);
         profileRepository.delete(profile);
+    }
+
+    private void requireUserInTenant(String userId, String tenantId) {
+        if (tenantId == null || userRepository.findByIdAndTenantId(userId, tenantId).isEmpty()) {
+            throw new ResourceNotFoundException("user not found");
+        }
     }
 
     private Profile findByUserId(String userId) {
@@ -104,7 +112,7 @@ public class ProfileService {
         if (request.internalNote() != null) profile.setInternalNote(trimToNull(request.internalNote()));
     }
 
-    private ProfileResponse toResponse(Profile profile) {
+    private ProfileResponse toResponse(Profile profile, boolean withInternalNote) {
         return new ProfileResponse(
                 profile.getId(),
                 profile.getUserId(),
@@ -122,7 +130,7 @@ public class ProfileService {
                 profile.getTeachingPhilosophy(),
                 Map.of(),
                 profile.getRating(),
-                profile.getInternalNote(),
+                withInternalNote ? profile.getInternalNote() : null,
                 iso(profile.getCreatedAt()),
                 iso(profile.getUpdatedAt())
         );

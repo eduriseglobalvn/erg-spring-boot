@@ -36,6 +36,7 @@ import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import com.erg.ergspringboot.timekeeping.authorization.TimekeepingRead;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,7 +65,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping("/today")
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<TodayDashboard> today(@RequestParam(required = false) String schoolId,
             @RequestParam(required = false) String siteId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -80,7 +81,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping("/timesheet")
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<Timesheet> timesheet(@RequestParam String schoolId, @RequestParam String period,
             @RequestParam(required = false) String team, @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size,
@@ -112,7 +113,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping("/sites")
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<List<SiteConfig>> sites(@RequestParam(required = false) String schoolId,
             HttpServletRequest request) {
         return ok("Sites loaded", timekeeping.sites(principal(), schoolId), request);
@@ -139,7 +140,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping("/shifts")
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<List<ShiftConfig>> shifts(@RequestParam(required = false) String schoolId,
             HttpServletRequest request) {
         return ok("Shifts loaded", timekeeping.shifts(principal(), schoolId), request);
@@ -166,7 +167,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping("/policies/{schoolId}")
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<PolicyVersions> policy(@PathVariable String schoolId, HttpServletRequest request) {
         return ok("Policy loaded", timekeeping.policy(principal(), schoolId), request);
     }
@@ -179,7 +180,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping(TimekeepingPaths.HOLIDAYS)
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<List<HolidayConfig>> holidays(@RequestParam(required = false) String schoolId,
             @RequestParam(required = false) Integer year, HttpServletRequest request) {
         return ok("Holidays loaded", timekeeping.holidays(principal(), schoolId, year), request);
@@ -216,7 +217,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping(TimekeepingPaths.SATURDAY_MODES)
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<List<SaturdayModeView>> saturdayModes(@RequestParam String month, HttpServletRequest request) {
         return ok("Saturday modes loaded", timekeeping.saturdayModes(principal(), month), request);
     }
@@ -238,7 +239,7 @@ public class TimekeepingAdminController {
     }
 
     @GetMapping("/remote-rules")
-    @TimekeepingManage
+    @TimekeepingRead
     public ApiResponse<List<RemoteRuleConfig>> remoteRules(@RequestParam(required = false) String schoolId,
             HttpServletRequest request) {
         return ok("Remote rules loaded", timekeeping.remoteRules(principal(), schoolId), request);

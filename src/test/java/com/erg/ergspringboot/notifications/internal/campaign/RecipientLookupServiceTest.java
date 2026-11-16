@@ -29,8 +29,13 @@ import org.springframework.security.access.AccessDeniedException;
 class RecipientLookupServiceTest {
 
     private static final String TENANT = "t1";
-    private static final List<String> ADMIN = List.of("admin");
-    private static final List<String> TEACHER = List.of("teacher");
+    // Workspaces come from verified permissions only; the tenant-wide admin is the wildcard holder.
+    private static final CampaignActor ADMIN =
+            new CampaignActor(TENANT, "ad1", Set.of("system.super_admin"), List.of("*"), List.of());
+
+    private static CampaignActor teacher(String id) {
+        return new CampaignActor(TENANT, id, Set.of("lms.teacher"), List.of("teacher.workspace.access"), List.of());
+    }
 
     /** Students of class 7A / 7B. Phone is stored with spaces on purpose; its key is the stripped form. */
     private final List<StudentCard> roll = List.of(
@@ -73,7 +78,7 @@ class RecipientLookupServiceTest {
     }
 
     private ResolvePeopleResult resolveAsAdmin(String... lines) {
-        return service.resolveLines(TENANT, "ad1", ADMIN, List.of(lines));
+        return service.resolveLines(ADMIN, List.of(lines));
     }
 
     private static List<String> ids(ResolvePeopleResult result) {
@@ -145,9 +150,9 @@ class RecipientLookupServiceTest {
     void moreThanFiveThousandLinesIsRejected() {
         List<String> lines = IntStream.rangeClosed(1, 5_001).mapToObj(i -> "HS" + i).toList();
 
-        assertThatThrownBy(() -> service.resolveLines(TENANT, "ad1", ADMIN, lines))
+        assertThatThrownBy(() -> service.resolveLines(ADMIN, lines))
                 .isInstanceOf(BadRequestException.class);
-        assertThat(service.resolveLines(TENANT, "ad1", ADMIN, lines.subList(0, 5_000)).notFound()).hasSize(5_000);
+        assertThat(service.resolveLines(ADMIN, lines.subList(0, 5_000)).notFound()).hasSize(5_000);
     }
 
     @Test
@@ -178,7 +183,7 @@ class RecipientLookupServiceTest {
     @Test
     void teacherOnlyReachesStudentsOfTaughtClasses() {
         ResolvePeopleResult result = service.resolveLines(
-                TENANT, "gv1", TEACHER, List.of("HS0712", "HS0300", "hoa@erg.edu.vn", "Vũ Lan", "Lê Bảo"));
+                teacher("gv1"), List.of("HS0712", "HS0300", "hoa@erg.edu.vn", "Vũ Lan", "Lê Bảo"));
 
         assertThat(ids(result)).containsExactly("u-a1");
         assertThat(result.notFound()).containsExactly("HS0300", "hoa@erg.edu.vn", "Vũ Lan", "Lê Bảo");
@@ -188,9 +193,9 @@ class RecipientLookupServiceTest {
     void teacherWithNoClassesReachesNobody() {
         when(lms.classIdsTaughtBy(TENANT, "gv2")).thenReturn(List.of());
 
-        assertThat(service.resolveLines(TENANT, "gv2", TEACHER, List.of("HS0712")).notFound())
+        assertThat(service.resolveLines(teacher("gv2"), List.of("HS0712")).notFound())
                 .containsExactly("HS0712");
-        assertThat(service.search(TENANT, "gv2", TEACHER, "Nguyễn", 20)).isEmpty();
+        assertThat(service.search(teacher("gv2"), "Nguyễn", 20)).isEmpty();
     }
 
     @Test
@@ -203,52 +208,52 @@ class RecipientLookupServiceTest {
 
     @Test
     void searchMatchesNamePartsIgnoringAccentsAndOrdersByName() {
-        List<RecipientCard> found = service.search(TENANT, "ad1", ADMIN, "van", 20);
+        List<RecipientCard> found = service.search(ADMIN, "van", 20);
 
         assertThat(found).extracting(RecipientCard::userId).containsExactly("u-a1", "u-a2");
-        assertThat(service.search(TENANT, "ad1", ADMIN, "  ĐỨC ", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(ADMIN, "  ĐỨC ", 20)).extracting(RecipientCard::userId)
                 .containsExactly("u-minh");
     }
 
     @Test
     void searchIsExactOnCodeEmailAndPhone() {
-        assertThat(service.search(TENANT, "ad1", ADMIN, "HS0100", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(ADMIN, "HS0100", 20)).extracting(RecipientCard::userId)
                 .containsExactly("u-minh");
-        assertThat(service.search(TENANT, "ad1", ADMIN, "minh@erg.edu.vn", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(ADMIN, "minh@erg.edu.vn", 20)).extracting(RecipientCard::userId)
                 .containsExactly("u-minh");
-        assertThat(service.search(TENANT, "ad1", ADMIN, "0911 111 111", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(ADMIN, "0911 111 111", 20)).extracting(RecipientCard::userId)
                 .containsExactly("u-a1");
         // exact, not prefix
-        assertThat(service.search(TENANT, "ad1", ADMIN, "HS07", 20)).isEmpty();
+        assertThat(service.search(ADMIN, "HS07", 20)).isEmpty();
     }
 
     @Test
     void searchBlankQueryIsEmptyAndLimitIsClamped() {
-        assertThat(service.search(TENANT, "ad1", ADMIN, "   ", 20)).isEmpty();
-        assertThat(service.search(TENANT, "ad1", ADMIN, null, 20)).isEmpty();
-        assertThat(service.search(TENANT, "ad1", ADMIN, "van", 0)).hasSize(1);
-        assertThat(service.search(TENANT, "ad1", ADMIN, "van", -5)).hasSize(1);
+        assertThat(service.search(ADMIN, "   ", 20)).isEmpty();
+        assertThat(service.search(ADMIN, null, 20)).isEmpty();
+        assertThat(service.search(ADMIN, "van", 0)).hasSize(1);
+        assertThat(service.search(ADMIN, "van", -5)).hasSize(1);
 
         List<StudentCard> many = IntStream.range(0, 40)
                 .mapToObj(i -> new StudentCard("m" + i, "Học Sinh %02d".formatted(i), "M" + i, null, null, "7A"))
                 .toList();
         students.extra = many;
-        assertThat(service.search(TENANT, "ad1", ADMIN, "Học Sinh", 1_000)).hasSize(20);
+        assertThat(service.search(ADMIN, "Học Sinh", 1_000)).hasSize(20);
     }
 
     @Test
     void searchForATeacherStaysInsideTaughtClassesAndNeverShowsStaff() {
-        assertThat(service.search(TENANT, "gv1", TEACHER, "le", 20)).isEmpty(); // Lê Bảo is in 9C
-        assertThat(service.search(TENANT, "gv1", TEACHER, "hoa", 20)).isEmpty();
-        assertThat(service.search(TENANT, "gv1", TEACHER, "lan", 20)).isEmpty();
-        assertThat(service.search(TENANT, "gv1", TEACHER, "minh", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(teacher("gv1"), "le", 20)).isEmpty(); // Lê Bảo is in 9C
+        assertThat(service.search(teacher("gv1"), "hoa", 20)).isEmpty();
+        assertThat(service.search(teacher("gv1"), "lan", 20)).isEmpty();
+        assertThat(service.search(teacher("gv1"), "minh", 20)).extracting(RecipientCard::userId)
                 .containsExactly("u-minh");
     }
 
     @Test
     void searchDropsStudentsWhoseLoginIsSuspended() {
-        assertThat(service.search(TENANT, "ad1", ADMIN, "Khoá", 20)).isEmpty();
-        assertThat(service.search(TENANT, "ad1", ADMIN, "HS0200", 20)).isEmpty();
+        assertThat(service.search(ADMIN, "Khoá", 20)).isEmpty();
+        assertThat(service.search(ADMIN, "HS0200", 20)).isEmpty();
     }
 
     @Test
@@ -259,7 +264,7 @@ class RecipientLookupServiceTest {
                 new StudentCard("u-out", "Chỉ Ngoài Lớp", "OUT1", null, "0966 000 222", "9C"));
 
         ResolvePeopleResult teacher = service.resolveLines(
-                TENANT, "gv1", TEACHER, List.of("hoang trung ten", "0955000111", "OUT1", "0966000222", "Chỉ Ngoài Lớp"));
+                teacher("gv1"), List.of("hoang trung ten", "0955000111", "OUT1", "0966000222", "Chỉ Ngoài Lớp"));
         assertThat(ids(teacher)).containsExactly("u-t1");
         assertThat(teacher.ambiguous()).isEmpty();
         assertThat(teacher.notFound()).containsExactly("OUT1", "0966000222", "Chỉ Ngoài Lớp");
@@ -271,15 +276,15 @@ class RecipientLookupServiceTest {
 
     @Test
     void adminSearchFindsTeachersAndStaffByNameAndEmail() {
-        assertThat(service.search(TENANT, "ad1", ADMIN, "đỗ thị", 20)).containsExactly(
+        assertThat(service.search(ADMIN, "đỗ thị", 20)).containsExactly(
                 new RecipientCard("t-hoa", "Đỗ Thị Hoa", "TEACHER", "Giáo viên · hoa@erg.edu.vn"));
-        assertThat(service.search(TENANT, "ad1", ADMIN, "HOA@erg.edu.vn", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(ADMIN, "HOA@erg.edu.vn", 20)).extracting(RecipientCard::userId)
                 .containsExactly("t-hoa");
-        assertThat(service.search(TENANT, "ad1", ADMIN, "vu lan", 20)).containsExactly(
+        assertThat(service.search(ADMIN, "vu lan", 20)).containsExactly(
                 new RecipientCard("st-lan", "Vũ Lan", "STAFF", "Nhân viên · lan@erg.edu.vn"));
-        assertThat(service.search(TENANT, "ad1", ADMIN, "lan@erg.edu.vn", 20)).extracting(RecipientCard::userId)
+        assertThat(service.search(ADMIN, "lan@erg.edu.vn", 20)).extracting(RecipientCard::userId)
                 .containsExactly("st-lan");
-        assertThat(service.search(TENANT, "ad1", ADMIN, "nghi", 20)).isEmpty(); // suspended teacher
+        assertThat(service.search(ADMIN, "nghi", 20)).isEmpty(); // suspended teacher
     }
 
     @Test
@@ -290,7 +295,7 @@ class RecipientLookupServiceTest {
                 .toList();
         List<String> lines = IntStream.range(0, 2_500).mapToObj(i -> "big%04d".formatted(i)).toList();
 
-        ResolvePeopleResult result = service.resolveLines(TENANT, "ad1", ADMIN, lines);
+        ResolvePeopleResult result = service.resolveLines(ADMIN, lines);
 
         assertThat(result.matched()).hasSize(2_000);
         assertThat(result.notFound()).hasSize(500).contains("big0000", "big2495");
@@ -308,8 +313,8 @@ class RecipientLookupServiceTest {
         assertThat(result.matched()).isEmpty();
         assertThat(result.ambiguous()).isEmpty();
         assertThat(result.notFound()).containsExactly("-", ".", "()", "́", "@");
-        assertThat(service.search(TENANT, "ad1", ADMIN, "́", 20)).isEmpty();
-        assertThat(service.search(TENANT, "ad1", ADMIN, "()", 20)).isEmpty();
+        assertThat(service.search(ADMIN, "́", 20)).isEmpty();
+        assertThat(service.search(ADMIN, "()", 20)).isEmpty();
     }
 
     @Test
@@ -326,7 +331,7 @@ class RecipientLookupServiceTest {
                 }).toList();
 
         long start = System.nanoTime();
-        ResolvePeopleResult result = service.resolveLines(TENANT, "ad1", ADMIN, lines);
+        ResolvePeopleResult result = service.resolveLines(ADMIN, lines);
         long millis = (System.nanoTime() - start) / 1_000_000;
 
         assertThat(result.matched()).hasSize(5_000);

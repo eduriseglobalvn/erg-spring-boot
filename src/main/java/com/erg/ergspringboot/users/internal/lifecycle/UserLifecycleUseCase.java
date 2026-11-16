@@ -32,10 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserLifecycleUseCase {
     private static final String DEFAULT_TENANT = "erg";
     static final String STATUS_DELETED = "DELETED";
+    static final long RESTORE_WINDOW_DAYS = 30;
     private final UserRepository users; private final AuthSessionRepository sessions;
-    private final UserActivityRepository activities;
-    public UserLifecycleUseCase(UserRepository users, AuthSessionRepository sessions, UserActivityRepository activities) {
-        this.users=users; this.sessions=sessions; this.activities=activities;
+    private final UserActivityRepository activities; private final UserSoftDeleteStore softDeletes;
+    public UserLifecycleUseCase(UserRepository users, AuthSessionRepository sessions, UserActivityRepository activities,
+            UserSoftDeleteStore softDeletes) {
+        this.users=users; this.sessions=sessions; this.activities=activities; this.softDeletes=softDeletes;
     }
     @Transactional
     public UserResponse updateStatus(String userId, String tenantId, AdminUpdateUserStatusRequest request,
@@ -44,18 +46,36 @@ public class UserLifecycleUseCase {
         user.setStatus(status); users.save(user); revokeIfLocked(user,tenant(tenantId),status);
         record(user,audit,Map.of("status",previous),Map.of("status",status)); return response(user);
     }
-    /** Soft delete: keeps the row and its audit trail, disables the account and anonymises its PII. */
-    @Transactional public BulkOperationResponse delete(String userId,String tenantId){
-        softDelete(List.of(find(userId,tenantId)),tenant(tenantId));return new BulkOperationResponse(1);}
+    /** Soft delete: status DELETED, sessions revoked, password cleared; PII is anonymised by {@link UserPurgeJob} after 30 days. */
+    @Transactional public BulkOperationResponse delete(String userId,String tenantId){return delete(userId,tenantId,null);}
+    @Transactional public BulkOperationResponse delete(String userId,String tenantId,UserAuditContext audit){
+        softDelete(List.of(find(userId,tenantId)),tenant(tenantId),audit);return new BulkOperationResponse(1);}
+    /** Undo a soft delete inside the window. The account comes back INACTIVE and must have its credential reset. */
+    @Transactional public UserResponse restore(String userId,String tenantId,UserAuditContext audit){
+        User user=users.findByIdAndTenantId(userId,tenant(tenantId)).filter(u->STATUS_DELETED.equalsIgnoreCase(u.getStatus()))
+                .orElseThrow(()->new ResourceNotFoundException("user not found"));
+        OffsetDateTime until=softDeletes.purgeAfter(userId).filter(t->t.isAfter(OffsetDateTime.now(ZoneOffset.UTC)))
+                .orElseThrow(()->new BadRequestException("restore window has passed"));
+        user.setStatus("INACTIVE"); user.setMustChangePassword(true); user.setAuthzVersion((user.getAuthzVersion()==null?1L:user.getAuthzVersion())+1);
+        users.save(user); softDeletes.restore(userId);
+        record(user,audit,"USER_RESTORED","Employee account restored",Map.of("status",STATUS_DELETED,"restorableUntil",until.toString()),Map.of("status","INACTIVE"));
+        return response(user);}
     @Transactional public BulkOperationResponse bulkStatus(String tenantId,BulkStatusRequest request){
         String status=status(request.status()); List<User> found=findAll(request.userIds(),tenantId);
         found.forEach(user->user.setStatus(status)); users.saveAll(found); String t=tenant(tenantId);
         found.forEach(user->revokeIfLocked(user,t,status)); return new BulkOperationResponse(found.size()); }
-    @Transactional public BulkOperationResponse bulkDelete(String tenantId,BulkDeleteRequest request){
-        List<User> found=findAll(request.userIds(),tenantId); softDelete(found,tenant(tenantId)); return new BulkOperationResponse(found.size()); }
-    private void softDelete(List<User> found,String tenant){
-        found.forEach(UserLifecycleUseCase::anonymise); users.saveAll(found);
-        found.forEach(user->revokeIfLocked(user,tenant,STATUS_DELETED)); }
+    @Transactional public BulkOperationResponse bulkDelete(String tenantId,BulkDeleteRequest request){return bulkDelete(tenantId,request,null);}
+    @Transactional public BulkOperationResponse bulkDelete(String tenantId,BulkDeleteRequest request,UserAuditContext audit){
+        List<User> found=findAll(request.userIds(),tenantId); softDelete(found,tenant(tenantId),audit); return new BulkOperationResponse(found.size()); }
+    private void softDelete(List<User> found,String tenant,UserAuditContext audit){
+        OffsetDateTime now=OffsetDateTime.now(ZoneOffset.UTC); OffsetDateTime purgeAfter=now.plusDays(RESTORE_WINDOW_DAYS);
+        Map<String,String> previous=found.stream().collect(Collectors.toMap(User::getId,u->safe(u.getStatus()),(a,b)->a));
+        found.forEach(user->{user.setStatus(STATUS_DELETED); user.setPasswordHash(null);
+            user.setAuthzVersion((user.getAuthzVersion()==null?1L:user.getAuthzVersion())+1);});
+        users.saveAll(found); softDeletes.mark(found.stream().map(User::getId).toList(),now,purgeAfter);
+        found.forEach(user->{revokeIfLocked(user,tenant,STATUS_DELETED);
+            record(user,audit,"USER_DELETED","Employee account deleted",Map.of("status",previous.get(user.getId())),
+                    Map.of("status",STATUS_DELETED,"restorableUntil",purgeAfter.toString()));}); }
     static void anonymise(User u){
         u.setStatus(STATUS_DELETED); u.setEmail("deleted-"+u.getId()+"@deleted.invalid"); u.setUsername(null);
         u.setPasswordHash(null); u.setFullName("Deleted user"); u.setAvatarUrl(null); u.setPhone(null); u.setBio(null);
@@ -69,11 +89,13 @@ public class UserLifecycleUseCase {
         OffsetDateTime at=OffsetDateTime.now(ZoneOffset.UTC); String reason="status_changed_"+status.toLowerCase();
         active.forEach(s->{s.setRevokedAt(at);s.setRevokedReason(reason);});sessions.saveAll(active);}
     private void record(User target,UserAuditContext audit,Map<String,Object> before,Map<String,Object> after){
+        record(target,audit,"EMPLOYEE_STATUS_CHANGED","Employee account status changed",before,after);}
+    private void record(User target,UserAuditContext audit,String action,String description,Map<String,Object> before,Map<String,Object> after){
         UserAuditContext c=audit==null?new UserAuditContext(target.getId(),null,null,null):audit;
         UserActivity a=new UserActivity();a.setId(IdGenerator.newId());a.setUserId(blank(c.actorUserId())?target.getId():c.actorUserId());
-        a.setTenantId(tenant(target.getTenantId()));a.setAction("EMPLOYEE_STATUS_CHANGED");a.setTargetUserId(target.getId());
+        a.setTenantId(tenant(target.getTenantId()));a.setAction(action);a.setTargetUserId(target.getId());
         a.setIpAddress(trim(c.ipAddress()));a.setUserAgent(trim(c.userAgent()));a.setRequestId(trim(c.requestId()));
-        a.setDescription("Employee account status changed");a.setMetadata(Map.of("before",before,"after",after));
+        a.setDescription(description);a.setMetadata(Map.of("before",before,"after",after));
         a.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));activities.save(a);}
     private User find(String id,String tenant){return users.findByIdAndTenantId(id,tenant(tenant))
             .filter(u->!STATUS_DELETED.equalsIgnoreCase(u.getStatus()))

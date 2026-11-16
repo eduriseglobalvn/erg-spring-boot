@@ -73,11 +73,6 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
             if (principal.isEmpty()) {
                 markBearerAuthenticationFailure(request);
             }
-            if (principal.isPresent() && !canAccessRequestedPortal(request, principal.get())) {
-                errorWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN, "PORTAL_SESSION_MISMATCH",
-                        "Portal session does not match requested API.");
-                return;
-            }
             if (principal.isPresent() && isLifecycleRestricted(principal.get()) && !isOnboardingRequest(request)) {
                 errorWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN, "ACCOUNT_LIFECYCLE_RESTRICTED",
                         "Account must finish onboarding before using this API");
@@ -161,7 +156,7 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         TenantContext.set(TenantContext.of(
                 resolvedTenantId,
                 null,
-                SecurityUtils.portalFromPath(request.getRequestURI())
+                null
         ));
         try {
             return lookup.get();
@@ -229,14 +224,6 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
-
-    private boolean canAccessRequestedPortal(HttpServletRequest request, ErgPrincipal principal) {
-        String requiredPortal = SecurityUtils.portalFromPath(request.getRequestURI());
-        if (requiredPortal == null) {
-            return true;
-        }
-        return new AuthorizationCapabilityPolicy().hasWorkspace(principal, requiredPortal);
     }
 
     private boolean isLifecycleRestricted(ErgPrincipal principal) {

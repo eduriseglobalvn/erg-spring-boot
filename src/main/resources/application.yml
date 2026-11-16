@@ -204,6 +204,9 @@ scalar:
 
 
 erg:
+  audit:
+    retention:
+      default-days: 1825
   calendar:
     travel:
       default-minutes: ${ERG_CALENDAR_TRAVEL_DEFAULT_MINUTES:50}

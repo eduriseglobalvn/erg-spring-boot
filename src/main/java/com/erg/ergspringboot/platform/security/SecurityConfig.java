@@ -37,6 +37,10 @@ public class SecurityConfig {
     @Autowired(required = false)
     private OidcPrincipalBridgeFilter oidcPrincipalBridgeFilter;
 
+    // Optional so slice tests that build SecurityConfig without the audit module still start.
+    @Autowired(required = false)
+    private com.erg.ergspringboot.audit.capture.AuditDeniedRecorder auditDeniedRecorder;
+
     public SecurityConfig(
             ErgAuthenticationFilter authenticationFilter,
             PermissionAuthorizationManager permissions,
@@ -106,8 +110,10 @@ public class SecurityConfig {
                                             : "Authentication is required"
                             );
                         })
-                        .accessDeniedHandler((request, response, ex) ->
-                                errorWriter.write(request, response, 403, "ACCESS_DENIED", "You do not have permission to access this resource"))
+                        .accessDeniedHandler((request, response, ex) -> {
+                            if (auditDeniedRecorder != null) auditDeniedRecorder.record(request);
+                            errorWriter.write(request, response, 403, "ACCESS_DENIED", "You do not have permission to access this resource");
+                        })
                 )
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -146,17 +152,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/graphql").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/permission-groups/**")
                         .access((auth, context) -> permissions.require("rbac.role.read", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/roles")
-                        .access((auth, context) -> permissions.require("rbac.role.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/roles/**")
-                        .access((auth, context) -> permissions.require("rbac.role.update", auth, context))
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/roles/**")
-                        .access((auth, context) -> permissions.require("rbac.role.update", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/roles/**")
-                        .access((auth, context) -> permissions.require("rbac.role.delete", auth, context))
-                        .requestMatchers("/api/v1/users/*/roles/**", "/api/v1/users/*/role-assignments/**", "/api/v1/users/*/permissions/**", "/api/v1/users/roles/bulk")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rbac/catalog")
+                        .access((auth, context) -> permissions.require("rbac.role.read", auth, context))
+                        // The use case filters the list to roles within the caller's own permissions.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rbac/assignable-roles").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*/roles/**", "/api/v1/users/*/role-assignments/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("rbac.assignment.read", "rbac.role.assign", "*")))
+                        .requestMatchers("/api/v1/users/*/roles/**", "/api/v1/users/*/role-assignments/**", "/api/v1/users/roles/bulk")
                         .access((auth, context) -> permissions.require("rbac.role.assign", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*/effective-permissions", "/api/v1/users/*/permission-overrides")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*/effective-permissions")
                         .access((auth, context) -> permissions.require("rbac.permission.read", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.read", "profile.self", "*")))
@@ -175,6 +179,11 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("account.self.update", "profile.self", "*")))
                         .requestMatchers("/api/v1/users/me/**")
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/users/security-feed", "/api/v1/admin/users/*/activity",
+                                "/api/v1/admin/users/*/security-events", "/api/v1/admin/users/*/sessions", "/api/v1/users/*/activity")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("users.activity.read", "*")))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users", "/api/v1/users/**", "/api/v1/admin/users", "/api/v1/admin/users/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("users.read", "users.manage", "*")))
                         .requestMatchers("/api/v1/users", "/api/v1/users/**")
                         .access((auth, context) -> permissions.require("users.manage", auth, context))
                         .requestMatchers("/api/v1/admin/users", "/api/v1/admin/users/**")
@@ -194,7 +203,9 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.require("api-keys.manage", auth, context))
                         .requestMatchers("/api/v1/ai-content/**")
                         .access((auth, context) -> permissions.require("ai-content.use", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/curriculum/**", "/api/curriculum/**", "/api/v1/content/**", "/api/content/**")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/curriculum/**", "/api/curriculum/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("curriculum.read", "curriculum.manage", "content.resource.read", "content.manage", "lms.resource.read", "*")))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/content/**", "/api/content/**")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("content.resource.read", "content.manage", "lms.resource.read", "*")))
                         .requestMatchers(HttpMethod.POST, "/api/v1/content/**", "/api/content/items", "/api/content/assets", "/api/content/lectures/google-slides")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.resource.create", "content.manage", "*")))
@@ -208,7 +219,11 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("content.manage", "curriculum.manage", "*")))
                         .requestMatchers(HttpMethod.PUT, "/api/v1/audit/events/*/legal-hold")
                         .access((auth, context) -> permissions.require("audit.manage", auth, context))
-                        .requestMatchers("/api/v1/operations/**", "/api/v1/audit/**", "/api/v1/operations/firewall/**")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/audit/export")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("audit.export", "audit.manage")))
+                        .requestMatchers("/api/v1/audit/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("audit.read", "audit.manage")))
+                        .requestMatchers("/api/v1/operations/**", "/api/v1/operations/firewall/**")
                         .access((auth, context) -> permissions.require("operations.manage", auth, context))
                         .requestMatchers("/api/v1/migration/**", "/api/v1/platform/**")
                         .access((auth, context) -> permissions.require("platform.read", auth, context))
@@ -237,12 +252,16 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/notification-devices/web-push-config")
                         .access((auth, context) -> permissions.require("profile.self", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/notifications/**", "/api/v1/notifications/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("notifications.read", "notifications.manage", "*")))
                         // Admin notification API — requires notifications.manage
                         .requestMatchers("/api/v1/admin/notifications/**")
                         .access((auth, context) -> permissions.require("notifications.manage", auth, context))
                         // Fallback catch-all for other notification routes
                         .requestMatchers("/api/v1/notifications/**")
                         .access((auth, context) -> permissions.require("notifications.manage", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/elearning/**", "/api/v1/elearning/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("elearning.read", "elearning.manage", "*")))
                         .requestMatchers("/api/v1/admin/elearning/**", "/api/v1/elearning/**")
                         .access((auth, context) -> permissions.require("elearning.manage", auth, context))
                         .requestMatchers("/api/v1/seo/**")
@@ -271,6 +290,8 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.require("courses.update", auth, context))
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**")
                         .access((auth, context) -> permissions.require("courses.delete", auth, context))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/documents/**")
+                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("documents.read", "documents.manage", "*")))
                         .requestMatchers("/api/v1/documents/**")
                         .access((auth, context) -> permissions.require("documents.manage", auth, context))
                         .requestMatchers(HttpMethod.POST, "/api/v1/public-disclosure/**")

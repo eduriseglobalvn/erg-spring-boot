@@ -30,17 +30,14 @@ public final class AccessScopeAssembler {
         return scopeType != null
                 && EDUCATION_UNIT_SCOPE_TYPES.contains(scopeType.trim().toUpperCase(java.util.Locale.ROOT));
     }
-    private static final java.util.Set<String> EDUCATION_UNIT_ADMIN_ROLES = java.util.Set.of(
-            "center_admin", "school_admin", "principal", "lms.admin");
+    public static final String CLASS_MANAGE_PERMISSION = "lms.class.manage";
 
     /**
-     * The one rule for unit-scoped admin roles: they manage their units and every descendant, never the whole
-     * tenant. Shared by session bootstrap and notification campaigns. Exact names only: "vice_principal" or
-     * "school_admin_assistant" must not inherit unit-admin scope.
+     * The one rule for unit-scoped admins: whoever holds {@code lms.class.manage} manages their units and every
+     * descendant, never the whole tenant. Shared by session bootstrap and notification campaigns.
      */
-    public static boolean isEducationUnitAdminRole(String roleName) {
-        return roleName != null
-                && EDUCATION_UNIT_ADMIN_ROLES.contains(roleName.trim().toLowerCase(java.util.Locale.ROOT));
+    public static boolean isEducationUnitAdmin(Collection<String> permissions) {
+        return permissions != null && permissions.contains(CLASS_MANAGE_PERMISSION);
     }
 
     /**
@@ -55,7 +52,9 @@ public final class AccessScopeAssembler {
 
     public static AccessScopeSet from(ErgPrincipal principal) {
         if (principal == null) return AccessScopeSet.legacy(List.of(), List.of(), null, null);
-        if (principal.permissions().contains("*")) {
+        // Same rule as the policy: `*` is unlimited only for the Quản trị (super admin) principal.
+        if (WorkspaceCapabilityMapper.isPlatformWide(
+                principal.roles(), principal.permissions(), principal.deniedPermissions())) {
             return AccessScopeSet.legacy(List.of("*"), List.of("*"), null, null);
         }
         Map<String, Object> attributes = principal.attributes();

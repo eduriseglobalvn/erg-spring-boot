@@ -145,6 +145,17 @@ public class LocalMediaStorageAdapter implements MediaStorageAdapter {
         }
     }
 
+    /** Response headers a blob endpoint must send; SVG can carry script, so it is sandboxed. */
+    public static Map<String, String> servingHeaders(String storageKey) {
+        Map<String, String> headers = new java.util.LinkedHashMap<>();
+        headers.put("X-Content-Type-Options", "nosniff");
+        if (storageKey != null && storageKey.endsWith(".svg")) {
+            headers.put("Content-Security-Policy", "sandbox");
+            headers.put("Content-Disposition", "inline; filename=\"image.svg\"");
+        }
+        return headers;
+    }
+
     private Path resolve(String storageKey) {
         Path resolved = storageRoot.resolve(storageKey).normalize();
         if (!resolved.startsWith(storageRoot)) throw new IllegalArgumentException("storage key escapes media root");

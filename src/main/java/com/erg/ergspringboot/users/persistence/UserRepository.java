@@ -160,24 +160,28 @@ public interface UserRepository extends JpaRepository<User, String> {
             select distinct u
             from User u
             left join u.roles r
-            left join u.accessScopes scope
             where u.tenantId = :tenantId
             and (u.status is null or lower(u.status) = 'active')
-            and (
-                lower(coalesce(r.name, '')) in ('teacher', 'lms.teacher', 'lms.instructor')
-                or lower(coalesce(scope.role, '')) in ('teacher', 'lms.teacher', 'lms.instructor')
-            )
+            and (r.id in ('role_lms_teacher', 'role_lms_subject_teacher')
+                   or exists (select 1 from UserRoleAssignment a
+                              where a.userId = u.id and a.tenantId = :tenantId
+                                and a.roleId in ('role_lms_teacher', 'role_lms_subject_teacher')
+                                and a.revokedAt is null
+                                and (a.expiresAt is null or a.expiresAt > current_timestamp)))
             """)
     List<User> findCalendarTeachersByTenant(@Param("tenantId") String tenantId);
 
     @Query("""
             select distinct u from User u
             left join u.roles r
-            left join u.accessScopes scope
             where u.tenantId = :tenantId
               and (u.status is null or lower(u.status) = 'active')
-              and (lower(coalesce(r.name, '')) in ('teacher', 'lms.teacher', 'lms.instructor')
-                   or lower(coalesce(scope.role, '')) in ('teacher', 'lms.teacher', 'lms.instructor'))
+              and (r.id in ('role_lms_teacher', 'role_lms_subject_teacher')
+                   or exists (select 1 from UserRoleAssignment a
+                              where a.userId = u.id and a.tenantId = :tenantId
+                                and a.roleId in ('role_lms_teacher', 'role_lms_subject_teacher')
+                                and a.revokedAt is null
+                                and (a.expiresAt is null or a.expiresAt > current_timestamp)))
             """)
     List<User> findCalendarTeachersByTenant(@Param("tenantId") String tenantId, Pageable pageable);
 
@@ -188,10 +192,12 @@ public interface UserRepository extends JpaRepository<User, String> {
             left join u.accessScopes scope
             where u.tenantId = :tenantId
             and (u.status is null or lower(u.status) = 'active')
-            and (
-                lower(coalesce(r.name, '')) in ('teacher', 'lms.teacher', 'lms.instructor')
-                or lower(coalesce(scope.role, '')) in ('teacher', 'lms.teacher', 'lms.instructor')
-            )
+            and (r.id in ('role_lms_teacher', 'role_lms_subject_teacher')
+                   or exists (select 1 from UserRoleAssignment a
+                              where a.userId = u.id and a.tenantId = :tenantId
+                                and a.roleId in ('role_lms_teacher', 'role_lms_subject_teacher')
+                                and a.revokedAt is null
+                                and (a.expiresAt is null or a.expiresAt > current_timestamp)))
             and (
                 scope.educationUnitId in :schoolIds
                 or scope.educationUnitId is null
@@ -208,8 +214,12 @@ public interface UserRepository extends JpaRepository<User, String> {
             left join u.accessScopes scope
             where u.tenantId = :tenantId
               and (u.status is null or lower(u.status) = 'active')
-              and (lower(coalesce(r.name, '')) in ('teacher', 'lms.teacher', 'lms.instructor')
-                   or lower(coalesce(scope.role, '')) in ('teacher', 'lms.teacher', 'lms.instructor'))
+              and (r.id in ('role_lms_teacher', 'role_lms_subject_teacher')
+                   or exists (select 1 from UserRoleAssignment a
+                              where a.userId = u.id and a.tenantId = :tenantId
+                                and a.roleId in ('role_lms_teacher', 'role_lms_subject_teacher')
+                                and a.revokedAt is null
+                                and (a.expiresAt is null or a.expiresAt > current_timestamp)))
               and (scope.educationUnitId in :schoolIds or scope.educationUnitId is null)
             """)
     List<User> findCalendarTeachersByTenantAndSchoolIds(

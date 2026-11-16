@@ -28,8 +28,8 @@ public class LmsAcademicRecordGraphQlController {
     @SchemaMapping(typeName = "LmsQuery", field = "attendanceWorkspace")
     public AttendanceWorkspaceResponse attendanceWorkspace(@Argument AttendanceWorkspaceInput input) {
         ErgPrincipal principal = principal("lms.attendance.read", "lms.manage", "*");
-        access.assertClassScope(principal, input.classId(), input.schoolId());
         String tenantId = access.verifiedTenantId(principal, input.tenantId());
+        assertClassScope(principal, tenantId, input.classId());
         String to = input.to() == null ? LocalDate.now(VIETNAM_ZONE).toString() : input.to();
         String from = input.from() == null ? LocalDate.parse(to).minusDays(31).toString() : input.from();
         return records.attendanceWorkspace(tenantId, input.classId(), input.subjectId(), from, to);
@@ -38,16 +38,19 @@ public class LmsAcademicRecordGraphQlController {
     @SchemaMapping(typeName = "LmsQuery", field = "gradebookWorkspace")
     public GradebookWorkspaceResponse gradebookWorkspace(@Argument GradebookWorkspaceInput input) {
         ErgPrincipal principal = principal("lms.grade.read", "lms.manage", "*");
-        access.assertClassScope(principal, input.classId(), input.schoolId());
-        return records.gradebookWorkspace(access.verifiedTenantId(principal, input.tenantId()), input.classId(), input.subjectId());
+        String tenantId = access.verifiedTenantId(principal, input.tenantId());
+        assertClassScope(principal, tenantId, input.classId());
+        return records.gradebookWorkspace(tenantId, input.classId(), input.subjectId());
     }
 
     @SchemaMapping(typeName = "Mutation", field = "upsertAttendance")
     public AttendanceRecordResponse upsertAttendance(@Argument UpsertAttendanceInput input) {
         ErgPrincipal principal = principal("lms.attendance.write", "lms.manage", "*");
-        access.assertClassScope(principal, input.classId(), input.schoolId());
+        String tenantId = access.verifiedTenantId(principal, input.tenantId());
+        assertClassScope(principal, tenantId, input.classId());
+        records.assertStudentInClass(tenantId, input.classId(), input.studentId());
         return records.upsertAttendance(new AttendanceCommand(
-                access.verifiedTenantId(principal, input.tenantId()), principal.userId(), input.classId(),
+                tenantId, principal.userId(), input.classId(),
                 input.studentId(), input.subjectId(), input.attendanceDate(), input.lessonIndex(),
                 input.status(), input.expectedVersion(), input.operationId(), input.idempotencyKey()));
     }
@@ -55,12 +58,19 @@ public class LmsAcademicRecordGraphQlController {
     @SchemaMapping(typeName = "Mutation", field = "upsertGradebookScore")
     public GradebookScoreResponse upsertGradebookScore(@Argument UpsertGradebookScoreInput input) {
         ErgPrincipal principal = principal("lms.grade.write", "lms.manage", "*");
-        access.assertClassScope(principal, input.classId(), input.schoolId());
+        String tenantId = access.verifiedTenantId(principal, input.tenantId());
+        assertClassScope(principal, tenantId, input.classId());
+        records.assertStudentInClass(tenantId, input.classId(), input.studentId());
         return records.upsertGradebookScore(new GradebookScoreCommand(
-                access.verifiedTenantId(principal, input.tenantId()), principal.userId(), input.classId(),
+                tenantId, principal.userId(), input.classId(),
                 input.studentId(), input.subjectId(), input.columnId(), input.label(), input.maxScore(),
                 input.kind(), input.position() == null ? 0 : input.position(), input.score(), input.expectedVersion(),
                 input.operationId(), input.idempotencyKey()));
+    }
+
+    /** The school comes from the class row, never from the client's {@code schoolId}. */
+    private void assertClassScope(ErgPrincipal principal, String tenantId, String classId) {
+        access.assertClassScope(principal, classId, records.schoolOfClass(tenantId, classId));
     }
 
     private ErgPrincipal principal(String... permissions) {

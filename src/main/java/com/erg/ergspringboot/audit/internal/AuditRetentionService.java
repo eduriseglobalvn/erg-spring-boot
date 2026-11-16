@@ -43,7 +43,7 @@ public class AuditRetentionService {
             AuditEventRepository repository,
             EntityManager entityManager,
             @Value("${erg.audit.retention.batch-size:500}") int batchSize,
-            @Value("${erg.audit.retention.default-days:365}") int retentionDays,
+            @Value("${erg.audit.retention.default-days:1825}") int retentionDays,
             ObjectProvider<ClusterJobLock> jobLock
     ) {
         this(repository, entityManager, batchSize, retentionDays, jobLock.getIfAvailable());

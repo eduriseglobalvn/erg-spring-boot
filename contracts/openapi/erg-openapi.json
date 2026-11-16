@@ -227,34 +227,6 @@
         ],
         "type": "object"
       },
-      "AdminAssignPermissionsRequest": {
-        "properties": {
-          "expires_at": {
-            "type": "string"
-          },
-          "grant_type": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "permissions": {
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "type": "array"
-          },
-          "reason": {
-            "maxLength": 255,
-            "minLength": 0,
-            "type": "string"
-          }
-        },
-        "required": [
-          "grant_type",
-          "permissions"
-        ],
-        "type": "object"
-      },
       "AdminAssignRolesRequest": {
         "properties": {
           "roles": {
@@ -3220,35 +3192,6 @@
         },
         "type": "object"
       },
-      "ApiResponseListPermissionOverrideResponse": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/PermissionOverrideResponse"
-            },
-            "type": "array"
-          },
-          "errors": {},
-          "message": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "request_id": {
-            "type": "string"
-          },
-          "statusCode": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "timestamp": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "ApiResponseListPermissionResponse": {
         "properties": {
           "data": {
@@ -4064,32 +4007,6 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PeriodLockView"
-          },
-          "errors": {},
-          "message": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "request_id": {
-            "type": "string"
-          },
-          "statusCode": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "timestamp": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "ApiResponsePermissionOverrideResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/PermissionOverrideResponse"
           },
           "errors": {},
           "message": {
@@ -5837,6 +5754,23 @@
           "roleId",
           "scopeType"
         ],
+        "type": "object"
+      },
+      "AssignableRole": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "exclusive": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "AssignmentProgressJobRequest": {
@@ -8874,27 +8808,6 @@
             "type": "string"
           }
         },
-        "type": "object"
-      },
-      "CreateRoleRequest": {
-        "properties": {
-          "description": {
-            "type": "string"
-          },
-          "name": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "permissions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "name"
-        ],
         "type": "object"
       },
       "CreateRoomRequest": {
@@ -12489,23 +12402,6 @@
               "$ref": "#/components/schemas/PermissionResponse"
             },
             "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "PermissionOverrideResponse": {
-        "properties": {
-          "grantType": {
-            "type": "string"
-          },
-          "permissions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "userId": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -16511,23 +16407,6 @@
             "type": "string"
           },
           "studentIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "UpdateRoleRequest": {
-        "properties": {
-          "description": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "permissions": {
             "items": {
               "type": "string"
             },
@@ -26242,6 +26121,49 @@
         ]
       }
     },
+    "/api/v1/rbac/assignable-roles": {
+      "get": {
+        "operationId": "assignableRoles",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssignableRole"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "assignable-roles-controller"
+        ]
+      }
+    },
+    "/api/v1/rbac/catalog": {
+      "get": {
+        "operationId": "catalog",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "rbac-catalog-controller"
+        ]
+      }
+    },
     "/api/v1/ready": {
       "get": {
         "operationId": "ready",
@@ -26471,65 +26393,9 @@
         "tags": [
           "authorization-controller"
         ]
-      },
-      "post": {
-        "operationId": "createRole",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRoleRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseRoleResponse"
-                }
-              }
-            },
-            "description": "Created"
-          }
-        },
-        "tags": [
-          "authorization-controller"
-        ]
       }
     },
     "/api/v1/roles/{roleId}": {
-      "delete": {
-        "operationId": "deleteRole",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "roleId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authorization-controller"
-        ]
-      },
       "get": {
         "operationId": "getRole",
         "parameters": [
@@ -26542,82 +26408,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseRoleResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authorization-controller"
-        ]
-      },
-      "patch": {
-        "operationId": "updateRole_1",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "roleId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateRoleRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseRoleResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authorization-controller"
-        ]
-      },
-      "put": {
-        "operationId": "updateRole",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "roleId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateRoleRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {
@@ -29511,114 +29301,6 @@
         ]
       }
     },
-    "/api/v1/users/{userId}/permission-overrides": {
-      "get": {
-        "operationId": "permissionOverrides",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListPermissionOverrideResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authorization-controller"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/permissions": {
-      "post": {
-        "operationId": "assignPermissions",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminAssignPermissionsRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePermissionOverrideResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "user-controller"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/permissions/{overrideId}": {
-      "delete": {
-        "operationId": "deletePermissionOverride",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "overrideId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "authorization-controller"
-        ]
-      }
-    },
     "/api/v1/users/{userId}/preview": {
       "post": {
         "operationId": "previewChanges",
@@ -29717,6 +29399,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCredentialDeliveryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "user-controller"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/restore": {
+      "post": {
+        "operationId": "restoreUser",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseUserResponse"
                 }
               }
             },

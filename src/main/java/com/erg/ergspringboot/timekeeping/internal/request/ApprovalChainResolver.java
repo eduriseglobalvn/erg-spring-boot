@@ -28,8 +28,8 @@ import tools.jackson.databind.ObjectMapper;
  * Who approves a request, step by step (D4). The chain comes from the school policy's {@code approval_chains}
  * ({@code {"LEAVE":[{"minDays":0,"steps":["MANAGER"]},...]}}: the entry with the greatest {@code minDays} not above
  * the requested days), else the built-in defaults. {@code MANAGER} = the requester's {@code EmployeeProfile.managerId}
- * when that user is active; {@code SCHOOL_ROLE:X} = active holders of role {@code school.x} in the school (all of them
- * hold the step). Only holders of {@code timekeeping.approve} in the tenant are kept, since nobody else can call the
+ * when that user is active; {@code SCHOOL_ROLE:X} = active {@code timekeeping.approve} holders in the school (the X label is
+ * only a title; all of them hold the step). Only holders of {@code timekeeping.approve} in the tenant are kept, since nobody else can call the
  * approval API. A step with nobody falls back to the school's {@code timekeeping.approve} holders. The requester never
  * approves their own request: such a step is SKIPPED. When every step is skipped, one ESCALATION step goes to another
  * approve holder of the school, else to the tenant's {@code timekeeping.manage} holders; if still nobody, every step
@@ -126,8 +126,9 @@ public class ApprovalChainResolver {
             return users.findByTenantIdAndIdIn(tenantId, List.of(managerId)).isEmpty() ? List.of() : List.of(managerId);
         }
         if (resolver.startsWith(SCHOOL_ROLE)) {
-            String role = "school." + resolver.substring(SCHOOL_ROLE.length()).toLowerCase();
-            return inSchool(users.findActiveUserIdsHoldingRole(tenantId, role), schoolId);
+            // No role names: every SCHOOL_ROLE step is held by the school's active timekeeping.approve holders.
+            LocalDate today = LocalDate.now(clock.withZone(WorkContextResolver.ZONE));
+            return inSchool(users.findActiveUserIdsHoldingPermission(tenantId, APPROVE, today), schoolId);
         }
         log.warn("Unknown approval resolver in tenant {}: {}", tenantId, resolver);
         return List.of();

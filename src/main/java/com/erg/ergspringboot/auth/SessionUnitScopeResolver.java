@@ -4,6 +4,8 @@ import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBo
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapScope;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapUnit;
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
+import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
@@ -124,6 +126,7 @@ final class SessionUnitScopeResolver {
                 .toList();
         Set<String> directIds = new LinkedHashSet<>();
         Set<String> educationUnitAdminRootIds = new LinkedHashSet<>();
+        boolean userHoldsClassManage = holdsClassManage(user);
 
         for (UserAccessScope scope : scopes) {
             String educationUnitId = safe(scope.getEducationUnitId());
@@ -131,7 +134,7 @@ final class SessionUnitScopeResolver {
                 continue;
             }
             directIds.add(educationUnitId);
-            if (isEducationUnitAdminScope(scope, roles)) {
+            if (userHoldsClassManage) {
                 educationUnitAdminRootIds.add(educationUnitId);
             }
         }
@@ -147,14 +150,15 @@ final class SessionUnitScopeResolver {
                 }
                 if (AccessScopeAssembler.isEducationUnitScopeType(scopeType)) {
                     directIds.add(scopeId);
-                    if (isEducationUnitAdminRole(assignment) || isEducationUnitAdminRoles(roles)) {
+                    if (userHoldsClassManage || holdsClassManage(assignment.getRole())) {
                         educationUnitAdminRootIds.add(scopeId);
                     }
                 }
             }
         }
 
-        if (isTeacherLike(roles)) {
+        // Teaching assignments are data: anyone assigned to teach a class gets its school, whatever their role names.
+        if (user != null && user.getId() != null) {
             directIds.addAll(classroomRepository.findTeacherManagedSchoolIds(tenantId, user.getId()));
         }
 
@@ -218,27 +222,14 @@ final class SessionUnitScopeResolver {
                 .toList();
     }
 
-    private boolean isEducationUnitAdminScope(UserAccessScope scope, List<String> roleNames) {
-        return isEducationUnitAdminRoleName(scope.getRole()) || isEducationUnitAdminRoles(roleNames);
+    /** A direct role holding {@code lms.class.manage} makes every one of the user's legacy scopes a unit-admin root. */
+    private boolean holdsClassManage(User user) {
+        return user != null && user.getRoles() != null && user.getRoles().stream().anyMatch(this::holdsClassManage);
     }
 
-    private boolean isEducationUnitAdminRole(UserRoleAssignment assignment) {
-        String roleName = assignment.getRole() == null ? null : assignment.getRole().getName();
-        return isEducationUnitAdminRoleName(roleName) || isEducationUnitAdminRoleName(assignment.getRoleId());
-    }
-
-    private boolean isEducationUnitAdminRoles(List<String> roleNames) {
-        return roleNames.stream().anyMatch(this::isEducationUnitAdminRoleName);
-    }
-
-    private boolean isEducationUnitAdminRoleName(String roleName) {
-        return AccessScopeAssembler.isEducationUnitAdminRole(roleName);
-    }
-
-    private boolean isTeacherLike(List<String> roleNames) {
-        return roleNames.stream()
-                .map(role -> role.toLowerCase(Locale.ROOT))
-                .anyMatch(role -> role.contains("teacher") || role.contains("instructor"));
+    private boolean holdsClassManage(Role role) {
+        return role != null && role.getPermissions() != null && AccessScopeAssembler.isEducationUnitAdmin(
+                role.getPermissions().stream().filter(Objects::nonNull).map(Permission::getName).toList());
     }
 
     private SessionBootstrapScope fallbackScope(

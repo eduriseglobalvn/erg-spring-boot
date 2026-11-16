@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 617
+  route-count: 611
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -341,14 +341,6 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: DELETE /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.deleteRole
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
     - route: DELETE /api/v1/rss/feeds/{id} => com.erg.ergspringboot.controller.crawler.RssBlacklistController.deleteFeed
       classification: process-local-stub
       disposition: disable-in-prod
@@ -425,14 +417,6 @@ rest:
       cache-policy: none
       pagination-policy: required-for-collections
     - route: DELETE /api/v1/users/{userId} => com.erg.ergspringboot.controller.users.UserController.deleteUser
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
-    - route: DELETE /api/v1/users/{userId}/permissions/{overrideId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.deletePermissionOverride
       classification: persistent-write
       statement-budget: 12
       row-budget: 500
@@ -2679,14 +2663,6 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
-    - route: GET /api/v1/users/{userId}/permission-overrides => com.erg.ergspringboot.controller.authorization.AuthorizationController.permissionOverrides
-      classification: persistent-read
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
     - route: GET /robots.txt => com.erg.ergspringboot.controller.seo.SeoController.robots
       classification: process-local-stub
       disposition: disable-in-prod
@@ -3059,14 +3035,6 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: PATCH /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.updateRole
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
     - route: PATCH /api/v1/users/me => com.erg.ergspringboot.controller.users.UserController.updateProfile
       classification: persistent-write
       statement-budget: 12
@@ -4140,14 +4108,6 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: POST /api/v1/roles => com.erg.ergspringboot.controller.authorization.AuthorizationController.createRole
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
     - route: POST /api/v1/rss/feeds => com.erg.ergspringboot.controller.crawler.RssBlacklistController.createFeed
       classification: process-local-stub
       disposition: disable-in-prod
@@ -4570,14 +4530,6 @@ rest:
       state-owner: postgresql-and-redis-state
       cache-policy: none
       pagination-policy: required-for-collections
-    - route: POST /api/v1/users/{userId}/permissions => com.erg.ergspringboot.controller.users.UserController.assignPermissions
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
     - route: POST /api/v1/users/{userId}/preview => com.erg.ergspringboot.controller.authorization.AuthorizationController.previewChanges
       classification: persistent-write
       statement-budget: 12
@@ -4595,6 +4547,14 @@ rest:
       cache-policy: none
       pagination-policy: required-for-collections
     - route: POST /api/v1/users/{userId}/reset-credential => com.erg.ergspringboot.controller.users.UserController.resetCredential
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: POST /api/v1/users/{userId}/restore => com.erg.ergspringboot.controller.users.UserController.restoreUser
       classification: persistent-write
       statement-budget: 12
       row-budget: 500
@@ -4810,14 +4770,6 @@ rest:
       state-owner: process-local-disabled-prod
       cache-policy: none
       pagination-policy: bounded-or-disabled
-    - route: PUT /api/v1/roles/{roleId} => com.erg.ergspringboot.controller.authorization.AuthorizationController.updateRole
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 500
-      payload-budget-bytes: 1048576
-      state-owner: postgresql-and-redis-state
-      cache-policy: none
-      pagination-policy: required-for-collections
     - route: PUT /api/v1/rss/feeds/{id} => com.erg.ergspringboot.controller.crawler.RssBlacklistController.updateFeed
       classification: process-local-stub
       disposition: disable-in-prod

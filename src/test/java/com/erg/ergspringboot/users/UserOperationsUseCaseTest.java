@@ -20,7 +20,6 @@ import com.erg.ergspringboot.common.request.users.UserRequests.ChangePasswordReq
 import com.erg.ergspringboot.common.request.users.UserRequests.UpdateProfileRequest;
 import com.erg.ergspringboot.common.response.users.UserResponses.ActivityListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.OnboardingResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.PermissionOverrideResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.RevokeSessionResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.SessionListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserCreatedResponse;
@@ -32,7 +31,6 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
-import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverride;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
@@ -42,7 +40,6 @@ import com.erg.ergspringboot.users.persistence.UserListItemProjection;
 import com.erg.ergspringboot.users.persistence.UserRoleNameProjection;
 import com.erg.ergspringboot.users.persistence.authorization.PermissionRepository;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
-import com.erg.ergspringboot.users.persistence.authorization.UserPermissionOverrideRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
@@ -89,9 +86,6 @@ class UserOperationsUseCaseTest {
     private PermissionRepository permissionRepository;
 
     @Mock
-    private UserPermissionOverrideRepository permissionOverrideRepository;
-
-    @Mock
     private UserActivityRepository userActivityRepository;
 
     @Mock
@@ -105,6 +99,9 @@ class UserOperationsUseCaseTest {
 
     @Mock
     private RoleAssignmentAudit authorizationMutationAuditService;
+
+    @Mock
+    private com.erg.ergspringboot.platform.security.AccountActionGuard guard;
 
     private PasswordService passwordService;
     private UserOperations operations;
@@ -120,9 +117,11 @@ class UserOperationsUseCaseTest {
                 new UserProvisioningUseCase(userRepository, sessionRepository, roleRepository,
                         userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender,
                         userRoleAssignmentRepository),
-                new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository),
-                new UserRoleAssignmentUseCase(userRepository, roleRepository, permissionRepository,
-                        permissionOverrideRepository, userActivityRepository, authorizationMutationAuditService));
+                new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository,
+                        org.mockito.Mockito.mock(com.erg.ergspringboot.users.internal.lifecycle.UserSoftDeleteStore.class)),
+                new UserRoleAssignmentUseCase(userRepository, roleRepository, userActivityRepository,
+                        authorizationMutationAuditService, guard),
+                guard);
     }
 
     @Test
@@ -366,6 +365,7 @@ class UserOperationsUseCaseTest {
 
     @Test
     void adminCreatesInvitedInternalUserWithOneTimeCredential() {
+        authenticate(tenantAdmin());
         when(userRepository.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
         when(userRepository.existsByUsernameIgnoreCase("new@example.com")).thenReturn(false);
         when(roleRepository.findByNameInIgnoreCase(List.of("lms_teacher_standard")))
@@ -398,6 +398,7 @@ class UserOperationsUseCaseTest {
 
     @Test
     void adminEmailInviteAssignsRoleGroupsAndScopedPoliciesAtomically() {
+        authenticate(tenantAdmin());
         Role teacherRole = role("lms_teacher_standard");
         when(userRepository.existsByEmailIgnoreCase("teacher@example.com")).thenReturn(false);
         when(userRepository.existsByUsernameIgnoreCase("teacher@example.com")).thenReturn(false);
@@ -500,6 +501,9 @@ class UserOperationsUseCaseTest {
         user.setMustChangePassword(false);
         Role learner = new Role();
         learner.setName("lms.learner");
+        Permission studentAccess = new Permission();
+        studentAccess.setName("student.workspace.access");
+        learner.setPermissions(new java.util.LinkedHashSet<>(List.of(studentAccess)));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(learner)));
         when(userRepository.findByIdAndTenantId("student-1", "erg")).thenReturn(Optional.of(user));
 
@@ -515,6 +519,9 @@ class UserOperationsUseCaseTest {
         user.setMustChangePassword(false);
         Role learner = new Role();
         learner.setName("lms.learner");
+        Permission studentAccess = new Permission();
+        studentAccess.setName("student.workspace.access");
+        learner.setPermissions(new java.util.LinkedHashSet<>(List.of(studentAccess)));
         com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment assignment =
                 new com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment();
         assignment.setRole(learner);
@@ -647,6 +654,7 @@ class UserOperationsUseCaseTest {
 
     @Test
     void assignRolesReplacesExistingRolesByName() {
+        authenticate(tenantAdmin());
         User user = user("user-1");
         Role admin = role("admin");
         Role teacher = role("teacher");
@@ -687,54 +695,6 @@ class UserOperationsUseCaseTest {
                         "user-1", "erg", new AdminAssignRolesRequest(List.of("system.super_admin")), null
                 )
         );
-    }
-
-    @Test
-    void assignPermissionsReplacesDirectPermissionOverrides() {
-        User user = user("user-1");
-        Permission permission = new Permission();
-        permission.setId("permission-1");
-        permission.setName("users.read");
-        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
-        when(permissionRepository.findByNameInIgnoreCase(List.of("users.read"))).thenReturn(List.of(permission));
-        authenticate(tenantAdmin());
-
-        PermissionOverrideResponse response = operations.assignPermissions(
-                "user-1",
-                "erg",
-                new AdminAssignPermissionsRequest(List.of("users.read"), "grant", "Manual access", null), null
-        );
-
-        assertEquals("user-1", response.userId());
-        assertEquals(List.of("users.read"), response.permissions());
-        assertEquals("GRANT", response.grantType());
-        verify(permissionOverrideRepository).deleteByUserId("user-1");
-        verify(permissionOverrideRepository).saveAll(org.mockito.ArgumentMatchers.argThat(overrides -> {
-            UserPermissionOverride override = overrides.iterator().next();
-            return "users.read".equals(override.getPermission()) && "GRANT".equals(override.getGrantType());
-        }));
-        verify(authorizationMutationAuditService).authorizationChanged(
-                List.of(new UserRef("user-1", "erg")),
-                "permission-1",
-                "USER_PERMISSIONS_CHANGED",
-                new UserAuditContext("user-1", null, null, null));
-    }
-
-    @Test
-    void tenantAdminCannotGrantWildcardPermissionToSelfOrOthers() {
-        Permission wildcard = new Permission();
-        wildcard.setId("perm_all");
-        wildcard.setName("*");
-        when(userRepository.findByIdAndTenantId("admin-1", "erg")).thenReturn(Optional.of(user("admin-1")));
-        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user("user-1")));
-        when(permissionRepository.findByNameInIgnoreCase(List.of("*"))).thenReturn(List.of(wildcard));
-        authenticate(tenantAdmin());
-
-        assertThrows(ForbiddenException.class, () -> operations.assignPermissions(
-                "admin-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null), null));
-        assertThrows(ForbiddenException.class, () -> operations.assignPermissions(
-                "user-1", "erg", new AdminAssignPermissionsRequest(List.of("*"), "GRANT", null, null), null));
-        org.mockito.Mockito.verify(permissionOverrideRepository, org.mockito.Mockito.never()).deleteByUserId(any());
     }
 
     @org.junit.jupiter.api.AfterEach

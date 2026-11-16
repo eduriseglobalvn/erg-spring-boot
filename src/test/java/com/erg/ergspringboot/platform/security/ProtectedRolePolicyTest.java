@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.users.persistence.authorization.Permission;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,82 +17,36 @@ class ProtectedRolePolicyTest {
     private final ProtectedRolePolicy policy = new ProtectedRolePolicy();
 
     @Test
-    void rejectsCreationOrRenameIntoReservedSystemNamespace() {
-        assertThatThrownBy(() -> policy.assertRoleDefinitionAllowed(" SyStEm.Super_Admin "))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("reserved");
+    void roleNameMustNotBeBlank() {
+        assertThatThrownBy(() -> policy.assertRoleDefinitionAllowed(" "))
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test
-    void delegatedAdministratorCannotGrantProtectedRole() {
-        ErgPrincipal actor = principal(
-                List.of("user_admin"),
-                List.of("users.manage", "rbac.role.assign")
-        );
+    void actorCannotGrantRoleCarryingPermissionTheyLack() {
+        ErgPrincipal actor = principal(List.of("pdt_operator"), List.of("users.manage", "lms.class.manage"));
 
-        assertThatThrownBy(() -> policy.assertCanGrant(actor, List.of(role("system.super_admin"))))
-                .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("protected role");
-    }
-
-    @Test
-    void protectedRoleNameWithoutDatabaseWildcardCannotGrantProtectedRole() {
-        ErgPrincipal actor = principal(List.of("system.super_admin"), List.of("rbac.role.assign"));
-
-        assertThatThrownBy(() -> policy.assertCanGrant(actor, List.of(role("system.super_admin"))))
-                .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("protected role");
-    }
-
-    @Test
-    void platformSuperAdminCanGrantExistingProtectedRole() {
-        ErgPrincipal actor = principal(List.of("system.super_admin"), List.of("*"));
-
-        assertThatCode(() -> policy.assertCanGrant(actor, List.of(role("system.super_admin"))))
+        assertThatThrownBy(() -> policy.assertCanGrant(actor, List.of(role("crm_role", "crm.workspace.access"))))
+                .isInstanceOf(ForbiddenException.class);
+        assertThatCode(() -> policy.assertCanGrant(actor, List.of(role("teacher", "lms.class.manage"))))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    void godModeRemainsUnassignableUntilStepUpAuthenticationExists() {
-        ErgPrincipal actor = principal(List.of("system.super_admin"), List.of("*"));
+    void wildcardRoleOnlyFromPlatformSuperAdmin() {
+        Role admin = role("system.super_admin", "*");
 
-        assertThatThrownBy(() -> policy.assertCanGrant(actor, List.of(role("system.god_mode"))))
-                .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("step-up authentication");
-    }
-
-    @Test
-    void tenantAdminWithWildcardPermissionButNoSystemRoleIsNotPlatformWide() {
-        ErgPrincipal actor = principal(List.of("user_admin"), List.of("*"));
-
-        assertThatThrownBy(() -> policy.assertCanGrant(actor, List.of(role("system.super_admin"))))
+        assertThatThrownBy(() -> policy.assertCanGrant(principal(List.of("pdt_operator"), List.of("*")), List.of(admin)))
                 .isInstanceOf(ForbiddenException.class);
-        assertThatThrownBy(() -> policy.assertCanManageRoleDefinitions(actor))
-                .isInstanceOf(ForbiddenException.class);
-    }
-
-    @Test
-    void delegatedAdministratorCannotGrantWildcardOrRbacPermissions() {
-        ErgPrincipal actor = principal(List.of("user_admin"), List.of("users.manage", "rbac.role.assign"));
-
-        assertThatThrownBy(() -> policy.assertCanGrantPermissions(actor, "user-2", List.of("*")))
-                .isInstanceOf(ForbiddenException.class);
-        assertThatThrownBy(() -> policy.assertCanGrantPermissions(actor, "user-2", List.of("rbac.role.assign")))
-                .isInstanceOf(ForbiddenException.class);
-        assertThatCode(() -> policy.assertCanGrantPermissions(actor, "user-2", List.of("lms.class.read")))
+        assertThatCode(() -> policy.assertCanGrant(principal(List.of("system.super_admin"), List.of("*")), List.of(admin)))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    void nobodyCanGrantPermissionsToThemselves() {
-        ErgPrincipal superAdmin = principal(List.of("system.super_admin"), List.of("*"));
-
-        assertThatThrownBy(() -> policy.assertCanGrantPermissions(superAdmin, "actor-1", List.of("lms.class.read")))
-                .isInstanceOf(ForbiddenException.class)
-                .hasMessageContaining("self");
-        assertThatThrownBy(() -> policy.assertCanGrantPermissions(null, "user-2", List.of("lms.class.read")))
+    void onlyPlatformWideActorManagesRoleDefinitions() {
+        assertThatThrownBy(() -> policy.assertCanManageRoleDefinitions(principal(List.of("pdt_operator"), List.of("*"))))
                 .isInstanceOf(ForbiddenException.class);
-        assertThatCode(() -> policy.assertCanGrantPermissions(superAdmin, "user-2", List.of("*")))
+        assertThatCode(() -> policy.assertCanManageRoleDefinitions(principal(List.of("system.super_admin"), List.of("*"))))
                 .doesNotThrowAnyException();
     }
 
@@ -101,10 +57,17 @@ class ProtectedRolePolicyTest {
         );
     }
 
-    private Role role(String name) {
+    private Role role(String name, String... permissions) {
         Role role = new Role();
         role.setId("role-" + name);
         role.setName(name);
+        LinkedHashSet<Permission> values = new LinkedHashSet<>();
+        for (String value : permissions) {
+            Permission permission = new Permission();
+            permission.setName(value);
+            values.add(permission);
+        }
+        role.setPermissions(values);
         return role;
     }
 }

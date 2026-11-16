@@ -48,6 +48,7 @@ class EmployeeManagementServiceTest {
     @Mock private SecurityEventRepository securityEventRepository;
     @Mock private UserRoleAssignmentRepository roleAssignmentRepository;
     @Mock private ScopedRoleAssigner scopedRoleAssignmentService;
+    @Mock private com.erg.ergspringboot.platform.security.AccountActionGuard guard;
     private EmployeeManagementService service;
 
     @BeforeEach
@@ -60,7 +61,8 @@ class EmployeeManagementServiceTest {
                 sessionRepository,
                 securityEventRepository,
                 roleAssignmentRepository,
-                scopedRoleAssignmentService);
+                scopedRoleAssignmentService,
+                guard);
     }
 
     @Test

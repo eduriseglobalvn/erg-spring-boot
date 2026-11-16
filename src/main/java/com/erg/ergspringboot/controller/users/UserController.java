@@ -1,7 +1,6 @@
 package com.erg.ergspringboot.controller.users;
 
 import com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRequest;
-import com.erg.ergspringboot.common.request.users.UserRequests.AdminAssignPermissionsRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.AdminAssignRolesRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.AdminUpdateUserStatusRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.BulkDeleteRequest;
@@ -15,7 +14,6 @@ import com.erg.ergspringboot.common.request.users.UserRequests.CredentialDeliver
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.ActivityListResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.BulkOperationResponse;
-import com.erg.ergspringboot.common.response.users.UserResponses.PermissionOverrideResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.OnboardingResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.RevokeSessionResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.SessionListResponse;
@@ -233,7 +231,7 @@ public class UserController {
             @Valid @RequestBody BulkDeleteRequest request,
             HttpServletRequest servletRequest
     ) {
-        BulkOperationResponse data = users.bulkDelete(tenantId(servletRequest), request);
+        BulkOperationResponse data = users.bulkDelete(tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -282,15 +280,14 @@ public class UserController {
         return ok(data, servletRequest);
     }
 
-    @PostMapping("/{userId}/permissions")
+    /** Undo a soft delete within the 30-day window; the account returns INACTIVE. */
+    @PostMapping("/{userId}/restore")
     @UsersManage
-    public ResponseEntity<ApiResponse<PermissionOverrideResponse>> assignPermissions(
+    public ResponseEntity<ApiResponse<UserResponse>> restoreUser(
             @PathVariable String userId,
-            @Valid @RequestBody AdminAssignPermissionsRequest request,
             HttpServletRequest servletRequest
     ) {
-        PermissionOverrideResponse data = users.assignPermissions(
-                userId, tenantId(servletRequest), request, auditContext(servletRequest));
+        UserResponse data = users.restoreUser(userId, tenantId(servletRequest), auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 
@@ -300,7 +297,7 @@ public class UserController {
             @PathVariable String userId,
             HttpServletRequest servletRequest
     ) {
-        BulkOperationResponse data = users.deleteUser(userId, tenantId(servletRequest));
+        BulkOperationResponse data = users.deleteUser(userId, tenantId(servletRequest), auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 

@@ -13,7 +13,9 @@ class LmsQueryBoundaryTest {
         assertThat(LmsClassWorkspaceGraphQlController.class.getConstructors())
                 .singleElement()
                 .satisfies(constructor -> assertThat(constructor.getParameterTypes())
-                        .containsExactly(LmsQueryOperations.class, GraphQlAccessSupport.class));
+                        .containsExactly(LmsQueryOperations.class, GraphQlAccessSupport.class,
+                                // resolves the class's real school for the scope check
+                                com.erg.ergspringboot.lms.LmsAcademicRecordOperations.class));
     }
 
     @Test

@@ -16,11 +16,12 @@ class NotificationSecuritySupportTest {
 
     private final ErgPrincipal learner = ErgPrincipal.authenticated("usr_stu", "sess", "erg",
             List.of("lms.learner"),
-            List.of("lms.assignment.read_self", "lms.assignment.submit", "lms.quiz.play", "elearning.assignment.read_self"),
+            List.of("lms.assignment.read_self", "lms.assignment.submit", "lms.quiz.play", "elearning.assignment.read_self",
+                    "student.workspace.access"),
             List.of(), List.of("elearning"), "student", "self", Map.of());
 
     private final ErgPrincipal teacher = ErgPrincipal.authenticated("usr_tch", "sess", "erg",
-            List.of("lms.teacher"), List.of("lms.assignment.read"), List.of(), List.of("lms"), "staff", "class", Map.of());
+            List.of("lms.teacher"), List.of("lms.assignment.read", "teacher.workspace.access"), List.of(), List.of("lms"), "staff", "class", Map.of());
 
     @Test
     void learnerReadsTheDefaultLmsInboxAndTheStudentInbox() {
