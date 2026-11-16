@@ -55,6 +55,7 @@ public class LessonLogCommandUseCase {
                                   int actualPeriod, String comment, Integer expectedVersion) {
         LocalDate day = LessonLogQueryUseCase.date(date);
         Row row = ownPeriod(tenantId, actorId, eventId, day, periodNo);
+        requireStarted(row, periodNo);
         apply(tenantId, actorId, row, actualPeriod, comment, expectedVersion);
         return reload(tenantId, actorId, eventId, day, periodNo);
     }
@@ -97,6 +98,7 @@ public class LessonLogCommandUseCase {
                                                 Integer expectedVersion) {
         LocalDate day = LessonLogQueryUseCase.date(date);
         Row row = ownPeriod(tenantId, actorId, eventId, day, periodNo);
+        requireStarted(row, periodNo);
         if (monthLock.isClosed(tenantId, YearMonth.from(day))) throw LessonLogException.monthClosed();
         // Validate the log fields first so a bad actual period cannot leave half of the attendance saved.
         checkActual(tenantId, row, actualPeriod);
@@ -115,6 +117,11 @@ public class LessonLogCommandUseCase {
                 .filter(s -> s.eventId().equals(eventId)).toList();
         return LessonLogReader.find(reader.rows(tenantId, slots, clock.instant()), eventId, periodNo)
                 .orElseThrow(LessonLogException::notTeacherOfPeriod);
+    }
+
+    /** A period that has not begun cannot carry a log or attendance (PERIOD_NOT_HAPPENED). */
+    private void requireStarted(Row row, int periodNo) {
+        if (!LessonLogReader.started(row.slot(), periodNo, clock.instant())) throw LessonLogException.periodNotHappened();
     }
 
     private LessonLogPeriod reload(String tenantId, String actorId, String eventId, LocalDate day, int periodNo) {

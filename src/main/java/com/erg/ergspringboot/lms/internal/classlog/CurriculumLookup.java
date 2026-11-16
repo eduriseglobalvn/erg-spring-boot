@@ -48,6 +48,7 @@ class CurriculumLookup {
         private final Map<String, LocalDate> starts = new HashMap<>();
         private final Map<String, TreeMap<Integer, CurriculumProgramRow>> framework = new HashMap<>();
         private final Map<String, TreeMap<Integer, CurriculumProgramRow>> allocated = new HashMap<>();
+        private final Map<String, String> allocatedSubject = new HashMap<>();
 
         private Scope(String tenantId) {
             this.tenantId = tenantId;
@@ -76,10 +77,20 @@ class CurriculumLookup {
                     if (!classId.equals(a.getAcademicClassId())) continue;
                     Optional<CurriculumProgram> program = programs.findFirstByTenantIdAndSubjectIdAndAcademicYearAndStatusOrderByLevelIdAsc(
                             tenantId, a.getSubjectId(), year, "published");
-                    if (program.isPresent()) return framework(a.getSubjectId(), program.get().getLevelId(), date);
+                    if (program.isPresent()) {
+                        allocatedSubject.put(k, a.getSubjectId());
+                        return framework(a.getSubjectId(), program.get().getLevelId(), date);
+                    }
                 }
                 return new TreeMap<>();
             });
+        }
+
+        /** The subject the slot is taught as: the allocated curriculum subject (e.g. IC3) when its KCT came from the allocation, else the slot's own. */
+        String subjectFor(String schoolId, String classId, String subjectId, String levelId, LocalDate date) {
+            if (!framework(subjectId, levelId, date).isEmpty()) return subjectId;
+            framework(schoolId, classId, subjectId, levelId, date);
+            return allocatedSubject.getOrDefault(schoolId + '|' + classId + '|' + academicYear(date), subjectId);
         }
 
         /** KCT rows of the program of (subject, level, school year of date) keyed by period; empty when none. */

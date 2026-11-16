@@ -74,7 +74,11 @@ class LessonLogReader {
                 .collect(Collectors.toMap(e -> key(e.getEventId(), e.getPeriodNo()), e -> e, (a, b) -> a));
         Map<String, String> classNames = classes.findAllById(slots.stream().map(LessonSlot::classId).distinct().toList())
                 .stream().collect(Collectors.toMap(Classroom::getId, Classroom::getName, (a, b) -> a));
-        Map<String, String> subjectNames = subjects.findAllById(slots.stream().map(LessonSlot::subjectId).distinct().toList())
+        Map<String, String> shownSubject = new HashMap<>();
+        for (LessonSlot slot : slots) {
+            shownSubject.put(slot.eventId(), kct.subjectFor(slot.schoolId(), slot.classId(), slot.subjectId(), slot.levelId(), slot.date()));
+        }
+        Map<String, String> subjectNames = subjects.findAllById(shownSubject.values().stream().distinct().toList())
                 .stream().collect(Collectors.toMap(Subject::getId, Subject::getName, (a, b) -> a));
         Map<String, List<LessonLogAbsentee>> absent = absentees(tenantId, slots);
         Map<String, String> teachers = teacherNames(tenantId, slots);
@@ -91,7 +95,7 @@ class LessonLogReader {
                 int actual = entry == null ? position : entry.getActualPeriod();
                 CurriculumProgramRow lesson = program.get(actual);
                 result.add(new Row(slot, entry, new LessonLogPeriod(slot.eventId(), slot.date(), periodNo, slot.classId(),
-                        classNames.getOrDefault(slot.classId(), ""), slot.subjectId(), subjectNames.getOrDefault(slot.subjectId(), ""),
+                        classNames.getOrDefault(slot.classId(), ""), slot.subjectId(), subjectNames.getOrDefault(shownSubject.get(slot.eventId()), ""),
                         teacherName(slot, teachers),
                         position, actual, lesson == null ? null : lesson.getTitle(),
                         absent.getOrDefault(absentKey(slot.classId(), slot.subjectId(), slot.date(), periodNo), List.of()),
@@ -159,6 +163,13 @@ class LessonLogReader {
      * A period is over once its end passed. The timetable holds one start/end per event, so the periods of a multi-period
      * event are spread evenly across it (shortcut: use the period template times when minute accuracy matters).
      */
+    /** True once the period has begun (a teacher takes attendance during the lesson, so this is earlier than {@link #happened}). */
+    static boolean started(LessonSlot slot, int periodNo, Instant now) {
+        if (slot.start() == null || slot.end() == null) return false;
+        long perPeriod = Duration.between(slot.start(), slot.end()).toMillis() / Math.max(1, slot.periodCount());
+        return !slot.start().plusMillis(perPeriod * (periodNo - slot.periodStart())).isAfter(now);
+    }
+
     static boolean happened(LessonSlot slot, int periodNo, Instant now) {
         if (slot.start() == null || slot.end() == null) return false;
         long perPeriod = Duration.between(slot.start(), slot.end()).toMillis() / Math.max(1, slot.periodCount());

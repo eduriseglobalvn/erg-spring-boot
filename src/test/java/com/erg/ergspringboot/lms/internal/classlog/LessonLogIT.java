@@ -161,6 +161,16 @@ class LessonLogIT extends TeachingScheduleITBase {
         assertThat(first.curriculumPeriodCount()).as("kct size").isEqualTo(20);
         assertThat(first.actualPeriod()).as("actual").isEqualTo(10);
         assertThat(first.lessonTitle()).isEqualTo("KCT 10");
+        assertThat(first.subjectName()).as("shown as the allocated subject").isEqualTo("Tin hoc");
+    }
+
+    @Test
+    void aPeriodThatHasNotBegunCannotCarryALogOrAttendance() {
+        setUp();
+
+        assertThat(codeOf(() -> commands.update(tenant, teacher, friday, "2026-11-13", 1, 8, "x", null))).isEqualTo("PERIOD_NOT_HAPPENED");
+        assertThat(codeOf(() -> commands.saveAttendanceAndLog(tenant, teacher, friday, "2026-11-13", 1, List.of(), 8, "x", null)))
+                .isEqualTo("PERIOD_NOT_HAPPENED");
     }
 
     @Test
