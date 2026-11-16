@@ -193,7 +193,7 @@ public class TeachingScheduleGraphQlController {
     @CalendarUpdate
     public SlotChangeResponse editTeachingScheduleSlot(@Argument TeachingScheduleSlotChanges.Edit input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
-        accessSupport.assertPermission(principal, "lms.schedule.update", "lms.schedule.manage", "lms.manage", "*");
+        accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, null);
         scopeService.requireEvent(principal, tenantId, input.eventId());
         return schedule.editSlot(tenantId, input, accessSupport.blankToNull(principal.userId()));
@@ -204,7 +204,7 @@ public class TeachingScheduleGraphQlController {
     @CalendarUpdate
     public SlotChangeResponse swapTeachingScheduleTeacher(@Argument TeachingScheduleSlotChanges.Swap input) {
         ErgPrincipal principal = accessSupport.currentPrincipal();
-        accessSupport.assertPermission(principal, "lms.schedule.update", "lms.schedule.manage", "lms.manage", "*");
+        accessSupport.assertPermission(principal, "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, null);
         scopeService.requireEvent(principal, tenantId, input.eventId());
         return schedule.swapTeacher(tenantId, input, accessSupport.blankToNull(principal.userId()));
