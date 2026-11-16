@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,7 @@ public final class UserRequests {
             @Size(max = 20) String phone,
             @Email String recoveryEmail,
             @NotEmpty List<String> roleGroupIds,
-            @NotEmpty List<AccessPolicyRequest> policies,
+            @NotNull List<AccessPolicyRequest> policies,
             @NotBlank String credentialDelivery
     ) {
     }

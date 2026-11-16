@@ -262,7 +262,6 @@
             "items": {
               "$ref": "#/components/schemas/AccessPolicyRequest"
             },
-            "minItems": 1,
             "type": "array"
           },
           "primaryEmail": {
@@ -8411,7 +8410,6 @@
             "items": {
               "$ref": "#/components/schemas/EmployeeAccessPolicyRequest"
             },
-            "minItems": 1,
             "type": "array"
           },
           "primaryEmail": {

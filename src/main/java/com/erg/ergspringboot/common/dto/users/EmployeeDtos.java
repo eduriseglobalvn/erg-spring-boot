@@ -41,7 +41,7 @@ public final class EmployeeDtos {
             @Size(max = 20) String phone,
             @Email String recoveryEmail,
             @NotEmpty List<String> roleGroupIds,
-            @NotEmpty @Valid List<EmployeeAccessPolicyRequest> policies,
+            @NotNull @Valid List<EmployeeAccessPolicyRequest> policies,
             @NotBlank String credentialDelivery,
             @NotNull @Valid EmployeeProfileRequest profile
     ) {
