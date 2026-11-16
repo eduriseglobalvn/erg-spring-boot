@@ -80,7 +80,7 @@ class AuthControllerContractTest {
                     new SessionDeviceResponse("session-1", request.deviceId(), "Browser", request.portal(),
                             "127.0.0.1", "JUnit", true, false, null, "2026-07-11T00:00:00Z",
                             "2026-07-11T00:00:00Z", "2026-07-11T12:00:00Z"),
-                    List.of("lms.dashboard.read"), List.of("lms"), "erg", "user");
+                    List.of("lms.dashboard.read"), List.of("lms"), "erg", "user", List.of("TEACHER"));
         }
 
         @Override

@@ -136,7 +136,10 @@ final class SessionIssuer {
         return new AuthResponse(
                 LoginResponseMapper.profile(user, studentOnly), accessToken, refreshToken, ACCESS_TOKEN_TTL.toSeconds(),
                 "Bearer", LoginResponseMapper.sessionResponse(session), permissions, portals,
-                firstNonBlank(user.getAccountType(), "erg"), "user");
+                firstNonBlank(user.getAccountType(), "erg"), "user",
+                // the frontend opens workspaces from this claim only, so the login response must carry it
+                WorkspaceCapabilityMapper.canonicalWorkspacesFromVerifiedGrants(
+                        EffectivePermissionResolver.roleNames(user, assignments), permissions, List.of()));
     }
 
     private void lockUserForSessionMutation(String userId) {

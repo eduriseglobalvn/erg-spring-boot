@@ -156,6 +156,8 @@ class AuthOperationsFlowTest {
         assertEquals(List.of("admin.workspace.access", "lcms.quiz.publish", "lms.classes.read", "teacher.workspace.access"),
                 response.permissions());
         assertEquals(List.of("lcms", "lms"), response.portals());
+        // the frontend opens workspaces from this claim only
+        assertEquals(List.of("ADMIN", "TEACHER"), response.workspaces());
     }
 
     @Test

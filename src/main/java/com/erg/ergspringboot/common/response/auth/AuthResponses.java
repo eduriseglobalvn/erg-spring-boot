@@ -19,7 +19,8 @@ public final class AuthResponses {
             List<String> permissions,
             List<String> portals,
             String accountType,
-            String accessLevel
+            String accessLevel,
+            List<String> workspaces
     ) {
     }
 
