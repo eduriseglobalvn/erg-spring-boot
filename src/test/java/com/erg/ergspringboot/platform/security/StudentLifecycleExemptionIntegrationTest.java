@@ -52,7 +52,7 @@ class StudentLifecycleExemptionIntegrationTest {
 
     @Test
     void teacherWithMustChangePasswordIsStillLifecycleRestricted() throws Exception {
-        String token = login(seedUser("role_lms_homeroom_teacher"));
+        String token = login(seedUser("role_lms_teacher"));
 
         mockMvc.perform(get("/api/v1/lms/classes").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
@@ -67,12 +67,12 @@ class StudentLifecycleExemptionIntegrationTest {
             jdbc.update("""
                     insert into user_role_assignments (id, user_id, role_id, tenant_id, scope_type, assigned_by,
                         revoked_at, revoked_by)
-                    values (?, ?, 'role_lms_homeroom_teacher', 'erg', 'TENANT', 'usr_super_admin', now(), 'usr_super_admin')
+                    values (?, ?, 'role_lms_teacher', 'erg', 'TENANT', 'usr_super_admin', now(), 'usr_super_admin')
                     """, UUID.randomUUID().toString(), id);
             jdbc.update("""
                     insert into user_role_assignments (id, user_id, role_id, tenant_id, scope_type, assigned_by,
                         created_at, expires_at)
-                    values (?, ?, 'role_lms_homeroom_teacher', 'erg', 'TENANT', 'usr_super_admin',
+                    values (?, ?, 'role_lms_teacher', 'erg', 'TENANT', 'usr_super_admin',
                         now() - interval '2 days', now() - interval '1 day')
                     """, UUID.randomUUID().toString(), id);
         });
@@ -86,7 +86,7 @@ class StudentLifecycleExemptionIntegrationTest {
 
     @Test
     void teacherBootstrapReadsWorkspaceFromRoleAssignment() throws Exception {
-        String token = login(seedUser("role_lms_homeroom_teacher"));
+        String token = login(seedUser("role_lms_teacher"));
 
         mockMvc.perform(get("/api/v1/sessions/current").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())

@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.context.annotation.Profile;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -66,7 +65,8 @@ class EndpointPermissionKindTest {
             "/api/v1/notifications/", // own inbox only: every call is scoped to principal.userId()
             "/api/v1/notification-devices", // own devices, gated by profile.self
             "/api/v1/profiles", // ProfileController: own profile, or users.manage for someone else's
-            "/api/v1/reports/jobs/assignment-progress"); // enqueues a report: @ReportingRead, a read in effect
+            "/api/v1/reports/jobs/assignment-progress", // enqueues a report: @ReportingRead, a read in effect
+            "/api/v1/insight/"); // visit telemetry every signed-in user sends about their own session
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
@@ -90,10 +90,6 @@ class EndpointPermissionKindTest {
                             && m != RequestMethod.OPTIONS).map(Enum::name).toList();
             if (writeMethods.isEmpty() || entry.getKey().getPathPatternsCondition() == null) {
                 continue;
-            }
-            Profile profile = AnnotatedElementUtils.findMergedAnnotation(entry.getValue().getBeanType(), Profile.class);
-            if (profile != null && List.of(profile.value()).contains("prototype")) {
-                continue; // prototype-only controllers are never deployed (prod and dev profiles)
             }
             List<String> methodPermissions = methodPermissions(entry.getValue());
             for (String pattern : entry.getKey().getPathPatternsCondition().getPatternValues()) {

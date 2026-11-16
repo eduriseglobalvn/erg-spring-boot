@@ -102,7 +102,7 @@ class PrincipalCacheIntegrationTest {
 
     @Test
     void lifecycleFlagChangeIsSeenImmediately() throws Exception {
-        String email = seedUser("role_lms_homeroom_teacher");
+        String email = seedUser("role_lms_teacher");
         String id = email.substring(0, email.indexOf('@'));
         new TransactionTemplate(transactions).executeWithoutResult(status ->
                 jdbc.update("update users set must_change_password = false, is_profile_completed = true,"
