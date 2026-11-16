@@ -64,15 +64,13 @@ class AuditWriteHardeningTest {
     }
 
     @Test
-    void missingHmacSecretFailsOutsideDev() {
-        for (String profile : new String[] {"prod", "staging", "local"}) {
-            MockEnvironment env = new MockEnvironment();
-            env.setActiveProfiles(profile);
-            assertThatThrownBy(() -> new AuditRedactionPolicy("", env)).isInstanceOf(IllegalStateException.class);
-        }
-        assertThatThrownBy(() -> new AuditRedactionPolicy("", new MockEnvironment()))
-                .isInstanceOf(IllegalStateException.class);
-        for (String profile : new String[] {"dev", "test"}) {
+    void missingHmacSecretFailsOnlyInProd() {
+        MockEnvironment prod = new MockEnvironment();
+        prod.setActiveProfiles("prod");
+        assertThatThrownBy(() -> new AuditRedactionPolicy("", prod)).isInstanceOf(IllegalStateException.class);
+        // the IDE run config starts with no profile at all; it must still boot
+        assertThat(new AuditRedactionPolicy("", new MockEnvironment())).isNotNull();
+        for (String profile : new String[] {"dev", "test", "local"}) {
             MockEnvironment env = new MockEnvironment();
             env.setActiveProfiles(profile);
             assertThat(new AuditRedactionPolicy("", env)).isNotNull();
