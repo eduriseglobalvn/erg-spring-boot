@@ -111,18 +111,24 @@ final class PlayerBodyShuffler {
             }
         }
         List<Object> correctOrder = newKey.stream().map(pair -> pair.get("responseId")).toList();
-        for (int attempt = 0; attempt < 8 && responseIds(responses).equals(correctOrder); attempt++) {
+        List<Map<String, Object>> solved = new ArrayList<>(responses);
+        // No right piece may start beside its own left prompt: a half-solved board reads as "already matched".
+        for (int attempt = 0; attempt < 32 && hasFixedPoint(responses, correctOrder); attempt++) {
             Collections.shuffle(responses, RANDOM);
         }
-        if (responseIds(responses).equals(correctOrder)) {
-            Collections.rotate(responses, 1); // never hand the learner a solved board
+        if (hasFixedPoint(responses, correctOrder) && solved.size() > 1) {
+            responses = solved;
+            Collections.rotate(responses, 1); // a rotation of the solved order never leaves a piece in place
         }
         body.put("matching", prompts);
         body.put("matchingResponses", responses);
         key.put("pairs", newKey);
     }
 
-    private static List<Object> responseIds(List<Map<String, Object>> responses) {
-        return responses.stream().map(response -> response.get("id")).toList();
+    private static boolean hasFixedPoint(List<Map<String, Object>> responses, List<Object> correctOrder) {
+        for (int index = 0; index < responses.size(); index++) {
+            if (Objects.equals(responses.get(index).get("id"), correctOrder.get(index))) return true;
+        }
+        return false;
     }
 }

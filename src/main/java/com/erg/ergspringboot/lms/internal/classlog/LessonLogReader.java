@@ -13,8 +13,8 @@ import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.LessonLogEntry;
 import com.erg.ergspringboot.lms.persistence.LessonLogEntryRepository;
-import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -51,11 +51,11 @@ class LessonLogReader {
     private final CurriculumLookup curriculum;
     private final LessonLogEntryRepository entries;
     private final ClassroomRepository classes;
-    private final SubjectRepository subjects;
+    private final CurriculumSubjectRepository subjects;
     private final JdbcTemplate jdbc;
 
     LessonLogReader(PpctCounter ppct, CurriculumLookup curriculum, LessonLogEntryRepository entries,
-                    ClassroomRepository classes, SubjectRepository subjects, JdbcTemplate jdbc) {
+                    ClassroomRepository classes, CurriculumSubjectRepository subjects, JdbcTemplate jdbc) {
         this.ppct = ppct;
         this.curriculum = curriculum;
         this.entries = entries;
@@ -79,7 +79,7 @@ class LessonLogReader {
             shownSubject.put(slot.eventId(), kct.subjectFor(slot.schoolId(), slot.classId(), slot.subjectId(), slot.levelId(), slot.date()));
         }
         Map<String, String> subjectNames = subjects.findAllById(shownSubject.values().stream().distinct().toList())
-                .stream().collect(Collectors.toMap(Subject::getId, Subject::getName, (a, b) -> a));
+                .stream().collect(Collectors.toMap(CurriculumSubject::getId, CurriculumSubject::getName, (a, b) -> a));
         Map<String, List<LessonLogAbsentee>> absent = absentees(tenantId, slots);
         Map<String, String> teachers = teacherNames(tenantId, slots);
 

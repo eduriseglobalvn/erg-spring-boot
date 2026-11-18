@@ -8,9 +8,9 @@ statement, row, payload, state-owner, cache and pagination metadata. The existin
 `RequestMappingHandlerMapping`; a new production mapping therefore fails CI until it is
 explicitly inventoried.
 
-REST route count: `611`
+REST route count: `609`
 
-GraphQL mapped field count: `43`
+GraphQL mapped field count: `44`
 
 ## Route metadata contract
 
@@ -64,6 +64,7 @@ that the declared count is exact, and that all GraphQL fields are owned below.
 | `com.erg.ergspringboot.controller.trending` | `platform-trending` | `prototype` | authenticated/admin; process-local state disabled in production |
 | `com.erg.ergspringboot.controller.users` | `users` | `canonical` | authenticated; tenant and scoped-role policy |
 | `com.erg.ergspringboot.timekeeping.web` | `timekeeping` | `canonical` | authenticated + timekeeping.self/approve/manage; tenant/school scope; server clock only; idempotency on punches |
+| `com.erg.ergspringboot.lms.internal.core` | `lms` | `canonical` | authenticated + LMS permission; tenant/class/student scope |
 
 ## Status and persistence policy
 
@@ -120,7 +121,7 @@ an owner and permission decision:
 
 ### `lms` / `calendar`
 
-`learningResourceLibrary`, `classWorkspace`, `teacherHomeworkWorkspace`,
+`learningResourceLibrary`, `classWorkspace`, `classScoreBoard`, `teacherHomeworkWorkspace`,
 `assignmentProgressWorkspace`, `studentGroups`, `myTeachingCalendar`, `myStudentCalendar`,
 `previewTeachingSchedule`, `createTeachingSchedule`, `updateTeachingScheduleEvent`,
 `deleteTeachingScheduleEvent`, `deleteTeacherSchedule`, `publishTeachingScheduleBatch`,

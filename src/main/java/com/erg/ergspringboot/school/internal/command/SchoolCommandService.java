@@ -60,6 +60,7 @@ public class SchoolCommandService {
     public SchoolResponse create(CreateSchoolRequest request, UserAccessContext access) {
         String type = schoolType(request.schoolType());
         String schoolId = IdGenerator.newId();
+        assertNameFree(access.tenantId(), request.name(), schoolId);
         String slug = uniqueSlug(access.tenantId(), request.name(), schoolId);
 
         EducationUnit unit = new EducationUnit();
@@ -108,7 +109,11 @@ public class SchoolCommandService {
         if (!previousType.equals(nextType) && classroomRepository.countByTenantIdAndSchoolIdAndStatusIgnoreCase(access.tenantId(), schoolId, "active") > 0) {
             throw new ConflictException("School type cannot change while active classes exist.");
         }
-        if (request.name() != null && !request.name().isBlank()) unit.setName(request.name().trim());
+        if (request.name() != null && !request.name().isBlank()) {
+            // Only a rename is checked: a school that already shares its name (older data) must stay editable.
+            if (!nameKey(request.name()).equals(nameKey(unit.getName()))) assertNameFree(access.tenantId(), request.name(), schoolId);
+            unit.setName(request.name().trim());
+        }
         unit.setType(nextType);
         profile.setSchoolType(nextType);
         if (request.address() != null) profile.setAddress(trim(request.address()));
@@ -339,6 +344,19 @@ public class SchoolCommandService {
         String base = NON_SLUG.matcher(ascii.toLowerCase(Locale.ROOT)).replaceAll("-").replaceAll("(^-|-$)", "");
         if (base.isBlank()) base = "school";
         return unitRepository.existsByTenantIdAndSlugIgnoreCase(tenantId, base) ? base + "-" + id.substring(Math.max(0, id.length() - 6)) : base;
+    }
+
+    /** Compared in Java, not SQL: Postgres lower() on a C-locale database leaves Vietnamese capitals untouched. */
+    private void assertNameFree(String tenantId, String name, String selfId) {
+        String wanted = nameKey(name);
+        boolean taken = unitRepository.findByTenantIdOrderByNameAsc(tenantId).stream()
+                .filter(u -> !u.getId().equals(selfId) && !"ARCHIVED".equalsIgnoreCase(u.getStatus()))
+                .anyMatch(u -> wanted.equals(nameKey(u.getName())));
+        if (taken) throw new ConflictException("Tên trường đã tồn tại");
+    }
+
+    private static String nameKey(String name) {
+        return name == null ? "" : Normalizer.normalize(name.trim(), Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
     }
 
     private String schoolType(String value) {

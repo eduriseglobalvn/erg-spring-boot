@@ -8,7 +8,12 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "erg.notifications.push")
 public class NotificationPushProperties {
 
+    public static final String PROVIDER_FCM = "fcm";
+    public static final String PROVIDER_WEB_PUSH = "webpush";
+
     private boolean enabled = false;
+    /** fcm | webpush; blank picks fcm when FCM credentials are configured, otherwise webpush. */
+    private String provider = "";
     private String senderMode = "http-v1";
     private boolean nativeImageStrict = true;
     private String projectId = "";
@@ -27,6 +32,55 @@ public class NotificationPushProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
+
+    /** The push channel devices register on and the worker sends through. */
+    public String resolvedProvider() {
+        String explicit = provider == null ? "" : provider.trim().toLowerCase(java.util.Locale.ROOT);
+        if (PROVIDER_FCM.equals(explicit) || PROVIDER_WEB_PUSH.equals(explicit)) {
+            return explicit;
+        }
+        return isBlank(credentials.staticAccessToken) && isBlank(credentials.serviceAccountPath)
+                ? PROVIDER_WEB_PUSH : PROVIDER_FCM;
+    }
+
+    /** FCM can send: a project id plus a static token or a readable credentials file (only its path is checked). */
+    public boolean fcmReady() {
+        if (isBlank(projectId)) {
+            return false;
+        }
+        if (!isBlank(credentials.staticAccessToken)) {
+            return true;
+        }
+        if (isBlank(credentials.serviceAccountPath)) {
+            return false;
+        }
+        try {
+            return java.nio.file.Files.isReadable(java.nio.file.Path.of(credentials.serviceAccountPath.trim()));
+        } catch (java.nio.file.InvalidPathException invalid) {
+            return false;
+        }
+    }
+
+    /**
+     * Only the active channel is sent: a browser holds one subscription, and rows of the other channel are
+     * replaced when the app re-registers. FCM rows also wait while FCM credentials are missing.
+     */
+    public boolean sendsTransport(String transport) {
+        boolean webPushRow = "WEB_PUSH".equals(transport);
+        return PROVIDER_WEB_PUSH.equals(resolvedProvider()) ? webPushRow : !webPushRow && fcmReady();
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     public String getSenderMode() {

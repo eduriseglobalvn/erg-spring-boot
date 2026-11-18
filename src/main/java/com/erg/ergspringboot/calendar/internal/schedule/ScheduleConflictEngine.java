@@ -1,7 +1,6 @@
 package com.erg.ergspringboot.calendar.internal.schedule;
 
 import com.erg.ergspringboot.calendar.SchoolShortName;
-import com.erg.ergspringboot.calendar.TeacherShortName;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleModel.Leave;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleModel.Occurrence;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleModel.RoomRef;
@@ -212,7 +211,7 @@ public class ScheduleConflictEngine {
                 .orElse(null);
         if (best == null) return null;
         return new FixSuggestionResponse(kind, target.eventId(), target.clientRowId(), target.className(), best.id(),
-                TeacherShortName.of(best.displayName()), null, null, reason);
+                best.displayName(), null, null, reason);
     }
 
     private FixSuggestionResponse suggestRoom(Context ctx, List<Hit> group) {
@@ -249,7 +248,7 @@ public class ScheduleConflictEngine {
                 .or(() -> o.teachers().stream().filter(t -> "MAIN".equals(t.role())).findFirst())
                 .or(() -> o.teachers().stream().findFirst()).orElse(null);
         return new SideResponse(o.eventId(), teacher == null ? null : teacher.id(),
-                teacher == null ? null : TeacherShortName.of(teacher.name()), o.classId(), o.className(), o.roomId(),
+                teacher == null ? null : teacher.name(), o.classId(), o.className(), o.roomId(),
                 o.roomName(), o.schoolId(), nz(o.schoolName()), SchoolShortName.of(o.schoolName()), o.subjectName(),
                 o.batchId(), o.batchLabel(), o.batchStatus(), o.createdByName(), o.createdByRole(),
                 o.createdAt() == null ? null : o.createdAt().toString(), o.periodNo(), o.start().format(HH_MM),
@@ -257,7 +256,7 @@ public class ScheduleConflictEngine {
     }
 
     private static String message(Hit hit) {
-        String teacher = hit.focus() == null ? "" : TeacherShortName.of(hit.focus().name());
+        String teacher = hit.focus() == null ? "" : hit.focus().name(); // a sentence, not a dense cell: the full name
         Occurrence c = hit.mine();
         Occurrence x = hit.other();
         return switch (hit.kind()) {

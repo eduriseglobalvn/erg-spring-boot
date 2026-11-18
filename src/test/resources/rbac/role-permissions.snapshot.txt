@@ -133,7 +133,9 @@ lms.grade.finalize
 lms.grade.read
 lms.grade.write
 lms.manage
+lms.notification.preferences.update
 lms.notification.read
+lms.portal.access
 lms.progress.read
 lms.quiz.create
 lms.quiz.publish
@@ -170,6 +172,7 @@ lms.subject.read
 lms.unit.read
 media.delete
 media.upload
+notification.campaign.send
 notifications.manage
 notifications.read
 operations.manage
@@ -186,6 +189,7 @@ teacher.workspace.access
 timekeeping.approve
 timekeeping.manage
 timekeeping.read
+timekeeping.self
 users.manage
 users.read
 
@@ -261,6 +265,7 @@ lms.exercise.create
 lms.exercise.read
 lms.exercise.update
 lms.grade.read
+lms.grade.write
 lms.notification.preferences.update
 lms.notification.read
 lms.portal.access
@@ -278,6 +283,7 @@ lms.student_group.create
 lms.student_group.read
 lms.student_group.update
 lms.unit.read
+notification.campaign.send
 profile.self
 teacher.workspace.access
 timekeeping.self

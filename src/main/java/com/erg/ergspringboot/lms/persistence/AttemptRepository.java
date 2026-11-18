@@ -44,6 +44,19 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
             String studentId
     );
 
+    /** Newest handed-in attempt first; pass {@code PageRequest.of(0, 1)} for the latest one. */
+    @Query("""
+            select attempt from Attempt attempt
+            where attempt.tenantId = :tenantId
+              and attempt.assignmentId = :assignmentId
+              and attempt.studentId = :studentId
+              and lower(attempt.status) in :statuses
+            order by attempt.submittedAt desc nulls last, attempt.updatedAt desc
+            """)
+    List<Attempt> findLatestByStatuses(@Param("tenantId") String tenantId, @Param("assignmentId") String assignmentId,
+            @Param("studentId") String studentId, @Param("statuses") Collection<String> statuses,
+            Pageable pageable);
+
     List<Attempt> findByTenantIdAndAssignmentIdInAndStudentIdOrderByAssignmentIdAscUpdatedAtDesc(
             String tenantId,
             Collection<String> assignmentIds,

@@ -99,7 +99,7 @@ public class ScheduleConflictService {
         requireAll(roomIds, roomNames, "ROOM_INVALID", "Phòng không thuộc trường này");
         String schoolName = loader.names(tenantId, "education_units", "name", Set.of(scope.schoolId())).get(scope.schoolId());
         String subjectName = scope.subjectId() == null ? null
-                : loader.names(tenantId, "lms_subjects", "name", Set.of(scope.subjectId())).get(scope.subjectId());
+                : loader.names(tenantId, "curriculum_subjects", "name", Set.of(scope.subjectId())).get(scope.subjectId());
         if (scope.subjectId() != null && subjectName == null) {
             throw TeachingScheduleException.badRequest("SUBJECT_INVALID", "Môn học không tồn tại.");
         }

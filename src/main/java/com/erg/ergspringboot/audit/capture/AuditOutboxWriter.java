@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.servlet.HandlerMapping;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -75,14 +76,15 @@ public class AuditOutboxWriter {
 
     /** Server-side record for an authenticated actor; {@code details} get the common fields added. */
     public static AuditRecord record(ErgPrincipal principal, String action, String resourceType,
-                                     AuditOutcome outcome, String requestId, Map<String, Object> details) {
+                                     String resourceId, AuditOutcome outcome, String requestId,
+                                     Map<String, Object> details) {
         String tenantId = SecurityUtils.normalizeTenant(principal.tenantId());
         Map<String, Object> merged = new LinkedHashMap<>();
         merged.put("roles", principal.roles());
         merged.put("capturedAt", OffsetDateTime.now().toString());
         if (details != null) merged.putAll(details);
         return new AuditRecord(tenantId, principal.userId(), "TENANT", tenantId,
-                cut(action, 128), cut(resourceType, 96), null, outcome, requestId, requestId, null, merged,
+                cut(action, 128), cut(resourceType, 96), resourceId == null || resourceId.isBlank() ? null : cut(resourceId, 96), outcome, requestId, requestId, null, merged,
                 null, OffsetDateTime.now(), null);
     }
 
@@ -100,8 +102,26 @@ public class AuditOutboxWriter {
         Map<String, Object> params = new LinkedHashMap<>();
         request.getParameterMap().forEach((key, values) -> params.put(key, values.length == 1 ? values[0] : List.of(values)));
         details.put("params", params);
-        return record(principal, request.getMethod() + " " + pattern, resourceTypeOf(pattern), outcome,
+        return record(principal, request.getMethod() + " " + pattern, resourceTypeOf(pattern), resourceIdOf(request), outcome,
                 RequestCorrelation.current(request), details);
+    }
+
+    /** The target of the call: the last path variable, e.g. {@code {id}} of {@code /notification-campaigns/{id}/send}; null when the path has none. */
+    static String resourceIdOf(HttpServletRequest request) {
+        if (!(request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE) instanceof Map<?, ?> variables)) return null;
+        String last = null;
+        for (Object value : variables.values()) if (value != null) last = value.toString();
+        return last;
+    }
+
+    /** Target id of a GraphQL mutation: an {@code id} argument, or an {@code id} inside its {@code input} object. */
+    static String argumentResourceId(Object arguments) {
+        if (!(arguments instanceof Map<?, ?> map)) return null;
+        if (map.get("id") instanceof String id) return id;
+        for (Object value : map.values()) {
+            if (value instanceof Map<?, ?> nested && nested.get("id") instanceof String id) return id;
+        }
+        return null;
     }
 
     /** First meaningful path segment, e.g. {@code /api/v1/users/{id}/reset} gives {@code USERS}. */

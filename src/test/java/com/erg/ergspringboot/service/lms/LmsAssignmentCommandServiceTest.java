@@ -219,6 +219,20 @@ class LmsAssignmentCommandServiceTest {
     }
 
     @Test
+    void createRejectsAQuizAnotherTeacherBuilt() {
+        when(studentRepository.findByTenantIdAndAcademicClassIdOrderByFullNameAsc("tenant-a", "class-1"))
+                .thenReturn(List.of(student("s1", "class-1")));
+        when(quizVersionRepository.countTeacherQuizzesNotOwnedBy("tenant-a", List.of("quiz-theirs"), admin.userId()))
+                .thenReturn(1L);
+
+        CreateAssignmentRequest request = new CreateAssignmentRequest(
+                "Homework", List.of("quiz-theirs"), "class", "class-1", null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.create(admin, null, request))
+                .isInstanceOf(com.erg.ergspringboot.exception.ForbiddenException.class);
+    }
+
+    @Test
     void createRejectsQuizWithNoPublishedVersion() {
         when(studentRepository.findByTenantIdAndAcademicClassIdOrderByFullNameAsc("tenant-a", "class-1"))
                 .thenReturn(List.of(student("s1", "class-1")));

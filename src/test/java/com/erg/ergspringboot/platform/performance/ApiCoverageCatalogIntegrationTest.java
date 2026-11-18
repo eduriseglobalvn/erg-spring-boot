@@ -136,7 +136,8 @@ class ApiCoverageCatalogIntegrationTest {
     private void addRoutes(Set<String> routes, RequestMappingInfo mapping, HandlerMethod handler) {
         String handlerPackage = handler.getBeanType().getPackageName();
         if (!handlerPackage.startsWith("com.erg.ergspringboot.controller")
-                && !handlerPackage.startsWith("com.erg.ergspringboot.timekeeping.web")) return;
+                && !handlerPackage.startsWith("com.erg.ergspringboot.timekeeping.web")
+                && !handlerPackage.startsWith("com.erg.ergspringboot.lms.internal.core")) return;
         Set<String> paths = mapping.getPatternValues();
         RequestMethodsRequestCondition methodCondition = mapping.getMethodsCondition();
         Set<org.springframework.web.bind.annotation.RequestMethod> methods = methodCondition.getMethods();

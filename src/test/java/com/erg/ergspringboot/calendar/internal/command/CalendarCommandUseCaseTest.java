@@ -43,7 +43,7 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarRoom;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
@@ -53,8 +53,8 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository
 import com.erg.ergspringboot.calendar.persistence.CalendarRoomRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.LevelRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleConflictService;
@@ -122,9 +122,9 @@ class CalendarCommandUseCaseTest {
     @Mock
     private ClassroomRepository classroomRepository;
     @Mock
-    private SubjectRepository subjectRepository;
+    private CurriculumSubjectRepository subjectRepository;
     @Mock
-    private LevelRepository levelRepository;
+    private CurriculumLevelRepository levelRepository;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -248,15 +248,15 @@ class CalendarCommandUseCaseTest {
         classroom.setName("Class A");
         classroom.setSchoolId(SCHOOL_ID);
 
-        Subject subject = new Subject();
+        CurriculumSubject subject = new CurriculumSubject();
         subject.setId("subj-math");
         subject.setName("Mathematics");
 
         when(classroomRepository.findByTenantIdAndSchoolIdOrderByNameAsc(TENANT_ID, SCHOOL_ID))
                 .thenReturn(List.of(classroom));
-        when(subjectRepository.findTop500ByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+        when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(eq(TENANT_ID), eq("ACTIVE"), any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(List.of(subject));
-        when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+        when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                 eq(TENANT_ID), anySet(), eq("ACTIVE")))
                 .thenReturn(List.of());
         when(userRepository.findByTenantIdAndIdIn(eq(TENANT_ID), anySet())).thenReturn(List.of());

@@ -223,6 +223,8 @@ public class WebPushNotificationDeliveryAdapter implements NotificationDeliveryA
         payload.put("title", request.payload().title());
         payload.put("body", body.length() > BODY_MAX ? body.substring(0, BODY_MAX) + "…" : body);
         payload.put("priority", priority.name());
+        payload.put("eventType", request.payload().data().get("eventType"));
+        payload.put("portal", request.payload().data().get("portal"));
         payload.put("url", "/notifications/" + request.notificationId());
         payload.put("tag", request.payload().collapseKey() == null ? request.notificationId() : request.payload().collapseKey());
         payload.put("requireInteraction", priority == NotificationPriority.URGENT);

@@ -63,7 +63,9 @@ class LcmsMediaControllerUploadTest {
                         com.erg.ergspringboot.lcms.quiz.publish.QuizPublishService.class),
                 media,
                 org.mockito.Mockito.mock(
-                        com.erg.ergspringboot.lcms.internal.quiz.bundle.PortableQuizBundleService.class)));
+                        com.erg.ergspringboot.lcms.internal.quiz.bundle.PortableQuizBundleService.class),
+                org.mockito.Mockito.mock(
+                        com.erg.ergspringboot.lcms.quiz.authoring.TeacherQuizOwnership.class)));
     }
 
     @Test

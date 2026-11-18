@@ -180,7 +180,19 @@ public class GlobalExceptionHandler {
         // unique idempotency index at the DB (uq_*_idempotency, idx_tsb_tenant_idempotency_key, ...).
         // Surface that with a distinct, actionable code so clients can treat it as a raced retry rather
         // than an unrelated data conflict. The constraint name is inspected internally but never leaked.
-        boolean idempotencyConflict = mentionsIdempotencyConstraint(exception);
+        if (DbConstraintInspector.isForeignKeyViolation(exception)) {
+            // 23503: a referenced row does not exist. Not a duplicate, so not a 409; the table and column stay internal.
+            ApiResponse<Void> missing = buildErrorResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "Bad Request",
+                    "A referenced record does not exist",
+                    "REFERENCE_NOT_FOUND",
+                    request);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .header(RequestCorrelation.REQUEST_ID_HEADER, missing.requestId())
+                    .body(missing);
+        }
+        boolean idempotencyConflict = DbConstraintInspector.mentionsIdempotencyConstraint(exception);
         ApiResponse<Void> response = buildErrorResponse(
                 HttpStatus.CONFLICT,
                 "Conflict",
@@ -192,23 +204,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
                 .body(response);
-    }
-
-    private static final java.util.regex.Pattern IDEMPOTENCY_CONSTRAINT =
-            java.util.regex.Pattern.compile("constraint \"?[A-Za-z0-9_]*idempotency[A-Za-z0-9_]*\"?", java.util.regex.Pattern.CASE_INSENSITIVE);
-
-    private boolean mentionsIdempotencyConstraint(Throwable exception) {
-        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-            String message = cause.getMessage();
-            // The constraint's own name only: the failed INSERT text also lists an idempotency_key column, which is not a retry.
-            if (message != null && IDEMPOTENCY_CONSTRAINT.matcher(message).find()) {
-                return true;
-            }
-            if (cause.getCause() == cause) {
-                break;
-            }
-        }
-        return false;
     }
 
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)

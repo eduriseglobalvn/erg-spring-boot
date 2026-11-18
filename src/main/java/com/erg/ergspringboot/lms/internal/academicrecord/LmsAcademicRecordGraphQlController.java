@@ -68,6 +68,14 @@ public class LmsAcademicRecordGraphQlController {
                 input.operationId(), input.idempotencyKey()));
     }
 
+    @SchemaMapping(typeName = "Mutation", field = "deleteGradebookScore")
+    public boolean deleteGradebookScore(@Argument DeleteGradebookScoreInput input) {
+        ErgPrincipal principal = principal("lms.grade.write", "lms.manage", "*");
+        String tenantId = access.verifiedTenantId(principal, input.tenantId());
+        assertClassScope(principal, tenantId, input.classId());
+        return records.deleteGradebookScore(tenantId, input.classId(), input.subjectId(), input.studentId(), input.columnId());
+    }
+
     /** The school comes from the class row, never from the client's {@code schoolId}. */
     private void assertClassScope(ErgPrincipal principal, String tenantId, String classId) {
         access.assertClassScope(principal, classId, records.schoolOfClass(tenantId, classId));
@@ -82,6 +90,8 @@ public class LmsAcademicRecordGraphQlController {
     public record AttendanceWorkspaceInput(String tenantId, String classId, String schoolId, String subjectId,
                                            String from, String to) { }
     public record GradebookWorkspaceInput(String tenantId, String classId, String schoolId, String subjectId) { }
+    public record DeleteGradebookScoreInput(String tenantId, String classId, String studentId, String subjectId,
+                                            String columnId) { }
     public record UpsertAttendanceInput(String tenantId, String classId, String schoolId, String studentId,
                                         String subjectId, String attendanceDate, int lessonIndex, String status,
                                         Integer expectedVersion, String operationId, String idempotencyKey) {

@@ -2,6 +2,8 @@ package com.erg.ergspringboot.platform.security;
 
 import com.erg.ergspringboot.authorization.catalog.BusinessRole;
 import com.erg.ergspringboot.authorization.catalog.BusinessRoleCatalog;
+import com.erg.ergspringboot.authorization.catalog.PermissionCatalog;
+import com.erg.ergspringboot.authorization.catalog.PermissionKind;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
@@ -108,6 +110,9 @@ public class AccountActionGuard {
         if (roleIds.size() > 1 && roleIds.stream().filter(Objects::nonNull).anyMatch(EXCLUSIVE_ROLE_IDS::contains)) {
             throw new BadRequestException("Vai trò Giám đốc và Vận hành không được kèm vai trò khác");
         }
+        if (roleIds.size() > 1 && roleIds.contains(BusinessRoleCatalog.STUDENT)) {
+            throw new BadRequestException("Vai trò Học sinh không được kèm vai trò nhân sự");
+        }
     }
 
     /** Role ids the user holds now: direct roles plus active scoped assignments. */
@@ -177,8 +182,11 @@ public class AccountActionGuard {
         if (capabilityPolicy.isPlatformWide(actor)) return true;
         Set<String> have = new LinkedHashSet<>();
         actor.permissions().forEach(p -> have.add(p.trim().toLowerCase(Locale.ROOT)));
+        // Portal gates and self-service rights (kind WORKSPACE) are not privileges to escalate: Phòng đào tạo manages
+        // teacher and student accounts without holding "lms.quiz.play" itself. "*" never passes.
         return permissions.stream().map(p -> p.trim().toLowerCase(Locale.ROOT))
-                .allMatch(p -> !"*".equals(p) && have.contains(p));
+                .allMatch(p -> !"*".equals(p) && (have.contains(p)
+                        || PermissionCatalog.kindOf(p).filter(kind -> kind == PermissionKind.WORKSPACE).isPresent()));
     }
 
     private void assertAnotherActiveSuperAdmin(ErgPrincipal actor, User target) {

@@ -554,6 +554,7 @@ type AssignmentSummaryItem {
   resources: [AssignmentResource!]!
   createdAt: String
   updatedAt: String
+  title: String
 }
 
 type TeacherHomeworkWorkspace {
@@ -595,6 +596,8 @@ type HomeworkAssignmentCard {
   createdAt: String
   updatedAt: String
   title: String
+  recipientCount: Int!
+  submittedCount: Int!
 }
 
 type ClassOption {
@@ -995,6 +998,47 @@ type LearningRecentResource {
 }
 
 extend type LmsQuery {
+  classScoreBoard(input: ClassScoreBoardInput!): ClassScoreBoard!
+}
+
+input ClassScoreBoardInput {
+  tenantId: String
+  classId: String!
+}
+
+type ClassScoreBoard {
+  classId: String!
+  className: String
+  students: [ClassScoreBoardStudent!]!
+  attempts: [ClassScoreBoardAttempt!]!
+  truncated: Boolean!
+}
+
+type ClassScoreBoardStudent {
+  id: String!
+  studentCode: String
+  fullName: String
+}
+
+type ClassScoreBoardAttempt {
+  id: String!
+  studentId: String!
+  assignmentId: String!
+  assignmentTitle: String
+  quizId: String
+  quizTitle: String
+  topicId: String
+  topicName: String
+  score: Float
+  maxScore: Float
+  percent: Float
+  status: String
+  startedAt: String
+  submittedAt: String
+  durationSeconds: Int
+}
+
+extend type LmsQuery {
   learningOutcomes(input: LearningOutcomesQueryInput): LearningOutcomesWorkspace!
   learningOutcomePath(pathId: String!): LearningPathDetail!
   verifyOutcomeCertificate(verificationId: String!): OutcomeCertificate!
@@ -1039,6 +1083,8 @@ input RevokeOutcomeCertificateInput { certificateId: String!, expectedVersion: I
 type Mutation {
   upsertAttendance(input: UpsertAttendanceInput!): AttendanceRecord!
   upsertGradebookScore(input: UpsertGradebookScoreInput!): GradebookScore!
+  "Clears one cell: the student has no score in that column any more"
+  deleteGradebookScore(input: DeleteGradebookScoreInput!): Boolean!
   createStudentDiscussion(input: CreateStudentDiscussionInput!): StudentDiscussionPost!
   replyStudentDiscussion(input: ReplyStudentDiscussionInput!): StudentDiscussionComment!
   setStudentDiscussionReaction(input: SetStudentDiscussionReactionInput!): StudentDiscussionReactionPayload!
@@ -1088,6 +1134,7 @@ type Mutation {
 input AttendanceWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String!, from: String, to: String }
 input GradebookWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String! }
 input UpsertAttendanceInput { tenantId: String, classId: String!, schoolId: String, studentId: String!, subjectId: String!, attendanceDate: String!, lessonIndex: Int!, status: String!, expectedVersion: Int, operationId: String, idempotencyKey: String }
+input DeleteGradebookScoreInput { tenantId: String, classId: String!, studentId: String!, subjectId: String!, columnId: String! }
 input UpsertGradebookScoreInput { tenantId: String, classId: String!, schoolId: String, studentId: String!, subjectId: String!, columnId: String!, label: String!, maxScore: Float!, kind: String!, position: Int, score: Float!, expectedVersion: Int, operationId: String, idempotencyKey: String }
 
 type AttendanceWorkspace { tenantId: String!, classId: String!, subjectId: String!, from: String!, to: String!, records: [AttendanceRecord!]! }
@@ -1134,9 +1181,6 @@ extend type Mutation {
   updateSchoolStudent(input: UpdateSchoolStudentInput!): OperationalStudentResponse!
   archiveSchoolStudent(input: ArchiveSchoolStudentInput!): OperationalStudentResponse!
   importSchoolStudents(input: ImportSchoolStudentsInput!): BulkStudentImportResponse!
-  createSchoolSubject(input: CreateSchoolSubjectInput!): OperationalSubjectResponse!
-  updateSchoolSubject(input: UpdateSchoolSubjectInput!): OperationalSubjectResponse!
-  archiveSchoolSubject(input: ArchiveSchoolSubjectInput!): OperationalSubjectResponse!
   enrollSchoolStudent(input: EnrollSchoolStudentInput!): OperationalEnrollmentResponse!
   bulkEnrollSchoolStudents(input: BulkEnrollSchoolStudentsInput!): BulkEnrollmentResponse!
 }
@@ -1212,9 +1256,6 @@ input UpdateSchoolStudentInput {
 input ArchiveSchoolStudentInput { tenantId: String, schoolId: String!, studentId: String!, version: String! }
 input ImportSchoolStudentsInput { tenantId: String, schoolId: String!, idempotencyKey: String, items: [CreateSchoolStudentInput!]! }
 
-input CreateSchoolSubjectInput { tenantId: String, schoolId: String, name: String!, code: String!, status: String }
-input UpdateSchoolSubjectInput { tenantId: String, subjectId: String!, version: String!, name: String, code: String, status: String }
-input ArchiveSchoolSubjectInput { tenantId: String, subjectId: String!, version: String! }
 
 input EnrollSchoolStudentInput { tenantId: String, studentId: String!, classId: String!, academicYear: String, idempotencyKey: String }
 input BulkEnrollSchoolStudentsInput { tenantId: String, idempotencyKey: String, items: [EnrollSchoolStudentItemInput!]! }
@@ -1253,17 +1294,6 @@ type OperationalStudentResponse {
   parentRelationship: String
   enrollmentDate: String
   note: String
-  status: String!
-  version: String!
-  updatedAt: String
-}
-
-type OperationalSubjectResponse {
-  id: String!
-  tenantId: String!
-  schoolId: String
-  name: String!
-  code: String!
   status: String!
   version: String!
   updatedAt: String
@@ -1634,7 +1664,7 @@ extend type LmsQuery {
 extend type Mutation {
   "Errors: STALE_VERSION, MONTH_CLOSED, NOT_TEACHER_OF_PERIOD, ACTUAL_PERIOD_OUT_OF_RANGE"
   updateLessonLogEntry(input: UpdateLessonLogEntryInput!): LessonLogPeriod!
-  "Confirms every happened, unconfirmed period of the week. Errors: MONTH_CLOSED, PERIOD_NOT_HAPPENED"
+  "Confirms every happened, unconfirmed period of the week; a week with none is a no-op. Errors: MONTH_CLOSED"
   confirmLessonLogWeek(weekStart: Date!): LessonLogStats!
   saveAttendanceAndLog(input: SaveAttendanceAndLogInput!): LessonLogPeriod!
   remindLessonReport(teacherIds: [ID!]!): Int!

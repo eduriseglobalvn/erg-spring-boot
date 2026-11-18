@@ -66,6 +66,29 @@ class LoginFailureEnforcementServiceTest {
         verify(sessionRepository, never()).saveAll(any());
     }
 
+    @Test
+    void credentialResetLiftsTheTemporaryLockout() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(i -> attempt("FAILED", now.minusMinutes(2))).toList();
+        LoginFailureEnforcementService service = new LoginFailureEnforcementService(userRepository, sessionRepository, attemptRepository);
+
+        when(attemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any())).thenReturn(failures);
+        assertThat(service.isTemporarilyLocked(user())).isTrue();
+
+        List<AuthLoginAttempt> afterReset = new java.util.ArrayList<>(failures);
+        afterReset.add(0, attempt(AuthLoginAttemptRepository.RESULT_RESET, now.minusMinutes(1)));
+        when(attemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any())).thenReturn(afterReset);
+        assertThat(service.isTemporarilyLocked(user())).isFalse();
+    }
+
+    private AuthLoginAttempt attempt(String result, OffsetDateTime at) {
+        AuthLoginAttempt attempt = new AuthLoginAttempt();
+        attempt.setResult(result);
+        attempt.setReason("FAILED".equals(result) ? "invalid_credentials" : "credential_reset");
+        attempt.setCreatedAt(at);
+        return attempt;
+    }
+
     private User user() {
         User user = new User();
         user.setId("user-1");

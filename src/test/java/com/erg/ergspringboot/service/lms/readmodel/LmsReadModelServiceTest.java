@@ -17,6 +17,7 @@ import com.erg.ergspringboot.lms.internal.readmodel.*;
 import com.erg.ergspringboot.lms.persistence.StudentGroup;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMember;
 import com.erg.ergspringboot.platform.concurrency.ErgReadTaskExecutor;
+import com.erg.ergspringboot.lms.persistence.AssignmentProgressCountRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
@@ -65,6 +66,9 @@ class LmsReadModelServiceTest {
     private AssignmentRepository assignmentRepository;
 
     @Mock
+    private AssignmentProgressCountRepository progressCounts;
+
+    @Mock
     private AssignmentResourceRepository assignmentResourceRepository;
 
     @Mock
@@ -92,7 +96,7 @@ class LmsReadModelServiceTest {
     void setUp() {
         readTaskExecutor = new ErgReadTaskExecutor(4, 4, 32, Duration.ofSeconds(1));
         var attempts = new JpaLmsAttemptQueryAdapter(attemptRepository);
-        var assignments = new JpaLmsAssignmentQueryAdapter(assignmentRepository);
+        var assignments = new JpaLmsAssignmentQueryAdapter(assignmentRepository, progressCounts);
         service = new LmsReadModelUseCase(
                 new LmsStudentGroupReadUseCase(studentGroupRepository, studentGroupMemberRepository),
                 new LmsAssignmentProgressQueryUseCase(attempts, assignments, assignmentResourceRepository),
@@ -340,7 +344,7 @@ class LmsReadModelServiceTest {
                 "assignment-1",
                 List.of("student-1", "student-2")
         );
-        verifyNoMoreInteractions(classroomRepository, studentRepository, assignmentRepository, assignmentResourceRepository, attemptRepository);
+        verifyNoMoreInteractions(classroomRepository, studentRepository, assignmentRepository, progressCounts, assignmentResourceRepository, attemptRepository);
     }
 
     @Test
@@ -578,7 +582,7 @@ class LmsReadModelServiceTest {
         verify(assignmentRepository, times(1)).findClassAssignmentCards("erg", "class-1", null, assignmentPage);
         verify(assignmentResourceRepository, times(1))
                 .findResourceProjectionsByAssignmentIds("erg", List.of("assignment-1", "assignment-2"));
-        verifyNoMoreInteractions(classroomRepository, studentRepository, assignmentRepository, assignmentResourceRepository, attemptRepository);
+        verifyNoMoreInteractions(classroomRepository, studentRepository, assignmentRepository, progressCounts, assignmentResourceRepository, attemptRepository);
     }
 
     @Test
@@ -784,7 +788,11 @@ class LmsReadModelServiceTest {
         verify(classroomRepository, times(1)).findTeacherClassOptions("erg", "teacher-1");
         verify(attemptRepository, times(1)).findTeacherPendingReviews("erg", "teacher-1", clampedPage);
         verify(studentRepository, times(1)).findTeacherOverdueStudents("erg", "teacher-1", clampedPage);
-        verifyNoMoreInteractions(classroomRepository, studentRepository, assignmentRepository, assignmentResourceRepository, attemptRepository);
+        // BUG-A-054: recipient and submitted counts come from one grouped query each for the whole page, never per assignment.
+        verify(progressCounts, times(1)).countSavedRecipients("erg", List.of("assignment-1"));
+        verify(progressCounts, times(1)).countClassRosterRecipients("erg", List.of("assignment-1"));
+        verify(progressCounts, times(1)).countSubmittedRecipients("erg", List.of("assignment-1"));
+        verifyNoMoreInteractions(classroomRepository, studentRepository, assignmentRepository, progressCounts, assignmentResourceRepository, attemptRepository);
     }
 
     @Test

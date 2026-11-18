@@ -143,7 +143,9 @@ class TeachingScheduleOverviewIT extends TeachingScheduleITBase {
         assertThat(byEvent.get(travelEvent).conflictKinds()).containsExactly("TRAVEL_TIME");
         assertThat(grid.conflicts()).extracting("kind").containsExactlyInAnyOrder("TEACHER_TIME", "TRAVEL_TIME");
 
-        assertThatThrownBy(() -> schedule.overviewGrid(tenant, WEEK, List.of(tcd, nguyenDu, vanLang, moi)))
+        assertThat(schedule.overviewGrid(tenant, WEEK, List.of(tcd, nguyenDu, vanLang, moi)).schools()).hasSize(4);
+        List<String> tooMany = java.util.stream.IntStream.rangeClosed(1, 51).mapToObj(i -> "school-" + i).toList();
+        assertThatThrownBy(() -> schedule.overviewGrid(tenant, WEEK, tooMany))
                 .isInstanceOfSatisfying(TeachingScheduleException.class, e -> assertThat(e.getCode()).isEqualTo("TOO_MANY_SCHOOLS"));
     }
 

@@ -151,7 +151,13 @@ public final class CurriculumDtos {
             String name, String status, Long recordVersion, List<CurriculumProgramRowResponse> rows,
             OffsetDateTime createdAt, OffsetDateTime updatedAt) { }
 
-    public record CurriculumClassSubjectAllocationItem(String classId, List<String> subjectIds) { }
+    /** {@code levelIds}: subjectId to the curriculum level the class studies it at; optional. */
+    public record CurriculumClassSubjectAllocationItem(
+            String classId, List<String> subjectIds, java.util.Map<String, String> levelIds) {
+        public CurriculumClassSubjectAllocationItem(String classId, List<String> subjectIds) {
+            this(classId, subjectIds, java.util.Map.of());
+        }
+    }
 
     public record CurriculumClassSubjectsRequest(List<CurriculumClassSubjectAllocationItem> allocations, Long expectedVersion) { }
 

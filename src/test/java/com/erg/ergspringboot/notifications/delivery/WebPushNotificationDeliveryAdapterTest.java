@@ -85,7 +85,8 @@ class WebPushNotificationDeliveryAdapterTest {
     void sendsOnceWithTheInboxUrlTitleAndPriority() throws Exception {
         respond(201);
 
-        SendResult result = adapter().deliver(request(Map.of("priority", "IMPORTANT", "campaignId", "c-1")));
+        SendResult result = adapter().deliver(request(Map.of("priority", "IMPORTANT", "campaignId", "c-1",
+                "eventType", "CAMPAIGN", "portal", "elearning")));
 
         assertThat(result.success()).isTrue();
         assertThat(executed).singleElement().satisfies(post -> assertThat(post.getURI().toString()).isEqualTo(ENDPOINT));
@@ -95,6 +96,8 @@ class WebPushNotificationDeliveryAdapterTest {
         assertThat(payload.get("title").asText()).isEqualTo("Họp phụ huynh");
         assertThat(payload.get("body").asText()).isEqualTo("Tối thứ 6");
         assertThat(payload.get("priority").asText()).isEqualTo("IMPORTANT");
+        assertThat(payload.get("eventType").asText()).isEqualTo("CAMPAIGN");
+        assertThat(payload.get("portal").asText()).isEqualTo("elearning");
         assertThat(payload.get("tag").asText()).isEqualTo("msg-1");
         assertThat(payload.get("requireInteraction").asBoolean()).isFalse();
         assertThat(sent.getUrgency()).isEqualTo(Urgency.NORMAL);

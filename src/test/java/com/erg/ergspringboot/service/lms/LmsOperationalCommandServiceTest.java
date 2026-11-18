@@ -16,13 +16,11 @@ import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
-import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollmentRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import java.util.List;
@@ -38,7 +36,6 @@ class LmsOperationalCommandServiceTest {
 
     @Mock private ClassroomRepository classrooms;
     @Mock private StudentRepository students;
-    @Mock private SubjectRepository subjects;
     @Mock private StudentEnrollmentRepository enrollments;
     @Mock private EducationUnitRepository schools;
     @Mock private UserActivityRepository activities;
@@ -50,7 +47,7 @@ class LmsOperationalCommandServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LmsOperationalCommandService(classrooms, students, subjects, enrollments, schools, activities, users);
+        service = new LmsOperationalCommandService(classrooms, students, enrollments, schools, activities, users);
     }
 
     @Test
@@ -97,7 +94,7 @@ class LmsOperationalCommandServiceTest {
     void repeatedImportWithTheSameStudentCodesIsReplaySafe() {
         Student existing = student("student-1", "S-001", "Alice");
         when(schools.findByIdAndTenantId("school-1", "tenant-1")).thenReturn(Optional.of(school()));
-        when(students.findByTenantIdAndStudentCodeIgnoreCase("tenant-1", "S-001"))
+        when(students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase("tenant-1", "school-1", "S-001"))
                 .thenReturn(Optional.of(existing));
 
         var result = service.importStudents("school-1",

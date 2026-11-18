@@ -32,11 +32,12 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Weekly overview by school: the school list with counters, and the side-by-side grid of up to three schools. */
+/** Weekly overview by school: the school list with counters, and the side-by-side grid of one page of schools. */
 @Service
 public class ScheduleOverviewService {
 
-    static final int MAX_GRID_SCHOOLS = 3;
+    /** One request = one page of schools; the client pages through any number of selected schools (BUG-B-021). */
+    static final int MAX_GRID_SCHOOLS = 50;
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
     private final ScheduleDataLoader loader;
@@ -80,14 +81,14 @@ public class ScheduleOverviewService {
     }
 
     /**
-     * 1 to 3 schools side by side: every period of the week, the conflicts, and the holidays that week. Not read-only:
+     * One page of schools side by side: every period of the week, the conflicts, and the holidays that week. Not read-only:
      * the first look-up of a tenant seeds its default period template.
      */
     @Transactional("postgresTransactionManager")
     public OverviewGridResponse grid(String tenantId, LocalDate weekStart, List<String> schoolIds) {
         List<String> ids = schoolIds == null ? List.of() : schoolIds.stream().distinct().toList();
         if (ids.size() > MAX_GRID_SCHOOLS) {
-            throw TeachingScheduleException.badRequest("TOO_MANY_SCHOOLS", "Chỉ xem cạnh nhau tối đa 3 trường.");
+            throw TeachingScheduleException.badRequest("TOO_MANY_SCHOOLS", "Mỗi lần tải tối đa " + MAX_GRID_SCHOOLS + " trường.");
         }
         if (ids.isEmpty()) {
             throw TeachingScheduleException.badRequest("SCHOOL_REQUIRED", "Chọn ít nhất một trường.");

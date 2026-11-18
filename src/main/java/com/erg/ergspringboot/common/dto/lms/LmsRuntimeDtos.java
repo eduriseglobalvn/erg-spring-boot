@@ -131,7 +131,7 @@ public final class LmsRuntimeDtos {
             String quizVersion,
             boolean offlineAllowed,
             OffsetDateTime startedAt,
-            OffsetDateTime serverTimeAtStart
+            OffsetDateTime serverTimeAtStart, OffsetDateTime serverTime // serverTime: the clock now, for a resumed countdown
     ) {
         public static AttemptPolicySnapshotResponse from(Map<String, Object> source) {
             if (source == null || source.isEmpty()) {
@@ -152,7 +152,7 @@ public final class LmsRuntimeDtos {
                     string(source, "quizVersion"),
                     Boolean.TRUE.equals(source.get("offlineAllowed")),
                     offsetDateTime(source, "startedAt"),
-                    offsetDateTime(source, "serverTimeAtStart")
+                    offsetDateTime(source, "serverTimeAtStart"), OffsetDateTime.now(java.time.ZoneOffset.UTC)
             );
         }
 
@@ -309,6 +309,19 @@ public final class LmsRuntimeDtos {
     public record AttemptSubmitResponse(double score, double maxScore, double percent, boolean passed) {
     }
 
+    /** A learner's own latest handed-in attempt; {@code answers} and {@code results} share the runtime question id keys. Never carries the answer key. */
+    public record LatestSubmittedAttemptResponse(
+            String attemptId, String assignmentId, String quizId, String quizVersionId, String packageHash,
+            String status, Double score, Double maxScore, Double percent, Boolean passed,
+            OffsetDateTime startedAt, OffsetDateTime submittedAt,
+            Map<String, Object> answers, Map<String, QuestionOutcome> results, boolean attemptsExhausted
+    ) {
+    }
+
+    public record QuestionOutcome(boolean correct, boolean partiallyRight, double awardedPoints, double maxPoints,
+            boolean needsManualGrade) {
+    }
+
     /** Contents of a {@code .ergresult} file: the exported {@code body} plus its SHA-256 {@code checksum}. */
     public record ImportPortableResultRequest(
             @jakarta.validation.constraints.NotNull Map<String, Object> body,
@@ -321,6 +334,16 @@ public final class LmsRuntimeDtos {
             String attemptId, String assignmentId, String quizId, String studentId, String status,
             double score, double maxScore, double percent, boolean passed, boolean late, boolean duplicate
     ) {
+    }
+
+    /** One hand-graded answer of an attempt: the question prompt, the learner's raw answer and its points. */
+    public record ManualReviewItem(String questionId, String kind, String prompt, Object answer, double maxPoints,
+            double awardedPoints, boolean needsManualGrade) {
+    }
+
+    /** The answers of one attempt a teacher grades by hand; {@code version} is the {@code expectedVersion} to send back. */
+    public record ManualReviewResponse(String attemptId, String studentId, String status, long version,
+            List<ManualReviewItem> items) {
     }
 
     /** Teacher grade for one answer awaiting manual review; {@code expectedVersion} guards concurrent graders. */

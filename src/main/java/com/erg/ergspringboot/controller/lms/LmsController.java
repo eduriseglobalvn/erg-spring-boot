@@ -7,6 +7,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ManualGradeRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ManualReviewResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSubmitResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncRequest;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
@@ -85,6 +86,14 @@ public class LmsController {
         StudentScoreListResponse data = lms.listStudentScores(
                 access.userId(), access, page == null ? 0 : page, size == null ? 50 : size);
         return ok("Scores loaded", data, request);
+    }
+
+    @GetMapping("/assignments/{assignmentId}/attempts/latest-submitted")
+    @LmsAssignmentReadSelf
+    public ApiResponse<com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.LatestSubmittedAttemptResponse> latestSubmittedAttempt(
+            @PathVariable String assignmentId, HttpServletRequest request) {
+        UserAccessContext access = UserAccessContext.from(request);
+        return ok("Latest submitted attempt loaded", lms.latestSubmittedAttempt(assignmentId, access.userId(), access), request);
     }
 
     @GetMapping("/quizzes/{quizId}/package")
@@ -215,6 +224,13 @@ public class LmsController {
             HttpServletRequest request
     ) {
         return ok("Answer graded", lms.gradeManualAnswer(attemptId, questionId, body, UserAccessContext.from(request)), request);
+    }
+
+    /** The hand-graded answers of one attempt, for the teacher grading screen. */
+    @GetMapping("/attempts/{attemptId}/manual-answers")
+    @LmsAttemptGrade
+    public ApiResponse<ManualReviewResponse> manualAnswers(@PathVariable String attemptId, HttpServletRequest request) {
+        return ok("Manual answers loaded", lms.manualAnswers(attemptId, UserAccessContext.from(request)), request);
     }
 
     @GetMapping("/quizzes/{quizId}/students")

@@ -12,6 +12,7 @@ import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import com.erg.ergspringboot.lcms.internal.quiz.assessment.AssessmentCurriculumBridge;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -40,14 +41,17 @@ public class QuizAuthoringService {
     private final QuizDraftRepository quizDraftRepository;
     private final QuizQuestionLinkService quizQuestionLinkService;
     private final AssessmentCurriculumBridge assessmentCurriculumBridge;
+    private final QuizVersionRepository quizVersionRepository;
 
     public QuizAuthoringService(
             UserRepository userRepository,
             QuizRepository quizRepository,
             QuizDraftRepository quizDraftRepository,
             QuizQuestionLinkService quizQuestionLinkService,
-            AssessmentCurriculumBridge assessmentCurriculumBridge
+            AssessmentCurriculumBridge assessmentCurriculumBridge,
+            QuizVersionRepository quizVersionRepository
     ) {
+        this.quizVersionRepository = quizVersionRepository;
         this.userRepository = userRepository;
         this.quizRepository = quizRepository;
         this.quizDraftRepository = quizDraftRepository;
@@ -97,9 +101,10 @@ public class QuizAuthoringService {
         QuizDraft draft = new QuizDraft();
         draft.setQuizId(savedQuiz.getId());
         draft.setTenantId(tenantId);
-        draft.setSettings(Map.of());
-        draft.setPlayerTemplate(Map.of());
-        draft.setTree(java.util.List.of());
+        Map<String, Object> source = publishedSnapshot(tenantId, authorUserId, request.sourceQuizId());
+        draft.setSettings(asMap(source.get("settings")));
+        draft.setPlayerTemplate(asMap(source.get("playerTemplate")));
+        draft.setTree(source.containsKey("tree") ? source.get("tree") : java.util.List.of());
         draft.setSchemaVersion(SCHEMA_VERSION);
         draft.setDocVersion(0L);
         draft.setUpdatedBy(authorUserId);
@@ -110,6 +115,24 @@ public class QuizAuthoringService {
         quizRepository.save(savedQuiz);
 
         return new CreateQuizResponse(savedQuiz.getId(), savedDraft.getId(), savedDraft.getDocVersion());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object value) {
+        return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+    }
+
+    /** What the published version of `sourceQuizId` was authored from; empty when no source is named. Unfinished draft edits are never copied. */
+    private Map<String, Object> publishedSnapshot(String tenantId, String userId, String sourceQuizId) {
+        if (sourceQuizId == null || sourceQuizId.isBlank()) return Map.of();
+        // another teacher's quiz is not visible to this one, so it is reported as missing
+        if (quizVersionRepository.countTeacherQuizzesNotOwnedBy(tenantId, List.of(sourceQuizId), userId) > 0) {
+            throw new ResourceNotFoundException("quiz not found");
+        }
+        Map<String, Object> snapshot = quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue(sourceQuizId, tenantId)
+                .orElseThrow(() -> new BadRequestException("Bài gốc chưa xuất bản nên chưa sao chép được."))
+                .getAuthoringSnapshot();
+        return snapshot == null ? Map.of() : snapshot;
     }
 
     @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)

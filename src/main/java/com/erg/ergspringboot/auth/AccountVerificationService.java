@@ -180,9 +180,7 @@ public class AccountVerificationService {
 
     private AccountLifecycleResponse lifecycle(User user) {
         java.util.List<String> nextSteps = new java.util.ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        nextSteps.addAll(user.firstLoginSteps());
         return new AccountLifecycleResponse(
                 nextSteps.isEmpty() ? "ACTIVE" : "FIRST_LOGIN_RESTRICTED",
                 Boolean.TRUE.equals(user.getIsProfileCompleted()),

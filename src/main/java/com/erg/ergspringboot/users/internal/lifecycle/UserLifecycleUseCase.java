@@ -109,9 +109,7 @@ public class UserLifecycleUseCase {
             u.getSocialLinks()==null?Map.of():u.getSocialLinks(),Boolean.TRUE.equals(u.getIsProfileCompleted()),iso(u.getLastLoginAt()),
             u.getLoginCount(),u.getTenantId(),iso(u.getCreatedAt()),iso(u.getUpdatedAt()),lifecycle(u));}
     private AccountLifecycleResponse lifecycle(User u){List<String> next=new ArrayList<>();
-        if(!Boolean.TRUE.equals(u.getIsProfileCompleted()))next.add("COMPLETE_PROFILE");
-        if(!Boolean.TRUE.equals(u.getRecoveryEmailVerified()))next.add("VERIFY_RECOVERY_EMAIL");
-        if(Boolean.TRUE.equals(u.getMustChangePassword()))next.add("CHANGE_PASSWORD");
+        next.addAll(u.firstLoginSteps());
         String state=next.isEmpty()?"ACTIVE":("INVITED".equalsIgnoreCase(u.getStatus())?"PROVISIONED":"FIRST_LOGIN_RESTRICTED");
         String e=u.getRecoveryEmail();String masked=e==null||!e.contains("@")?null:e.substring(0,1)+"***"+e.substring(e.indexOf('@'));
         return new AccountLifecycleResponse(state,Boolean.TRUE.equals(u.getIsProfileCompleted()),masked,

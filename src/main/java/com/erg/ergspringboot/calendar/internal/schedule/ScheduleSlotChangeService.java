@@ -136,7 +136,7 @@ public class ScheduleSlotChangeService {
         Map<String, String> roomNames = patch.roomId() == null ? Map.of() : loader.names(tenantId, "teaching_schedule_rooms", "name",
                 Set.of(patch.roomId()), target.batch().getSchoolId());
         Map<String, String> subjectNames = patch.subjectId() == null ? Map.of()
-                : loader.names(tenantId, "lms_subjects", "name", Set.of(patch.subjectId()));
+                : loader.names(tenantId, "curriculum_subjects", "name", Set.of(patch.subjectId()));
         Set<String> userIds = new HashSet<>();
         if (patch.assistantId() != null) userIds.add(patch.assistantId());
         if (patch.newMainId() != null) userIds.add(patch.newMainId());

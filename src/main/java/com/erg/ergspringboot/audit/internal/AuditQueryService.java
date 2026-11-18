@@ -6,6 +6,8 @@ import com.erg.ergspringboot.audit.AuditQuery;
 import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuditQueryService {
     private final AuditEventRepository repository;
     private final AuditRedactionPolicy redaction;
+
+    private static final OffsetDateTime MIN_TIME = OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+    private static final OffsetDateTime MAX_TIME = OffsetDateTime.of(9999, 12, 31, 0, 0, 0, 0, ZoneOffset.UTC);
 
     public AuditQueryService(AuditEventRepository repository, AuditRedactionPolicy redaction) {
         this.repository = repository;
@@ -33,7 +38,8 @@ public class AuditQueryService {
         List<String> classes = safeIds(access.managedClassIds());
         boolean allScopes = educationUnits.contains("*") || classes.contains("*");
         Page<AuditEvent> page = repository.search(
-                access.tenantId(), safe.from(), safe.to(), safe.actorId(), safe.resourceType(), safe.resourceId(),
+                access.tenantId(), safe.from() == null ? MIN_TIME : safe.from(), safe.to() == null ? MAX_TIME : safe.to(),
+                safe.actorId(), safe.resourceType(), safe.resourceId(),
                 safe.outcome(), allScopes, educationUnits, classes, PageRequest.of(safe.page(), safe.size()));
         return new AuditPage(
                 page.map(this::entry).getContent(), page.getNumber(), page.getSize(), page.getTotalElements(),

@@ -297,7 +297,9 @@ public class QuizAttemptGradingService {
         row.setCorrect(result.correct());
         row.setPartiallyRight(result.partiallyRight());
         row.setAwardedPoints(result.awardedPoints());
-        row.setMaxPoints(question.getPoints() == null ? BigDecimal.ZERO : question.getPoints());
+        // A survey (likert) row carries no points, matching its exclusion from the attempt maximum.
+        row.setMaxPoints(question.getPoints() == null || "survey".equals(question.getGradingPolicy())
+                ? BigDecimal.ZERO : question.getPoints());
         row.setGradedBy(gradedBy);
         row.setGradedAt(gradedAt);
         row.setNeedsManualGrade(result.needsManualGrade());

@@ -168,6 +168,7 @@ class TeachingScheduleSlotOptionsIT extends TeachingScheduleITBase {
                 insert into user_access_scopes (id, user_id, education_unit_id, role, created_at, updated_at)
                 select md5(? || 'a' || t), md5(? || 'u' || t), ?, 'lms.instructor', now(), now() from generate_series(1, 200) t
                 """, big, big, school);
+        write("insert into user_roles (user_id, role_id) select md5(? || 'u' || t), 'role_lms_teacher' from generate_series(1, 200) t", big);
         String batch = batch(big, school, "PUBLISHED", "Đợt 1");
         String subject = subject(big, "Toán");
         write("""

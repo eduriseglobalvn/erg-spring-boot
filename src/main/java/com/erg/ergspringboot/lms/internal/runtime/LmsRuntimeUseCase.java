@@ -21,9 +21,15 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
     private final LmsClassroomQueryUseCase classrooms;
     private final LmsResourceQueryUseCase resources;
     private final LmsStudentReadModelUseCase students;
+    private final com.erg.ergspringboot.lms.internal.readmodel.LmsLatestSubmittedAttemptUseCase latestSubmitted;
+    private final com.erg.ergspringboot.lms.internal.readmodel.LmsManualReviewUseCase manualReview;
 
     public LmsRuntimeUseCase(LmsAttemptUseCase attempts, LmsPortableResultImportUseCase imports, LmsClassroomQueryUseCase classrooms,
-            LmsResourceQueryUseCase resources, LmsStudentReadModelUseCase students) {
+            LmsResourceQueryUseCase resources, LmsStudentReadModelUseCase students,
+            com.erg.ergspringboot.lms.internal.readmodel.LmsLatestSubmittedAttemptUseCase latestSubmitted,
+            com.erg.ergspringboot.lms.internal.readmodel.LmsManualReviewUseCase manualReview) {
+        this.latestSubmitted = latestSubmitted;
+        this.manualReview = manualReview;
         this.attempts = attempts;
         this.imports = imports;
         this.classrooms = classrooms;
@@ -33,6 +39,7 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
 
     @Override public StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access, int page, int size) { return students.listAssignments(studentId, access, page, size); }
     @Override public StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access, int page, int size) { return students.listScores(studentId, access, page, size); }
+    @Override public LatestSubmittedAttemptResponse latestSubmittedAttempt(String assignmentId, String studentId, UserAccessContext access) { return latestSubmitted.latestSubmitted(assignmentId, studentId, access); }
     @Override public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) { return resources.getQuizPackage(quizId, assignmentId, access); }
     @Override public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return resources.getQuiz(quizId, access); }
     @Override public AttemptResponse startAttempt(String studentId, StartAttemptRequest request, UserAccessContext access) { return attempts.start(studentId, request, null, access); }
@@ -43,6 +50,7 @@ public class LmsRuntimeUseCase implements LmsRuntimePort {
     @Override public AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access) { return attempts.submit(attemptId, request, access); }
     @Override public ImportedAttemptResponse importPortableResult(ImportPortableResultRequest request, String assignmentId, String idempotencyKey, UserAccessContext access) { return imports.importPortableResult(request, assignmentId, idempotencyKey, access); }
     @Override public AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access) { return attempts.gradeManualAnswer(attemptId, questionId, request, access); }
+    @Override public ManualReviewResponse manualAnswers(String attemptId, UserAccessContext access) { return manualReview.manualAnswers(attemptId, access); }
     @Override public AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access) { return students.assignmentProgress(assignmentId, access); }
     @Override public List<AttemptResponse> quizStudents(String quizId, UserAccessContext access) { return students.quizStudents(quizId, access); }
     @Override public com.erg.ergspringboot.common.response.PageResponse<AttemptResponse> quizStudentsPage(String quizId, UserAccessContext access, int page, int size) { return students.quizStudentsPage(quizId, access, page, size); }

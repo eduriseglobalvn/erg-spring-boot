@@ -93,6 +93,16 @@ class FlywayConfigTest {
     }
 
     @Test
+    void freshInstallCleanupIsOnByDefaultOnlyForProd() {
+        MockEnvironment prod = new MockEnvironment();
+        prod.setActiveProfiles("prod");
+        assertThat(FlywayConfig.migrationInitSql(prod)).endsWith("SET erg.fresh_install_purge = 'true'");
+        assertThat(FlywayConfig.migrationInitSql(prod.withProperty(FlywayConfig.FRESH_INSTALL_PURGE, "false")))
+                .doesNotContain("fresh_install_purge");
+        assertThat(FlywayConfig.migrationInitSql(new MockEnvironment())).doesNotContain("fresh_install_purge");
+    }
+
+    @Test
     void migrationsAreExemptFromTheServerStatementTimeout() {
         // compose.yml sets statement_timeout=30s for the app pool; a long CREATE INDEX must not be killed mid-deploy.
         assertThat(FlywayConfig.migrationInitSql(new MockEnvironment())).isEqualTo("SET statement_timeout = 0");

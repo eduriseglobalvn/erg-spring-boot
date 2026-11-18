@@ -56,6 +56,19 @@ class AuditQueryServiceTest {
     }
 
     @Test
+    void neverPassesNullDatesToTheRepository() {
+        when(repository.search(eq("tenant-a"), org.mockito.ArgumentMatchers.notNull(),
+                org.mockito.ArgumentMatchers.notNull(), any(), any(), any(), any(), eq(true), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 100), 0));
+        UserAccessContext access = new UserAccessContext("actor-a", "tenant-a", List.of("*"), List.of(), null, null);
+
+        new AuditQueryService(repository, redaction).query(access, AuditQuery.defaults());
+
+        verify(repository).search(eq("tenant-a"), org.mockito.ArgumentMatchers.notNull(),
+                org.mockito.ArgumentMatchers.notNull(), any(), any(), any(), any(), eq(true), any(), any(), any());
+    }
+
+    @Test
     void failsClosedWhenTenantIdentityIsMissing() {
         AuditQueryService service = new AuditQueryService(repository, redaction);
         UserAccessContext noTenant = new UserAccessContext("actor-a", " ", List.of(), List.of(), null, null);

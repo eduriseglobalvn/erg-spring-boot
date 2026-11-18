@@ -59,7 +59,9 @@ public final class LmsHomeworkWorkspaceResponses {
             List<AssignmentResourceResponse> resources,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt,
-            String title
+            String title,
+            int recipientCount,
+            int submittedCount
     ) {
     }
 

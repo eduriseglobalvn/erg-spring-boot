@@ -12,6 +12,7 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptSyncResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ClassesBySchoolResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.EducationUnitListResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ManualGradeRequest;
+import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ManualReviewResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.SaveAnswerRequest;
@@ -64,6 +65,10 @@ public class LmsOperations {
         return legacy.gradeManualAnswer(attemptId, questionId, request, access);
     }
 
+    public ManualReviewResponse manualAnswers(String attemptId, UserAccessContext access) {
+        return legacy.manualAnswers(attemptId, access);
+    }
+
     public CreateAssignmentResponse createAssignment(UserAccessContext access, String idempotencyKey,
             CreateAssignmentRequest request) {
         return assignments.create(access, idempotencyKey, request);
@@ -99,6 +104,11 @@ public class LmsOperations {
 
     public StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access, int page, int size) {
         return legacy.listStudentScores(studentId, access, page, size);
+    }
+
+    public com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.LatestSubmittedAttemptResponse latestSubmittedAttempt(
+            String assignmentId, String studentId, UserAccessContext access) {
+        return legacy.latestSubmittedAttempt(assignmentId, studentId, access);
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) {

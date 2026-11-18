@@ -101,9 +101,13 @@ public class SessionService {
                 roles, permissionEnvelope.grantedPermissions(), permissionEnvelope.deniedPermissions());
         boolean canAccessGlobalErg = permissionEnvelope.grantedPermissions().contains("*");
 
-        List<SessionUnitScopeResolver.ManagedUnit> managedUnits = unitScopes.resolveManageableUnits(user, roles, canAccessGlobalErg, normalizeTenant(tenantId));
+        // BUG-B-003: Phòng đào tạo and the director manage every school of the organisation; teachers keep the scoped rule.
+        boolean allUnits = canAccessGlobalErg
+                || roles.stream().anyMatch(role -> "pdt_operator".equalsIgnoreCase(role) || "director".equalsIgnoreCase(role));
+        List<SessionUnitScopeResolver.ManagedUnit> managedUnits = unitScopes.resolveManageableUnits(user, roles, canAccessGlobalErg, allUnits, normalizeTenant(tenantId));
         List<SessionBootstrapUnit> manageableUnits = unitScopes.toBootstrapUnits(managedUnits);
-        List<SessionBootstrapClass> manageableClasses = unitScopes.resolveManageableClasses(normalizeTenant(tenantId), managedUnits);
+        List<SessionBootstrapClass> manageableClasses = unitScopes.resolveManageableClasses(normalizeTenant(tenantId), managedUnits,
+                canAccessGlobalErg || permissionEnvelope.grantedPermissions().contains("admin.workspace.access") ? null : user.getId());
 
         SessionBootstrapScope currentScope = unitScopes.resolveCurrentScope(
                 requestedAccess,
@@ -115,6 +119,7 @@ public class SessionService {
         return new SessionBootstrapResponse(
                 new SessionBootstrapUser(user.getId(), user.getFullName(), user.getEmail(), user.getAvatarUrl()),
                 new SessionBootstrapPermissions(
+                        allUnits,
                         canAccessGlobalErg,
                         roles,
                         permissionEnvelope.grantedPermissions(),
@@ -134,9 +139,7 @@ public class SessionService {
     private AccountLifecycleResponse lifecycle(User user, boolean studentOnly) {
         List<String> nextSteps = new java.util.ArrayList<>();
         if (!studentOnly) {
-            if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
-            if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
-            if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+            nextSteps.addAll(user.firstLoginSteps());
         }
         String status = nextSteps.isEmpty() ? "ACTIVE" : "FIRST_LOGIN_RESTRICTED";
         return new AccountLifecycleResponse(

@@ -29,7 +29,6 @@ class DemoSeedPurgeMigrationIntegrationTest {
             + "'usr_teacher_tram','seed.question.bank','seed.quiz.demo'))"
             + " + (select count(*) from education_units where id like 'sch\\_%')"
             + " + (select count(*) from academic_classes)"
-            + " + (select count(*) from lms_subjects) + (select count(*) from lms_levels)"
             + " + (select count(*) from lms_quizzes) + (select count(*) from lms_assignments)"
             + " + (select count(*) from lms_students) + (select count(*) from quiz_versions)"
             + " + (select count(*) from quiz_packages) + (select count(*) from teaching_schedule_rooms)"
@@ -65,7 +64,7 @@ class DemoSeedPurgeMigrationIntegrationTest {
         assertThat(flyway(url, false).migrate().success).isTrue();
 
         try (Connection connection = connect(url); var statement = connection.createStatement()) {
-            assertThat(number(statement, DEMO_ROWS)).isEqualTo(11 + 4 + 135 + 9 + 4 + 1 + 2 + 2 + 1 + 1 + 7 + 120 + 288 + 1 + 2);
+            assertThat(number(statement, DEMO_ROWS)).isEqualTo(11 + 4 + 135 + 1 + 2 + 2 + 1 + 1 + 7 + 120 + 288 + 1 + 2);
             assertThat(number(statement, "select count(*) from pg_tables where tablename like '\\_quarantine\\_v125%'"))
                     .isZero();
         }
@@ -90,6 +89,56 @@ class DemoSeedPurgeMigrationIntegrationTest {
             assertThat(number(statement, "select count(*) from users where id = 'usr_teacher_ba'")).isOne();
             assertThat(number(statement, "select count(*) from flyway_schema_history where version = '125'")).isZero();
         }
+    }
+
+    /** ENV-001: with the prod default, a database nobody has used ends with the admin and catalogs only. */
+    @Test
+    void prodFreshInstallKeepsOnlyTheAdminAndSystemCatalogs() throws Exception {
+        String url = database("fresh_prod");
+        assertThat(prodFlyway(url).migrate().success).isTrue();
+
+        try (Connection connection = connect(url); var statement = connection.createStatement()) {
+            statement.execute("set app.maintenance_mode = 'true'");
+            assertThat(number(statement, "select count(*) from users where id = 'usr_super_admin'")).isOne();
+            assertThat(number(statement, "select (select count(*) from users) + (select count(*) from education_units)"
+                    + " + (select count(*) from user_roles) + (select count(*) from user_access_scopes)")).isEqualTo(4);
+            assertThat(number(statement, DEMO_ROWS + " + (select count(*) from curriculum_subjects)"
+                    + " + (select count(*) from curriculum_levels) + (select count(*) from curriculum_programs)"
+                    + " + (select count(*) from lms_questions) + (select count(*) from content_items)")).isZero();
+            assertThat(number(statement, "select count(*) from roles")).isPositive();
+            assertThat(number(statement, "select count(*) from question_types")).isPositive();
+        }
+    }
+
+    /** The safety rule: a database that has been used is never touched, even with the flag on. */
+    @Test
+    void usedDatabaseIsLeftAloneByTheFreshInstallCleanup() throws Exception {
+        String url = database("fresh_used");
+        Flyway.configure().dataSource(url, postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration/postgres")
+                .configuration(FlywayConfig.SESSION_LEVEL_LOCK)
+                .target(MigrationVersion.fromVersion("168"))
+                .load().migrate();
+        try (Connection connection = connect(url); var statement = connection.createStatement()) {
+            statement.execute("update users set login_count = 1 where id = 'usr_super_admin'");
+        }
+
+        assertThat(prodFlyway(url).migrate().success).isTrue();
+        try (Connection connection = connect(url); var statement = connection.createStatement()) {
+            assertThat(number(statement, "select count(*) from users")).isEqualTo(13);
+            assertThat(number(statement, "select count(*) from academic_classes")).isEqualTo(135);
+        }
+    }
+
+    private static Flyway prodFlyway(String url) {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles("prod");
+        return Flyway.configure()
+                .dataSource(url, postgres.getUsername(), postgres.getPassword())
+                .locations("classpath:db/migration/postgres")
+                .configuration(FlywayConfig.SESSION_LEVEL_LOCK)
+                .initSql(FlywayConfig.migrationInitSql(environment))
+                .load();
     }
 
     private static Flyway flyway(String url, boolean purge) {

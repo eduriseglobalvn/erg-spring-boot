@@ -6,8 +6,8 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import java.util.LinkedHashMap;
@@ -124,12 +124,12 @@ public class CalendarWorkspaceAssembler {
     }
 
     private String subjectName(String id, CalendarReferenceMaps references) {
-        Subject value = id == null ? null : references.subjectMap().get(id);
+        CurriculumSubject value = id == null ? null : references.subjectMap().get(id);
         return value == null ? null : value.getName();
     }
 
     private String levelName(String id, CalendarReferenceMaps references) {
-        Level value = id == null ? null : references.levelMap().get(id);
+        CurriculumLevel value = id == null ? null : references.levelMap().get(id);
         return value == null ? null : value.getName();
     }
 

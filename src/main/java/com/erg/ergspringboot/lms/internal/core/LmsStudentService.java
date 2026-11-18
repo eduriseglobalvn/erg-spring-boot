@@ -20,7 +20,7 @@ public class LmsStudentService {
         return repository.findFirstByTenantIdAndAuthUserId(tenantId, authUserId);
     }
 
-    public Optional<Student> findByTenantIdAndStudentCode(String tenantId, String studentCode) {
+    public java.util.List<Student> findByTenantIdAndStudentCode(String tenantId, String studentCode) {
         return repository.findByTenantIdAndStudentCodeIgnoreCase(tenantId, studentCode);
     }
 

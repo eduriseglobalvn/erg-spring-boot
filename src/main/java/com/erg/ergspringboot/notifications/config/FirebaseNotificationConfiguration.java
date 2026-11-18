@@ -19,6 +19,8 @@ import tools.jackson.databind.ObjectMapper;
 @ImportRuntimeHints(FirebaseNotificationRuntimeHints.class)
 public class FirebaseNotificationConfiguration {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(FirebaseNotificationConfiguration.class);
+
     @Bean
     @ConditionalOnProperty(prefix = "erg.notifications.push", name = "enabled", havingValue = "true")
     HttpClient firebaseHttpClient(NotificationPushProperties properties) {
@@ -34,6 +36,10 @@ public class FirebaseNotificationConfiguration {
             HttpClient firebaseHttpClient,
             ObjectMapper objectMapper
     ) {
+        if (NotificationPushProperties.PROVIDER_FCM.equals(properties.resolvedProvider()) && !properties.fcmReady()) {
+            // One line, names only: never the path or file content.
+            LOG.warn("Push FCM is off: ERG_FCM_CREDENTIALS_FILE or FIREBASE_PROJECT_ID is missing or unreadable");
+        }
         String staticToken = trimToNull(properties.getCredentials().getStaticAccessToken());
         if (staticToken != null) {
             return new StaticAccessTokenProvider(staticToken);

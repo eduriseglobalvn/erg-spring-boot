@@ -2,6 +2,8 @@ package com.erg.ergspringboot.school.internal.read;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -11,7 +13,10 @@ import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumClassSubjectAllocation;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumClassSubjectAllocationRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.school.persistence.SchoolAcademicYearRepository;
 import com.erg.ergspringboot.school.persistence.SchoolGradeRepository;
@@ -35,7 +40,8 @@ class SchoolOperationsReadServiceTest {
     @Mock private SchoolAcademicYearRepository yearRepository;
     @Mock private SchoolGradeRepository gradeRepository;
     @Mock private ClassroomRepository classroomRepository;
-    @Mock private SubjectRepository subjectRepository;
+    @Mock private CurriculumSubjectRepository subjectRepository;
+    @Mock private CurriculumClassSubjectAllocationRepository allocationRepository;
     private StudentRepository studentRepository;
     private SchoolOperationsReadService service;
 
@@ -55,7 +61,7 @@ class SchoolOperationsReadServiceTest {
             return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
         });
         service = new SchoolOperationsReadService(readRepository, unitRepository, profileRepository,
-                yearRepository, gradeRepository, classroomRepository, studentRepository, subjectRepository);
+                yearRepository, gradeRepository, classroomRepository, studentRepository, subjectRepository, allocationRepository);
 
         EducationUnit unit = new EducationUnit();
         unit.setId("school-a");
@@ -88,5 +94,40 @@ class SchoolOperationsReadServiceTest {
 
         assertThat(response.summary().gradeCount()).isEqualTo(12);
         assertThat(response.grades()).isEmpty();
+    }
+
+    @Test
+    void subjectsComeFromClassAllocationsAndStudentsInheritTheirClassSubjects() {
+        StudentRepository students = mock(StudentRepository.class);
+        Student inClass = new Student();
+        inClass.setId("s1");
+        inClass.setAcademicClassId("class-1");
+        Student otherClass = new Student();
+        otherClass.setId("s2");
+        otherClass.setAcademicClassId("class-2");
+        when(students.findByTenantIdAndSchoolIdOrderByFullNameAsc(eq("tenant-a"), eq("school-a"), any()))
+                .thenReturn(List.of(inClass, otherClass));
+        CurriculumClassSubjectAllocation allocation = new CurriculumClassSubjectAllocation();
+        allocation.setAcademicClassId("class-1");
+        allocation.setSubjectId("sub-ic3");
+        when(allocationRepository.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc("tenant-a", "school-a"))
+                .thenReturn(List.of(allocation));
+        CurriculumSubject subject = new CurriculumSubject();
+        subject.setId("sub-ic3");
+        subject.setTenantId("tenant-a");
+        subject.setName("IC3");
+        subject.setCode("ic3");
+        when(subjectRepository.findAllById(List.of("sub-ic3"))).thenReturn(List.of(subject));
+        SchoolOperationsReadService small = new SchoolOperationsReadService(readRepository, unitRepository, profileRepository,
+                yearRepository, gradeRepository, classroomRepository, students, subjectRepository, allocationRepository);
+
+        var response = small.operations("tenant-a", "school-a", true, true, true, true, Set.of("students", "subjects"));
+
+        assertThat(response.subjects()).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo("sub-ic3");
+            assertThat(item.studentCount()).isEqualTo(1);
+        });
+        assertThat(response.students()).extracting(item -> item.id() + ":" + item.subjectIds())
+                .containsExactly("s1:[sub-ic3]", "s2:[]");
     }
 }

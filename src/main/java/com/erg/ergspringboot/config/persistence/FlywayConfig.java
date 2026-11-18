@@ -54,7 +54,20 @@ public class FlywayConfig {
      */
     static String migrationInitSql(Environment environment) {
         String demoPurge = demoPurgeInitSql(environment);
-        return "SET statement_timeout = 0" + (demoPurge == null ? "" : "; " + demoPurge);
+        return "SET statement_timeout = 0" + (demoPurge == null ? "" : "; " + demoPurge)
+                + (freshInstallPurge(environment) ? "; SET erg.fresh_install_purge = 'true'" : "");
+    }
+
+    /** Fresh-install cleanup switch (env {@code ERG_FLYWAY_FRESH_INSTALL_PURGE}), read by V169. */
+    static final String FRESH_INSTALL_PURGE = "erg.flyway.fresh-install-purge";
+
+    /**
+     * V169 empties the demo seed when the database has never been used (it checks that itself and is
+     * a no-op otherwise). On by default for prod, so a new production install is clean without anyone
+     * remembering a flag; off elsewhere because dev and the integration tests rely on the seed rows.
+     */
+    static boolean freshInstallPurge(Environment environment) {
+        return environment.getProperty(FRESH_INSTALL_PURGE, Boolean.class, isProduction(environment));
     }
 
     /** Fresh-install demo purge switch (env {@code ERG_FLYWAY_DEMO_PURGE=true}), read by V125. */

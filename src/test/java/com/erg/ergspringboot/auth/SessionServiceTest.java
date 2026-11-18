@@ -81,9 +81,35 @@ class SessionServiceTest {
         assertThat(response.portals()).containsExactly("lms");
         assertThat(response.workspaces()).containsExactly("TEACHER");
         assertThat(response.tenantId()).isEqualTo("erg");
-        assertThat(response.lifecycle().status()).isEqualTo("FIRST_LOGIN_RESTRICTED");
+        assertThat(response.lifecycle().status()).isEqualTo("ACTIVE");
         verify(educationUnitRepository, never()).findTop500ByOrderByNameAsc();
         verify(educationUnitRepository, never()).findByParentIdInOrderByNameAsc(any());
+    }
+
+    /** BUG-B-003: Phòng đào tạo manages every school of the organisation, without any access scope of its own. */
+    @Test
+    void currentBootstrapGivesPdtOperatorEverySchoolOfTheTenant() {
+        SessionService service = new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
+                userPermissionOverrideRepository, userRoleAssignmentRepository);
+        User user = userWithRole("u-pdt", "pdt_operator", "admin.workspace.access");
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s-pdt");
+        session.setTenantId("erg");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+        when(sessionRepository.findWithUserBySessionIdAndTenantId("s-pdt", "erg")).thenReturn(Optional.of(session));
+        when(educationUnitRepository.findByTenantIdOrderByNameAsc(org.mockito.ArgumentMatchers.eq("erg"),
+                any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(List.of(educationUnit("school-1", "THCS Binh An", "school", null),
+                        educationUnit("school-2", "THCS Cat Lai", "school", null)));
+
+        SessionBootstrapResponse response = service.currentBootstrap(
+                "s-pdt", "erg", new UserAccessContext("u-pdt", "erg", List.of(), List.of(), null, null));
+
+        assertThat(response.manageableUnits()).extracting(unit -> unit.id()).containsExactly("school-1", "school-2");
+        assertThat(response.permissions().allUnits()).isTrue();
+        assertThat(response.permissions().canAccessGlobalErg()).isFalse();
+        verify(educationUnitRepository, never()).findTop500ByOrderByNameAsc();
     }
 
     @Test

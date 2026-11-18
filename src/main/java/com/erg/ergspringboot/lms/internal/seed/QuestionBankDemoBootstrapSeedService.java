@@ -1,6 +1,5 @@
 package com.erg.ergspringboot.lms.internal.seed;
 
-import com.erg.ergspringboot.lms.persistence.Level;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Question;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
@@ -8,17 +7,9 @@ import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository;
-import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.lms.persistence.Topic;
-import com.erg.ergspringboot.lms.persistence.LevelRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
-import com.erg.ergspringboot.lms.persistence.TopicRepository;
 import com.erg.ergspringboot.lcms.quiz.authoring.QuizQuestionLinkService;
-import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoSeedContent.LevelSeed;
 import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoSeedContent.QuestionSeed;
 import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoSeedContent.QuizBankItemSeed;
-import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoSeedContent.SubjectSeed;
-import com.erg.ergspringboot.lms.internal.seed.QuestionBankDemoSeedContent.TopicSeed;
 import java.util.List;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -34,26 +25,17 @@ public class QuestionBankDemoBootstrapSeedService {
     private static final String ACTIVE = "ACTIVE";
     private static final String SEED_USER_ID = "seed.question.bank";
 
-    private final SubjectRepository subjectRepository;
-    private final LevelRepository levelRepository;
-    private final TopicRepository topicRepository;
     private final QuestionRepository questionRepository;
     private final QuizRepository quizRepository;
     private final QuizDraftRepository quizDraftRepository;
     private final QuizQuestionLinkService quizQuestionLinkService;
 
     public QuestionBankDemoBootstrapSeedService(
-            SubjectRepository subjectRepository,
-            LevelRepository levelRepository,
-            TopicRepository topicRepository,
             QuestionRepository questionRepository,
             QuizRepository quizRepository,
             QuizDraftRepository quizDraftRepository,
             QuizQuestionLinkService quizQuestionLinkService
     ) {
-        this.subjectRepository = subjectRepository;
-        this.levelRepository = levelRepository;
-        this.topicRepository = topicRepository;
         this.questionRepository = questionRepository;
         this.quizRepository = quizRepository;
         this.quizDraftRepository = quizDraftRepository;
@@ -63,31 +45,8 @@ public class QuestionBankDemoBootstrapSeedService {
     @Transactional("postgresTransactionManager")
     @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
     public void seedQuestionBankDemo() {
-        seedSubjects();
         seedQuestions();
         seedQuizBankItems();
-    }
-
-    private void seedSubjects() {
-        QuestionBankDemoSeedContent.SUBJECTS.forEach(this::upsertSubject);
-        deactivateLegacyDemoSubjects();
-        QuestionBankDemoSeedContent.LEVELS.forEach(this::upsertLevel);
-        QuestionBankDemoSeedContent.TOPICS.forEach(this::seedTopics);
-    }
-
-    private void seedTopics(TopicSeed seed) {
-        String levelId = seed.levelId();
-        List<String> labels = seed.labels();
-        for (int index = 0; index < labels.size(); index += 1) {
-            upsertTopic(levelId + "-topic-" + (index + 1), levelId, labels.get(index), levelId + "-topic-" + (index + 1), index + 1);
-        }
-    }
-
-    private void deactivateLegacyDemoSubjects() {
-        QuestionBankDemoSeedContent.LEGACY_SUBJECT_IDS.forEach(subjectId -> subjectRepository.findById(subjectId).ifPresent(subject -> {
-            subject.setStatus("INACTIVE");
-            subjectRepository.save(subject);
-        }));
     }
 
     private void seedQuestions() {
@@ -97,51 +56,6 @@ public class QuestionBankDemoBootstrapSeedService {
     private void seedQuizBankItems() {
         QuestionBankDemoSeedContent.QUIZ_BANK_ITEMS.forEach(this::upsertQuizBankItem);
         upsertSampleEditorDraft(QuestionBankDemoSeedContent.SAMPLE_EDITOR_QUIZ_ID);
-    }
-
-    private void upsertSubject(SubjectSeed seed) {
-        String id = seed.id();
-        Subject subject = subjectRepository.findById(id).orElseGet(() -> {
-            Subject created = new Subject();
-            created.setId(id);
-            return created;
-        });
-        subject.setTenantId(TENANT_ID);
-        subject.setName(seed.name());
-        subject.setCode(seed.code());
-        subject.setStatus(ACTIVE);
-        subjectRepository.save(subject);
-    }
-
-    private void upsertLevel(LevelSeed seed) {
-        String id = seed.id();
-        Level level = levelRepository.findById(id).orElseGet(() -> {
-            Level created = new Level();
-            created.setId(id);
-            return created;
-        });
-        level.setTenantId(TENANT_ID);
-        level.setSubjectId(seed.subjectId());
-        level.setName(seed.name());
-        level.setCode(seed.code());
-        level.setOrder(seed.order());
-        level.setStatus(ACTIVE);
-        levelRepository.save(level);
-    }
-
-    private void upsertTopic(String id, String levelId, String name, String code, int order) {
-        Topic topic = topicRepository.findById(id).orElseGet(() -> {
-            Topic created = new Topic();
-            created.setId(id);
-            return created;
-        });
-        topic.setTenantId(TENANT_ID);
-        topic.setLevelId(levelId);
-        topic.setName(name);
-        topic.setCode(code);
-        topic.setOrder(order);
-        topic.setStatus(ACTIVE);
-        topicRepository.save(topic);
     }
 
     private void upsertQuestion(QuestionSeed seed) {

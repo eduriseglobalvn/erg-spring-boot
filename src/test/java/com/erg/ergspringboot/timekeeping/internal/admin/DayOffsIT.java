@@ -67,7 +67,7 @@ class DayOffsIT extends AdminITBase {
                 + " values (?, ?, 'Trường thứ hai', ?, 'school', 'active', now(), now())", school2, T, school2);
         jdbc.update("insert into academic_classes (id, tenant_id, school_id, name, created_at, updated_at)"
                 + " values ('cls_do1', ?, ?, '6A1', now(), now()), ('cls_do2', ?, ?, '7A1', now(), now())", T, f.school(), T, school2);
-        jdbc.update("insert into lms_subjects (id, tenant_id, name, created_at, updated_at) values ('sub_do', ?, 'Tin', now(), now())", T);
+        jdbc.update("insert into curriculum_subjects (id, tenant_id, code, name, created_at, updated_at) values ('sub_do', ?, 'sub_do', 'Tin', now(), now())", T);
         batch = "batch_do";
         jdbc.update("insert into teaching_schedule_batches (id, tenant_id, school_id, apply_from, repeat_weeks, status, label)"
                 + " values (?, ?, ?, date '2026-11-02', 10, 'PUBLISHED', 'Đợt 1')", batch, T, f.school());

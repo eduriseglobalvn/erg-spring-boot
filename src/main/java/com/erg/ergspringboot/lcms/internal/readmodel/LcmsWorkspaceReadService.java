@@ -183,7 +183,7 @@ public class LcmsWorkspaceReadService {
         }
         return questionRepository.findQuestionBankQuestions(
                 tenantId,
-                search,
+                com.erg.ergspringboot.lcms.persistence.quiz.bank.VietnameseFold.fold(search),
                 subjectId,
                 levelId,
                 topicId,

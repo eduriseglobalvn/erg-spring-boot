@@ -4,17 +4,14 @@ import com.erg.ergspringboot.school.internal.command.SchoolCommandService;
 
 import com.erg.ergspringboot.common.request.school.SchoolRequests.CreateSchoolRequest;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lcms.persistence.quiz.bank.ContentScope;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfileRepository;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentMetrics;
-import com.erg.ergspringboot.lms.persistence.Subject;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -35,22 +32,19 @@ public class SchoolOperationsDemoSeedService {
     private final UserRepository userRepository;
     private final ClassroomRepository classroomRepository;
     private final StudentRepository studentRepository;
-    private final SubjectRepository subjectRepository;
 
     public SchoolOperationsDemoSeedService(
             SchoolOperationalProfileRepository profileRepository,
             SchoolCommandService commandService,
             UserRepository userRepository,
             ClassroomRepository classroomRepository,
-            StudentRepository studentRepository,
-            SubjectRepository subjectRepository
+            StudentRepository studentRepository
     ) {
         this.profileRepository = profileRepository;
         this.commandService = commandService;
         this.userRepository = userRepository;
         this.classroomRepository = classroomRepository;
         this.studentRepository = studentRepository;
-        this.subjectRepository = subjectRepository;
     }
 
     public int seedIfEmpty(String tenantId) {
@@ -93,7 +87,6 @@ public class SchoolOperationsDemoSeedService {
                 seedStudents(profile, classroom, schoolIndex);
             }
         }
-        seedSubjects(profile);
     }
 
     private void enrichProfile(SchoolOperationalProfile profile, int index) {
@@ -165,22 +158,6 @@ public class SchoolOperationsDemoSeedService {
         return student;
     }
 
-    private void seedSubjects(SchoolOperationalProfile profile) {
-        for (int index = 0; index < SUBJECTS.length; index++) {
-            String id = seedId("sub", profile.getSchoolId(), String.valueOf(index));
-            if (subjectRepository.existsById(id)) continue;
-
-            Subject subject = new Subject();
-            subject.setId(id);
-            subject.setTenantId(profile.getTenantId());
-            subject.setScope(new ContentScope("SCHOOL", profile.getSchoolId()));
-            subject.setName(SUBJECTS[index][0]);
-            subject.setCode(SUBJECTS[index][1]);
-            subject.setStatus("ACTIVE");
-            subjectRepository.save(subject);
-        }
-    }
-
     private List<String> gradesFor(String schoolType) {
         return switch (schoolType) {
             case "PRIMARY" -> List.of("1", "2", "3", "4", "5");
@@ -210,5 +187,4 @@ public class SchoolOperationsDemoSeedService {
     private static final String[] TEACHERS = { "Nguyễn Minh Anh", "Trần Thu Hà", "Lê Mạnh Hùng", "Vũ Thanh Mai", "Phạm Quốc Bảo" };
     private static final String[] STUDENT_FAMILIES = { "Nguyễn", "Trần", "Lê", "Phạm", "Võ", "Đặng", "Bùi", "Đỗ" };
     private static final String[] STUDENT_GIVEN_NAMES = { "Gia Hân", "Minh Khang", "Bảo Ngọc", "Đức Anh", "Khánh Linh", "Tuấn Kiệt", "Hoàng Nam", "Thảo Vy", "Quang Huy", "Ngọc Anh" };
-    private static final String[][] SUBJECTS = { { "Tiếng Anh", "ENG" }, { "Toán học", "MATH" }, { "Khoa học", "SCI" }, { "Tin học", "ICT" } };
 }

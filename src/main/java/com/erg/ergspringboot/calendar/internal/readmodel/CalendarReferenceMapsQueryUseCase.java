@@ -6,11 +6,11 @@ import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.LevelRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,15 +25,15 @@ public final class CalendarReferenceMapsQueryUseCase {
 
     private final EducationUnitRepository schools;
     private final ClassroomRepository classes;
-    private final SubjectRepository subjects;
-    private final LevelRepository levels;
+    private final CurriculumSubjectRepository subjects;
+    private final CurriculumLevelRepository levels;
     private final UserRepository users;
 
     public CalendarReferenceMapsQueryUseCase(
             EducationUnitRepository schools,
             ClassroomRepository classes,
-            SubjectRepository subjects,
-            LevelRepository levels,
+            CurriculumSubjectRepository subjects,
+            CurriculumLevelRepository levels,
             UserRepository users) {
         this.schools = schools;
         this.classes = classes;
@@ -74,9 +74,9 @@ public final class CalendarReferenceMapsQueryUseCase {
                 classIdSet.isEmpty() ? Map.of() : classes.findAllById(classIdSet).stream()
                         .collect(Collectors.toMap(Classroom::getId, Function.identity())),
                 subjectIdSet.isEmpty() ? Map.of() : subjects.findAllById(subjectIdSet).stream()
-                        .collect(Collectors.toMap(Subject::getId, Function.identity())),
+                        .collect(Collectors.toMap(CurriculumSubject::getId, Function.identity())),
                 levelIdSet.isEmpty() ? Map.of() : levels.findAllById(levelIdSet).stream()
-                        .collect(Collectors.toMap(Level::getId, Function.identity())),
+                        .collect(Collectors.toMap(CurriculumLevel::getId, Function.identity())),
                 userIdSet.isEmpty() ? Map.of() : users.findAllById(userIdSet).stream()
                         .collect(Collectors.toMap(User::getId, Function.identity())),
                 Map.of());

@@ -7,7 +7,6 @@ import com.erg.ergspringboot.controller.lcms.graphql.LcmsSchoolOperationsMutatio
 import com.erg.ergspringboot.lcms.authorization.LcmsClassManage;
 import com.erg.ergspringboot.lcms.authorization.LcmsEnrollmentManage;
 import com.erg.ergspringboot.lcms.authorization.LcmsStudentManage;
-import com.erg.ergspringboot.lcms.authorization.LcmsSubjectManage;
 import com.erg.ergspringboot.lms.LmsOperationalOperations;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -36,15 +35,14 @@ class LmsOperationalCommandBoundaryTest {
         assertThat(methods).allSatisfy(method -> assertThat(
                 method.isAnnotationPresent(LcmsClassManage.class)
                         || method.isAnnotationPresent(LcmsStudentManage.class)
-                        || method.isAnnotationPresent(LcmsSubjectManage.class)
                         || method.isAnnotationPresent(LcmsEnrollmentManage.class))
                 .as("missing typed authorization on %s", method.getName())
                 .isTrue());
     }
 
     @Test
-    void classStudentAndSubjectUpdatesAcceptPutAndPatchWithConflictVersion() throws Exception {
-        for (String methodName : new String[]{"updateClass", "updateStudent", "updateSubject"}) {
+    void classAndStudentUpdatesAcceptPutAndPatchWithConflictVersion() throws Exception {
+        for (String methodName : new String[]{"updateClass", "updateStudent"}) {
             Method method = Arrays.stream(LmsOperationalCommandController.class.getDeclaredMethods())
                     .filter(candidate -> candidate.getName().equals(methodName)).findFirst().orElseThrow();
             RequestMapping mapping = method.getAnnotation(RequestMapping.class);
@@ -63,6 +61,6 @@ class LmsOperationalCommandBoundaryTest {
                                 com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport.class));
         assertThat(Arrays.stream(LcmsSchoolOperationsMutationGraphQlController.class.getDeclaredMethods())
                 .filter(method -> method.isAnnotationPresent(MutationMapping.class))
-                .count()).isEqualTo(12);
+                .count()).isEqualTo(9);
     }
 }

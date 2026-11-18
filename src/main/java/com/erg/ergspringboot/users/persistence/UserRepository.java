@@ -121,6 +121,12 @@ public interface UserRepository extends JpaRepository<User, String> {
                         select 1 from u.roles r
                         where lower(r.name) = cast(:role as string)
                     ))
+                    and (not (exists (select 1 from u.roles r where r.id in :studentRoleIds)
+                              or exists (select 1 from UserRoleAssignment a where a.userId = u.id and a.roleId in :studentRoleIds
+                                         and a.revokedAt is null and (a.expiresAt is null or a.expiresAt > current_timestamp)))
+                         or exists (select 1 from u.roles r where r.id in :staffRoleIds)
+                         or exists (select 1 from UserRoleAssignment a where a.userId = u.id and a.roleId in :staffRoleIds
+                                    and a.revokedAt is null and (a.expiresAt is null or a.expiresAt > current_timestamp)))
                     order by u.createdAt desc
                     """,
             countQuery = """
@@ -137,6 +143,12 @@ public interface UserRepository extends JpaRepository<User, String> {
                         select 1 from u.roles r
                         where lower(r.name) = cast(:role as string)
                     ))
+                    and (not (exists (select 1 from u.roles r where r.id in :studentRoleIds)
+                              or exists (select 1 from UserRoleAssignment a where a.userId = u.id and a.roleId in :studentRoleIds
+                                         and a.revokedAt is null and (a.expiresAt is null or a.expiresAt > current_timestamp)))
+                         or exists (select 1 from u.roles r where r.id in :staffRoleIds)
+                         or exists (select 1 from UserRoleAssignment a where a.userId = u.id and a.roleId in :staffRoleIds
+                                    and a.revokedAt is null and (a.expiresAt is null or a.expiresAt > current_timestamp)))
                     """
     )
     Page<UserListItemProjection> findAdminListItems(
@@ -144,6 +156,8 @@ public interface UserRepository extends JpaRepository<User, String> {
             @Param("search") String search,
             @Param("status") String status,
             @Param("role") String role,
+            @Param("studentRoleIds") Collection<String> studentRoleIds,
+            @Param("staffRoleIds") Collection<String> staffRoleIds,
             Pageable pageable
     );
 

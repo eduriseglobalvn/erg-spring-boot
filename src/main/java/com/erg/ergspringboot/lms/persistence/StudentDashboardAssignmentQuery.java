@@ -44,7 +44,7 @@ final class StudentDashboardAssignmentQuery {
                 and quiz.id = assignment.quizId
             left join User teacher
                 on teacher.id = assignment.assignedBy
-            left join Subject subject
+            left join CurriculumSubject subject
                 on subject.tenantId = assignment.tenantId
                 and subject.id = assignment.subjectId
             left join Attempt latestAttempt

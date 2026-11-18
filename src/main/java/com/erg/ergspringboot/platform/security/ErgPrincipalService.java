@@ -27,6 +27,7 @@ public class ErgPrincipalService {
     private final AuthSessionTenantResolver tenantResolver;
     private UserRoleAssignmentRepository userRoleAssignmentRepository;
     private PrincipalCache principalCache;
+    private TeacherClassScopeProvider teacherClassScopes;
 
     @Autowired
     public ErgPrincipalService(
@@ -147,6 +148,11 @@ public class ErgPrincipalService {
     }
 
     @Autowired(required = false)
+    void setTeacherClassScopes(TeacherClassScopeProvider teacherClassScopes) {
+        this.teacherClassScopes = teacherClassScopes;
+    }
+
+    @Autowired(required = false)
     void setPrincipalCache(PrincipalCache principalCache) {
         this.principalCache = principalCache;
     }
@@ -256,14 +262,13 @@ public class ErgPrincipalService {
                         "assignedScopeIds", assignedScopeIds(assignments),
                         "lifecycleRestricted", !StudentAccountPolicy.isStudentOnly(roles, permissions.granted(), permissions.denied())
                                 && isLifecycleRestricted(user)
-                ), AccessScopeSet.legacy(managedEducationUnitIds, assignedClassIds(assignments), null, null))
+                ), AccessScopeSet.legacy(managedEducationUnitIds, classIds(user, session.getTenantId(), permissions, assignments), null, null))
         );
     }
 
     private boolean isLifecycleRestricted(User user) {
-        return !Boolean.TRUE.equals(user.getIsProfileCompleted())
-                || !Boolean.TRUE.equals(user.getRecoveryEmailVerified())
-                || Boolean.TRUE.equals(user.getMustChangePassword());
+        // Only the temporary password blocks a staff account; phone and recovery email are reminders in Profile.
+        return Boolean.TRUE.equals(user.getMustChangePassword());
     }
 
     private List<String> effectivePortals(
@@ -288,6 +293,20 @@ public class ErgPrincipalService {
                 .toList();
     }
 
+    /**
+     * Standing CLASS assignments plus, for a teacher, the classes they actually teach. Without the second part a
+     * teacher who only has a published timetable could open none of their own classes (BUG-A-028).
+     */
+    private List<String> classIds(User user, String tenantId, PermissionEnvelope permissions, List<UserRoleAssignment> assignments) {
+        List<String> assigned = assignedClassIds(assignments);
+        if (teacherClassScopes == null || user == null || !permissions.granted().contains("teacher.workspace.access")) {
+            return assigned;
+        }
+        Set<String> ids = new LinkedHashSet<>(assigned);
+        ids.addAll(teacherClassScopes.classIds(tenantId, user.getId()));
+        return List.copyOf(ids);
+    }
+
     private List<String> assignedClassIds(List<UserRoleAssignment> assignments) {
         return assignments.stream()
                 .filter(assignment -> "CLASS".equals(assignment.getScopeType()))
@@ -304,6 +323,11 @@ public class ErgPrincipalService {
             List<UserRoleAssignment> assignments
     ) {
         if (WorkspaceCapabilityMapper.isPlatformWide(roles, permissions.granted(), permissions.denied())) {
+            return List.of("*");
+        }
+        // Phòng đào tạo runs every school of its own tenant (owner decision 16/11/2026). Every query stays
+        // tenant-filtered, and permissions are untouched: this widens the unit scope only.
+        if (AccessScopeAssembler.managesWholeTenant(roles)) {
             return List.of("*");
         }
         Set<String> managedIds = new LinkedHashSet<>();

@@ -11,7 +11,9 @@ import com.erg.ergspringboot.common.response.users.UserResponses.UserListRespons
 import com.erg.ergspringboot.common.response.users.UserResponses.UserResponse;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
+import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
+import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
@@ -33,18 +35,22 @@ import org.springframework.transaction.annotation.Transactional;
 /** Read-only user use cases backed by tenant-scoped projections. */
 @Service
 public class UserQueryUseCase {
+    private static final String NO_ROLE = "-";
 
     private static final String DEFAULT_TENANT = "erg";
 
     private final UserRepository userRepository;
     private final AuthSessionRepository sessionRepository;
     private final UserActivityRepository userActivityRepository;
+    private final RoleRepository roleRepository;
 
     public UserQueryUseCase(
             UserRepository userRepository,
             AuthSessionRepository sessionRepository,
-            UserActivityRepository userActivityRepository
+            UserActivityRepository userActivityRepository,
+            RoleRepository roleRepository
     ) {
+        this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.userActivityRepository = userActivityRepository;
@@ -61,11 +67,22 @@ public class UserQueryUseCase {
     ) {
         int safePage = page == null || page < 1 ? 1 : page;
         int safeLimit = limit == null || limit < 1 ? 20 : Math.min(limit, 100);
+        // The employee list leaves out student-only accounts (StudentAccountPolicy), filtered in the query so paging and totals stay right.
+        List<String> studentRoleIds = new ArrayList<>(List.of(NO_ROLE));
+        List<String> staffRoleIds = new ArrayList<>(List.of(NO_ROLE));
+        for (Role r : roleRepository.findAllWithPermissionsAndUsers()) {
+            List<String> permissions = r.getPermissions() == null ? List.of()
+                    : r.getPermissions().stream().map(p -> p.getName()).filter(java.util.Objects::nonNull).toList();
+            (StudentAccountPolicy.isStudentOnly(List.of(String.valueOf(r.getName())), permissions, List.of())
+                    ? studentRoleIds : staffRoleIds).add(r.getId());
+        }
         Page<UserListItemProjection> pageItems = userRepository.findAdminListItems(
                 normalizeTenant(tenantId),
                 trimToLowerCase(search),
                 trimToLowerCase(status),
                 trimToLowerCase(role),
+                studentRoleIds,
+                staffRoleIds,
                 PageRequest.of(safePage - 1, safeLimit)
         );
         List<String> userIds = pageItems.getContent().stream()
@@ -160,9 +177,7 @@ public class UserQueryUseCase {
 
     private AccountLifecycleResponse lifecycle(User user) {
         List<String> nextSteps = new ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) nextSteps.add("COMPLETE_PROFILE");
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) nextSteps.add("VERIFY_RECOVERY_EMAIL");
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) nextSteps.add("CHANGE_PASSWORD");
+        nextSteps.addAll(user.firstLoginSteps());
         String lifecycleStatus = nextSteps.isEmpty()
                 ? "ACTIVE"
                 : ("INVITED".equalsIgnoreCase(user.getStatus()) ? "PROVISIONED" : "FIRST_LOGIN_RESTRICTED");

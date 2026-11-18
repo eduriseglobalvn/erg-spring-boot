@@ -19,8 +19,13 @@ public final class QuizAuthoringRequests {
             String subjectId,
             String levelId,
             String categoryId,
-            List<String> questionIds
+            List<String> questionIds,
+            /** Start the new quiz as a copy of this quiz's published version (a teacher's own copy of a system quiz). */
+            String sourceQuizId
     ) {
+        public CreateQuizRequest(String title, String subtitle, String kind, String subjectId, String levelId, String categoryId, List<String> questionIds) {
+            this(title, subtitle, kind, subjectId, levelId, categoryId, questionIds, null);
+        }
     }
 
     /** Quiz-bank metadata edit (PATCH). Both fields optional, at least one required. */

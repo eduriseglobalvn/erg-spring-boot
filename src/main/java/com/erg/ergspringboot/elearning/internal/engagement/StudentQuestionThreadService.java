@@ -220,7 +220,7 @@ public class StudentQuestionThreadService {
                    coalesce(tu.full_name, '') teacher_name, coalesce(su.full_name, '') student_name
             from student_question_threads t
             left join lms_assignments a on a.id = t.assignment_id and a.tenant_id = t.tenant_id
-            left join lms_subjects s on s.id = a.subject_id and s.tenant_id = t.tenant_id
+            left join curriculum_subjects s on s.id = a.subject_id and s.tenant_id = t.tenant_id
             left join academic_classes c on c.id = t.academic_class_id and c.tenant_id = t.tenant_id
             left join users tu on tu.id = t.teacher_id and tu.tenant_id = t.tenant_id
             left join users su on su.id = t.student_user_id and su.tenant_id = t.tenant_id

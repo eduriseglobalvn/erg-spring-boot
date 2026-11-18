@@ -187,6 +187,21 @@ class GlobalExceptionHandlerTest {
         assertThat(errorCode(response)).isEqualTo("DATA_CONFLICT");
     }
 
+    @Test
+    void foreignKeyViolationIsABadRequestWithoutLeakingSql() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/users");
+        var exception = new org.springframework.dao.DataIntegrityViolationException(
+                "could not execute statement",
+                new java.sql.SQLException("violates foreign key constraint \"fk_secret_table\"", "23503"));
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleDataIntegrity(
+                exception, new ServletWebRequest(request));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(errorCode(response)).isEqualTo("REFERENCE_NOT_FOUND");
+        assertThat(response.getBody().message()).doesNotContain("fk_secret_table");
+    }
+
     @org.springframework.web.bind.annotation.RestController
     static class ProbeController {
         @org.springframework.web.bind.annotation.PostMapping(value = "/probe", consumes = "application/json")

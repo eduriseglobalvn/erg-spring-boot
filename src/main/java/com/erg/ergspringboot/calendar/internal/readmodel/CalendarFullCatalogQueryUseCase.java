@@ -9,14 +9,14 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarTeacherOptionResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarRoomRepository;
 import com.erg.ergspringboot.calendar.persistence.projection.CalendarTeacherColorProjection;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.LevelRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.users.UserAccountProjection;
 import com.erg.ergspringboot.users.UserDirectoryPort;
@@ -43,8 +43,8 @@ public final class CalendarFullCatalogQueryUseCase {
 
     private final CalendarEventTeacherRepository eventTeacherRepository;
     private final ClassroomRepository classroomRepository;
-    private final SubjectRepository subjectRepository;
-    private final LevelRepository levelRepository;
+    private final CurriculumSubjectRepository subjectRepository;
+    private final CurriculumLevelRepository levelRepository;
     private final EducationUnitRepository educationUnitRepository;
     private final CalendarRoomRepository roomRepository;
     private final UserDirectoryPort userDirectory;
@@ -52,8 +52,8 @@ public final class CalendarFullCatalogQueryUseCase {
     public CalendarFullCatalogQueryUseCase(
             CalendarEventTeacherRepository eventTeacherRepository,
             ClassroomRepository classroomRepository,
-            SubjectRepository subjectRepository,
-            LevelRepository levelRepository,
+            CurriculumSubjectRepository subjectRepository,
+            CurriculumLevelRepository levelRepository,
             EducationUnitRepository educationUnitRepository,
             CalendarRoomRepository roomRepository,
             UserDirectoryPort userDirectory) {
@@ -80,9 +80,9 @@ public final class CalendarFullCatalogQueryUseCase {
                         tenantId, schoolIds, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
                         () -> classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(tenantId, schoolIds))
                 : List.of();
-        List<Subject> subjects = nonNull(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(
+        List<CurriculumSubject> subjects = nonNull(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                         tenantId, STATUS_ACTIVE, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
-                () -> subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(tenantId, STATUS_ACTIVE));
+                () -> subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(tenantId, STATUS_ACTIVE));
         Map<String, String> teacherColorKeys = findTeacherColorKeys(tenantId, schoolIds, from, to);
         List<UserAccountProjection> scopedTeachers = findTeachers(tenantId, schoolIds);
         List<CalendarRoomOptionResponse> roomOptions = schoolIds == null || schoolIds.isEmpty() ? List.of()
@@ -115,14 +115,14 @@ public final class CalendarFullCatalogQueryUseCase {
                 .map(subject -> new CalendarSubjectOptionResponse(subject.getId(), subject.getName()))
                 .toList();
 
-        Set<String> subjectIds = subjects.stream().map(Subject::getId).collect(Collectors.toSet());
+        Set<String> subjectIds = subjects.stream().map(CurriculumSubject::getId).collect(Collectors.toSet());
         List<CalendarLevelOptionResponse> levelOptions = subjectIds.isEmpty() ? List.of()
-                : nonNull(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+                : nonNull(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                         tenantId, subjectIds, STATUS_ACTIVE, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
-                        () -> levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+                        () -> levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                                 tenantId, subjectIds, STATUS_ACTIVE)).stream()
                         .map(level -> new CalendarLevelOptionResponse(
-                                level.getId(), level.getSubjectId(), level.getName(), level.getOrder()))
+                                level.getId(), level.getSubjectId(), level.getName(), level.getSortOrder()))
                         .toList();
         requireBound(levelOptions, "levels");
 
@@ -137,7 +137,10 @@ public final class CalendarFullCatalogQueryUseCase {
                 .toList();
         requireBound(assignmentOnlyTeacherIds, "teachers");
         List<UserAccountProjection> assignmentOnlyTeachers = assignmentOnlyTeacherIds.isEmpty() ? List.of()
-                : userDirectory.findByTenantIdAndIds(tenantId, assignmentOnlyTeacherIds);
+                // A deactivated or locked account is never offered for scheduling, even when it still has periods.
+                : userDirectory.findByTenantIdAndIds(tenantId, assignmentOnlyTeacherIds).stream()
+                        .filter(teacher -> teacher.status() == null || "ACTIVE".equalsIgnoreCase(teacher.status()))
+                        .toList();
         List<UserAccountProjection> teachers = new ArrayList<>(scopedTeachers);
         teachers.addAll(assignmentOnlyTeachers);
         requireBound(teachers, "teachers");

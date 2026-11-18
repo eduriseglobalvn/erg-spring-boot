@@ -113,7 +113,13 @@ Then run `flyway repair` (only if the history row is marked failed) and migrate 
 schema. They refuse any host other than `localhost`, `127.0.0.1`, `::1`, `*.localhost` or `*.test`
 unless `-AllowRemoteHost <exact host>` names the target. Never pass it for a production database.
 
-## 6. Fresh production install without demo data (V125)
+## 6. Fresh production install without demo data (V125, V169)
+
+**V169 (ENV-001) supersedes the manual flag below.** With the `prod` profile, `FlywayConfig` sets
+`erg.fresh_install_purge` and `V169__clean_fresh_install.sql` removes every demo row (accounts, schools,
+classes, calendar, curriculum, quizzes, content), leaving `usr_super_admin`, `ctr_system` and the system
+catalogs. It is a logged no-op on any database in use: a user outside the 13 seed ids, any login or
+session, or more rows than the seed in any cleared table. Opt out with `ERG_FLYWAY_FRESH_INSTALL_PURGE=false`.
 
 V4, V11, V21, V33, V68 and V102 are applied, append-only migrations that insert demo rows (demo
 schools, classes, subjects, quizzes, a teaching calendar and seed accounts) in every environment.

@@ -42,12 +42,7 @@ class LessonLogIT extends TeachingScheduleITBase {
         curriculumSubject = subject;
         teacher = user(tenant, "Nguyen Quoc Vuong");
         String level = id();
-        write("insert into curriculum_subjects (id, tenant_id, code, name, created_at, updated_at)"
-                + " values (?, ?, 'tin', 'Tin hoc', now(), now())", subject, tenant);
         write("insert into curriculum_levels (id, tenant_id, subject_id, code, name, created_at, updated_at)"
-                + " values (?, ?, ?, 'l1', 'Level 1', now(), now())", level, tenant, subject);
-        // lms_levels carries the level of timetable events; its ids are preserved in curriculum_levels
-        write("insert into lms_levels (id, tenant_id, subject_id, code, name, created_at, updated_at)"
                 + " values (?, ?, ?, 'l1', 'Level 1', now(), now())", level, tenant, subject);
         String program = id();
         write("insert into curriculum_programs (id, tenant_id, subject_id, level_id, academic_year, name, status)"
@@ -165,23 +160,24 @@ class LessonLogIT extends TeachingScheduleITBase {
     }
 
     @Test
-    void aPeriodThatHasNotBegunCannotCarryALogOrAttendance() {
+    void aPeriodThatHasNotBegunTakesALogButNoAttendance() {
         setUp();
 
-        assertThat(codeOf(() -> commands.update(tenant, teacher, friday, "2026-11-13", 1, 8, "x", null))).isEqualTo("PERIOD_NOT_HAPPENED");
-        assertThat(codeOf(() -> commands.saveAttendanceAndLog(tenant, teacher, friday, "2026-11-13", 1, List.of(), 8, "x", null)))
+        assertThat(commands.update(tenant, teacher, friday, "2026-11-13", 1, 8, "x", null).comment()).isEqualTo("x");
+        assertThat(codeOf(() -> commands.saveAttendanceAndLog(tenant, teacher, friday, "2026-11-13", 1,
+                List.of(new AttendanceMark("student-1", "ABSENT")), 8, "x", null)))
                 .isEqualTo("PERIOD_NOT_HAPPENED");
     }
 
     @Test
-    void aWeekWithOnlyPeriodsStillToComeCannotBeConfirmedAndAnEmptyWeekIsANoOp() {
+    void aWeekWithOnlyPeriodsStillToComeOrNoPeriodsIsANoOp() {
         setUp();
         String school = jdbc.queryForObject("select school_id from teaching_schedule_events where id = ?", String.class, friday);
         String subject = jdbc.queryForObject("select subject_id from teaching_schedule_events where id = ?", String.class, friday);
         String batch = jdbc.queryForObject("select batch_id from teaching_schedule_events where id = ?", String.class, friday);
         event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-16", "08:00"), 1, teacher, null, null);
 
-        assertThat(codeOf(() -> commands.confirmWeek(tenant, teacher, "2026-11-16"))).isEqualTo("PERIOD_NOT_HAPPENED");
+        assertThat(commands.confirmWeek(tenant, teacher, "2026-11-16").confirmed()).isZero();
         assertThat(commands.confirmWeek(tenant, teacher, "2026-11-23").confirmed()).isZero();
         assertThat(codeOf(() -> commands.confirmWeek(tenant, teacher, "2026-11-11"))).isEqualTo("BAD_REQUEST");
     }

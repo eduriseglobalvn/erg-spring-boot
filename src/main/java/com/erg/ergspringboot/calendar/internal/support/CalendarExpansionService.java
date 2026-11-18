@@ -5,8 +5,8 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarRoom;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.utils.IdGenerator;
@@ -39,8 +39,8 @@ public class CalendarExpansionService {
 
     public record ReferenceData(
             Map<String, Classroom> classMap,
-            Map<String, Subject> subjectMap,
-            Map<String, Level> levelMap,
+            Map<String, CurriculumSubject> subjectMap,
+            Map<String, CurriculumLevel> levelMap,
             Map<String, User> userMap,
             Map<String, EducationUnit> schoolMap
     ) {}
@@ -139,7 +139,7 @@ public class CalendarExpansionService {
 
     private String resolveSubjectName(String subjectId, ReferenceData refData) {
         if (subjectId != null) {
-            Subject subject = refData.subjectMap().get(subjectId);
+            CurriculumSubject subject = refData.subjectMap().get(subjectId);
             if (subject != null) {
                 return subject.getName();
             }

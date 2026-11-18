@@ -77,7 +77,7 @@ public final class PermissionCatalog {
         add(list, PermissionFunction.NOTIFICATIONS, PermissionKind.XEM,
                 "notifications.read", "lms.notification.read");
         add(list, PermissionFunction.NOTIFICATIONS, PermissionKind.SUA,
-                "notifications.manage");
+                "notifications.manage", "notification.campaign.send");
         add(list, PermissionFunction.ACCOUNTS_STAFF, PermissionKind.XEM,
                 "users.read", "users.activity.read");
         add(list, PermissionFunction.ACCOUNTS_STAFF, PermissionKind.SUA,

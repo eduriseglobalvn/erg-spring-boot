@@ -1,10 +1,12 @@
 package com.erg.ergspringboot.lms;
 
 import com.erg.ergspringboot.lms.persistence.projection.AssignmentCardProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AssignmentCountProjection;
 import com.erg.ergspringboot.lms.persistence.projection.AssignmentDetailProjection;
 import com.erg.ergspringboot.lms.persistence.projection.MissingLateStudentProjection;
 import com.erg.ergspringboot.lms.persistence.projection.RecipientProgressProjection;
 import com.erg.ergspringboot.lms.persistence.projection.TeacherHomeworkSummaryProjection;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -17,4 +19,7 @@ public interface LmsAssignmentQueryPort {
     Page<MissingLateStudentProjection> findAssignmentMissingLateStudents(String tenantId, String assignmentId, Pageable pageable);
     Page<AssignmentCardProjection> findTeacherAssignmentCards(String tenantId, String teacherId, String status, Pageable pageable);
     TeacherHomeworkSummaryProjection summarizeTeacherHomeworkWorkspace(String tenantId, String teacherId);
+    List<AssignmentCountProjection> countSavedRecipients(String tenantId, Collection<String> assignmentIds);
+    List<AssignmentCountProjection> countClassRosterRecipients(String tenantId, Collection<String> assignmentIds);
+    List<AssignmentCountProjection> countSubmittedRecipients(String tenantId, Collection<String> assignmentIds);
 }

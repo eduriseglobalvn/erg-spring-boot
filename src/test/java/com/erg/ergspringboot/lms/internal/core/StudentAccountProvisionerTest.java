@@ -54,6 +54,27 @@ class StudentAccountProvisionerTest {
     }
 
     @Test
+    void anImportGetsTheFirstFreeNumberedLogin() {
+        when(users.existsByUsernameIgnoreCase("ten.test.8a")).thenReturn(true);
+        when(users.existsByUsernameIgnoreCase("ten.test.8a2")).thenReturn(true);
+
+        assertThat(provisioner.freeLogin(" Ten.Test.8A ")).isEqualTo("ten.test.8a3");
+        assertThat(provisioner.freeLogin("moi.test.8a")).isEqualTo("moi.test.8a");
+    }
+
+    @Test
+    void anImportedPasswordThatEqualsTheUsernameFollowsTheRenumberedLogin() {
+        when(users.existsByUsernameIgnoreCase("thcstcd.voan0123")).thenReturn(true);
+        when(hasher.hash("thcstcd.voan01232")).thenReturn("hash");
+
+        var account = provisioner.provisionForImport(access, "school-1", "thcstcd.voan0123", null, "Võ An", null,
+                "thcstcd.voan0123");
+
+        assertThat(account.login()).isEqualTo("thcstcd.voan01232");
+        verify(hasher).hash("thcstcd.voan01232");
+    }
+
+    @Test
     void refusesALoginThatIsAlreadyTaken() {
         when(users.existsByUsernameIgnoreCase("an")).thenReturn(true);
 

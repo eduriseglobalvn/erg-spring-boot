@@ -1,6 +1,8 @@
 type Mutation {
   upsertAttendance(input: UpsertAttendanceInput!): AttendanceRecord!
   upsertGradebookScore(input: UpsertGradebookScoreInput!): GradebookScore!
+  "Clears one cell: the student has no score in that column any more"
+  deleteGradebookScore(input: DeleteGradebookScoreInput!): Boolean!
   createStudentDiscussion(input: CreateStudentDiscussionInput!): StudentDiscussionPost!
   replyStudentDiscussion(input: ReplyStudentDiscussionInput!): StudentDiscussionComment!
   setStudentDiscussionReaction(input: SetStudentDiscussionReactionInput!): StudentDiscussionReactionPayload!
@@ -50,6 +52,7 @@ type Mutation {
 input AttendanceWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String!, from: String, to: String }
 input GradebookWorkspaceInput { tenantId: String, classId: String!, schoolId: String, subjectId: String! }
 input UpsertAttendanceInput { tenantId: String, classId: String!, schoolId: String, studentId: String!, subjectId: String!, attendanceDate: String!, lessonIndex: Int!, status: String!, expectedVersion: Int, operationId: String, idempotencyKey: String }
+input DeleteGradebookScoreInput { tenantId: String, classId: String!, studentId: String!, subjectId: String!, columnId: String! }
 input UpsertGradebookScoreInput { tenantId: String, classId: String!, schoolId: String, studentId: String!, subjectId: String!, columnId: String!, label: String!, maxScore: Float!, kind: String!, position: Int, score: Float!, expectedVersion: Int, operationId: String, idempotencyKey: String }
 
 type AttendanceWorkspace { tenantId: String!, classId: String!, subjectId: String!, from: String!, to: String!, records: [AttendanceRecord!]! }

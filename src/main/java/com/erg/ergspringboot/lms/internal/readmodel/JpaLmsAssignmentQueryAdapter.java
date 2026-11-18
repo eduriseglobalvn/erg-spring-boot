@@ -1,12 +1,15 @@
 package com.erg.ergspringboot.lms.internal.readmodel;
 
 import com.erg.ergspringboot.lms.LmsAssignmentQueryPort;
+import com.erg.ergspringboot.lms.persistence.AssignmentProgressCountRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.projection.AssignmentCardProjection;
+import com.erg.ergspringboot.lms.persistence.projection.AssignmentCountProjection;
 import com.erg.ergspringboot.lms.persistence.projection.AssignmentDetailProjection;
 import com.erg.ergspringboot.lms.persistence.projection.MissingLateStudentProjection;
 import com.erg.ergspringboot.lms.persistence.projection.RecipientProgressProjection;
 import com.erg.ergspringboot.lms.persistence.projection.TeacherHomeworkSummaryProjection;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -17,9 +20,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class JpaLmsAssignmentQueryAdapter implements LmsAssignmentQueryPort {
     private final AssignmentRepository assignments;
+    private final AssignmentProgressCountRepository progressCounts;
 
-    public JpaLmsAssignmentQueryAdapter(AssignmentRepository assignments) {
+    public JpaLmsAssignmentQueryAdapter(AssignmentRepository assignments, AssignmentProgressCountRepository progressCounts) {
         this.assignments = assignments;
+        this.progressCounts = progressCounts;
     }
 
     @Override public Optional<AssignmentDetailProjection> findAssignmentDetail(String tenantId, String assignmentId) { return assignments.findAssignmentDetail(tenantId, assignmentId); }
@@ -27,4 +32,7 @@ public class JpaLmsAssignmentQueryAdapter implements LmsAssignmentQueryPort {
     @Override public Page<MissingLateStudentProjection> findAssignmentMissingLateStudents(String tenantId, String assignmentId, Pageable pageable) { return assignments.findAssignmentMissingLateStudents(tenantId, assignmentId, pageable); }
     @Override public Page<AssignmentCardProjection> findTeacherAssignmentCards(String tenantId, String teacherId, String status, Pageable pageable) { return assignments.findTeacherAssignmentCards(tenantId, teacherId, status, pageable); }
     @Override public TeacherHomeworkSummaryProjection summarizeTeacherHomeworkWorkspace(String tenantId, String teacherId) { return assignments.summarizeTeacherHomeworkWorkspace(tenantId, teacherId); }
+    @Override public List<AssignmentCountProjection> countSavedRecipients(String tenantId, Collection<String> assignmentIds) { return progressCounts.countSavedRecipients(tenantId, assignmentIds); }
+    @Override public List<AssignmentCountProjection> countClassRosterRecipients(String tenantId, Collection<String> assignmentIds) { return progressCounts.countClassRosterRecipients(tenantId, assignmentIds); }
+    @Override public List<AssignmentCountProjection> countSubmittedRecipients(String tenantId, Collection<String> assignmentIds) { return progressCounts.countSubmittedRecipients(tenantId, assignmentIds); }
 }

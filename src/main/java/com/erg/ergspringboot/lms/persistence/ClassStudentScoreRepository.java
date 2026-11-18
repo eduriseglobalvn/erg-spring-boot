@@ -1,9 +1,11 @@
 package com.erg.ergspringboot.lms.persistence;
 
 import com.erg.ergspringboot.lms.LmsStatePolicy;
+import com.erg.ergspringboot.lms.persistence.projection.ClassScoreBoardAttemptProjection;
 import com.erg.ergspringboot.lms.persistence.projection.ClassStudentScoreProjection;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 
@@ -40,4 +42,28 @@ public interface ClassStudentScoreRepository extends Repository<Attempt, String>
         if (studentIds.isEmpty()) return List.of();
         return summarizeClassStudentScores(tenantId, academicClassId, studentIds, LmsStatePolicy.completedAttemptStates());
     }
+
+    /** Every handed-in attempt of a class, newest first, for its score board. */
+    @Query("""
+            select new com.erg.ergspringboot.lms.persistence.projection.ClassScoreBoardAttemptProjection(
+                attempt.id, attempt.studentId, assignment.id, assignment.title, quiz.id, quiz.title, topic.id, topic.name,
+                attempt.score, attempt.maxScore, attempt.percent, attempt.status, attempt.startedAt, attempt.submittedAt
+            )
+            from Attempt attempt
+            join Assignment assignment
+                on assignment.tenantId = attempt.tenantId
+                and assignment.id = attempt.assignmentId
+            left join Quiz quiz
+                on quiz.tenantId = attempt.tenantId
+                and quiz.id = attempt.quizId
+            left join CurriculumTopic topic
+                on topic.tenantId = attempt.tenantId
+                and topic.id = quiz.categoryId
+            where attempt.tenantId = :tenantId
+              and assignment.academicClassId = :academicClassId
+              and lower(attempt.status) in :completedStates
+            order by attempt.submittedAt desc, attempt.id
+            """)
+    List<ClassScoreBoardAttemptProjection> findClassAttempts(String tenantId, String academicClassId,
+            Collection<String> completedStates, Pageable pageable);
 }

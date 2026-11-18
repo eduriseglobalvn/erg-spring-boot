@@ -70,7 +70,8 @@ public class GraphQlMutationAuditInstrumentation extends SimplePerformantInstrum
 
     private void record(ErgPrincipal principal, String field, AuditOutcome outcome, String requestId, Map<String, Object> details) {
         if (principal == null || outcome == null) return;
-        writer.write(AuditOutboxWriter.record(principal, field, "GRAPHQL", outcome, requestId, details));
+        writer.write(AuditOutboxWriter.record(principal, field, "GRAPHQL",
+                AuditOutboxWriter.argumentResourceId(details.get("arguments")), outcome, requestId, details));
     }
 
     private static AuditOutcome outcomeOf(Throwable failure) {

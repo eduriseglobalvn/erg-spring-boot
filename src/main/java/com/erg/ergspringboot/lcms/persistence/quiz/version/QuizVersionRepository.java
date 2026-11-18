@@ -19,6 +19,17 @@ public interface QuizVersionRepository extends JpaRepository<QuizVersion, String
 
     List<QuizVersion> findByQuizIdInAndTenantIdAndIsActiveTrue(java.util.Collection<String> quizIds, String tenantId);
 
+    /** Quizzes among `quizIds` that a teacher built and that belong to someone other than `userId`. */
+    @Query("""
+            select count(q) from Quiz q
+            where q.tenantId = :tenantId and q.id in :quizIds and q.portal = 'teacher'
+            and (q.ownerUserId is null or q.ownerUserId <> :userId)
+            """)
+    long countTeacherQuizzesNotOwnedBy(
+            @Param("tenantId") String tenantId,
+            @Param("quizIds") java.util.Collection<String> quizIds,
+            @Param("userId") String userId);
+
     Optional<QuizVersion> findByIdAndTenantId(String id, String tenantId);
 
     Optional<QuizVersion> findTopByQuizIdAndTenantIdOrderByVersionNumberDesc(String quizId, String tenantId);

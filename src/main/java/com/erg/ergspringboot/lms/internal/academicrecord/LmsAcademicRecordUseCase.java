@@ -217,6 +217,16 @@ public class LmsAcademicRecordUseCase implements LmsAcademicRecordOperations {
         }
     }
 
+    @Override
+    @Transactional
+    public boolean deleteGradebookScore(String tenantId, String classId, String subjectId, String studentId, String columnId) {
+        return jdbc.update("""
+                delete from lms_gradebook_scores
+                where tenant_id = ? and class_id = ? and subject_id = ? and student_id = ? and column_id = ?
+                """, tenantId, required(classId, "classId", 36), required(subjectId, "subjectId", 100),
+                required(studentId, "studentId", 36), required(columnId, "columnId", 100)) > 0;
+    }
+
     private List<AttendanceRecordResponse> attendanceByNaturalKey(AttendanceCommand command, LocalDate date) {
         return jdbc.query("""
                 select id, student_id, subject_id, attendance_date, lesson_index, status, version, updated_at

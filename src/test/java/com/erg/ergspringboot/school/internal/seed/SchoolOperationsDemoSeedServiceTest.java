@@ -14,7 +14,6 @@ import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -30,7 +29,6 @@ class SchoolOperationsDemoSeedServiceTest {
     @Mock UserRepository userRepository;
     @Mock ClassroomRepository classroomRepository;
     @Mock StudentRepository studentRepository;
-    @Mock SubjectRepository subjectRepository;
 
     @BeforeEach
     void returnSavedClassroom() {
@@ -44,7 +42,7 @@ class SchoolOperationsDemoSeedServiceTest {
         actor.setId("existing-user");
         when(userRepository.findFirstByTenantIdOrderByCreatedAtAsc("erg")).thenReturn(Optional.of(actor));
         when(profileRepository.findByTenantIdOrderBySchoolIdAsc("erg")).thenReturn(List.of(profile("school-primary", "PRIMARY")));
-        SchoolOperationsDemoSeedService seedService = new SchoolOperationsDemoSeedService(profileRepository, commandService, userRepository, classroomRepository, studentRepository, subjectRepository);
+        SchoolOperationsDemoSeedService seedService = new SchoolOperationsDemoSeedService(profileRepository, commandService, userRepository, classroomRepository, studentRepository);
 
         seedService.seedIfEmpty("erg");
 
@@ -55,14 +53,13 @@ class SchoolOperationsDemoSeedServiceTest {
     void enrichesExistingSchoolsInsteadOfSkippingTheSeed() {
         when(profileRepository.countByTenantId("erg")).thenReturn(1L);
         when(profileRepository.findByTenantIdOrderBySchoolIdAsc("erg")).thenReturn(List.of(profile("school-secondary", "SECONDARY")));
-        SchoolOperationsDemoSeedService seedService = new SchoolOperationsDemoSeedService(profileRepository, commandService, userRepository, classroomRepository, studentRepository, subjectRepository);
+        SchoolOperationsDemoSeedService seedService = new SchoolOperationsDemoSeedService(profileRepository, commandService, userRepository, classroomRepository, studentRepository);
 
         seedService.seedIfEmpty("erg");
 
         verify(commandService, never()).create(any(), any());
         verify(classroomRepository, times(8)).save(any());
         verify(studentRepository, times(8)).saveAll(any());
-        verify(subjectRepository, times(4)).save(any());
     }
 
     private SchoolOperationalProfile profile(String schoolId, String schoolType) {

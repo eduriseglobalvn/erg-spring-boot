@@ -17,6 +17,8 @@ import tools.jackson.databind.ObjectMapper;
 
 public class FirebaseHttpV1PushSender implements FirebasePushSender {
 
+    private static final int BODY_MAX = 240;
+
     private final NotificationPushProperties properties;
     private final HttpClient httpClient;
     private final AccessTokenProvider accessTokenProvider;
@@ -120,14 +122,17 @@ public class FirebaseHttpV1PushSender implements FirebasePushSender {
                 notification.put("title", payload.title());
             }
             if (!isBlank(payload.body())) {
-                notification.put("body", payload.body());
+                // Same short preview as the VAPID adapter: push text leaves our servers, keep it to one sentence.
+                notification.put("body", payload.body().length() > BODY_MAX
+                        ? payload.body().substring(0, BODY_MAX) + "…" : payload.body());
             }
             message.put("notification", notification);
         }
         if (payload.data() != null && !payload.data().isEmpty()) {
             message.put("data", payload.data());
         }
-        if (!isBlank(payload.actionUrl())) {
+        // FCM rejects a non-HTTPS link with 400; relative app paths travel in data.deeplink for the SW instead.
+        if (!isBlank(payload.actionUrl()) && payload.actionUrl().startsWith("https://")) {
             message.put("webpush", Map.of("fcm_options", Map.of("link", payload.actionUrl())));
         }
         Map<String, Object> request = new LinkedHashMap<>();

@@ -177,6 +177,36 @@ class NotificationDeviceServiceWebPushTest {
     void exposesThePublicKeyOnlyWhenConfigured() {
         assertThat(service.webPushConfig().enabled()).isTrue();
         assertThat(service.webPushConfig().publicKey()).isEqualTo(webPush.getPublicKey());
+        assertThat(service.webPushConfig().provider()).isEqualTo("webpush");
+    }
+
+    @Test
+    void fcmProviderIsPickedFromTheCredentialsFileAndTurnsOffWhenTheFileIsMissing() throws Exception {
+        java.nio.file.Path credentials = java.nio.file.Files.createTempFile("fcm-test", ".json");
+        try {
+            NotificationPushProperties fcm = enabledPush();
+            fcm.setProjectId("erg-test");
+            fcm.getCredentials().setServiceAccountPath(credentials.toString());
+            var config = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush), fcm)
+                    .webPushConfig();
+            assertThat(config.provider()).isEqualTo("fcm");
+            assertThat(config.enabled()).isTrue();
+            assertThat(config.publicKey()).isNull();
+
+            fcm.getCredentials().setServiceAccountPath(credentials.resolveSibling("missing-fcm.json").toString());
+            var missing = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush), fcm)
+                    .webPushConfig();
+            assertThat(missing.provider()).isEqualTo("fcm");
+            assertThat(missing.enabled()).isFalse();
+
+            fcm.setProvider("webpush");
+            var fallback = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush), fcm)
+                    .webPushConfig();
+            assertThat(fallback.provider()).isEqualTo("webpush");
+            assertThat(fallback.publicKey()).isEqualTo(webPush.getPublicKey());
+        } finally {
+            java.nio.file.Files.deleteIfExists(credentials);
+        }
     }
 
     @Test

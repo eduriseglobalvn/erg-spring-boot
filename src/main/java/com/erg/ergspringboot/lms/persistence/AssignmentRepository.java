@@ -172,10 +172,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                     from Assignment assignment
                     join Student student
                         on student.tenantId = assignment.tenantId
-                        and student.academicClassId = assignment.academicClassId
                     where assignment.tenantId = :tenantId
                       and assignment.id = :assignmentId
-                      and lower(coalesce(assignment.recipientMode, 'class')) = 'class'
+                    """ + AssignmentRecipientScope.RECIPIENT_OF_ASSIGNMENT + """
                     order by student.fullName asc, student.studentCode asc
                     """,
             countQuery = """
@@ -183,12 +182,12 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                     from Assignment assignment
                     join Student student
                         on student.tenantId = assignment.tenantId
-                        and student.academicClassId = assignment.academicClassId
                     where assignment.tenantId = :tenantId
                       and assignment.id = :assignmentId
-                      and lower(coalesce(assignment.recipientMode, 'class')) = 'class'
+                    """ + AssignmentRecipientScope.RECIPIENT_OF_ASSIGNMENT + """
                     """
     )
+    // Recipients are the saved assignment_recipients rows; a class assignment without rows falls back to the class roster (BUG-D-003).
     Page<RecipientProgressProjection> findAssignmentRecipients(
             String tenantId,
             String assignmentId,
@@ -234,10 +233,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                     from Assignment assignment
                     join Student student
                         on student.tenantId = assignment.tenantId
-                        and student.academicClassId = assignment.academicClassId
                     where assignment.tenantId = :tenantId
                       and assignment.id = :assignmentId
-                      and lower(coalesce(assignment.recipientMode, 'class')) = 'class'
+                    """ + AssignmentRecipientScope.RECIPIENT_OF_ASSIGNMENT + """
                       and assignment.dueAt is not null
                       and assignment.dueAt < CURRENT_TIMESTAMP
                       and not exists (
@@ -257,10 +255,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
                     from Assignment assignment
                     join Student student
                         on student.tenantId = assignment.tenantId
-                        and student.academicClassId = assignment.academicClassId
                     where assignment.tenantId = :tenantId
                       and assignment.id = :assignmentId
-                      and lower(coalesce(assignment.recipientMode, 'class')) = 'class'
+                    """ + AssignmentRecipientScope.RECIPIENT_OF_ASSIGNMENT + """
                       and assignment.dueAt is not null
                       and assignment.dueAt < CURRENT_TIMESTAMP
                       and not exists (

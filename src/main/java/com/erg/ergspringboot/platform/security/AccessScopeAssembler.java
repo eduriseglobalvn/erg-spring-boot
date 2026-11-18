@@ -33,6 +33,14 @@ public final class AccessScopeAssembler {
     public static final String CLASS_MANAGE_PERMISSION = "lms.class.manage";
 
     /**
+     * Phòng đào tạo runs every school of its own tenant (owner decision 16/11/2026). The one rule, shared by
+     * request authorization and notification campaigns. It widens the unit scope only, never permissions.
+     */
+    public static boolean managesWholeTenant(Collection<String> roleNames) {
+        return roleNames != null && roleNames.stream().anyMatch("pdt_operator"::equalsIgnoreCase);
+    }
+
+    /**
      * The one rule for unit-scoped admins: whoever holds {@code lms.class.manage} manages their units and every
      * descendant, never the whole tenant. Shared by session bootstrap and notification campaigns.
      */

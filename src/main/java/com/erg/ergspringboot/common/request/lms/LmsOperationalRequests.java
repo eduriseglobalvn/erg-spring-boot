@@ -94,20 +94,6 @@ public final class LmsOperationalRequests {
         }
     }
 
-    public record CreateSubjectRequest(
-            @NotBlank @Size(max = 255) String name,
-            @NotBlank @Size(max = 255) String code,
-            @Size(max = 36) String schoolId,
-            @Size(max = 32) String status
-    ) {}
-
-    public record UpdateSubjectRequest(
-            Long version,
-            @Size(max = 255) String name,
-            @Size(max = 255) String code,
-            @Size(max = 32) String status
-    ) {}
-
     public record EnrollmentItem(
             @NotBlank String studentId,
             @NotBlank String classId,

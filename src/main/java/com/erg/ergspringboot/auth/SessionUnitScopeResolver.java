@@ -54,11 +54,14 @@ final class SessionUnitScopeResolver {
             User user,
             List<String> roles,
             boolean canAccessGlobalErg,
+            boolean allTenantUnits,
             String tenantId
     ) {
         List<EducationUnit> educationUnits = canAccessGlobalErg
                 ? educationUnitRepository.findTop500ByOrderByNameAsc()
-                : scopedEducationUnits(user, roles, tenantId);
+                : allTenantUnits
+                        ? educationUnitRepository.findByTenantIdOrderByNameAsc(tenantId, PageRequest.of(0, MAX_BOOTSTRAP_UNITS))
+                        : scopedEducationUnits(user, roles, tenantId);
         return educationUnits.stream()
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(this::unitSortKey).thenComparing(unit -> safe(unit.getName())))
@@ -78,7 +81,11 @@ final class SessionUnitScopeResolver {
                 .toList();
     }
 
-    List<SessionBootstrapClass> resolveManageableClasses(String tenantId, List<ManagedUnit> managedUnits) {
+    /**
+     * {@code teacherId} non-null means a plain teacher (no back-office workspace): only the classes they are homeroom
+     * teacher of, have assigned work to, or teach in the published timetable; never every class of the school.
+     */
+    List<SessionBootstrapClass> resolveManageableClasses(String tenantId, List<ManagedUnit> managedUnits, String teacherId) {
         List<String> schoolIds = managedUnits.stream()
                 .map(ManagedUnit::id)
                 .filter(id -> id != null && !id.isBlank())
@@ -86,6 +93,14 @@ final class SessionUnitScopeResolver {
                 .toList();
         if (schoolIds.isEmpty()) {
             return List.of();
+        }
+        if (teacherId != null) {
+            return classroomRepository.findTeacherClassOptions(tenantId, teacherId).stream()
+                    .filter(option -> schoolIds.contains(option.schoolId()))
+                    .limit(MAX_BOOTSTRAP_CLASSES)
+                    .map(option -> new SessionBootstrapClass(option.id(), option.name(), option.schoolId(),
+                            option.grade(), option.academicYear(), option.status()))
+                    .toList();
         }
 
         List<Classroom> classes = classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(

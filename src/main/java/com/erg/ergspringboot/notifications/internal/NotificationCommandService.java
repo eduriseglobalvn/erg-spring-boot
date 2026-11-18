@@ -142,12 +142,11 @@ public class NotificationCommandService {
 
         List<NotificationOutboxEntity> outboxes = new ArrayList<>();
         if (!userIds.isEmpty()) {
-            List<NotificationDeviceRegistrationEntity> devices =
-                    deviceRepository.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(
-                            command.tenantId(), userIds, portal);
-            for (NotificationDeviceRegistrationEntity device : devices) {
-                if (pushDisabled.contains(device.getUserId())) continue;
-                NotificationOutboxEntity outbox = outboxForDevice(savedMessage, command, device);
+            // Students enable push from elearning, so an "lms" event must reach devices of every portal.
+            for (NotificationDeviceRegistrationEntity device :
+                    deviceRepository.findByTenantIdAndUserIdInAndEnabledTrue(command.tenantId(), userIds)) {
+                if (pushDisabled.contains(device.getUserId()) || !properties.sendsTransport(device.getTransport())) continue;
+                NotificationOutboxEntity outbox = outboxForDevice(savedMessage, withPortal(command, device.getPortal()), device);
                 if (outbox != null) outboxes.add(outbox);
             }
         }
@@ -231,18 +230,22 @@ public class NotificationCommandService {
             for (NotificationDeviceRegistrationEntity device : deviceRepository
                     .findByTenantIdAndUserIdInAndEnabledTrue(delivery.tenantId(), userIds)) {
                 NotificationMessageEntity message = messages.get(device.getUserId());
-                if (message == null || pushDisabled.contains(device.getUserId() + "|" + device.getPortal())) continue;
-                NotificationCommand devicePortal = new NotificationCommand(command.tenantId(), command.createdBy(), null,
-                        command.eventType(), command.sourceType(), command.sourceId(), command.title(),
-                        command.bodyPreview(), null, command.priority(), device.getPortal(), command.userIds(), null,
-                        command.data());
-                NotificationOutboxEntity outbox = outboxForDevice(message, devicePortal, device);
+                if (message == null || pushDisabled.contains(device.getUserId() + "|" + device.getPortal())
+                        || !properties.sendsTransport(device.getTransport())) continue;
+                NotificationOutboxEntity outbox = outboxForDevice(message, withPortal(command, device.getPortal()), device);
                 if (outbox != null) outboxes.add(outbox);
             }
             if (!outboxes.isEmpty()) outboxRepository.saveAll(outboxes);
         }
         metrics.created(CAMPAIGN_EVENT_TYPE, CAMPAIGN_PORTAL, recipients.size(), outboxes.size());
         return new NotificationCommandResult(delivery.campaignId(), recipients.size(), outboxes.size());
+    }
+
+    /** The push payload carries the device's portal so the SW/tab handlers of that portal react to it. */
+    private static NotificationCommand withPortal(NotificationCommand c, String portal) {
+        return new NotificationCommand(c.tenantId(), c.createdBy(), c.idempotencyKey(), c.eventType(), c.sourceType(),
+                c.sourceId(), c.title(), c.bodyPreview(), c.actionUrl(), c.priority(), portal, c.userIds(),
+                c.topicName(), c.data());
     }
 
     private void validateTargets(Set<String> userIds, String topicName) {

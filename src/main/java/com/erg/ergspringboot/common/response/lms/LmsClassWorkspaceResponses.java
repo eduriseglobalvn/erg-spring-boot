@@ -77,7 +77,8 @@ public final class LmsClassWorkspaceResponses {
             String recipientMode,
             List<AssignmentResourceResponse> resources,
             OffsetDateTime createdAt,
-            OffsetDateTime updatedAt
+            OffsetDateTime updatedAt,
+            String title
     ) {
     }
 }

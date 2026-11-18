@@ -143,6 +143,34 @@ class ErgPrincipalServiceTest {
     }
 
     @Test
+    void trainingOfficeManagesEverySchoolOfItsTenantWithoutBecomingPlatformWide() {
+        AuthTokenService tokenService = new AuthTokenService();
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);
+        Role role = new Role();
+        role.setName("pdt_operator");
+        role.setPermissions(new LinkedHashSet<>());
+        User user = new User();
+        user.setId("u-pdt");
+        user.setStatus("ACTIVE");
+        user.setRoles(new LinkedHashSet<>(List.of(role)));
+        AuthSession session = new AuthSession();
+        session.setUser(user);
+        session.setSessionId("s-pdt");
+        session.setTenantId("erg");
+        session.setPortal("admin");
+        session.setExpiresAt(OffsetDateTime.now().plusHours(1));
+        String bearerToken = "pdt-access-token";
+        when(sessionRepository.findByAccessTokenHash(tokenService.hashToken(bearerToken)))
+                .thenReturn(List.of(session));
+
+        ErgPrincipal principal = service.fromBearerToken(bearerToken, "erg").orElseThrow();
+
+        assertThat(principal.attributes().get("managedEducationUnitIds")).isEqualTo(List.of("*"));
+        assertThat(principal.portals()).doesNotContain("*");
+        assertThat(principal.accessLevel()).isEqualTo("user");
+    }
+
+    @Test
     void systemRoleNameWithoutDatabasePermissionDoesNotGrantPlatformScope() {
         AuthTokenService tokenService = new AuthTokenService();
         ErgPrincipalService service = new ErgPrincipalService(sessionRepository, tokenService);

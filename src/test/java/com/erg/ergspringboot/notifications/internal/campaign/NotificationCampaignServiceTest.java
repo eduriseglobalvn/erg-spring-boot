@@ -84,8 +84,11 @@ class NotificationCampaignServiceTest {
 
     @BeforeEach
     void setUp() {
+        NotificationPushProperties fcm = new NotificationPushProperties();
+        fcm.setProjectId("erg-test");
+        fcm.getCredentials().setStaticAccessToken("test-token");
         NotificationCommandService commands = new NotificationCommandService(messages, recipients, devices, outbox,
-                new NotificationPushProperties(), new NotificationTokenCipher(new NotificationPushProperties()),
+                fcm, new NotificationTokenCipher(new NotificationPushProperties()),
                 metrics, preferences);
         service = new NotificationCampaignService(campaigns, guard, resolver, commands, queries, authorizations, users,
                 new ErgPolicyService(), Clock.fixed(NOW, ZoneOffset.UTC));

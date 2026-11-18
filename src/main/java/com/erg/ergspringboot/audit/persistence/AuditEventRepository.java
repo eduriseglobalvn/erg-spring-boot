@@ -17,14 +17,15 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, String> 
 
     Optional<AuditEvent> findTopByTenantIdOrderByOccurredAtDescIdDesc(String tenantId);
 
+    /** {@code from}/{@code to} must be non-null: a null Instant binds untyped and Postgres rejects {@code ? is null} (42P18). */
     @Query("""
             select e from AuditEvent e
             where e.tenantId = :tenantId
-              and (:from is null or e.occurredAt >= :from)
-              and (:to is null or e.occurredAt <= :to)
-              and (:actorId is null or e.actorId = :actorId)
-              and (:resourceType is null or e.resourceType = :resourceType)
-              and (:resourceId is null or e.resourceId = :resourceId)
+              and e.occurredAt >= :from
+              and e.occurredAt <= :to
+              and (cast(:actorId as string) is null or e.actorId = cast(:actorId as string))
+              and (cast(:resourceType as string) is null or e.resourceType = cast(:resourceType as string))
+              and (cast(:resourceId as string) is null or e.resourceId = cast(:resourceId as string))
               and (:outcome is null or e.outcome = :outcome)
               and (:allScopes = true
                    or e.scopeType is null

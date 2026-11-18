@@ -8,51 +8,6 @@ import java.util.Map;
 final class QuestionBankDemoSeedContent {
 
     static final String SAMPLE_EDITOR_QUIZ_ID = "quiz-sample-editor-question-types";
-    static final List<String> LEGACY_SUBJECT_IDS = List.of("mathematics", "english", "science");
-
-    static final List<SubjectSeed> SUBJECTS = List.of(
-        subject("ic3-gs6", "IC3 GS6", "ic3-gs6"),
-        subject("python", "Python", "python"),
-        subject("mos", "MOS", "mos"),
-        subject("scratch", "Scratch", "scratch"),
-        subject("tin-hoc-tre", "Tin hoc tre", "tin-hoc-tre")
-    );
-
-    static final List<LevelSeed> LEVELS = List.of(
-        level("ic3-l1", "ic3-gs6", "Level 1", "ic3-l1", 1),
-        level("ic3-l2", "ic3-gs6", "Level 2", "ic3-l2", 2),
-        level("ic3-l3", "ic3-gs6", "Level 3", "ic3-l3", 3),
-        level("python-foundation", "python", "Foundation", "python-foundation", 1),
-        level("python-intermediate", "python", "Intermediate", "python-intermediate", 2),
-        level("mos-word", "mos", "Word Associate", "mos-word", 1),
-        level("mos-excel", "mos", "Excel Associate", "mos-excel", 2),
-        level("mos-powerpoint", "mos", "PowerPoint Associate", "mos-powerpoint", 3),
-        level("scratch-intro", "scratch", "Thieu nhi", "scratch-intro", 1),
-        level("tht-bang-a", "tin-hoc-tre", "Doi tuyen", "tht-bang-a", 1)
-    );
-
-    static final List<TopicSeed> TOPICS = List.of(
-        topics("ic3-l1", List.of(
-                "Thiet bi va he dieu hanh", "Quan ly tep", "Go phim va nhap lieu", "Internet an toan",
-                "Email co ban", "Word can ban", "On tap level 1"
-        )),
-        topics("ic3-l2", List.of(
-                "Word nang cao", "Excel nhap mon", "Cong thuc Excel", "PowerPoint",
-                "Lam viec nhom online", "Tim kiem thong tin", "On tap level 2"
-        )),
-        topics("ic3-l3", List.of(
-                "Bao mat tai khoan", "Du lieu va bieu do", "Tu duy thuat toan", "Ban quyen so",
-                "Thuyet trinh du an", "Kiem tra mo phong IC3", "On tap level 3"
-        )),
-        topics("python-foundation", List.of("Bien va kieu du lieu", "Dieu kien", "Vong lap", "Ham co ban", "On tap Python foundation")),
-        topics("python-intermediate", List.of("List va dictionary", "Xu ly chuoi", "Doc ghi file", "Debug va test", "Mini project")),
-        topics("mos-word", List.of("Dinh dang van ban", "Bang va hinh anh", "Tham chieu va mail merge", "On tap Word")),
-        topics("mos-excel", List.of("Cong thuc co ban", "Bang du lieu", "Bieu do", "On tap Excel")),
-        topics("mos-powerpoint", List.of("Bo cuc slide", "Transition va animation", "Trinh chieu", "On tap PowerPoint")),
-        topics("scratch-intro", List.of("Lam quen khoi lenh", "Chuyen dong va am thanh", "Su kien va dieu khien", "Du an me cung")),
-        topics("tht-bang-a", List.of("Tu duy thuat toan", "Day so va uoc so", "Hinh hoc va do hoa", "Mini contest"))
-    );
-
     static final List<QuestionSeed> QUESTIONS = List.of(
         question("qb-ic3-001", "ic3-gs6", "ic3-l1", "ic3-l1-topic-1", "multiple-choice", "core", "ready",
                 "Thiết bị nào sau đây dùng để nhập dữ liệu chữ và số vào máy tính?", "Bàn phím (Keyboard)", 62, 18, 3),
@@ -252,18 +207,6 @@ final class QuestionBankDemoSeedContent {
         );
     }
 
-    private static SubjectSeed subject(String id, String name, String code) {
-        return new SubjectSeed(id, name, code);
-    }
-
-    private static LevelSeed level(String id, String subjectId, String name, String code, int order) {
-        return new LevelSeed(id, subjectId, name, code, order);
-    }
-
-    private static TopicSeed topics(String levelId, List<String> labels) {
-        return new TopicSeed(levelId, labels);
-    }
-
     private static QuestionSeed question(
             String id,
             String subjectId,
@@ -300,15 +243,6 @@ final class QuestionBankDemoSeedContent {
             result.put(String.valueOf(entries[index]), entries[index + 1]);
         }
         return result;
-    }
-
-    record SubjectSeed(String id, String name, String code) {
-    }
-
-    record LevelSeed(String id, String subjectId, String name, String code, int order) {
-    }
-
-    record TopicSeed(String levelId, List<String> labels) {
     }
 
     record QuestionSeed(

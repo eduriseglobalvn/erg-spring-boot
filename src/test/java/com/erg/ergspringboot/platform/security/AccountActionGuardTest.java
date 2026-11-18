@@ -48,6 +48,14 @@ class AccountActionGuardTest {
     private final ErgPrincipal superAdmin = principal("sa-1", List.of("system.super_admin"), List.of("*"));
 
     @Test
+    void studentRoleCannotBeCombinedWithAnyStaffRole() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> AccountActionGuard.assertRoleCombination(
+                java.util.List.of("role_lms_teacher", "role_lms_student")))
+                .isInstanceOf(com.erg.ergspringboot.exception.BadRequestException.class);
+        AccountActionGuard.assertRoleCombination(java.util.List.of("role_lms_student"));
+    }
+
+    @Test
     void pdtCannotResetSuperAdminPassword() {
         target("admin-2", superAdminRole);
 

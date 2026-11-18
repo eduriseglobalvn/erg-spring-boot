@@ -49,6 +49,11 @@ public class UserPasswordUseCase {
         if (!passwordService.matches(request.oldPassword(), user.getPasswordHash())) {
             throw new BadRequestException("invalid old password");
         }
+        // A temporary password is replaced only once a verified recovery email exists to recover the account with.
+        if (previousMustChange && !Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
+            throw new com.erg.ergspringboot.exception.AccountLifecycleException(org.springframework.http.HttpStatus.CONFLICT,
+                    "RECOVERY_EMAIL_NOT_VERIFIED", "verify a recovery email before changing the temporary password");
+        }
         user.setPasswordHash(passwordService.hash(request.newPassword()));
         user.setMustChangePassword(false);
         if (Boolean.TRUE.equals(user.getIsProfileCompleted())
@@ -83,9 +88,7 @@ public class UserPasswordUseCase {
 
     private AccountLifecycleResponse lifecycle(User user) {
         List<String> next = new ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) next.add("COMPLETE_PROFILE");
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) next.add("VERIFY_RECOVERY_EMAIL");
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) next.add("CHANGE_PASSWORD");
+        next.addAll(user.firstLoginSteps());
         String status = next.isEmpty() ? "ACTIVE" : ("INVITED".equalsIgnoreCase(user.getStatus()) ? "PROVISIONED" : "FIRST_LOGIN_RESTRICTED");
         String email = user.getRecoveryEmail();
         String masked = email == null || !email.contains("@") ? null : email.substring(0, 1) + "***" + email.substring(email.indexOf('@'));

@@ -154,7 +154,7 @@ public class LmsAssignmentCommandService {
         assignment.setRecipientCount(recipients.size());
         Assignment saved = assignmentRepository.save(assignment);
 
-        List<AssignmentResource> resources = persistResources(tenantId, saved.getId(), request.quizIds());
+        List<AssignmentResource> resources = persistResources(tenantId, saved.getId(), request.quizIds(), userId);
         persistRecipients(tenantId, saved.getId(), primaryClassId, mode, recipients);
         caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
         events.publishEvent(new LmsAssignmentCreated("assignment-created:" + saved.getId(), tenantId, saved.getId(),
@@ -238,26 +238,28 @@ public class LmsAssignmentCommandService {
         caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
     }
 
-    /** Every recipient must sit in a class (or, without class, a school) the caller manages. */
+    /** Every recipient must sit in a class the caller manages: an assignment always belongs to a class. */
     private void ensureRecipientScope(String tenantId, List<Student> recipients, UserAccessContext access) {
         Set<String> checked = new LinkedHashSet<>();
         for (Student student : recipients) {
             String classId = blankToNull(student.getAcademicClassId());
             if (classId == null) {
-                if (!access.canAccessEducationUnit(student.getSchoolId())
-                        || (blankToNull(student.getSchoolId()) == null && !access.managedEducationUnitIds().contains("*"))) {
-                    throw new ForbiddenException("You can only assign students in managed centers/classes");
-                }
-            } else if (checked.add(classId)) {
+                throw new BadRequestException("Học sinh chưa được xếp lớp nên chưa thể nhận bài tập");
+            }
+            if (checked.add(classId)) {
                 policy.ensureClassScope(tenantId, classId, access);
             }
         }
     }
 
-    private List<AssignmentResource> persistResources(String tenantId, String assignmentId, List<String> quizIds) {
+    private List<AssignmentResource> persistResources(String tenantId, String assignmentId, List<String> quizIds, String userId) {
         List<AssignmentResource> resources = new ArrayList<>();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<String> distinctQuizIds = new ArrayList<>(new LinkedHashSet<>(quizIds));
+        // A quiz a teacher built for their own classes is theirs alone to assign.
+        if (quizVersionRepository.countTeacherQuizzesNotOwnedBy(tenantId, distinctQuizIds, userId) > 0) {
+            throw new com.erg.ergspringboot.exception.ForbiddenException("Bài này do giáo viên khác tạo, bạn không giao được.");
+        }
         Map<String, QuizVersion> activeVersions = quizVersionRepository
                 .findByQuizIdInAndTenantIdAndIsActiveTrue(distinctQuizIds, tenantId)
                 .stream()

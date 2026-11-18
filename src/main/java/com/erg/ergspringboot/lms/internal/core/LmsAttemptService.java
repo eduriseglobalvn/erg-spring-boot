@@ -52,6 +52,13 @@ public class LmsAttemptService {
         return repository.findTop3ByTenantIdAndAssignmentIdAndStudentIdOrderByUpdatedAtDesc(tenantId, assignmentId, studentId);
     }
 
+    /** Latest handed-in attempt (submitted/graded/needs_review); never an in-progress one. */
+    public Optional<Attempt> findLatestSubmitted(String tenantId, String assignmentId, String studentId) {
+        return repository.findLatestByStatuses(tenantId, assignmentId, studentId,
+                List.of("submitted", "graded", "needs_review"), org.springframework.data.domain.PageRequest.of(0, 1))
+                .stream().findFirst();
+    }
+
     public List<Attempt> findTop3ByAssignmentsAndStudent(
             String tenantId,
             Collection<String> assignmentIds,

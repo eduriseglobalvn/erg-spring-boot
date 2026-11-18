@@ -10,6 +10,20 @@ import org.springframework.data.domain.Pageable;
 
 public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttempt, String> {
 
+    String RESULT_RESET = "RESET";
+
+    /** A credential reset lifts the temporary lockout: the lockout scan stops at this row (BUG-A-059). */
+    default void recordCredentialReset(String tenantId, String userId, OffsetDateTime at) {
+        AuthLoginAttempt marker = new AuthLoginAttempt();
+        marker.setId(com.erg.ergspringboot.utils.IdGenerator.newId());
+        marker.setTenantId(tenantId);
+        marker.setUserId(userId);
+        marker.setResult(RESULT_RESET);
+        marker.setReason("credential_reset");
+        marker.setCreatedAt(at);
+        save(marker);
+    }
+
     List<AuthLoginAttempt> findByUserIdOrderByCreatedAtDesc(String userId);
 
     List<AuthLoginAttempt> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);

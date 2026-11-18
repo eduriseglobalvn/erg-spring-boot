@@ -30,6 +30,33 @@ class StudentAccountProvisioner {
         this.passwords = passwords;
     }
 
+    /**
+     * The login an import may use: the requested one, or the first free numbered variant (ten.ho.lop2, ...).
+     * Two schools can both have a class 8A with a student of the same name (BUG-A-003).
+     */
+    String freeLogin(String username) {
+        String login = username == null || username.isBlank() ? null : username.trim().toLowerCase();
+        if (login == null || !users.existsByUsernameIgnoreCase(login)) return login;
+        for (int n = 2; n <= 99; n++) {
+            if (!users.existsByUsernameIgnoreCase(login + n)) return login + n;
+        }
+        return login; // provision() reports the conflict
+    }
+
+    record ImportedAccount(String userId, String login) { }
+
+    /**
+     * Import path: a taken login is numbered instead of refused, and a password that equals the requested
+     * username (owner rule 17/11/2026) follows the login actually created.
+     */
+    ImportedAccount provisionForImport(UserAccessContext access, String schoolId, String username, String email,
+                                       String fullName, String phone, String password) {
+        String login = freeLogin(username);
+        boolean sameAsUsername = password != null && username != null && password.equalsIgnoreCase(username.trim());
+        return new ImportedAccount(
+                provision(access, schoolId, login, email, fullName, phone, sameAsUsername ? login : password), login);
+    }
+
     /** Returns the new user's id. Throws {@link ConflictException} when the username or email is taken. */
     String provision(UserAccessContext access, String schoolId, String username, String email, String fullName,
                      String phone, String password) {

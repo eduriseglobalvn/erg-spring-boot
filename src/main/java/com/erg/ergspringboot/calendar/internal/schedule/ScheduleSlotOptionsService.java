@@ -129,7 +129,7 @@ public class ScheduleSlotOptionsService {
             boolean taughtHere = lastWeek.stream().anyMatch(o -> o.hasTeacher(teacher.id()));
             String state = busy != null ? "BUSY" : gap != null ? "TRAVEL" : leave != null ? "LEAVE" : taughtHere ? "SUGGESTED" : "FREE";
             Occurrence neighbor = nearestSameSchool(cell, before, after);
-            result.add(new SlotTeacherOption(teacher.id(), TeacherShortName.of(teacher.displayName()),
+            result.add(new SlotTeacherOption(teacher.id(), teacher.displayName(),
                     TeacherShortName.initials(teacher.displayName()), state, mine.size(),
                     neighbor == null ? null : ScheduleConflictEngine.side(neighbor, teacher.id()), taughtHere,
                     accessed.contains(teacher.id()) ? "EXISTING" : "NEW",

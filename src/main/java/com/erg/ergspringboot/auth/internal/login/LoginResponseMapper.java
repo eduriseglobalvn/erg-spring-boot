@@ -45,15 +45,7 @@ final class LoginResponseMapper {
     private static AccountLifecycleResponse lifecycle(User user, boolean studentOnly) {
         List<String> nextSteps = new ArrayList<>();
         if (!studentOnly) {
-            if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) {
-                nextSteps.add("COMPLETE_PROFILE");
-            }
-            if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
-                nextSteps.add("VERIFY_RECOVERY_EMAIL");
-            }
-            if (Boolean.TRUE.equals(user.getMustChangePassword())) {
-                nextSteps.add("CHANGE_PASSWORD");
-            }
+            nextSteps.addAll(user.firstLoginSteps());
         }
         String lifecycleStatus = nextSteps.isEmpty() ? "ACTIVE"
                 : ("INVITED".equalsIgnoreCase(user.getStatus())

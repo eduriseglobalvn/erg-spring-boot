@@ -13,8 +13,8 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -27,7 +27,7 @@ class CalendarTeacherPeriodsQueryTest {
     private final CalendarEventRepository events = mock(CalendarEventRepository.class);
     private final CalendarEventTeacherRepository eventTeachers = mock(CalendarEventTeacherRepository.class);
     private final ClassroomRepository classes = mock(ClassroomRepository.class);
-    private final SubjectRepository subjects = mock(SubjectRepository.class);
+    private final CurriculumSubjectRepository subjects = mock(CurriculumSubjectRepository.class);
 
     @Test
     void publishedPeriodsOfTheTeacherInVietnamDaysWithClassSubjectAndRoom() {
@@ -45,7 +45,7 @@ class CalendarTeacherPeriodsQueryTest {
         Classroom classroom = new Classroom();
         classroom.setId("class-7a");
         classroom.setName("7A");
-        Subject subject = new Subject();
+        CurriculumSubject subject = new CurriculumSubject();
         subject.setId("math");
         subject.setName("Toán");
         when(events.findTeacherCalendarEvents(any(), any(), any(), any(), any())).thenReturn(List.of(event));

@@ -24,6 +24,10 @@ public class CurriculumClassSubjectAllocation extends BaseEntity {
     private String academicClassId;
     @Column(name = "subject_id", nullable = false, length = 36)
     private String subjectId;
+
+    /** The curriculum level this class studies the subject at (8A studies IC3 at Level 3); null when not chosen. */
+    @Column(name = "level_id", length = 36)
+    private String levelId;
     /** Generation of the whole (school, year) set; every row of one save carries the same value. */
     @Column(name = "version", nullable = false)
     private Long version = 1L;

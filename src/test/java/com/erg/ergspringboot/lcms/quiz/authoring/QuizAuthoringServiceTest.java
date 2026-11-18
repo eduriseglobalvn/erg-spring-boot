@@ -56,7 +56,8 @@ class QuizAuthoringServiceTest {
                 quizRepository,
                 quizDraftRepository,
                 quizQuestionLinkService,
-                assessmentCurriculumBridge
+                assessmentCurriculumBridge,
+                org.mockito.Mockito.mock(com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository.class)
         );
     }
 

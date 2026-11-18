@@ -96,6 +96,31 @@ class QuizAttemptGradingServiceTest {
                 .isInstanceOf(BadRequestException.class);
     }
 
+    @Test
+    void likertSurveyEarnsNothingAndAddsNothingToTheMaximum() {
+        when(versions.findById("ver-1")).thenReturn(Optional.empty());
+        QuizVersionQuestion likert = choice("vq-likert", "likert-1");
+        likert.setKind("likert_scale");
+        likert.setGradingPolicy("survey");
+        likert.setPoints(BigDecimal.valueOf(5));
+        when(questions.findByQuizVersionIdOrderByOrderIndexAsc("ver-1")).thenReturn(List.of(choice("vq-1", "q1"), likert));
+        when(rows.findByAttemptIdAndQuizVersionQuestionIdIn(eq("att-1"), anyCollection())).thenReturn(List.of());
+
+        var graded = service.gradeSubmission("erg", "att-1", "ver-1", Map.of(
+                "q1", Map.of("choiceId", "b"), "likert-1", Map.of("likertResponses", Map.of("row-1", "scale-4")))).orElseThrow();
+
+        assertThat(graded.score()).isEqualByComparingTo("1");
+        assertThat(graded.maxScore()).isEqualByComparingTo("1");
+        assertThat(graded.percent()).isEqualTo(100.0);
+        var saved = org.mockito.ArgumentCaptor.<List<AttemptAnswerRow>>captor();
+        verify(rows).saveAll(saved.capture());
+        AttemptAnswerRow likertRow = saved.getValue().stream()
+                .filter(row -> "vq-likert".equals(row.getQuizVersionQuestionId())).findFirst().orElseThrow();
+        assertThat(likertRow.getCorrect()).isNull();
+        assertThat(likertRow.getAwardedPoints()).isEqualByComparingTo("0");
+        assertThat(likertRow.getMaxPoints()).isEqualByComparingTo("0");
+    }
+
     private QuizVersionQuestion choice(String id, String runtimeId) {
         QuizVersionQuestion question = new QuizVersionQuestion();
         question.setId(id);

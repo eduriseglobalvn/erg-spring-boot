@@ -13,6 +13,8 @@ public interface LmsAcademicRecordOperations {
     void assertStudentInClass(String tenantId, String classId, String studentId);
     AttendanceRecordResponse upsertAttendance(AttendanceCommand command);
     GradebookScoreResponse upsertGradebookScore(GradebookScoreCommand command);
+    /** Removes one cell's score (the cell becomes "not graded"); false when there was none. */
+    boolean deleteGradebookScore(String tenantId, String classId, String subjectId, String studentId, String columnId);
 
     record AttendanceCommand(String tenantId, String actorUserId, String classId, String studentId,
                              String subjectId, String attendanceDate, int lessonIndex, String status,

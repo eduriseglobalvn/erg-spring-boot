@@ -45,7 +45,9 @@ public final class NotificationResponses {
     public record WebPushConfigResponse(
             boolean enabled,
             @Schema(description = "VAPID applicationServerKey (base64url); null when Web Push is disabled")
-            String publicKey
+            String publicKey,
+            @Schema(description = "Push channel devices must register on: fcm or webpush", allowableValues = {"fcm", "webpush"})
+            String provider
     ) {
     }
 

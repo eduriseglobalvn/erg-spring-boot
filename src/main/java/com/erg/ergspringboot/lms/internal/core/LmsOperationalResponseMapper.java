@@ -5,7 +5,6 @@ import static com.erg.ergspringboot.common.response.lms.LmsOperationalResponses.
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
-import com.erg.ergspringboot.lms.persistence.Subject;
 
 /** Maps LMS operational aggregates to their published response records. */
 final class LmsOperationalResponseMapper {
@@ -19,11 +18,6 @@ final class LmsOperationalResponseMapper {
 
     static StudentResponse studentResponse(Student value) {
         return new StudentResponse(value.getId(), value.getTenantId(), value.getSchoolId(), value.getAcademicClassId(), value.getStudentCode(), value.getFullName(), value.getUsername(), value.getAuthUserId(), value.getEmail(), value.getGender(), value.getBirthday(), value.getPhone(), value.getAddress(), value.getParentName(), value.getParentPhone(), value.getParentEmail(), value.getParentRelationship(), value.getEnrollmentDate(), value.getNote(), value.getStatus(), version(value.getRecordVersion()), value.getUpdatedAt());
-    }
-
-    static SubjectResponse subjectResponse(Subject value) {
-        String schoolId = value.getScope() == null ? null : value.getScope().getSchoolId();
-        return new SubjectResponse(value.getId(), value.getTenantId(), schoolId, value.getName(), value.getCode(), value.getStatus(), version(value.getRecordVersion()), value.getUpdatedAt());
     }
 
     static EnrollmentResponse enrollmentResponse(StudentEnrollment value, boolean replayed) {

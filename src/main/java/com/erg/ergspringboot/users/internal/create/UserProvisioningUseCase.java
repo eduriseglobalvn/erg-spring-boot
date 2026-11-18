@@ -46,10 +46,13 @@ public class UserProvisioningUseCase {
     private final UserActivityRepository activities; private final CredentialHasher passwords;
     private final AccountMailSender mail; private final ProtectedRolePolicy rolePolicy = new ProtectedRolePolicy();
     private final UserRoleAssignmentRepository assignments;
+    private final com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository loginAttempts;
 
     public UserProvisioningUseCase(UserRepository users, AuthSessionRepository sessions, RoleRepository roles,
             UserAccessScopeRepository scopes, UserActivityRepository activities,
-            CredentialHasher passwords, AccountMailSender mail, UserRoleAssignmentRepository assignments) {
+            CredentialHasher passwords, AccountMailSender mail, UserRoleAssignmentRepository assignments,
+            com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository loginAttempts) {
+        this.loginAttempts = loginAttempts;
         this.users = users; this.sessions = sessions; this.roles = roles; this.scopes = scopes;
         this.activities = activities; this.passwords = passwords; this.mail = mail; this.assignments = assignments;
     }
@@ -77,7 +80,7 @@ public class UserProvisioningUseCase {
         User user = new User(); user.setId(IdGenerator.newId()); user.setUsername(email); user.setEmail(email);
         user.setPasswordHash(passwords.hash(credential)); user.setFullName(trim(request.fullName()));
         user.setPhone(trim(request.phone())); user.setRecoveryEmail(recovery); user.setRecoveryEmailVerified(false);
-        user.setMustChangePassword(true); user.setStatus("INVITED"); user.setProvider("local");
+        user.setMustChangePassword(true); user.setStatus("ACTIVE"); user.setProvider("local");
         user.setAccountType("erg"); user.setTenantId(actor == null ? DEFAULT_TENANT : tenant(actor.tenantId()));
         user.setIsProfileCompleted(!blank(user.getFullName()) && !blank(user.getPhone()));
         user.setLoginCount(0L); user.setRoles(new LinkedHashSet<>(assignedRoles)); users.save(user);
@@ -113,6 +116,7 @@ public class UserProvisioningUseCase {
         List<AuthSession> active = sessions.findByUserIdAndTenantIdAndRevokedAtIsNull(userId, tenant(tenantId));
         active.forEach(session -> { session.setRevokedAt(now); session.setRevokedReason("credential_reset"); });
         if (!active.isEmpty()) sessions.saveAll(active);
+        loginAttempts.recordCredentialReset(user.getTenantId(), user.getId(), now);
         mail.sendTeacherInvite(user.getEmail(), user.getFullName(), credential);
         record(user, audit, "EMAIL_INVITE".equals(delivery) ? "TEACHER_INVITE_RESENT" : "TEACHER_CREDENTIAL_RESET",
                 "Teacher temporary credential rotated", Map.of("mustChangePassword", previous),
@@ -133,9 +137,7 @@ public class UserProvisioningUseCase {
         activities.save(a);
     }
     private AccountLifecycleResponse lifecycle(User user) { List<String> next = new ArrayList<>();
-        if (!Boolean.TRUE.equals(user.getIsProfileCompleted())) next.add("COMPLETE_PROFILE");
-        if (!Boolean.TRUE.equals(user.getRecoveryEmailVerified())) next.add("VERIFY_RECOVERY_EMAIL");
-        if (Boolean.TRUE.equals(user.getMustChangePassword())) next.add("CHANGE_PASSWORD");
+        next.addAll(user.firstLoginSteps());
         String status = next.isEmpty()?"ACTIVE":("INVITED".equalsIgnoreCase(user.getStatus())?"PROVISIONED":"FIRST_LOGIN_RESTRICTED");
         String e=user.getRecoveryEmail(); String masked=e==null||!e.contains("@")?null:e.substring(0,1)+"***"+e.substring(e.indexOf('@'));
         return new AccountLifecycleResponse(status,Boolean.TRUE.equals(user.getIsProfileCompleted()),masked,

@@ -8,11 +8,11 @@ import com.erg.ergspringboot.calendar.persistence.CalendarRoomRepository;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.LevelRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;
 import java.util.HashMap;
@@ -34,8 +34,8 @@ public class CalendarBulkReferenceDataUseCase {
     private static final String ACTIVE = "ACTIVE";
 
     private final ObjectProvider<ClassroomRepository> classrooms;
-    private final ObjectProvider<SubjectRepository> subjects;
-    private final ObjectProvider<LevelRepository> levels;
+    private final ObjectProvider<CurriculumSubjectRepository> subjects;
+    private final ObjectProvider<CurriculumLevelRepository> levels;
     private final ObjectProvider<UserRepository> users;
     private final ObjectProvider<CalendarRoomRepository> rooms;
     private final ObjectProvider<EducationUnitRepository> schools;
@@ -43,8 +43,8 @@ public class CalendarBulkReferenceDataUseCase {
     @Autowired
     public CalendarBulkReferenceDataUseCase(
             ObjectProvider<ClassroomRepository> classrooms,
-            ObjectProvider<SubjectRepository> subjects,
-            ObjectProvider<LevelRepository> levels,
+            ObjectProvider<CurriculumSubjectRepository> subjects,
+            ObjectProvider<CurriculumLevelRepository> levels,
             ObjectProvider<UserRepository> users,
             ObjectProvider<CalendarRoomRepository> rooms,
             ObjectProvider<EducationUnitRepository> schools) {
@@ -59,8 +59,8 @@ public class CalendarBulkReferenceDataUseCase {
     /** Compatibility constructor for direct unit tests and legacy callers. */
     public CalendarBulkReferenceDataUseCase(
             ClassroomRepository classrooms,
-            SubjectRepository subjects,
-            LevelRepository levels,
+            CurriculumSubjectRepository subjects,
+            CurriculumLevelRepository levels,
             UserRepository users,
             CalendarRoomRepository rooms,
             EducationUnitRepository schools) {
@@ -74,8 +74,8 @@ public class CalendarBulkReferenceDataUseCase {
 
     public ReferenceData load(String tenantId, String schoolId, CalendarBulkCreateRequest input) {
         ClassroomRepository classroomRepository = require(classrooms, "classroom repository");
-        SubjectRepository subjectRepository = require(subjects, "subject repository");
-        LevelRepository levelRepository = require(levels, "level repository");
+        CurriculumSubjectRepository subjectRepository = require(subjects, "subject repository");
+        CurriculumLevelRepository levelRepository = require(levels, "level repository");
         UserRepository userRepository = require(users, "user repository");
         CalendarRoomRepository roomRepository = require(rooms, "room repository");
         EducationUnitRepository schoolRepository = require(schools, "education-unit repository");
@@ -83,20 +83,20 @@ public class CalendarBulkReferenceDataUseCase {
         Map<String, Classroom> classMap = classroomRepository
                 .findByTenantIdAndSchoolIdOrderByNameAsc(tenantId, schoolId).stream()
                 .collect(Collectors.toMap(Classroom::getId, Function.identity()));
-        Map<String, Subject> subjectMap = subjectRepository
-                .findTop500ByTenantIdAndStatusIgnoreCaseOrderByNameAsc(tenantId, ACTIVE).stream()
-                .collect(Collectors.toMap(Subject::getId, Function.identity()));
+        Map<String, CurriculumSubject> subjectMap = subjectRepository
+                .findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(tenantId, ACTIVE, org.springframework.data.domain.PageRequest.of(0, 500)).stream()
+                .collect(Collectors.toMap(CurriculumSubject::getId, Function.identity()));
 
         Set<String> subjectIds = input.rows().stream()
                 .map(CalendarBulkRowRequest::subjectId)
                 .filter(id -> id != null && !id.isBlank())
                 .collect(Collectors.toSet());
-        Map<String, Level> levelMap = new HashMap<>();
+        Map<String, CurriculumLevel> levelMap = new HashMap<>();
         if (!subjectIds.isEmpty()) {
             levelMap = levelRepository
-                    .findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+                    .findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                             tenantId, subjectIds, ACTIVE)
-                    .stream().collect(Collectors.toMap(Level::getId, Function.identity()));
+                    .stream().collect(Collectors.toMap(CurriculumLevel::getId, Function.identity()));
         }
 
         Set<String> userIds = new HashSet<>();

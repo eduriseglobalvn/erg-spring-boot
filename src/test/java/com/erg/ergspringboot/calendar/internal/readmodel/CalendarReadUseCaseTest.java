@@ -30,8 +30,8 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarRoom;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.internal.directory.UserDirectoryAdapter;
@@ -43,9 +43,9 @@ import com.erg.ergspringboot.calendar.persistence.CalendarRoomRepository;
 import com.erg.ergspringboot.calendar.persistence.projection.CalendarTeacherColorProjection;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.LevelRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -85,8 +85,8 @@ class CalendarReadUseCaseTest {
     @Mock private CalendarEventRepository eventRepository;
     @Mock private CalendarEventTeacherRepository eventTeacherRepository;
     @Mock private ClassroomRepository classroomRepository;
-    @Mock private SubjectRepository subjectRepository;
-    @Mock private LevelRepository levelRepository;
+    @Mock private CurriculumSubjectRepository subjectRepository;
+    @Mock private CurriculumLevelRepository levelRepository;
     @Mock private EducationUnitRepository educationUnitRepository;
     @Mock private CalendarRoomRepository roomRepository;
     @Mock private UserRepository userRepository;
@@ -127,17 +127,17 @@ class CalendarReadUseCaseTest {
                 anyString(), anyList(), any(Pageable.class)))
                 .thenAnswer(invocation -> classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
                         invocation.getArgument(0), invocation.getArgument(1)));
-        lenient().when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(
+        lenient().when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                 anyString(), anyString(), any(Pageable.class)))
-                .thenAnswer(invocation -> subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(
+                .thenAnswer(invocation -> subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                         invocation.getArgument(0), invocation.getArgument(1)));
         lenient().when(roomRepository.findByTenantIdAndSchoolIdInAndStatus(
                 anyString(), anyList(), anyString(), any(Pageable.class)))
                 .thenAnswer(invocation -> roomRepository.findByTenantIdAndSchoolIdInAndStatus(
                         invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2)));
-        lenient().when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+        lenient().when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                 anyString(), anySet(), anyString(), any(Pageable.class)))
-                .thenAnswer(invocation -> levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+                .thenAnswer(invocation -> levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                         invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2)));
         lenient().when(userRepository.findCalendarTeachersByTenant(anyString(), any(Pageable.class)))
                 .thenAnswer(invocation -> userRepository.findCalendarTeachersByTenant(invocation.getArgument(0)));
@@ -258,20 +258,20 @@ class CalendarReadUseCaseTest {
                     .thenReturn(List.of(classA, classB));
 
             // subjectRepository.findAllById will be called for subj-a and subj-b
-            Subject subjectA = new Subject();
+            CurriculumSubject subjectA = new CurriculumSubject();
             subjectA.setId(SUBJECT_ID_A);
             subjectA.setName("Subject A");
-            Subject subjectB = new Subject();
+            CurriculumSubject subjectB = new CurriculumSubject();
             subjectB.setId(SUBJECT_ID_B);
             subjectB.setName("Subject B");
             when(subjectRepository.findAllById(any()))
                     .thenReturn(List.of(subjectA, subjectB));
 
             // levelRepository.findAllById will be called for level-a and level-b
-            Level levelA = new Level();
+            CurriculumLevel levelA = new CurriculumLevel();
             levelA.setId(LEVEL_ID_A);
             levelA.setName("Level A");
-            Level levelB = new Level();
+            CurriculumLevel levelB = new CurriculumLevel();
             levelB.setId(LEVEL_ID_B);
             levelB.setName("Level B");
             when(levelRepository.findAllById(any()))
@@ -284,10 +284,10 @@ class CalendarReadUseCaseTest {
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A, SCHOOL_ID_B)))
                     .thenReturn(List.of(classA, classB));
 
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of(subjectA, subjectB));
 
-            when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+            when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                     eq(TENANT_ID), anySet(), eq("ACTIVE")))
                     .thenReturn(List.of(levelA, levelB));
 
@@ -347,10 +347,10 @@ class CalendarReadUseCaseTest {
             when(classroomRepository.findAllById(any()))
                     .thenReturn(List.of(classA, classB));
 
-            Subject subjectA = new Subject();
+            CurriculumSubject subjectA = new CurriculumSubject();
             subjectA.setId(SUBJECT_ID_A);
             subjectA.setName("Subject A");
-            Subject subjectB = new Subject();
+            CurriculumSubject subjectB = new CurriculumSubject();
             subjectB.setId(SUBJECT_ID_B);
             subjectB.setName("Subject B");
             when(subjectRepository.findAllById(any()))
@@ -364,9 +364,9 @@ class CalendarReadUseCaseTest {
                     .thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A)))
                     .thenReturn(List.of(classA, classB));
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of(subjectA, subjectB));
-            when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+            when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                     eq(TENANT_ID), anySet(), eq("ACTIVE")))
                     .thenReturn(List.of());
 
@@ -412,7 +412,7 @@ class CalendarReadUseCaseTest {
             // buildCatalog
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A))).thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A))).thenReturn(List.of(classA));
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
 
             ErgPrincipal adminPrincipal = principal(List.of("*"), List.of());
 
@@ -435,7 +435,7 @@ class CalendarReadUseCaseTest {
             schoolA.setName("School A");
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A))).thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A))).thenReturn(List.of());
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
 
             ErgPrincipal adminPrincipal = principal(List.of("*"), List.of());
 
@@ -469,7 +469,7 @@ class CalendarReadUseCaseTest {
 
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A))).thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A))).thenReturn(List.of());
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
 
             ErgPrincipal adminPrincipal = principal(List.of("*"), List.of());
 
@@ -512,7 +512,7 @@ class CalendarReadUseCaseTest {
             // buildCatalog
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A))).thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A))).thenReturn(List.of());
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
 
             ErgPrincipal teacherPrincipal = principal(List.of(), List.of());
 
@@ -547,7 +547,7 @@ class CalendarReadUseCaseTest {
             // buildCatalog
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A))).thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A))).thenReturn(List.of());
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
 
             ErgPrincipal teacherPrincipal = principal(List.of(), List.of());
 
@@ -565,7 +565,7 @@ class CalendarReadUseCaseTest {
             stubTeacherWorkspaceEvents(TEACHER_USER_ID_A, List.of());
 
             // buildCatalog with empty schoolIds fetches subjects
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of());
 
             ErgPrincipal teacherPrincipal = principal(List.of(), List.of());
@@ -670,10 +670,10 @@ class CalendarReadUseCaseTest {
             Classroom cls = new Classroom();
             cls.setId(CLASS_ID_A);
             cls.setName("Class A");
-            Subject subj = new Subject();
+            CurriculumSubject subj = new CurriculumSubject();
             subj.setId(SUBJECT_ID_A);
             subj.setName("Subject A");
-            Level lvl = new Level();
+            CurriculumLevel lvl = new CurriculumLevel();
             lvl.setId(LEVEL_ID_A);
             lvl.setName("Level A");
             User teacherUser = new User();
@@ -782,10 +782,10 @@ class CalendarReadUseCaseTest {
             Classroom classB = new Classroom();
             classB.setId(CLASS_ID_B);
             classB.setName("Class B");
-            Subject subjectB = new Subject();
+            CurriculumSubject subjectB = new CurriculumSubject();
             subjectB.setId(SUBJECT_ID_B);
             subjectB.setName("Subject B");
-            Level levelB = new Level();
+            CurriculumLevel levelB = new CurriculumLevel();
             levelB.setId(LEVEL_ID_B);
             levelB.setName("Level B");
             User teacherUserA = new User();
@@ -1012,7 +1012,7 @@ class CalendarReadUseCaseTest {
         void catalogRepositoryReadsStayOnRequestTransactionThread() {
             Thread requestThread = Thread.currentThread();
             AtomicReference<Thread> repositoryThread = new AtomicReference<>();
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                     eq(TENANT_ID), eq("ACTIVE"), any(Pageable.class)))
                     .thenAnswer(invocation -> {
                         repositoryThread.set(Thread.currentThread());
@@ -1027,10 +1027,10 @@ class CalendarReadUseCaseTest {
 
         @Test
         void shouldRejectCatalogAboveFiveHundredOptions() {
-            List<Subject> subjects = IntStream.range(0, 501)
+            List<CurriculumSubject> subjects = IntStream.range(0, 501)
                     .mapToObj(index -> createSubject("subject-" + index, "Subject " + index))
                     .toList();
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(subjects);
 
             BadRequestException failure = assertThrows(BadRequestException.class,
@@ -1045,18 +1045,18 @@ class CalendarReadUseCaseTest {
             EducationUnit schoolB = createSchool(SCHOOL_ID_B, "School B");
             Classroom classA = createClass(CLASS_ID_A, "Class A");
             Classroom classB = createClass(CLASS_ID_B, "Class B");
-            Subject subjectA = createSubject(SUBJECT_ID_A, "Subject A");
-            Subject subjectB = createSubject(SUBJECT_ID_B, "Subject B");
-            Level levelA = createLevel(LEVEL_ID_A, "Level A");
-            Level levelB = createLevel(LEVEL_ID_B, "Level B");
+            CurriculumSubject subjectA = createSubject(SUBJECT_ID_A, "Subject A");
+            CurriculumSubject subjectB = createSubject(SUBJECT_ID_B, "Subject B");
+            CurriculumLevel levelA = createLevel(LEVEL_ID_A, "Level A");
+            CurriculumLevel levelB = createLevel(LEVEL_ID_B, "Level B");
 
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A, SCHOOL_ID_B)))
                     .thenReturn(List.of(schoolA, schoolB));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A, SCHOOL_ID_B)))
                     .thenReturn(List.of(classA, classB));
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of(subjectA, subjectB));
-            when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderByOrderAscNameAsc(
+            when(levelRepository.findByTenantIdAndSubjectIdInAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(
                     eq(TENANT_ID), anySet(), eq("ACTIVE")))
                     .thenReturn(List.of(levelA, levelB));
 
@@ -1071,6 +1071,19 @@ class CalendarReadUseCaseTest {
             teacherUser.setFullName("Teacher A");
             when(userRepository.findCalendarTeachersByTenantAndSchoolIds(TENANT_ID, List.of(SCHOOL_ID_A, SCHOOL_ID_B)))
                     .thenReturn(List.of(teacherUser));
+            // Homeroom teachers outside the scoped list are added, but never a deactivated account.
+            User homeroom = new User();
+            homeroom.setId("gv-homeroom");
+            homeroom.setFullName("Homeroom");
+            homeroom.setStatus("ACTIVE");
+            User deactivated = new User();
+            deactivated.setId("gv-deactivated");
+            deactivated.setFullName("Deactivated");
+            deactivated.setStatus("INACTIVE");
+            when(classroomRepository.findHomeroomTeacherIdsByTenantAndSchoolIds(TENANT_ID, List.of(SCHOOL_ID_A, SCHOOL_ID_B)))
+                    .thenReturn(List.of("gv-homeroom", "gv-deactivated"));
+            when(userRepository.findByTenantIdAndIdInAnyStatus(TENANT_ID, List.of("gv-homeroom", "gv-deactivated")))
+                    .thenReturn(List.of(homeroom, deactivated));
 
             CalendarRoom room = new CalendarRoom();
             room.setId("room-1");
@@ -1088,14 +1101,13 @@ class CalendarReadUseCaseTest {
             assertEquals(2, catalog.subjects().size());
             assertEquals(2, catalog.levels().size());
             assertEquals(1, catalog.rooms().size());
-            assertEquals(1, catalog.teachers().size());
-            assertEquals("Teacher A", catalog.teachers().get(0).label());
+            assertEquals(List.of("Teacher A", "Homeroom"), catalog.teachers().stream().map(t -> t.label()).toList());
             assertEquals("blue", catalog.teachers().get(0).colorKey());
         }
 
         @Test
         void shouldReturnEmptyCatalogForNullSchoolIds() {
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of());
 
             CalendarCatalogResponse catalog = fullCatalog.catalog(TENANT_ID, null, BASE_TIME, BASE_TIME.plusDays(7));
@@ -1108,7 +1120,7 @@ class CalendarReadUseCaseTest {
 
         @Test
         void shouldReturnEmptyCatalogForEmptySchoolIds() {
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of());
 
             CalendarCatalogResponse catalog = fullCatalog.catalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7));
@@ -1229,7 +1241,7 @@ class CalendarReadUseCaseTest {
             EducationUnit schoolA = createSchool(SCHOOL_ID_A, "School A");
             when(educationUnitRepository.findByIdInOrderByNameAsc(List.of(SCHOOL_ID_A))).thenReturn(List.of(schoolA));
             when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(TENANT_ID, List.of(SCHOOL_ID_A))).thenReturn(List.of());
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE")).thenReturn(List.of());
 
             ErgPrincipal principal = principal(List.of("*"), List.of());
 
@@ -1253,7 +1265,7 @@ class CalendarReadUseCaseTest {
             stubTeacherWorkspaceEvents(TEACHER_USER_ID_A, List.of());
 
             // buildCatalog is called with empty schoolIds; subjects query is always invoked
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderByNameAsc(TENANT_ID, "ACTIVE"))
+            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
                     .thenReturn(List.of());
 
             ErgPrincipal principal = principal(List.of(), List.of());
@@ -1300,8 +1312,8 @@ class CalendarReadUseCaseTest {
 
         EducationUnit school = createSchool(schoolId, schoolName);
         Classroom cls = createClass(classId, className);
-        Subject subj = createSubject(subjectId, subjectName);
-        Level lvl = createLevel(levelId, levelName);
+        CurriculumSubject subj = createSubject(subjectId, subjectName);
+        CurriculumLevel lvl = createLevel(levelId, levelName);
 
         return new CalendarReferenceMaps(
                 schoolId != null ? Map.of(schoolId, school) : Map.of(),
@@ -1329,15 +1341,15 @@ class CalendarReadUseCaseTest {
         return cls;
     }
 
-    private Subject createSubject(String id, String name) {
-        Subject subj = new Subject();
+    private CurriculumSubject createSubject(String id, String name) {
+        CurriculumSubject subj = new CurriculumSubject();
         subj.setId(id);
         subj.setName(name);
         return subj;
     }
 
-    private Level createLevel(String id, String name) {
-        Level lvl = new Level();
+    private CurriculumLevel createLevel(String id, String name) {
+        CurriculumLevel lvl = new CurriculumLevel();
         lvl.setId(id);
         lvl.setName(name);
         return lvl;

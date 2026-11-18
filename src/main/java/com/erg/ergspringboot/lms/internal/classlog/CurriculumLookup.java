@@ -75,6 +75,10 @@ class CurriculumLookup {
                 for (CurriculumClassSubjectAllocation a : allocations
                         .findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(tenantId, schoolId, year)) {
                     if (!classId.equals(a.getAcademicClassId())) continue;
+                    if (a.getLevelId() != null && !framework(a.getSubjectId(), a.getLevelId(), date).isEmpty()) {
+                        allocatedSubject.put(k, a.getSubjectId());
+                        return framework(a.getSubjectId(), a.getLevelId(), date);
+                    }
                     Optional<CurriculumProgram> program = programs.findFirstByTenantIdAndSubjectIdAndAcademicYearAndStatusOrderByLevelIdAsc(
                             tenantId, a.getSubjectId(), year, "published");
                     if (program.isPresent()) {

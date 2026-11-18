@@ -5,19 +5,21 @@ import static com.erg.ergspringboot.common.response.lms.LmsOperationalResponses.
 
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsOperationalCommandService;
-import com.erg.ergspringboot.lms.internal.core.LmsSubjectCommandService;
+import com.erg.ergspringboot.lms.internal.core.StudentCredentialResetService;
 import org.springframework.stereotype.Service;
 
 /** Public LMS boundary for school-directory write commands. */
 @Service
 public class LmsOperationalOperations {
     private final LmsOperationalCommandService commands;
-    private final LmsSubjectCommandService subjectCommands;
+    private final StudentCredentialResetService credentials;
 
-    public LmsOperationalOperations(LmsOperationalCommandService commands, LmsSubjectCommandService subjectCommands) {
+    public LmsOperationalOperations(LmsOperationalCommandService commands, StudentCredentialResetService credentials) {
         this.commands = commands;
-        this.subjectCommands = subjectCommands;
+        this.credentials = credentials;
     }
+
+    public StudentCredentialResetResponse resetStudentCredential(UserAccessContext access, String classId, String studentId, String requestId, String ip, String userAgent) { return credentials.reset(access, classId, studentId, requestId, ip, userAgent); }
 
     public ClassResponse createClass(String schoolId, CreateClassRequest request, UserAccessContext access) { return commands.createClass(schoolId, request, access); }
     public ClassResponse updateClass(String schoolId, String classId, UpdateClassRequest request, UserAccessContext access) { return commands.updateClass(schoolId, classId, request, access); }
@@ -26,9 +28,6 @@ public class LmsOperationalOperations {
     public StudentResponse updateStudent(String schoolId, String studentId, UpdateStudentRequest request, UserAccessContext access) { return commands.updateStudent(schoolId, studentId, request, access); }
     public StudentResponse archiveStudent(String schoolId, String studentId, Long version, UserAccessContext access) { return commands.archiveStudent(schoolId, studentId, version, access); }
     public BulkStudentImportResponse importStudents(String schoolId, BulkStudentImportRequest request, String key, UserAccessContext access) { return commands.importStudents(schoolId, request, key, access); }
-    public SubjectResponse createSubject(CreateSubjectRequest request, UserAccessContext access) { return subjectCommands.createSubject(request, access); }
-    public SubjectResponse updateSubject(String subjectId, UpdateSubjectRequest request, UserAccessContext access) { return subjectCommands.updateSubject(subjectId, request, access); }
-    public SubjectResponse archiveSubject(String subjectId, Long version, UserAccessContext access) { return subjectCommands.archiveSubject(subjectId, version, access); }
     public EnrollmentResponse enroll(EnrollStudentRequest request, String key, UserAccessContext access) { return commands.enroll(request, key, access); }
     public BulkEnrollmentResponse bulkEnroll(BulkEnrollRequest request, String key, UserAccessContext access) { return commands.bulkEnroll(request, key, access); }
 }

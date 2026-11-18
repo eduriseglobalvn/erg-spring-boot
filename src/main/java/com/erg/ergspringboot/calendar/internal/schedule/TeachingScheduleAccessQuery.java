@@ -105,7 +105,7 @@ public class TeachingScheduleAccessQuery {
                             "REVOKE", h.revokeOn().toString())));
             int weekly = (int) mine.stream().map(Occurrence::rowKey).distinct().count();
             LocalDate last = mine.stream().map(Occurrence::date).max(Comparator.naturalOrder()).orElse(null);
-            result.add(new AccessChangeResponse(teacher.id(), TeacherShortName.of(teacher.name()), weekly,
+            result.add(new AccessChangeResponse(teacher.id(), teacher.name(), weekly,
                     last == null ? null : last.toString(), schoolId, held.isEmpty() ? "NEW" : "EXISTING", null, classes));
         }
         result.sort(Comparator.comparing(AccessChangeResponse::teacherName));

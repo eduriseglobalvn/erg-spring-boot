@@ -161,9 +161,9 @@ final class LcmsWorkspaceResponseMapper {
                 questionIds,
                 questionCount,
                 durationLabel(draftSettings, questionCount, option.kind()),
-                "Toàn công ty",
+                "teacher".equals(option.portal()) ? "Giáo viên" : "Toàn công ty",
                 sourceMode(option.kind()),
-                blankToDefault(option.ownerUserId(), "Academic team"),
+                blankToDefault(option.ownerName(), blankToDefault(option.ownerUserId(), "Academic team")),
                 option.updatedAt() == null ? null : option.updatedAt().toString()
         );
     }

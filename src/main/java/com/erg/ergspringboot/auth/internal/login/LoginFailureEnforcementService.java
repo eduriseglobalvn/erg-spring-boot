@@ -80,7 +80,8 @@ public class LoginFailureEnforcementService {
         List<OffsetDateTime> failures = new java.util.ArrayList<>();
         for (AuthLoginAttempt attempt : attemptRepository.findByUserIdOrderByCreatedAtDesc(
                 user.getId(), PageRequest.of(0, LOCKOUT_SCAN_LIMIT))) {
-            if ("SUCCESS".equalsIgnoreCase(attempt.getResult())) {
+            if ("SUCCESS".equalsIgnoreCase(attempt.getResult())
+                    || AuthLoginAttemptRepository.RESULT_RESET.equalsIgnoreCase(attempt.getResult())) {
                 break;
             }
             if (attempt.getCreatedAt() != null && INVALID_CREDENTIALS.equals(attempt.getReason())) {

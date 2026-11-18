@@ -162,7 +162,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.ownerUserId,
                 q.updatedAt,
                 (select count(v) from QuizVersionQuestion v, QuizVersion qv
-                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true),
+                q.portal,
+                (select u.fullName from User u where u.id = q.ownerUserId)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -198,7 +200,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.ownerUserId,
                 q.updatedAt,
                 (select count(v) from QuizVersionQuestion v, QuizVersion qv
-                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true),
+                q.portal,
+                (select u.fullName from User u where u.id = q.ownerUserId)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -232,7 +236,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.ownerUserId,
                 q.updatedAt,
                 (select count(v) from QuizVersionQuestion v, QuizVersion qv
-                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true),
+                q.portal,
+                (select u.fullName from User u where u.id = q.ownerUserId)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -266,7 +272,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                 q.ownerUserId,
                 q.updatedAt,
                 (select count(v) from QuizVersionQuestion v, QuizVersion qv
-                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true)
+                    where qv.id = v.quizVersionId and qv.quizId = q.id and qv.tenantId = q.tenantId and qv.isActive = true),
+                q.portal,
+                (select u.fullName from User u where u.id = q.ownerUserId)
             )
             from Quiz q
             where q.tenantId = :tenantId
@@ -301,4 +309,20 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("tenantId") String tenantId,
             @Param("questionIds") List<String> questionIds
     );
+
+    /** Quizzes a teacher built that belong to someone other than `userId`. */
+    @Query("""
+            select q.id from Quiz q
+            where q.tenantId = :tenantId and q.portal = 'teacher' and q.deletedAt is null
+            and (q.ownerUserId is null or q.ownerUserId <> :userId)
+            """)
+    java.util.Set<String> findTeacherQuizIdsNotOwnedBy(@Param("tenantId") String tenantId, @Param("userId") String userId);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
+    @Query("""
+            update Quiz q set q.deletedAt = :now, q.status = 'deleted'
+            where q.portal = 'teacher' and q.deletedAt is null
+            and q.ownerUserId in (select u.id from User u where upper(u.status) in ('BLOCKED', 'BANNED', 'INACTIVE', 'DELETED'))
+            """)
+    int softDeleteTeacherQuizzesOfLockedOwners(@Param("now") java.time.OffsetDateTime now);
 }

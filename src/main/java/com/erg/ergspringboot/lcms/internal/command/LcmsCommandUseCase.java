@@ -16,6 +16,7 @@ import com.erg.ergspringboot.lcms.LcmsQuizPackageUpdateFeedResponse;
 import com.erg.ergspringboot.lcms.quiz.authoring.QuestionBankAuthoringService;
 import com.erg.ergspringboot.lcms.quiz.authoring.QuizAuthoringService;
 import com.erg.ergspringboot.lcms.quiz.authoring.QuizDraftService;
+import com.erg.ergspringboot.lcms.quiz.authoring.TeacherQuizOwnership;
 import com.erg.ergspringboot.lcms.internal.quiz.bundle.PortableQuizBundleService;
 import com.erg.ergspringboot.lcms.quiz.media.MediaService;
 import com.erg.ergspringboot.lcms.quiz.publish.QuizPublishService;
@@ -33,6 +34,7 @@ public class LcmsCommandUseCase implements LcmsCommandPort {
     private final QuizPublishService publishing;
     private final MediaService media;
     private final PortableQuizBundleService bundles;
+    private final TeacherQuizOwnership ownership;
 
     @Autowired
     public LcmsCommandUseCase(
@@ -41,27 +43,29 @@ public class LcmsCommandUseCase implements LcmsCommandPort {
             QuizDraftService drafts,
             QuizPublishService publishing,
             MediaService media,
-            PortableQuizBundleService bundles) {
+            PortableQuizBundleService bundles,
+            TeacherQuizOwnership ownership) {
         this.questions = questions;
         this.quizzes = quizzes;
         this.drafts = drafts;
         this.publishing = publishing;
         this.media = media;
         this.bundles = bundles;
+        this.ownership = ownership;
     }
 
     @Override public SaveQuestionResponse createQuestion(String tenantId, String userId, SaveQuestionRequest request) { return questions.create(tenantId, userId, request); }
     @Override public SaveQuestionResponse updateQuestion(String tenantId, String questionId, SaveQuestionRequest request) { return questions.update(tenantId, questionId, request); }
     @Override public DeleteQuestionResponse archiveQuestion(String tenantId, String questionId) { return questions.archive(tenantId, questionId); }
-    @Override public CreateQuizResponse createQuiz(String tenantId, String userId, String idempotencyKey, CreateQuizRequest request) { return quizzes.create(tenantId, userId, idempotencyKey, request); }
-    @Override public SaveDraftResponse saveDraft(String tenantId, String quizId, SaveDraftRequest request) { return drafts.saveDraft(tenantId, quizId, request); }
-    @Override public SaveDraftResponse upsertSlide(String tenantId, String quizId, SlideUpsertRequest request) { return drafts.upsertSlide(tenantId, quizId, request); }
-    @Override public SaveDraftResponse reorder(String tenantId, String quizId, ReorderRequest request) { return drafts.reorder(tenantId, quizId, request); }
-    @Override public ValidationResultResponse validateQuiz(String tenantId, String quizId) { return publishing.validate(tenantId, quizId); }
-    @Override public PublishResponse publishQuiz(String tenantId, String quizId, String userId, String idempotencyKey, PublishRequest request) { return publishing.publish(tenantId, quizId, userId, idempotencyKey, request); }
-    @Override public ForkResponse forkQuizVersion(String tenantId, String quizId, String versionId, String userId) { return publishing.fork(tenantId, quizId, versionId, userId); }
-    @Override public UpdateQuizResponse updateQuiz(String tenantId, String quizId, UpdateQuizRequest request) { return quizzes.update(tenantId, quizId, request); }
-    @Override public DeleteQuizResponse deleteQuiz(String tenantId, String quizId) { return quizzes.delete(tenantId, quizId); }
+    @Override public CreateQuizResponse createQuiz(String tenantId, String userId, String idempotencyKey, CreateQuizRequest request) { CreateQuizResponse created = quizzes.create(tenantId, userId, idempotencyKey, request); ownership.claim(tenantId, created.quizId()); return created; }
+    @Override public SaveDraftResponse saveDraft(String tenantId, String quizId, SaveDraftRequest request) { ownership.requireOwn(tenantId, quizId); return drafts.saveDraft(tenantId, quizId, request); }
+    @Override public SaveDraftResponse upsertSlide(String tenantId, String quizId, SlideUpsertRequest request) { ownership.requireOwn(tenantId, quizId); return drafts.upsertSlide(tenantId, quizId, request); }
+    @Override public SaveDraftResponse reorder(String tenantId, String quizId, ReorderRequest request) { ownership.requireOwn(tenantId, quizId); return drafts.reorder(tenantId, quizId, request); }
+    @Override public ValidationResultResponse validateQuiz(String tenantId, String quizId) { ownership.requireOwn(tenantId, quizId); return publishing.validate(tenantId, quizId); }
+    @Override public PublishResponse publishQuiz(String tenantId, String quizId, String userId, String idempotencyKey, PublishRequest request) { ownership.requireOwn(tenantId, quizId); return publishing.publish(tenantId, quizId, userId, idempotencyKey, request); }
+    @Override public ForkResponse forkQuizVersion(String tenantId, String quizId, String versionId, String userId) { ownership.requireOwn(tenantId, quizId); return publishing.fork(tenantId, quizId, versionId, userId); }
+    @Override public UpdateQuizResponse updateQuiz(String tenantId, String quizId, UpdateQuizRequest request) { ownership.requireOwn(tenantId, quizId); return quizzes.update(tenantId, quizId, request); }
+    @Override public DeleteQuizResponse deleteQuiz(String tenantId, String quizId) { ownership.requireOwn(tenantId, quizId); return quizzes.delete(tenantId, quizId); }
     @Override public MediaPresignResponse presignMedia(String tenantId, String userId, MediaPresignRequest request) { return media.presign(tenantId, userId, request); }
     @Override public long maxMediaUploadBytes() { return MediaService.MAX_IMAGE_BYTES; }
     @Override public boolean isSignedMediaUploadAuthorized(String uploadUrl, String tenantId, String mimeType, long byteSize) { return media.isSignedUploadAuthorized(uploadUrl, tenantId, mimeType, byteSize); }

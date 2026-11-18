@@ -294,6 +294,8 @@ erg:
   notifications:
     push:
       enabled: ${NOTIFICATIONS__PUSH__ENABLED:false}
+      # fcm | webpush. Empty: fcm when ERG_FCM_CREDENTIALS_FILE (path only, never the content) is set, else webpush.
+      provider: ${NOTIFICATIONS__PUSH__PROVIDER:}
       sender-mode: ${NOTIFICATIONS__PUSH__SENDER_MODE:http-v1}
       native-image-strict: ${NOTIFICATIONS__PUSH__NATIVE_IMAGE_STRICT:true}
       project-id: ${FIREBASE_PROJECT_ID:}
@@ -305,7 +307,7 @@ erg:
       max-payload-bytes: ${NOTIFICATIONS__PUSH__MAX_PAYLOAD_BYTES:4096}
       credentials:
         mode: ${FIREBASE_CREDENTIALS_MODE:adc}
-        service-account-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
+        service-account-path: ${ERG_FCM_CREDENTIALS_FILE:${GOOGLE_APPLICATION_CREDENTIALS:}}
         static-access-token: ${FIREBASE_STATIC_ACCESS_TOKEN:}
         registration-token-encryption-key: ${NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_KEY:}
         registration-token-encryption-required: ${NOTIFICATIONS__PUSH__REGISTRATION_TOKEN_ENCRYPTION_REQUIRED:false}

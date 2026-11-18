@@ -7,8 +7,8 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.Subject;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -30,11 +30,11 @@ public final class CalendarTeacherPeriodsQueryUseCase {
     private final CalendarEventRepository events;
     private final CalendarEventTeacherRepository eventTeachers;
     private final ClassroomRepository classes;
-    private final SubjectRepository subjects;
+    private final CurriculumSubjectRepository subjects;
 
     public CalendarTeacherPeriodsQueryUseCase(
             CalendarEventRepository events, CalendarEventTeacherRepository eventTeachers,
-            ClassroomRepository classes, SubjectRepository subjects) {
+            ClassroomRepository classes, CurriculumSubjectRepository subjects) {
         this.events = events;
         this.eventTeachers = eventTeachers;
         this.classes = classes;
@@ -50,7 +50,7 @@ public final class CalendarTeacherPeriodsQueryUseCase {
         Map<String, String> classNames = classes.findAllById(ids(found, CalendarEvent::getAcademicClassId)).stream()
                 .collect(Collectors.toMap(Classroom::getId, Classroom::getName, (a, b) -> a));
         Map<String, String> subjectNames = subjects.findAllById(ids(found, CalendarEvent::getSubjectId)).stream()
-                .collect(Collectors.toMap(Subject::getId, Subject::getName, (a, b) -> a));
+                .collect(Collectors.toMap(CurriculumSubject::getId, CurriculumSubject::getName, (a, b) -> a));
         // One query for the roles of this teacher on every found event (MAIN or ASSISTANT).
         Map<String, String> roles = eventTeachers.findByTenantIdAndEventIdIn(tenantId, ids(found, CalendarEvent::getId))
                 .stream().filter(t -> teacherUserId.equals(t.getTeacherUserId()))

@@ -55,20 +55,27 @@ class QuestionBodyCompilerTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void matchingResponsesNeverStartInTheCorrectOrder() {
+    void matchingResponsesNeverStartBesideTheirOwnPrompt() {
         for (int run = 0; run < 200; run++) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("matching", List.of(
                     Map.of("id", "m1", "prompt", "Cat", "response", "Meow"),
-                    Map.of("id", "m2", "prompt", "Dog", "response", "Woof")));
+                    Map.of("id", "m2", "prompt", "Dog", "response", "Woof"),
+                    Map.of("id", "m3", "prompt", "Cow", "response", "Moo"),
+                    Map.of("id", "m4", "prompt", "Pig", "response", "Oink")));
             Map<String, Object> key = new LinkedHashMap<>();
-            key.put("pairs", List.of(Map.of("promptId", "m1", "responseId", "m1"), Map.of("promptId", "m2", "responseId", "m2")));
+            key.put("pairs", List.of(Map.of("promptId", "m1", "responseId", "m1"), Map.of("promptId", "m2", "responseId", "m2"),
+                    Map.of("promptId", "m3", "responseId", "m3"), Map.of("promptId", "m4", "responseId", "m4")));
 
             PlayerBodyShuffler.matching(body, key);
 
             List<Object> shown = ((List<Map<String, Object>>) body.get("matchingResponses")).stream().map(r -> r.get("id")).toList();
             List<Object> correct = ((List<Map<String, Object>>) key.get("pairs")).stream().map(p -> p.get("responseId")).toList();
             assertThat(shown).isNotEqualTo(correct);
+            // Not even one right piece may start beside its own prompt.
+            for (int row = 0; row < shown.size(); row++) {
+                assertThat(shown.get(row)).isNotEqualTo(correct.get(row));
+            }
         }
     }
 

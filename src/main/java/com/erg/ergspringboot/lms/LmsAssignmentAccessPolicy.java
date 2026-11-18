@@ -116,14 +116,22 @@ public class LmsAssignmentAccessPolicy {
 
     /** Resolves an exported (class code, student code) pair inside the caller's tenant; both must agree. */
     public Student importedLearner(String tenantId, String classCode, String studentCode) {
-        Student student = students.findByTenantIdAndStudentCode(tenant(tenantId), studentCode)
-                .orElseThrow(() -> new ResourceNotFoundException("student not found"));
-        Classroom classroom = blank(student.getAcademicClassId()) == null ? null
-                : classrooms.findByTenantIdAndId(tenant(tenantId), student.getAcademicClassId()).orElse(null);
-        if (classroom == null || classroom.getName() == null || !classroom.getName().trim().equalsIgnoreCase(classCode.trim())) {
+        List<Student> candidates = students.findByTenantIdAndStudentCode(tenant(tenantId), studentCode);
+        if (candidates.isEmpty()) throw new ResourceNotFoundException("student not found");
+        // The code is unique per school, so the class name picks the student among schools.
+        // shortcut: two schools with the same class name and student code stay ambiguous, add the school to the export when portable results are used across schools
+        List<Student> matching = candidates.stream().filter(student -> {
+            Classroom classroom = blank(student.getAcademicClassId()) == null ? null
+                    : classrooms.findByTenantIdAndId(tenant(tenantId), student.getAcademicClassId()).orElse(null);
+            return classroom != null && classroom.getName() != null && classroom.getName().trim().equalsIgnoreCase(classCode.trim());
+        }).toList();
+        if (matching.isEmpty()) {
             throw new com.erg.ergspringboot.exception.BadRequestException("class code does not match the student's class");
         }
-        return student;
+        if (matching.size() > 1) {
+            throw new com.erg.ergspringboot.exception.BadRequestException("student code and class code match students in more than one school");
+        }
+        return matching.get(0);
     }
 
     /** Whether any assignment visible to the learner distributes the quiz (used by the learner package endpoint). */
@@ -186,6 +194,9 @@ public class LmsAssignmentAccessPolicy {
         if (blank(classId) == null) return;
         Classroom classroom = classrooms.findByTenantIdAndId(tenant(tenantId), classId)
                 .orElseThrow(() -> new ResourceNotFoundException("class not found"));
+        // A class named in the scope (a CLASS assignment, or a class the teacher teaches) carries its school:
+        // a timetable-only teacher has no standing school scope (BUG-A-050).
+        if (access.managedClassIds().contains(classId)) return;
         if (!access.canAccessClass(classId) || !access.canAccessEducationUnit(classroom.getSchoolId())) {
             throw new ForbiddenException(SCOPE_DENIED);
         }

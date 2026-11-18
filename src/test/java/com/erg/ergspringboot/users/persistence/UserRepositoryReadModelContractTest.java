@@ -17,6 +17,8 @@ class UserRepositoryReadModelContractTest {
                 String.class,
                 String.class,
                 String.class,
+                java.util.Collection.class,
+                java.util.Collection.class,
                 Pageable.class
         );
         Query query = method.getAnnotation(Query.class);
@@ -27,6 +29,7 @@ class UserRepositoryReadModelContractTest {
                 .contains("exists (")
                 .contains("from u.roles r")
                 .contains("u.tenantId = :tenantId")
+                .contains(":studentRoleIds")
                 .contains("order by u.createdAt desc")
                 .doesNotContain("select u");
         assertThat(method.getReturnType().getName()).isEqualTo("org.springframework.data.domain.Page");

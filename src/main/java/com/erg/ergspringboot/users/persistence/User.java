@@ -138,4 +138,11 @@ public class User extends BaseEntity {
     private Long loginCount;
 
     private Long authzVersion = 1L;
+
+    /** First-login steps, in order: a staff account verifies its recovery email before it replaces the temporary password. */
+    public java.util.List<String> firstLoginSteps() {
+        if (!Boolean.TRUE.equals(mustChangePassword)) return java.util.List.of();
+        return Boolean.TRUE.equals(recoveryEmailVerified)
+                ? java.util.List.of("CHANGE_PASSWORD") : java.util.List.of("VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD");
+    }
 }

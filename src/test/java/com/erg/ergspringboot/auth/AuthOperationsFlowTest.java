@@ -146,7 +146,7 @@ class AuthOperationsFlowTest {
 
         assertEquals("active@example.com", response.user().email());
         assertNotNull(response.user().lifecycle());
-        assertEquals("FIRST_LOGIN_RESTRICTED", response.user().lifecycle().status());
+        assertEquals("ACTIVE", response.user().lifecycle().status());
         assertEquals("Bearer", response.tokenType());
         assertFalse(response.accessToken().isBlank());
         assertFalse(response.refreshToken().isBlank());

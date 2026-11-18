@@ -50,6 +50,9 @@ public class CalendarScopeService {
         }
         List<String> managed = AccessScopeAssembler.from(principal)
                 .managedIds(AccessScopeSet.EDUCATION_UNIT);
+        if (managed.contains("*")) {
+            return normalize(requested);
+        }
         List<String> effective = (requested == null || requested.isEmpty())
                 ? managed
                 : normalize(requested);

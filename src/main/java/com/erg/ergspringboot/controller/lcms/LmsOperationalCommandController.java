@@ -8,7 +8,6 @@ import com.erg.ergspringboot.lms.LmsOperationalOperations;
 import com.erg.ergspringboot.lcms.authorization.LcmsClassManage;
 import com.erg.ergspringboot.lcms.authorization.LcmsEnrollmentManage;
 import com.erg.ergspringboot.lcms.authorization.LcmsStudentManage;
-import com.erg.ergspringboot.lcms.authorization.LcmsSubjectManage;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -78,29 +77,6 @@ public class LmsOperationalCommandController {
     public ApiResponse<BulkStudentImportResponse> importStudents(@PathVariable String schoolId, @Valid @RequestBody BulkStudentImportRequest body,
                                                                   @RequestHeader(value = "X-Idempotency-Key", required = false) String key, HttpServletRequest request) {
         return ok(200, "Students imported", operations.importStudents(schoolId, body, key, access(request)), request);
-    }
-
-    @PostMapping("/subjects")
-    @LcmsSubjectManage
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<SubjectResponse> createSubject(@Valid @RequestBody CreateSubjectRequest body, HttpServletRequest request) {
-        return ok(201, "Subject created", operations.createSubject(body, access(request)), request);
-    }
-
-    /** Read-side subject directory is intentionally a separate contract; keep the old placeholder fail-closed. */
-    @GetMapping("/subjects")
-    public ResponseEntity<Void> subjectsReadNotPublished() { return ResponseEntity.notFound().build(); }
-
-    @RequestMapping(value = "/subjects/{subjectId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
-    @LcmsSubjectManage
-    public ApiResponse<SubjectResponse> updateSubject(@PathVariable String subjectId, @Valid @RequestBody UpdateSubjectRequest body, HttpServletRequest request) {
-        return ok(200, "Subject updated", operations.updateSubject(subjectId, body, access(request)), request);
-    }
-
-    @DeleteMapping("/subjects/{subjectId}")
-    @LcmsSubjectManage
-    public ApiResponse<SubjectResponse> archiveSubject(@PathVariable String subjectId, @RequestParam(required = false) Long version, HttpServletRequest request) {
-        return ok(200, "Subject archived", operations.archiveSubject(subjectId, version, access(request)), request);
     }
 
     @PostMapping("/enrollments")

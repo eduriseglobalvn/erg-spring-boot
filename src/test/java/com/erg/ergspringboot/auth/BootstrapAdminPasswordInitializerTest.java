@@ -1,0 +1,49 @@
+package com.erg.ergspringboot.auth;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.erg.ergspringboot.auth.internal.credential.PasswordService;
+import com.erg.ergspringboot.platform.security.ErgAuthProperties;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+class BootstrapAdminPasswordInitializerTest {
+
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final PasswordService passwords = new PasswordService(new ErgAuthProperties());
+
+    @Test
+    void setsTheConfiguredPasswordWhileTheAdminStillCarriesTheMigrationHash() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH)))
+                .thenReturn(1);
+        when(jdbc.update(anyString(), anyString(), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH))).thenReturn(1);
+
+        assertThat(new BootstrapAdminPasswordInitializer(jdbc, passwords, "first-Pass1").apply()).isTrue();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).update(sql.capture(), hash.capture(), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH));
+        assertThat(passwords.matches("first-Pass1", hash.getValue())).isTrue();
+        // Only the untouched admin row, and it must change the password at first login.
+        assertThat(sql.getValue()).contains("must_change_password = true")
+                .contains("id = 'usr_super_admin' and password_hash = ?");
+    }
+
+    @Test
+    void neverTouchesAnAdminPasswordThatWasChanged() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH)))
+                .thenReturn(0);
+
+        assertThat(new BootstrapAdminPasswordInitializer(jdbc, passwords, "first-Pass1").apply()).isFalse();
+
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+}

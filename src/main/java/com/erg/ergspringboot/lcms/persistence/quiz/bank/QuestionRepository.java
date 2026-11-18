@@ -82,11 +82,12 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
                         q.content
                     )
                     from Question q
-                    left join Subject s on s.tenantId = q.tenantId and s.id = q.subjectId
-                    left join Level l on l.tenantId = q.tenantId and l.id = q.levelId
-                    left join Topic t on t.tenantId = q.tenantId and t.id = q.topicId
+                    left join CurriculumSubject s on s.tenantId = q.tenantId and s.id = q.subjectId
+                    left join CurriculumLevel l on l.tenantId = q.tenantId and l.id = q.levelId
+                    left join CurriculumTopic t on t.tenantId = q.tenantId and t.id = q.topicId
                     where q.tenantId = :tenantId
-                    and lower(coalesce(q.stem, '')) like concat('%', lower(:search), '%')
+                    and """ + VietnameseFold.STEM_CONTAINS_SEARCH + """
+
                     and (:subjectId is null or q.subjectId = :subjectId)
                     and (:levelId is null or q.levelId = :levelId)
                     and (:topicId is null or q.topicId = :topicId)
@@ -99,7 +100,8 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
                     select count(q.id)
                     from Question q
                     where q.tenantId = :tenantId
-                    and lower(coalesce(q.stem, '')) like concat('%', lower(:search), '%')
+                    and """ + VietnameseFold.STEM_CONTAINS_SEARCH + """
+
                     and (:subjectId is null or q.subjectId = :subjectId)
                     and (:levelId is null or q.levelId = :levelId)
                     and (:topicId is null or q.topicId = :topicId)
@@ -144,9 +146,9 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
                         q.content
                     )
                     from Question q
-                    left join Subject s on s.tenantId = q.tenantId and s.id = q.subjectId
-                    left join Level l on l.tenantId = q.tenantId and l.id = q.levelId
-                    left join Topic t on t.tenantId = q.tenantId and t.id = q.topicId
+                    left join CurriculumSubject s on s.tenantId = q.tenantId and s.id = q.subjectId
+                    left join CurriculumLevel l on l.tenantId = q.tenantId and l.id = q.levelId
+                    left join CurriculumTopic t on t.tenantId = q.tenantId and t.id = q.topicId
                     where q.tenantId = :tenantId
                     and (:subjectId is null or q.subjectId = :subjectId)
                     and (:levelId is null or q.levelId = :levelId)

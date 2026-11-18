@@ -117,12 +117,19 @@ class NotificationCommandServiceTest {
     }
 
     private NotificationCommandService service() {
+        NotificationPushProperties fcm = new NotificationPushProperties();
+        fcm.setProjectId("erg-test");
+        fcm.getCredentials().setStaticAccessToken("test-token");
+        return service(fcm);
+    }
+
+    private NotificationCommandService service(NotificationPushProperties properties) {
         return new NotificationCommandService(
                 messageRepository,
                 recipientRepository,
                 deviceRepository,
                 outboxRepository,
-                new NotificationPushProperties(),
+                properties,
                 new NotificationTokenCipher(new NotificationPushProperties()),
                 metrics,
                 preferenceRepository
@@ -141,7 +148,7 @@ class NotificationCommandServiceTest {
                 .thenReturn(List.of(
                         preference("inbox-off", false, true),
                         preference("push-off", true, false)));
-        when(deviceRepository.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq("tenant_a"), any(), eq("lms")))
+        when(deviceRepository.findByTenantIdAndUserIdInAndEnabledTrue(eq("tenant_a"), any()))
                 .thenReturn(List.of(device("device-inbox-off", "inbox-off"), device("device-push-off", "push-off")));
 
         NotificationCommandResult result = service().enqueue(command(
@@ -161,7 +168,7 @@ class NotificationCommandServiceTest {
     }
 
     @Test
-    void webPushDevicesAreRoutedToTheVapidAdapterByDeviceIdAndFcmDevicesStayOnFirebase() {
+    void onlyDevicesOfTheActiveProviderAreSent() {
         when(messageRepository.saveAndFlush(any())).thenAnswer(invocation -> {
             NotificationMessageEntity message = invocation.getArgument(0);
             message.setId("notification-1");
@@ -169,19 +176,46 @@ class NotificationCommandServiceTest {
         });
         NotificationDeviceRegistrationEntity browser = device("device-web", "user-1");
         browser.setTransport("WEB_PUSH");
-        when(deviceRepository.findByTenantIdAndUserIdInAndPortalAndEnabledTrue(eq("tenant_a"), any(), eq("lms")))
+        when(deviceRepository.findByTenantIdAndUserIdInAndEnabledTrue(eq("tenant_a"), any()))
                 .thenReturn(List.of(browser, device("device-fcm", "user-1")));
 
         service().enqueue(command(List.of("user-1"), null, Map.of()));
+        NotificationPushProperties webPush = new NotificationPushProperties();
+        webPush.setProvider("webpush");
+        service(webPush).enqueue(command(List.of("user-1"), null, Map.of()));
+        NotificationPushProperties fcmWithoutCredentials = new NotificationPushProperties();
+        fcmWithoutCredentials.setProvider("fcm");
+        service(fcmWithoutCredentials).enqueue(command(List.of("user-1"), null, Map.of()));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<NotificationOutboxEntity>> outboxes = ArgumentCaptor.forClass(List.class);
+        verify(outboxRepository, org.mockito.Mockito.times(2)).saveAll(outboxes.capture());
+        assertThat(outboxes.getAllValues().get(0)).extracting(NotificationOutboxEntity::getTargetKind,
+                        NotificationOutboxEntity::getProvider, NotificationOutboxEntity::getTargetRef)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("registration_token", "firebase", "token-device-fcm"));
+        assertThat(outboxes.getAllValues().get(1)).extracting(NotificationOutboxEntity::getTargetKind,
+                        NotificationOutboxEntity::getProvider, NotificationOutboxEntity::getTargetRef)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("web_push", "vapid", "device-web"));
+    }
+
+    @Test
+    void lmsEventReachesTheStudentsElearningDeviceWithThatPortalInThePayload() {
+        when(messageRepository.saveAndFlush(any())).thenAnswer(invocation -> {
+            NotificationMessageEntity message = invocation.getArgument(0);
+            message.setId("notification-1");
+            return message;
+        });
+        NotificationDeviceRegistrationEntity phone = device("device-student", "student-1");
+        phone.setPortal("elearning");
+        when(deviceRepository.findByTenantIdAndUserIdInAndEnabledTrue(eq("tenant_a"), any())).thenReturn(List.of(phone));
+
+        service().enqueue(command(List.of("student-1"), null, Map.of()));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<NotificationOutboxEntity>> outboxes = ArgumentCaptor.forClass(List.class);
         verify(outboxRepository).saveAll(outboxes.capture());
-        assertThat(outboxes.getValue()).extracting(NotificationOutboxEntity::getTargetKind,
-                        NotificationOutboxEntity::getProvider, NotificationOutboxEntity::getTargetRef)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("web_push", "vapid", "device-web"),
-                        org.assertj.core.groups.Tuple.tuple("registration_token", "firebase", "token-device-fcm"));
+        assertThat(outboxes.getValue()).singleElement()
+                .satisfies(outbox -> assertThat(outbox.getPayload()).containsEntry("portal", "elearning"));
     }
 
     private NotificationPreferenceEntity preference(String userId, boolean inbox, boolean push) {

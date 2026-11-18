@@ -38,7 +38,7 @@ class SchoolCommandServiceTest {
     @BeforeEach
     void setUp() {
         service = new SchoolCommandService(unitRepository, profileRepository, yearRepository, gradeRepository, classroomRepository);
-        when(gradeRepository.findByTenantIdAndSchoolIdAndAcademicYearIdOrderBySortOrderAsc(any(), any(), any()))
+        org.mockito.Mockito.lenient().when(gradeRepository.findByTenantIdAndSchoolIdAndAcademicYearIdOrderBySortOrderAsc(any(), any(), any()))
                 .thenReturn(List.of());
     }
 
@@ -68,6 +68,21 @@ class SchoolCommandServiceTest {
         verify(gradeRepository, never()).save(any());
         assertThat(response.grades()).isEmpty();
         assertThat(response.currentAcademicYear().endYear()).isEqualTo(2027);
+    }
+
+    @Test
+    void rejectsSameNameIgnoringCaseAndSurroundingSpaces() {
+        com.erg.ergspringboot.users.persistence.organization.EducationUnit existing =
+                new com.erg.ergspringboot.users.persistence.organization.EducationUnit();
+        existing.setId("sch-1");
+        existing.setName("TRƯỜNG KIỂM THỬ");
+        existing.setStatus("ACTIVE");
+        when(unitRepository.findByTenantIdOrderByNameAsc("tenant-1")).thenReturn(List.of(existing));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(request("PRIMARY", 2025), access))
+                .isInstanceOf(com.erg.ergspringboot.exception.ConflictException.class)
+                .hasMessage("Tên trường đã tồn tại");
+        verify(unitRepository, never()).save(any());
     }
 
     private CreateSchoolRequest request(String type, int startYear) {

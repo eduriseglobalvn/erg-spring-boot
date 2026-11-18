@@ -36,12 +36,6 @@ public interface NotificationDeviceRegistrationRepository extends JpaRepository<
             Collection<String> userIds
     );
 
-    List<NotificationDeviceRegistrationEntity> findByTenantIdAndUserIdInAndPortalAndEnabledTrue(
-            String tenantId,
-            Collection<String> userIds,
-            String portal
-    );
-
     long countByEnabledTrue();
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -2632,6 +2632,32 @@
         },
         "type": "object"
       },
+      "ApiResponseLatestSubmittedAttemptResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LatestSubmittedAttemptResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseLcmsQuizBundleResponse": {
         "properties": {
           "data": {
@@ -3453,6 +3479,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/LtiRegistrationResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseManualReviewResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ManualReviewResponse"
           },
           "errors": {},
           "message": {
@@ -4938,6 +4990,32 @@
         },
         "type": "object"
       },
+      "ApiResponseStudentCredentialResetResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StudentCredentialResetResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseStudentGroupResponse": {
         "properties": {
           "data": {
@@ -4994,32 +5072,6 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/StudentScoreListResponse"
-          },
-          "errors": {},
-          "message": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "request_id": {
-            "type": "string"
-          },
-          "statusCode": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "timestamp": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "ApiResponseSubjectResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/SubjectResponse"
           },
           "errors": {},
           "message": {
@@ -6118,6 +6170,10 @@
           "quizVersionId": {
             "type": "string"
           },
+          "serverTime": {
+            "format": "date-time",
+            "type": "string"
+          },
           "serverTimeAtStart": {
             "format": "date-time",
             "type": "string"
@@ -6432,10 +6488,10 @@
             "$ref": "#/components/schemas/ProfileResponse"
           },
           "workspaces": {
-            "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -8787,6 +8843,9 @@
             },
             "type": "array"
           },
+          "sourceQuizId": {
+            "type": "string"
+          },
           "subjectId": {
             "type": "string"
           },
@@ -8979,35 +9038,6 @@
         ],
         "type": "object"
       },
-      "CreateSubjectRequest": {
-        "properties": {
-          "code": {
-            "maxLength": 255,
-            "minLength": 0,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 255,
-            "minLength": 0,
-            "type": "string"
-          },
-          "schoolId": {
-            "maxLength": 36,
-            "minLength": 0,
-            "type": "string"
-          },
-          "status": {
-            "maxLength": 32,
-            "minLength": 0,
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "name"
-        ],
-        "type": "object"
-      },
       "CredentialDeliveryRequest": {
         "properties": {
           "credentialDelivery": {
@@ -9103,6 +9133,12 @@
         "properties": {
           "classId": {
             "type": "string"
+          },
+          "levelIds": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
           },
           "subjectIds": {
             "items": {
@@ -10582,6 +10618,23 @@
         },
         "type": "object"
       },
+      "HelpFaq": {
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "HolidayCommand": {
         "properties": {
           "confirmPast": {
@@ -10907,6 +10960,65 @@
             "type": "string"
           },
           "sourceModel": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LatestSubmittedAttemptResponse": {
+        "properties": {
+          "answers": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "assignmentId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          },
+          "attemptsExhausted": {
+            "type": "boolean"
+          },
+          "maxScore": {
+            "format": "double",
+            "type": "number"
+          },
+          "packageHash": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "percent": {
+            "format": "double",
+            "type": "number"
+          },
+          "quizId": {
+            "type": "string"
+          },
+          "quizVersionId": {
+            "type": "string"
+          },
+          "results": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/QuestionOutcome"
+            },
+            "type": "object"
+          },
+          "score": {
+            "format": "double",
+            "type": "number"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -11512,6 +11624,56 @@
         "required": [
           "points"
         ],
+        "type": "object"
+      },
+      "ManualReviewItem": {
+        "properties": {
+          "answer": {},
+          "awardedPoints": {
+            "format": "double",
+            "type": "number"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "maxPoints": {
+            "format": "double",
+            "type": "number"
+          },
+          "needsManualGrade": {
+            "type": "boolean"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "questionId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ManualReviewResponse": {
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ManualReviewItem"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "studentId": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "MarkReadResponse": {
@@ -12917,6 +13079,28 @@
           },
           "label": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "QuestionOutcome": {
+        "properties": {
+          "awardedPoints": {
+            "format": "double",
+            "type": "number"
+          },
+          "correct": {
+            "type": "boolean"
+          },
+          "maxPoints": {
+            "format": "double",
+            "type": "number"
+          },
+          "needsManualGrade": {
+            "type": "boolean"
+          },
+          "partiallyRight": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -14496,6 +14680,9 @@
       },
       "SessionBootstrapPermissions": {
         "properties": {
+          "allUnits": {
+            "type": "boolean"
+          },
           "canAccessGlobalErg": {
             "type": "boolean"
           },
@@ -15053,6 +15240,20 @@
         },
         "type": "object"
       },
+      "StudentCredentialResetResponse": {
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "studentId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "StudentGroupRequest": {
         "properties": {
           "classId": {
@@ -15254,37 +15455,6 @@
           },
           "totalPages": {
             "format": "int32",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "SubjectResponse": {
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "schoolId": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "version": {
-            "format": "int64",
             "type": "integer"
           }
         },
@@ -16560,30 +16730,6 @@
         },
         "type": "object"
       },
-      "UpdateSubjectRequest": {
-        "properties": {
-          "code": {
-            "maxLength": 255,
-            "minLength": 0,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 255,
-            "minLength": 0,
-            "type": "string"
-          },
-          "status": {
-            "maxLength": 32,
-            "minLength": 0,
-            "type": "string"
-          },
-          "version": {
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "UserCreatedResponse": {
         "properties": {
           "deliveryStatus": {
@@ -16828,6 +16974,14 @@
         "properties": {
           "enabled": {
             "type": "boolean"
+          },
+          "provider": {
+            "description": "Push channel devices must register on: fcm or webpush",
+            "enum": [
+              "fcm",
+              "webpush"
+            ],
+            "type": "string"
           },
           "publicKey": {
             "description": "VAPID applicationServerKey (base64url); null when Web Push is disabled",
@@ -19867,7 +20021,7 @@
           {
             "in": "query",
             "name": "academicYear",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -20206,7 +20360,7 @@
     },
     "/api/v1/curriculum/subjects": {
       "post": {
-        "operationId": "createSubject_1",
+        "operationId": "createSubject",
         "requestBody": {
           "content": {
             "application/json": {
@@ -20264,7 +20418,7 @@
         ]
       },
       "patch": {
-        "operationId": "updateSubject_2",
+        "operationId": "updateSubject",
         "parameters": [
           {
             "in": "path",
@@ -20304,7 +20458,7 @@
     },
     "/api/v1/curriculum/subjects/{id}/archive": {
       "post": {
-        "operationId": "archiveSubject_1",
+        "operationId": "archiveSubject",
         "parameters": [
           {
             "in": "path",
@@ -21104,6 +21258,39 @@
         "security": [],
         "tags": [
           "platform-health-controller"
+        ]
+      }
+    },
+    "/api/v1/help/faqs": {
+      "get": {
+        "operationId": "faqs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "portal",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HelpFaq"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "help-faq-controller"
         ]
       }
     },
@@ -22910,162 +23097,6 @@
         ]
       }
     },
-    "/api/v1/lcms/subjects": {
-      "get": {
-        "operationId": "subjectsReadNotPublished",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "lms-operational-command-controller"
-        ]
-      },
-      "post": {
-        "operationId": "createSubject",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSubjectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSubjectResponse"
-                }
-              }
-            },
-            "description": "Created"
-          }
-        },
-        "tags": [
-          "lms-operational-command-controller"
-        ]
-      }
-    },
-    "/api/v1/lcms/subjects/{subjectId}": {
-      "delete": {
-        "operationId": "archiveSubject",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "subjectId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "version",
-            "required": false,
-            "schema": {
-              "format": "int64",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSubjectResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "lms-operational-command-controller"
-        ]
-      },
-      "patch": {
-        "operationId": "updateSubject_1",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "subjectId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSubjectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSubjectResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "lms-operational-command-controller"
-        ]
-      },
-      "put": {
-        "operationId": "updateSubject",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "subjectId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSubjectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSubjectResponse"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "lms-operational-command-controller"
-        ]
-      }
-    },
     "/api/v1/learning-outcomes/attainments": {
       "post": {
         "operationId": "recordAttainment",
@@ -24082,6 +24113,36 @@
         ]
       }
     },
+    "/api/v1/lms/assignments/{assignmentId}/attempts/latest-submitted": {
+      "get": {
+        "operationId": "latestSubmittedAttempt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignmentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseLatestSubmittedAttemptResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-controller"
+        ]
+      }
+    },
     "/api/v1/lms/assignments/{assignmentId}/progress": {
       "get": {
         "operationId": "assignmentProgress_1",
@@ -24440,6 +24501,36 @@
         ]
       }
     },
+    "/api/v1/lms/attempts/{attemptId}/manual-answers": {
+      "get": {
+        "operationId": "manualAnswers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attemptId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseManualReviewResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-controller"
+        ]
+      }
+    },
     "/api/v1/lms/attempts/{attemptId}/submit": {
       "post": {
         "operationId": "submitAttempt",
@@ -24563,6 +24654,44 @@
         },
         "tags": [
           "lms-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/classes/{classId}/students/{studentId}/reset-credential": {
+      "post": {
+        "operationId": "reset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "classId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "studentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseStudentCredentialResetResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-student-credential-controller"
         ]
       }
     },

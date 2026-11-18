@@ -76,7 +76,7 @@ class TimekeepingAdminControllerIT extends AdminITBase {
     void cancellingTaughtPeriodsAnswers409WithTheImpactInData() throws Exception {
         jdbc.update("insert into academic_classes (id, tenant_id, school_id, name, created_at, updated_at)"
                 + " values ('cls_aw', ?, ?, '6A1', now(), now())", T, f.school());
-        jdbc.update("insert into lms_subjects (id, tenant_id, name, created_at, updated_at) values ('sub_aw', ?, 'Tin', now(), now())", T);
+        jdbc.update("insert into curriculum_subjects (id, tenant_id, code, name, created_at, updated_at) values ('sub_aw', ?, 'sub_aw', 'Tin', now(), now())", T);
         jdbc.update("insert into teaching_schedule_batches (id, tenant_id, school_id, apply_from, repeat_weeks, status, label)"
                 + " values ('batch_aw', ?, ?, date '2026-11-02', 10, 'PUBLISHED', 'Đợt 1')", T, f.school());
         java.time.OffsetDateTime start = LocalDate.of(2026, 11, 10).atTime(7, 0)

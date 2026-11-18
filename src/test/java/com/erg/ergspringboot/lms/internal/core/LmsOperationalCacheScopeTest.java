@@ -18,7 +18,6 @@ import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollmentRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import com.erg.ergspringboot.platform.cache.CacheDescriptor;
 import com.erg.ergspringboot.platform.cache.CacheDescriptorRegistry;
 import com.erg.ergspringboot.platform.cache.CacheFailurePolicy;
@@ -58,9 +57,9 @@ class LmsOperationalCacheScopeTest {
     private final StudentEnrollmentRepository enrollments = mock(StudentEnrollmentRepository.class);
     private final EducationUnitRepository schools = mock(EducationUnitRepository.class);
     private final LmsOperationalCommandService service = new LmsOperationalCommandService(
-            classrooms, students, mock(SubjectRepository.class), enrollments, schools,
+            classrooms, students, enrollments, schools,
             mock(UserActivityRepository.class), mock(UserRepository.class), null,
-            new LmsReadCacheInvalidator(manager, new CacheInvalidationService(generations, message -> { })));
+            new LmsReadCacheInvalidator(manager, new CacheInvalidationService(generations, message -> { })), null);
     private final UserAccessContext access =
             new UserAccessContext("actor-1", TENANT, List.of("*"), List.of("*"), null, null);
 

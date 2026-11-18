@@ -8,7 +8,6 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lcms.authorization.LcmsClassManage;
 import com.erg.ergspringboot.lcms.authorization.LcmsEnrollmentManage;
 import com.erg.ergspringboot.lcms.authorization.LcmsStudentManage;
-import com.erg.ergspringboot.lcms.authorization.LcmsSubjectManage;
 import com.erg.ergspringboot.lms.LmsOperationalOperations;
 import com.erg.ergspringboot.platform.security.AuthenticationRequiredException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
@@ -108,33 +107,6 @@ public class LcmsSchoolOperationsMutationGraphQlController {
     }
 
     @MutationMapping
-    @LcmsSubjectManage
-    public OperationalSubjectResponse createSchoolSubject(@Argument CreateSchoolSubjectInput input) {
-        ErgPrincipal principal = principal();
-        UserAccessContext access = access(principal, input.tenantId(), "lms.subject.manage", "curriculum.manage", "lms.class.manage", "*");
-        if (input.schoolId() != null) accessSupport.assertEducationUnitScope(principal, input.schoolId());
-        return subjectResponse(operations.createSubject(new CreateSubjectRequest(
-                input.name(), input.code(), input.schoolId(), input.status()), access));
-    }
-
-    @MutationMapping
-    @LcmsSubjectManage
-    public OperationalSubjectResponse updateSchoolSubject(@Argument UpdateSchoolSubjectInput input) {
-        ErgPrincipal principal = principal();
-        UserAccessContext access = access(principal, input.tenantId(), "lms.subject.manage", "curriculum.manage", "lms.class.manage", "*");
-        return subjectResponse(operations.updateSubject(input.subjectId(), new UpdateSubjectRequest(
-                version(input.version()), input.name(), input.code(), input.status()), access));
-    }
-
-    @MutationMapping
-    @LcmsSubjectManage
-    public OperationalSubjectResponse archiveSchoolSubject(@Argument ArchiveSchoolSubjectInput input) {
-        ErgPrincipal principal = principal();
-        UserAccessContext access = access(principal, input.tenantId(), "lms.subject.manage", "curriculum.manage", "lms.class.manage", "*");
-        return subjectResponse(operations.archiveSubject(input.subjectId(), version(input.version()), access));
-    }
-
-    @MutationMapping
     @LcmsEnrollmentManage
     public OperationalEnrollmentResponse enrollSchoolStudent(@Argument EnrollSchoolStudentInput input) {
         ErgPrincipal principal = principal();
@@ -219,11 +191,6 @@ public class LcmsSchoolOperationsMutationGraphQlController {
                 date(value.updatedAt()));
     }
 
-    private OperationalSubjectResponse subjectResponse(SubjectResponse value) {
-        return new OperationalSubjectResponse(value.id(), value.tenantId(), value.schoolId(), value.name(), value.code(),
-                value.status(), version(value.version()), date(value.updatedAt()));
-    }
-
     private OperationalEnrollmentResponse enrollmentResponse(EnrollmentResponse value) {
         return new OperationalEnrollmentResponse(value.id(), value.tenantId(), value.schoolId(), value.studentId(), value.classId(),
                 value.academicYear(), value.status(), version(value.version()), value.replayed(), date(value.updatedAt()));
@@ -256,9 +223,6 @@ public class LcmsSchoolOperationsMutationGraphQlController {
     public record ArchiveSchoolStudentInput(String tenantId, String schoolId, String studentId, String version) {}
     public record ImportSchoolStudentsInput(String tenantId, String schoolId, String idempotencyKey,
                                             List<CreateSchoolStudentInput> items) {}
-    public record CreateSchoolSubjectInput(String tenantId, String schoolId, String name, String code, String status) {}
-    public record UpdateSchoolSubjectInput(String tenantId, String subjectId, String version, String name, String code, String status) {}
-    public record ArchiveSchoolSubjectInput(String tenantId, String subjectId, String version) {}
     public record EnrollSchoolStudentInput(String tenantId, String studentId, String classId,
                                            String academicYear, String idempotencyKey) {}
     public record BulkEnrollSchoolStudentsInput(String tenantId, String idempotencyKey,
@@ -273,8 +237,6 @@ public class LcmsSchoolOperationsMutationGraphQlController {
                                             String gender, String birthday, String phone, String address, String parentName,
                                             String parentPhone, String parentEmail, String parentRelationship, String enrollmentDate,
                                             String note, String status, String version, String updatedAt) {}
-    public record OperationalSubjectResponse(String id, String tenantId, String schoolId, String name, String code,
-                                             String status, String version, String updatedAt) {}
     public record OperationalEnrollmentResponse(String id, String tenantId, String schoolId, String studentId, String classId,
                                                 String academicYear, String status, String version, boolean replayed,
                                                 String updatedAt) {}

@@ -33,8 +33,9 @@ public final class BusinessRoleCatalog {
             "lms.assignment.read", "lms.assignment.update", "lms.attempt.grade",
             "lms.attendance.read", "lms.attendance.write", "lms.class.read",
             "lms.class_log.read", "lms.class_log.write", "lms.dashboard.read",
-            "lms.exercise.create", "lms.exercise.read", "lms.exercise.update", "lms.grade.read",
+            "lms.exercise.create", "lms.exercise.read", "lms.exercise.update", "lms.grade.read", "lms.grade.write",
             "lms.notification.preferences.update", "lms.notification.read", "lms.portal.access",
+            "notification.campaign.send",
             "lms.report.read", "lms.resource.create", "lms.resource.read", "lms.resource.share",
             "lms.resource.update", "lms.schedule.create", "lms.schedule.read", "lms.schedule.read_self",
             "lms.schedule.update", "lms.student.read", "lms.student_group.create",
@@ -72,7 +73,8 @@ public final class BusinessRoleCatalog {
                                     && !d.name().startsWith("audit.")
                                     && !d.name().equals("users.activity.read")
                                     && !d.name().equals("api-keys.manage")),
-                            Set.of("admin.workspace.access", "teacher.workspace.access", "elearning.student.preview"), SELF_SERVICE)),
+                            Set.of("admin.workspace.access", "teacher.workspace.access", "elearning.student.preview"), SELF_SERVICE,
+                            TEACHER_PERMISSIONS)),
             new BusinessRole(OPERATIONS, "operations", "Vận hành",
                     "Chỉ xem phần LMS, không thêm, sửa hay xoá.",
                     List.of("Xem trường, lớp, học sinh, lịch dạy, điểm, chương trình, chấm công, thông báo"),

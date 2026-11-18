@@ -49,8 +49,13 @@ public class NotificationDeviceService {
 
     public WebPushConfigResponse webPushConfig() {
         // The outbox worker only runs when push is enabled, so a subscription made otherwise would never be served.
+        String provider = push.resolvedProvider();
+        if (NotificationPushProperties.PROVIDER_FCM.equals(provider)) {
+            // The FCM web config and VAPID key ship with the frontend build; only the switch comes from here.
+            return new WebPushConfigResponse(push.isEnabled() && push.fcmReady(), null, provider);
+        }
         boolean enabled = push.isEnabled() && webPush.enabled();
-        return new WebPushConfigResponse(enabled, enabled ? webPush.publicKey() : null);
+        return new WebPushConfigResponse(enabled, enabled ? webPush.publicKey() : null, provider);
     }
 
     @Transactional

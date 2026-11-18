@@ -69,14 +69,14 @@ class ScheduleConflictEngineIT extends TeachingScheduleITBase {
         assertThat(c.weekday()).isEqualTo(3);
         assertThat(c.periodNo()).isEqualTo(6);
         assertThat(c.startTime()).isEqualTo("13:30");
-        assertThat(c.mine().teacherName()).isEqualTo("Q.Vương");
+        assertThat(c.mine().teacherName()).isEqualTo("Nguyễn Quốc Vương");
         assertThat(c.other().className()).isEqualTo("8A2");
         assertThat(c.other().schoolShortName()).isEqualTo("Nguyễn Du");
         assertThat(c.other().batchLabel()).isEqualTo("Đợt HK1");
         assertThat(c.other().batchStatus()).isEqualTo("PUBLISHED");
-        assertThat(c.message()).isEqualTo("Q.Vương đang dạy 8A2 ở THCS Nguyễn Du cùng giờ");
+        assertThat(c.message()).isEqualTo("Nguyễn Quốc Vương đang dạy 8A2 ở THCS Nguyễn Du cùng giờ");
         assertThat(c.fix().kind()).isEqualTo("CHANGE_TEACHER");
-        assertThat(c.fix().teacherName()).isEqualTo("T.Tuấn");
+        assertThat(c.fix().teacherName()).isEqualTo("Trần Thanh Tuấn");
         assertThat(c.fix().reason()).isEqualTo("FREE");
         assertThat(c.fix().targetClientRowId()).isEqualTo("r1");
         assertThat(c.id()).isEqualTo(conflicts.checkDraft(tenant,

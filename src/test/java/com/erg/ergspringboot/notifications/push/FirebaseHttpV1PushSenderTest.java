@@ -66,6 +66,22 @@ class FirebaseHttpV1PushSenderTest {
     }
 
     @Test
+    void dropsRelativeLinkAndCapsBodyPreview() throws Exception {
+        AtomicReference<String> body = new AtomicReference<>();
+        server = server(exchange -> {
+            body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            respond(exchange, 200, "{\"name\":\"projects/erg-test/messages/2\"}", null);
+        });
+
+        sender(port()).sendToRegistrationToken(
+                new FirebasePushPayload("T", "x".repeat(300), "/notifications/n1", null, Map.of("notificationId", "n1")),
+                "token-1"
+        );
+
+        assertThat(body.get()).doesNotContain("\"link\"").contains("x".repeat(240) + "…").doesNotContain("x".repeat(241));
+    }
+
+    @Test
     void mapsRetryAfterForQuotaErrors() throws Exception {
         server = server(exchange -> respond(
                 exchange,

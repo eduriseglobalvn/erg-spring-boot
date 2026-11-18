@@ -11,10 +11,12 @@ import com.erg.ergspringboot.school.persistence.SchoolGrade;
 import com.erg.ergspringboot.school.persistence.SchoolOperationalProfile;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumClassSubjectAllocation;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumClassSubjectAllocationRepository;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
-import com.erg.ergspringboot.lms.persistence.SubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.school.persistence.SchoolAcademicYearRepository;
 import com.erg.ergspringboot.school.persistence.SchoolGradeRepository;
@@ -45,16 +47,19 @@ public class SchoolOperationsReadService {
     private final SchoolGradeRepository gradeRepository;
     private final ClassroomRepository classroomRepository;
     private final StudentRepository studentRepository;
-    private final SubjectRepository subjectRepository;
+    private final CurriculumSubjectRepository subjectRepository;
+    private final CurriculumClassSubjectAllocationRepository allocationRepository;
 
     public SchoolOperationsReadService(SchoolOperationsReadRepository readRepository, EducationUnitRepository unitRepository,
             SchoolOperationalProfileRepository profileRepository, SchoolAcademicYearRepository yearRepository,
             SchoolGradeRepository gradeRepository, ClassroomRepository classroomRepository, StudentRepository studentRepository,
-            SubjectRepository subjectRepository) {
+            CurriculumSubjectRepository subjectRepository,
+            CurriculumClassSubjectAllocationRepository allocationRepository) {
         this.readRepository = readRepository; this.unitRepository = unitRepository; this.profileRepository = profileRepository;
         this.yearRepository = yearRepository; this.gradeRepository = gradeRepository;
         this.classroomRepository = classroomRepository; this.studentRepository = studentRepository;
         this.subjectRepository = subjectRepository;
+        this.allocationRepository = allocationRepository;
     }
 
     @Transactional(readOnly = true)
@@ -113,11 +118,18 @@ public class SchoolOperationsReadService {
                         tenantId, schoolId, PageRequest.of(0, MAX_WORKSPACE_STUDENTS + 1)),
                         MAX_WORKSPACE_STUDENTS, "students")
                 : List.of();
-        List<Subject> subjects = needSubjects
-                ? bounded(subjectRepository.findSchoolSubjects(
-                        tenantId, schoolId, PageRequest.of(0, MAX_WORKSPACE_SUBJECTS + 1)),
-                        MAX_WORKSPACE_SUBJECTS, "subjects")
+        // shortcut: allocations of every school year count; filter by the current year once years carry a "2026-2027" key.
+        List<CurriculumClassSubjectAllocation> allocations = needSubjects
+                ? allocationRepository.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(tenantId, schoolId)
                 : List.of();
+        Map<String, List<String>> subjectIdsByClass = allocations.stream().collect(Collectors.groupingBy(
+                CurriculumClassSubjectAllocation::getAcademicClassId,
+                Collectors.mapping(CurriculumClassSubjectAllocation::getSubjectId, Collectors.toList())));
+        List<CurriculumSubject> subjects = bounded(subjectRepository.findAllById(allocations.stream()
+                        .map(CurriculumClassSubjectAllocation::getSubjectId).distinct().toList()).stream()
+                        .filter(subject -> tenantId.equals(subject.getTenantId()))
+                        .sorted(java.util.Comparator.comparing(CurriculumSubject::getName)).toList(),
+                MAX_WORKSPACE_SUBJECTS, "subjects");
         long activeClasses = includeClasses
                 ? classrooms.stream().filter(item -> "active".equalsIgnoreCase(item.getStatus())).count()
                 : classroomRepository.countByTenantIdAndSchoolIdAndStatusIgnoreCase(tenantId, schoolId, "active");
@@ -132,7 +144,8 @@ public class SchoolOperationsReadService {
                 .filter(student -> student.getAcademicClassId() != null)
                 .collect(Collectors.groupingBy(Student::getAcademicClassId, Collectors.counting()));
         Map<String, List<String>> subjectIdsByStudent = students.stream()
-                .collect(Collectors.toMap(Student::getId, student -> assignedSubjectIds(student, subjects)));
+                .collect(Collectors.toMap(Student::getId, student -> student.getAcademicClassId() == null ? List.<String>of()
+                        : subjectIdsByClass.getOrDefault(student.getAcademicClassId(), List.of()).stream().distinct().toList()));
         Map<String, Long> studentsBySubject = subjectIdsByStudent.values().stream()
                 .flatMap(List::stream)
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
@@ -181,17 +194,9 @@ public class SchoolOperationsReadService {
                 student.getMetrics() == null ? null : student.getMetrics().getAverageScore());
     }
 
-    private SchoolSubject subjectResponse(Subject subject, Map<String, Long> studentsBySubject) {
+    private SchoolSubject subjectResponse(CurriculumSubject subject, Map<String, Long> studentsBySubject) {
         long count = studentsBySubject.getOrDefault(subject.getId(), 0L);
         return new SchoolSubject(subject.getId(), subject.getName(), subject.getCode(), count, 1);
-    }
-
-    private List<String> assignedSubjectIds(Student student, List<Subject> subjects) {
-        if (subjects.isEmpty()) return List.of();
-        int hash = Math.abs(student.getId().hashCode());
-        return java.util.stream.IntStream.range(0, subjects.size())
-                .filter(index -> index < 2 || (index == 2 && hash % 2 == 0) || (index == 3 && hash % 3 == 0))
-                .mapToObj(index -> subjects.get(index).getId()).toList();
     }
 
     private <T> List<T> bounded(List<T> rows, int maximum, String section) {

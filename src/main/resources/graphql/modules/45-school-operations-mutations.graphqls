@@ -6,9 +6,6 @@ extend type Mutation {
   updateSchoolStudent(input: UpdateSchoolStudentInput!): OperationalStudentResponse!
   archiveSchoolStudent(input: ArchiveSchoolStudentInput!): OperationalStudentResponse!
   importSchoolStudents(input: ImportSchoolStudentsInput!): BulkStudentImportResponse!
-  createSchoolSubject(input: CreateSchoolSubjectInput!): OperationalSubjectResponse!
-  updateSchoolSubject(input: UpdateSchoolSubjectInput!): OperationalSubjectResponse!
-  archiveSchoolSubject(input: ArchiveSchoolSubjectInput!): OperationalSubjectResponse!
   enrollSchoolStudent(input: EnrollSchoolStudentInput!): OperationalEnrollmentResponse!
   bulkEnrollSchoolStudents(input: BulkEnrollSchoolStudentsInput!): BulkEnrollmentResponse!
 }
@@ -84,9 +81,6 @@ input UpdateSchoolStudentInput {
 input ArchiveSchoolStudentInput { tenantId: String, schoolId: String!, studentId: String!, version: String! }
 input ImportSchoolStudentsInput { tenantId: String, schoolId: String!, idempotencyKey: String, items: [CreateSchoolStudentInput!]! }
 
-input CreateSchoolSubjectInput { tenantId: String, schoolId: String, name: String!, code: String!, status: String }
-input UpdateSchoolSubjectInput { tenantId: String, subjectId: String!, version: String!, name: String, code: String, status: String }
-input ArchiveSchoolSubjectInput { tenantId: String, subjectId: String!, version: String! }
 
 input EnrollSchoolStudentInput { tenantId: String, studentId: String!, classId: String!, academicYear: String, idempotencyKey: String }
 input BulkEnrollSchoolStudentsInput { tenantId: String, idempotencyKey: String, items: [EnrollSchoolStudentItemInput!]! }
@@ -125,17 +119,6 @@ type OperationalStudentResponse {
   parentRelationship: String
   enrollmentDate: String
   note: String
-  status: String!
-  version: String!
-  updatedAt: String
-}
-
-type OperationalSubjectResponse {
-  id: String!
-  tenantId: String!
-  schoolId: String
-  name: String!
-  code: String!
   status: String!
   version: String!
   updatedAt: String

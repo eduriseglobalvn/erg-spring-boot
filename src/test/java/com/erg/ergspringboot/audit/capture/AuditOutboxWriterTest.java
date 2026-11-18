@@ -15,6 +15,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.Invocation;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.ObjectMapper;
 
@@ -48,5 +50,15 @@ class AuditOutboxWriterTest {
         when(transactions.getTransaction(any())).thenThrow(new IllegalStateException("db down"));
 
         assertThatCode(() -> writer.write(record(Map.of()))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void resourceIdIsTheLastPathVariableOrTheIdArgument() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/notification-campaigns/c-1/send");
+        assertThat(AuditOutboxWriter.resourceIdOf(request)).isNull();
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, new java.util.LinkedHashMap<>(Map.of("id", "c-1")));
+        assertThat(AuditOutboxWriter.resourceIdOf(request)).isEqualTo("c-1");
+        assertThat(AuditOutboxWriter.argumentResourceId(Map.of("input", Map.of("id", "q-9")))).isEqualTo("q-9");
+        assertThat(AuditOutboxWriter.argumentResourceId(Map.of("name", "x"))).isNull();
     }
 }

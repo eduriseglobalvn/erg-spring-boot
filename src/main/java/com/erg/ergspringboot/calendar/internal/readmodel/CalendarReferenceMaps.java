@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.calendar.internal.readmodel;
 
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import java.util.Map;
@@ -15,8 +15,8 @@ import java.util.Map;
 public record CalendarReferenceMaps(
         Map<String, EducationUnit> schoolMap,
         Map<String, Classroom> classMap,
-        Map<String, Subject> subjectMap,
-        Map<String, Level> levelMap,
+        Map<String, CurriculumSubject> subjectMap,
+        Map<String, CurriculumLevel> levelMap,
         Map<String, User> userMap,
         Map<String, String> teacherColorKeyMap
 ) { }

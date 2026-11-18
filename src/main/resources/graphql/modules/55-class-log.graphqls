@@ -13,7 +13,7 @@ extend type LmsQuery {
 extend type Mutation {
   "Errors: STALE_VERSION, MONTH_CLOSED, NOT_TEACHER_OF_PERIOD, ACTUAL_PERIOD_OUT_OF_RANGE"
   updateLessonLogEntry(input: UpdateLessonLogEntryInput!): LessonLogPeriod!
-  "Confirms every happened, unconfirmed period of the week. Errors: MONTH_CLOSED, PERIOD_NOT_HAPPENED"
+  "Confirms every happened, unconfirmed period of the week; a week with none is a no-op. Errors: MONTH_CLOSED"
   confirmLessonLogWeek(weekStart: Date!): LessonLogStats!
   saveAttendanceAndLog(input: SaveAttendanceAndLogInput!): LessonLogPeriod!
   remindLessonReport(teacherIds: [ID!]!): Int!

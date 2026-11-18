@@ -8,6 +8,8 @@ import java.util.List;
 public interface LmsRuntimePort {
     StudentAssignmentListResponse listStudentAssignments(String studentId, UserAccessContext access, int page, int size);
     StudentScoreListResponse listStudentScores(String studentId, UserAccessContext access, int page, int size);
+    /** The caller's own latest handed-in attempt on the assignment, or null when there is none. */
+    LatestSubmittedAttemptResponse latestSubmittedAttempt(String assignmentId, String studentId, UserAccessContext access);
     default QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) { return getQuizPackage(quizId, null, access); }
     /** Learners receive the package pinned by {@code assignmentId} (when given) and only if they are assigned. */
     QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access);
@@ -20,6 +22,7 @@ public interface LmsRuntimePort {
     AttemptSubmitResponse submitAttempt(String attemptId, SubmitAttemptRequest request, UserAccessContext access);
     ImportedAttemptResponse importPortableResult(ImportPortableResultRequest request, String assignmentId, String idempotencyKey, UserAccessContext access);
     AttemptResponse gradeManualAnswer(String attemptId, String questionId, ManualGradeRequest request, UserAccessContext access);
+    ManualReviewResponse manualAnswers(String attemptId, UserAccessContext access);
     AssignmentProgressResponse assignmentProgress(String assignmentId, UserAccessContext access);
     List<AttemptResponse> quizStudents(String quizId, UserAccessContext access);
 

@@ -76,6 +76,14 @@ public final class UserAuthorizationAdapter implements UserAuthorizationPort {
         if (userId == null || users.findByIdAndTenantId(userId, scopedTenant).isEmpty()) {
             return List.of();
         }
+        List<UserRoleAssignment> active = assignments.findActiveForUser(userId, scopedTenant, OffsetDateTime.now());
+        List<String> roleNames = new java.util.ArrayList<>(users.findRoleNamesByUserIds(List.of(userId)).stream()
+                .map(UserRoleNameProjection::roleName).toList());
+        active.stream().map(UserRoleAssignment::getRole).filter(java.util.Objects::nonNull)
+                .map(Role::getName).forEach(roleNames::add);
+        if (AccessScopeAssembler.managesWholeTenant(roleNames)) {
+            return units.findByTenantIdOrderByNameAsc(scopedTenant).stream().map(EducationUnit::getId).toList();
+        }
         // Same roots as SessionUnitScopeResolver: LMS access scopes plus active education-unit-scoped assignments.
         Set<String> roots = new LinkedHashSet<>();
         accessScopes.findByUserIdOrderByCreatedAtAsc(userId).stream()
@@ -83,7 +91,7 @@ public final class UserAuthorizationAdapter implements UserAuthorizationPort {
                 .map(scope -> scope.getEducationUnitId())
                 .filter(this::nonBlank)
                 .forEach(roots::add);
-        assignments.findActiveForUser(userId, scopedTenant, OffsetDateTime.now()).stream()
+        active.stream()
                 .filter(assignment -> AccessScopeAssembler.isEducationUnitScopeType(assignment.getScopeType()))
                 .map(assignment -> assignment.getScopeId())
                 .filter(this::nonBlank)

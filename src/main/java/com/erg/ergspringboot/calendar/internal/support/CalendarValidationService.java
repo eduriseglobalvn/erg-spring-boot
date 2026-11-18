@@ -4,7 +4,7 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBu
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBulkRowRequest;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRowMessageResponse;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -68,13 +68,13 @@ public class CalendarValidationService {
             }
 
             if (row.levelId() != null && !row.levelId().isBlank()) {
-                Level level = refData.levelMap().get(row.levelId());
+                CurriculumLevel level = refData.levelMap().get(row.levelId());
                 if (level == null) {
                     errors.add(msg("LEVEL_NOT_FOUND", "levelId",
-                            "Level khong ton tai: " + row.levelId()));
+                            "CurriculumLevel khong ton tai: " + row.levelId()));
                 } else if (!level.getSubjectId().equals(row.subjectId())) {
                     errors.add(msg("LEVEL_NOT_IN_SUBJECT", "levelId",
-                            "Level khong thuoc mon hoc da chon"));
+                            "CurriculumLevel khong thuoc mon hoc da chon"));
                 }
             }
 

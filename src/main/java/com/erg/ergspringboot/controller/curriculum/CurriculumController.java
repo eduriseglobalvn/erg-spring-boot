@@ -86,7 +86,7 @@ public class CurriculumController {
 
     @GetMapping("/class-subjects")
     public ApiResponse<CurriculumClassSubjectsResponse> classSubjects(
-            @RequestParam String schoolId, @RequestParam String academicYear, HttpServletRequest request) {
+            @RequestParam String schoolId, @RequestParam(required = false) String academicYear, HttpServletRequest request) {
         return ok("Curriculum class subjects loaded",
                 classSubjectService.get(schoolId, academicYear, access(request), hasGlobalCurriculumPermission()), request);
     }

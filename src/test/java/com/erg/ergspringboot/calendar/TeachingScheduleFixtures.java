@@ -87,8 +87,8 @@ public abstract class TeachingScheduleFixtures {
 
     protected String subject(String tenant, String name) {
         String id = id();
-        write("insert into lms_subjects (id, tenant_id, name, created_at, updated_at) values (?, ?, ?, now(), now())",
-                id, tenant, name);
+        write("insert into curriculum_subjects (id, tenant_id, code, name, created_at, updated_at)"
+                + " values (?, ?, ?, ?, now(), now())", id, tenant, id, name);
         return id;
     }
 
@@ -104,6 +104,7 @@ public abstract class TeachingScheduleFixtures {
         String id = user(tenant, fullName);
         write("insert into user_access_scopes (id, user_id, education_unit_id, role, created_at, updated_at)"
                 + " values (?, ?, ?, 'lms.instructor', now(), now())", id(), id, school);
+        write("insert into user_roles (user_id, role_id) values (?, 'role_lms_teacher')", id);
         return id;
     }
 

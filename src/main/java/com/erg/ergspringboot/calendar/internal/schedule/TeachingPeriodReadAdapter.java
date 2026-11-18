@@ -42,9 +42,9 @@ class TeachingPeriodReadAdapter implements TeachingPeriodReadPort {
                 join teaching_schedule_event_teachers t on t.event_id = e.id and t.tenant_id = e.tenant_id
                 left join users u on u.id = t.teacher_user_id
                 left join academic_classes c on c.id = e.academic_class_id
-                left join lms_subjects s on s.id = e.subject_id
+                left join curriculum_subjects s on s.id = e.subject_id
                 left join education_units sc on sc.id = e.school_id
-                left join lms_levels l on l.id = e.level_id
+                left join curriculum_levels l on l.id = e.level_id
                 where e.tenant_id = :tenant and e.status = :status and e.start_at >= :from and e.start_at < :to
                 """ + onlyReal + """
                 order by e.start_at, c.name, t.teacher_user_id

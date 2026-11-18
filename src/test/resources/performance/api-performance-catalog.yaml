@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 611
+  route-count: 609
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -1849,6 +1849,22 @@ rest:
       state-owner: postgresql-report-job
       cache-policy: tenant-generation
       pagination-policy: required-or-job
+    - route: GET /api/v1/lms/attempts/{attemptId}/manual-answers => com.erg.ergspringboot.controller.lms.LmsController.manualAnswers
+      classification: persistent-read
+      statement-budget: 8
+      row-budget: 200
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/lms/assignments/{assignmentId}/attempts/latest-submitted => com.erg.ergspringboot.controller.lms.LmsController.latestSubmittedAttempt
+      classification: persistent-read
+      statement-budget: 8
+      row-budget: 200
+      payload-budget-bytes: 1048576
+      state-owner: postgresql
+      cache-policy: none
+      pagination-policy: required-for-collections
     - route: GET /api/v1/lms/classes => com.erg.ergspringboot.controller.lms.LmsController.classes
       classification: persistent-read
       statement-budget: 12
@@ -3917,6 +3933,14 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
+    - route: POST /api/v1/lms/classes/{classId}/students/{studentId}/reset-credential => com.erg.ergspringboot.lms.internal.core.LmsStudentCredentialController.reset
+      classification: persistent-write
+      statement-budget: 12
+      row-budget: 500
+      payload-budget-bytes: 1048576
+      state-owner: postgresql-and-redis-state
+      cache-policy: none
+      pagination-policy: required-for-collections
     - route: POST /api/v1/lms/student-groups => com.erg.ergspringboot.controller.lms.LmsAssignmentController.createGroup
       classification: persistent-write
       statement-budget: 25
@@ -4990,22 +5014,6 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
-    - route: DELETE /api/v1/lcms/subjects/{subjectId} => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.archiveSubject
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 100
-      payload-budget-bytes: 524288
-      state-owner: postgresql-outbox
-      cache-policy: post-commit-tenant-generation
-      pagination-policy: none
-    - route: GET /api/v1/lcms/subjects => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.subjectsReadNotPublished
-      classification: persistent-read
-      statement-budget: 1
-      row-budget: 0
-      payload-budget-bytes: 65536
-      state-owner: process-local
-      cache-policy: none
-      pagination-policy: bounded-or-disabled
     - route: GET /api/v1/reports/jobs/assignments/{assignmentId}/progress => com.erg.ergspringboot.controller.reporting.ReportJobController.assignmentProgress
       classification: persistent-read
       statement-budget: 8
@@ -5031,14 +5039,6 @@ rest:
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
     - route: PATCH /api/v1/lcms/schools/{schoolId}/students/{studentId} => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.updateStudent
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 100
-      payload-budget-bytes: 524288
-      state-owner: postgresql-outbox
-      cache-policy: post-commit-tenant-generation
-      pagination-policy: none
-    - route: PATCH /api/v1/lcms/subjects/{subjectId} => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.updateSubject
       classification: persistent-write
       statement-budget: 12
       row-budget: 100
@@ -5094,14 +5094,6 @@ rest:
       state-owner: postgresql-outbox
       cache-policy: post-commit-tenant-generation
       pagination-policy: bounded-500
-    - route: POST /api/v1/lcms/subjects => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.createSubject
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 100
-      payload-budget-bytes: 524288
-      state-owner: postgresql-outbox
-      cache-policy: post-commit-tenant-generation
-      pagination-policy: none
     - route: PUT /api/v1/lcms/schools/{schoolId}/classes/{classId} => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.updateClass
       classification: persistent-write
       statement-budget: 12
@@ -5111,14 +5103,6 @@ rest:
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
     - route: PUT /api/v1/lcms/schools/{schoolId}/students/{studentId} => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.updateStudent
-      classification: persistent-write
-      statement-budget: 12
-      row-budget: 100
-      payload-budget-bytes: 524288
-      state-owner: postgresql-outbox
-      cache-policy: post-commit-tenant-generation
-      pagination-policy: none
-    - route: PUT /api/v1/lcms/subjects/{subjectId} => com.erg.ergspringboot.controller.lcms.LmsOperationalCommandController.updateSubject
       classification: persistent-write
       statement-budget: 12
       row-budget: 100
@@ -5183,7 +5167,7 @@ rest:
       cache-policy: post-commit-tenant-generation
       pagination-policy: none
 graphql:
-  mapped-method-count: 43
+  mapped-method-count: 44
   fields:
     - studentDashboard
     - learningResourceLibrary
@@ -5191,6 +5175,7 @@ graphql:
     - assignmentProgressWorkspace
     - studentGroups
     - classWorkspace
+    - classScoreBoard
     - myTeachingCalendar
     - myStudentCalendar
     - teachingCalendarWorkspace

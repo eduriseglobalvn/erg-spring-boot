@@ -302,8 +302,10 @@ public class TeachingScheduleGraphQlController {
     /** The schools the caller may see: null (all of the tenant) for wildcard principals, else their managed schools. */
     private List<String> visibleSchools(ErgPrincipal principal) {
         if (accessSupport.isWildcardPrincipal(principal)) return null;
-        List<String> managed = scopeService.requireManagedSchools(principal, List.of());
-        return managed.contains("*") ? null : managed;
+        // A tenant-wide unit scope ("*", Phòng đào tạo) sees every school; requireManagedSchools would answer "none asked".
+        if (com.erg.ergspringboot.platform.security.AccessScopeAssembler.from(principal)
+                .managedIds(com.erg.ergspringboot.platform.security.AccessScopeSet.EDUCATION_UNIT).contains("*")) return null;
+        return scopeService.requireManagedSchools(principal, List.of());
     }
 
     private static LocalDate parseDate(String value) {

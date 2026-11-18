@@ -61,7 +61,7 @@ class PortableResultImportTest {
         pkg.setQuizVersionId("version-1");
         pkg.setContentHash("sha256:abc");
 
-        when(fixture.students.findByTenantIdAndStudentCode("erg", "HS001")).thenReturn(Optional.of(student));
+        when(fixture.students.findByTenantIdAndStudentCode("erg", "HS001")).thenReturn(java.util.List.of(student));
         when(fixture.classrooms.findByTenantIdAndId("erg", "class-1")).thenReturn(Optional.of(classroom));
         when(fixture.packages.packageEntityById("erg", "pkg-1")).thenReturn(Optional.of(pkg));
         when(fixture.assignments.findByTenantIdAndQuizId("erg", "quiz-1")).thenReturn(List.of(assignment));

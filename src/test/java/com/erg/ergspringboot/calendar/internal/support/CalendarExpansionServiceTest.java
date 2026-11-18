@@ -10,7 +10,7 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBu
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ExpansionResult;
@@ -232,7 +232,7 @@ class CalendarExpansionServiceTest {
 
         private Classroom classA;
         private Classroom classB;
-        private Subject math;
+        private CurriculumSubject math;
         private User teacherMain;
         private User teacherAssistant;
         private ReferenceData refData;
@@ -247,7 +247,7 @@ class CalendarExpansionServiceTest {
             classB.setId("class-b");
             classB.setName("Class 3B");
 
-            math = new Subject();
+            math = new CurriculumSubject();
             math.setId("subj-math");
             math.setName("Mathematics");
 

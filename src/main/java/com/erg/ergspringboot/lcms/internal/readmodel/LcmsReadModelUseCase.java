@@ -6,6 +6,7 @@ import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizDra
 import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizVersionHistoryResponse;
 import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWorkspaceResponse;
 import com.erg.ergspringboot.lcms.LcmsReadPort;
+import com.erg.ergspringboot.lcms.quiz.authoring.TeacherQuizOwnership;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -16,18 +17,21 @@ import org.springframework.stereotype.Service;
 public class LcmsReadModelUseCase implements LcmsReadPort {
     private final LcmsQuizWorkspaceReadService quizWorkspaces;
     private final LcmsWorkspaceReadService workspaces;
+    private final TeacherQuizOwnership ownership;
 
     @Autowired
     public LcmsReadModelUseCase(
             LcmsQuizWorkspaceReadService quizWorkspaces,
-            LcmsWorkspaceReadService workspaces) {
+            LcmsWorkspaceReadService workspaces,
+            TeacherQuizOwnership ownership) {
         this.quizWorkspaces = quizWorkspaces;
         this.workspaces = workspaces;
+        this.ownership = ownership;
     }
 
-    @Override public QuizWorkspaceResponse quizWorkspace(String tenantId, String search, String subjectId, String levelId, String categoryId, String status, String kind, Integer page, Integer size) { return quizWorkspaces.quizWorkspace(tenantId, search, subjectId, levelId, categoryId, status, kind, page, size); }
-    @Override public QuizDraftDocumentResponse quizDraft(String tenantId, String quizId) { return quizWorkspaces.quizDraft(tenantId, quizId); }
-    @Override public QuizVersionHistoryResponse quizVersions(String tenantId, String quizId) { return quizWorkspaces.quizVersions(tenantId, quizId); }
-    @Override public QuestionBankWorkspaceResponse questionBankWorkspace(String tenantId, String search, String subjectId, String levelId, String topicId, String status, String quizKind, Boolean includeQuestions, Integer page, Integer size) { return workspaces.questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page, size); }
+    @Override public QuizWorkspaceResponse quizWorkspace(String tenantId, String search, String subjectId, String levelId, String categoryId, String status, String kind, Integer page, Integer size) { return ownership.visibleToCaller(tenantId, quizWorkspaces.quizWorkspace(tenantId, search, subjectId, levelId, categoryId, status, kind, page, size)); }
+    @Override public QuizDraftDocumentResponse quizDraft(String tenantId, String quizId) { ownership.requireOwn(tenantId, quizId); return quizWorkspaces.quizDraft(tenantId, quizId); }
+    @Override public QuizVersionHistoryResponse quizVersions(String tenantId, String quizId) { ownership.requireOwn(tenantId, quizId); return quizWorkspaces.quizVersions(tenantId, quizId); }
+    @Override public QuestionBankWorkspaceResponse questionBankWorkspace(String tenantId, String search, String subjectId, String levelId, String topicId, String status, String quizKind, Boolean includeQuestions, Integer page, Integer size) { return ownership.visibleToCaller(tenantId, workspaces.questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page, size)); }
     @Override public AccessManagementWorkspaceResponse accessManagementWorkspace(String tenantId, String search, String roleId, String status, Integer page, Integer size, boolean includeEffectivePermissions) { return workspaces.accessManagementWorkspace(tenantId, search, roleId, status, page, size, includeEffectivePermissions); }
 }

@@ -44,6 +44,8 @@ public final class SessionResponses {
     }
 
     public record SessionBootstrapPermissions(
+            /** True when manageableUnits is every school of the organisation (admin, Phòng đào tạo, director). */
+            boolean allUnits,
             boolean canAccessGlobalErg,
             List<String> roles,
             List<String> grantedPermissions,

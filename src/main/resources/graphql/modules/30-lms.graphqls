@@ -150,6 +150,7 @@ type AssignmentSummaryItem {
   resources: [AssignmentResource!]!
   createdAt: String
   updatedAt: String
+  title: String
 }
 
 type TeacherHomeworkWorkspace {
@@ -191,6 +192,8 @@ type HomeworkAssignmentCard {
   createdAt: String
   updatedAt: String
   title: String
+  recipientCount: Int!
+  submittedCount: Int!
 }
 
 type ClassOption {
@@ -588,4 +591,45 @@ type LearningRecentResource {
   resourceId: String!
   title: String!
   openedAt: String
+}
+
+extend type LmsQuery {
+  classScoreBoard(input: ClassScoreBoardInput!): ClassScoreBoard!
+}
+
+input ClassScoreBoardInput {
+  tenantId: String
+  classId: String!
+}
+
+type ClassScoreBoard {
+  classId: String!
+  className: String
+  students: [ClassScoreBoardStudent!]!
+  attempts: [ClassScoreBoardAttempt!]!
+  truncated: Boolean!
+}
+
+type ClassScoreBoardStudent {
+  id: String!
+  studentCode: String
+  fullName: String
+}
+
+type ClassScoreBoardAttempt {
+  id: String!
+  studentId: String!
+  assignmentId: String!
+  assignmentTitle: String
+  quizId: String
+  quizTitle: String
+  topicId: String
+  topicName: String
+  score: Float
+  maxScore: Float
+  percent: Float
+  status: String
+  startedAt: String
+  submittedAt: String
+  durationSeconds: Int
 }

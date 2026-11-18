@@ -9,8 +9,8 @@ import com.erg.ergspringboot.common.request.calendar.CalendarRequests.CalendarBu
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRowMessageResponse;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.lms.persistence.Level;
-import com.erg.ergspringboot.lms.persistence.Subject;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumLevel;
+import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService.ReferenceData;
 import com.erg.ergspringboot.calendar.internal.support.CalendarValidationService.RowValidationResult;
 import java.util.List;
@@ -27,9 +27,9 @@ class CalendarValidationServiceTest {
 
     private Classroom classInSchool;
     private Classroom classOtherSchool;
-    private Subject math;
-    private Level mathLevelBeginner;
-    private Level levelOtherSubject;
+    private CurriculumSubject math;
+    private CurriculumLevel mathLevelBeginner;
+    private CurriculumLevel levelOtherSubject;
     private User teacherMain;
     private User teacherAssistant;
     private ReferenceData refData;
@@ -48,16 +48,16 @@ class CalendarValidationServiceTest {
         classOtherSchool.setName("Class 3B");
         classOtherSchool.setSchoolId("school-999");
 
-        math = new Subject();
+        math = new CurriculumSubject();
         math.setId("subj-math");
         math.setName("Mathematics");
 
-        mathLevelBeginner = new Level();
+        mathLevelBeginner = new CurriculumLevel();
         mathLevelBeginner.setId("level-beginner");
         mathLevelBeginner.setSubjectId("subj-math");
         mathLevelBeginner.setName("Beginner");
 
-        levelOtherSubject = new Level();
+        levelOtherSubject = new CurriculumLevel();
         levelOtherSubject.setId("level-other");
         levelOtherSubject.setSubjectId("subj-physics");
         levelOtherSubject.setName("Physics Level");

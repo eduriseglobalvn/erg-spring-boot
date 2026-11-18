@@ -62,7 +62,7 @@ public class TeachingHoursService {
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm").withZone(TeachingSheets.ZONE);
     private static final String USER_NAMES = "select id, coalesce(full_name, '') from users where tenant_id = :tenant and id in (:ids)";
     private static final String SCHOOL_NAMES = "select id, name from education_units where tenant_id = :tenant and id in (:ids)";
-    private static final String SUBJECT_NAMES = "select id, name from lms_subjects where tenant_id = :tenant and id in (:ids)";
+    private static final String SUBJECT_NAMES = "select id, name from curriculum_subjects where tenant_id = :tenant and id in (:ids)";
 
     private final TeachingPeriodReadPort calendar;
     private final LessonLogReportPort classLog;

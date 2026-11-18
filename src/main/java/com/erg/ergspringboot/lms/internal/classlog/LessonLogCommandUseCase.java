@@ -55,7 +55,7 @@ public class LessonLogCommandUseCase {
                                   int actualPeriod, String comment, Integer expectedVersion) {
         LocalDate day = LessonLogQueryUseCase.date(date);
         Row row = ownPeriod(tenantId, actorId, eventId, day, periodNo);
-        requireStarted(row, periodNo);
+        // The lesson log has no time gate: a teacher may fill it before the period. Only attendance waits for the period.
         apply(tenantId, actorId, row, actualPeriod, comment, expectedVersion);
         return reload(tenantId, actorId, eventId, day, periodNo);
     }
@@ -66,12 +66,11 @@ public class LessonLogCommandUseCase {
         LocalDate monday = LessonLogQueryUseCase.monday(weekStart);
         Instant now = clock.instant();
         List<Row> rows = reader.rows(tenantId, schedule.teacherSlots(tenantId, actorId, monday, monday.plusDays(6)), now);
-        // a week that only holds periods still to come has nothing to confirm; a week without periods stays a no-op
-        if (!rows.isEmpty() && rows.stream().noneMatch(r -> r.period().happened())) throw LessonLogException.periodNotHappened();
         boolean sawClosed = false;
         boolean confirmedAny = false;
         for (Row row : rows) {
             LessonLogPeriod p = row.period();
+            // a period is filled in ahead but confirmed only after it was taught; a week with none taught is a no-op
             if (!p.happened() || "CONFIRMED".equals(p.status())) continue;
             if (monthLock.isClosed(tenantId, YearMonth.from(p.date()))) {
                 sawClosed = true;
@@ -98,7 +97,7 @@ public class LessonLogCommandUseCase {
                                                 Integer expectedVersion) {
         LocalDate day = LessonLogQueryUseCase.date(date);
         Row row = ownPeriod(tenantId, actorId, eventId, day, periodNo);
-        requireStarted(row, periodNo);
+        if (!records.isEmpty()) requireStarted(row, periodNo);
         if (monthLock.isClosed(tenantId, YearMonth.from(day))) throw LessonLogException.monthClosed();
         // Validate the log fields first so a bad actual period cannot leave half of the attendance saved.
         checkActual(tenantId, row, actualPeriod);
@@ -119,7 +118,7 @@ public class LessonLogCommandUseCase {
                 .orElseThrow(LessonLogException::notTeacherOfPeriod);
     }
 
-    /** A period that has not begun cannot carry a log or attendance (PERIOD_NOT_HAPPENED). */
+    /** A period that has not begun cannot carry attendance (PERIOD_NOT_HAPPENED). */
     private void requireStarted(Row row, int periodNo) {
         if (!LessonLogReader.started(row.slot(), periodNo, clock.instant())) throw LessonLogException.periodNotHappened();
     }

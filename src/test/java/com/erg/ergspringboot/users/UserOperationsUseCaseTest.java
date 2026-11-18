@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 
 import com.erg.ergspringboot.common.request.users.UserRequests.OnboardingRequest;
 import com.erg.ergspringboot.common.request.users.UserRequests.AdminCreateUserRequest;
@@ -110,13 +111,14 @@ class UserOperationsUseCaseTest {
     void setUp() {
         passwordService = new PasswordService(new com.erg.ergspringboot.platform.security.ErgAuthProperties());
         operations = new UserOperations(
-                new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository),
+                new UserQueryUseCase(userRepository, sessionRepository, userActivityRepository, roleRepository),
                 new UserProfileUseCase(userRepository, userActivityRepository),
                 new UserPasswordUseCase(userRepository, sessionRepository, userActivityRepository, passwordService),
                 new UserSessionUseCase(sessionRepository, userActivityRepository),
                 new UserProvisioningUseCase(userRepository, sessionRepository, roleRepository,
                         userAccessScopeRepository, userActivityRepository, passwordService, accountMailSender,
-                        userRoleAssignmentRepository),
+                        userRoleAssignmentRepository,
+                        org.mockito.Mockito.mock(com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository.class)),
                 new UserLifecycleUseCase(userRepository, sessionRepository, userActivityRepository,
                         org.mockito.Mockito.mock(com.erg.ergspringboot.users.internal.lifecycle.UserSoftDeleteStore.class)),
                 new UserRoleAssignmentUseCase(userRepository, roleRepository, userActivityRepository,
@@ -137,8 +139,8 @@ class UserOperationsUseCaseTest {
         assertEquals("Active User", response.fullName());
         assertEquals("0909000000", response.phone());
         assertTrue(response.roles().contains("user"));
-        assertEquals("FIRST_LOGIN_RESTRICTED", response.lifecycle().status());
-        assertTrue(response.lifecycle().nextSteps().contains("COMPLETE_PROFILE"));
+        assertEquals("ACTIVE", response.lifecycle().status());
+        assertTrue(response.lifecycle().nextSteps().isEmpty());
     }
 
     @Test
@@ -286,6 +288,22 @@ class UserOperationsUseCaseTest {
     }
 
     @Test
+    void temporaryPasswordCannotBeChangedBeforeTheRecoveryEmailIsVerified() {
+        User user = user("user-1");
+        user.setPasswordHash(passwordService.hash("old-secret"));
+        user.setMustChangePassword(true);
+        user.setRecoveryEmailVerified(false);
+        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
+
+        var failure = assertThrows(com.erg.ergspringboot.exception.AccountLifecycleException.class,
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "new-secret"), null));
+
+        assertEquals("RECOVERY_EMAIL_NOT_VERIFIED", failure.getCode());
+        assertTrue(passwordService.matches("old-secret", user.getPasswordHash()));
+        assertEquals(List.of("VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD"), user.firstLoginSteps());
+    }
+
+    @Test
     void changePasswordRejectsWrongOldPassword() {
         User user = user("user-1");
         user.setPasswordHash(passwordService.hash("old-secret"));
@@ -299,7 +317,7 @@ class UserOperationsUseCaseTest {
 
     @Test
     void adminListUsersReturnsPaginatedResponse() {
-        when(userRepository.findAdminListItems("erg", null, null, null, PageRequest.of(0, 1)))
+        when(userRepository.findAdminListItems(eq("erg"), isNull(), isNull(), isNull(), any(), any(), eq(PageRequest.of(0, 1))))
                 .thenReturn(new PageImpl<>(
                         List.of(userListItem("user-1")),
                         PageRequest.of(0, 1),
@@ -318,13 +336,42 @@ class UserOperationsUseCaseTest {
     }
 
     @Test
+    void adminListExcludesStudentOnlyRolesInTheQuery() {
+        com.erg.ergspringboot.users.persistence.authorization.Permission studentAccess =
+                new com.erg.ergspringboot.users.persistence.authorization.Permission();
+        studentAccess.setName("student.workspace.access");
+        com.erg.ergspringboot.users.persistence.authorization.Permission teacherAccess =
+                new com.erg.ergspringboot.users.persistence.authorization.Permission();
+        teacherAccess.setName("teacher.workspace.access");
+        com.erg.ergspringboot.users.persistence.authorization.Role student =
+                new com.erg.ergspringboot.users.persistence.authorization.Role();
+        student.setId("role_lms_student");
+        student.setName("lms.learner");
+        student.setPermissions(java.util.Set.of(studentAccess));
+        com.erg.ergspringboot.users.persistence.authorization.Role teacher =
+                new com.erg.ergspringboot.users.persistence.authorization.Role();
+        teacher.setId("role_lms_teacher");
+        teacher.setName("lms.instructor");
+        teacher.setPermissions(java.util.Set.of(teacherAccess));
+        when(roleRepository.findAllWithPermissionsAndUsers()).thenReturn(List.of(student, teacher));
+        when(userRepository.findAdminListItems(eq("erg"), isNull(), isNull(), isNull(),
+                eq(List.of("-", "role_lms_student")), eq(List.of("-", "role_lms_teacher")), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        operations.listUsers("erg", 1, 20, null, null, null);
+
+        verify(userRepository).findAdminListItems(eq("erg"), isNull(), isNull(), isNull(),
+                eq(List.of("-", "role_lms_student")), eq(List.of("-", "role_lms_teacher")), any());
+    }
+
+    @Test
     void adminListUsersPassesAuthenticatedTenantToRepository() {
-        when(userRepository.findAdminListItems("tenant-a", null, null, null, PageRequest.of(0, 20)))
+        when(userRepository.findAdminListItems(eq("tenant-a"), isNull(), isNull(), isNull(), any(), any(), eq(PageRequest.of(0, 20))))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         operations.listUsers("tenant-a", 1, 20, null, null, null);
 
-        verify(userRepository).findAdminListItems("tenant-a", null, null, null, PageRequest.of(0, 20));
+        verify(userRepository).findAdminListItems(eq("tenant-a"), isNull(), isNull(), isNull(), any(), any(), eq(PageRequest.of(0, 20)));
     }
 
     @Test
@@ -383,7 +430,9 @@ class UserOperationsUseCaseTest {
                 null);
 
         assertEquals("new@example.com", response.user().primaryEmail());
-        assertEquals("INVITED", response.user().status());
+        // A created staff account is active at once; it still has to verify its email, then change the password.
+        assertEquals("ACTIVE", response.user().status());
+        assertEquals(List.of("VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD"), response.lifecycle().nextSteps());
         assertFalse(response.oneTimePassword().isBlank());
         verify(userRepository).save(org.mockito.ArgumentMatchers.argThat(user ->
                 "new@example.com".equals(user.getUsername())
