@@ -28,6 +28,10 @@ class BootstrapAdminPasswordInitializerTest {
 
         assertThat(new BootstrapAdminPasswordInitializer(jdbc, passwords, "first-Pass1").apply()).isTrue();
 
+        // Production runs as a role without BYPASSRLS: the admin row is visible only in maintenance mode.
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(jdbc);
+        order.verify(jdbc).queryForObject("select set_config('app.maintenance_mode', 'true', true)", String.class);
+        order.verify(jdbc).queryForObject(anyString(), eq(Integer.class), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH));
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
         verify(jdbc).update(sql.capture(), hash.capture(), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH));

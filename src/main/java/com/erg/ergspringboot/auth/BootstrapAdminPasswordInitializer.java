@@ -43,6 +43,8 @@ public class BootstrapAdminPasswordInitializer {
     /** Returns true when the admin password was set. */
     @Transactional
     public boolean apply() {
+        // users is tenant-protected (RLS) and startup has no tenant: without this the runtime role sees no admin row.
+        jdbc.queryForObject("select set_config('app.maintenance_mode', 'true', true)", String.class);
         Integer untouched = jdbc.queryForObject(
                 "select count(*) from users where id = 'usr_super_admin' and password_hash = ?", Integer.class, MIGRATION_HASH);
         if (untouched == null || untouched == 0 || bootstrapPassword == null || bootstrapPassword.isBlank()) {
