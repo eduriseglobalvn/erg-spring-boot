@@ -18,7 +18,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @ConditionalOnProperty(prefix = "erg.outbox.worker", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TransactionalOutboxWorker {
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TransactionalOutboxWorker.class);
     private static final int BATCH_SIZE = 50;
     private static final int MAX_ATTEMPTS = 8;
     private static final Duration LEASE = Duration.ofSeconds(60);
@@ -76,9 +75,7 @@ public class TransactionalOutboxWorker {
                 TenantContext.of(event.getTenantId(), null, "system"))) {
             Integer renewed = transaction.execute(status ->
                     repository.renewLease(event.getId(), WORKER_ID, OffsetDateTime.now().plus(LEASE)));
-            if (renewed != null && renewed > 0) return true;
-            log.warn("Outbox event {} skipped: lease renewal matched no row", event.getId());
-            return false;
+            return renewed != null && renewed > 0;
         }
     }
 
@@ -93,16 +90,8 @@ public class TransactionalOutboxWorker {
     }
 
     private void dispatch(OutboxEvent event) {
-        // The failure transition must run inside the tenant scope too: without app.tenant_id, RLS hides the
-        // row, findLeasedForUpdate finds nothing and the event stays "processing" forever with no error.
         try (TenantContext.Scope ignored = TenantContext.scope(
                 TenantContext.of(event.getTenantId(), null, "system"))) {
-            dispatchInScope(event);
-        }
-    }
-
-    private void dispatchInScope(OutboxEvent event) {
-        try {
             Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
             String encryptedRecipient = string(payload, "recipientCiphertext");
             String recipient = encryptedRecipient.isEmpty() ? string(payload, "recipient") : cipher.decrypt(encryptedRecipient);
@@ -116,16 +105,14 @@ public class TransactionalOutboxWorker {
             }
             transition(event.getId(), true, null);
         } catch (RuntimeException failure) {
-            // Provider messages often echo the recipient address; log and persist only the failure type.
-            log.warn("Outbox event {} ({}) dispatch failed: {}", event.getId(), event.getEventType(),
-                    failure.getClass().getName());
+            // Provider messages often echo the recipient address; persist only the failure type.
             transition(event.getId(), false, failure.getClass().getSimpleName());
         }
     }
 
     private void transition(String id, boolean success, String error) {
         // Only the current lease owner may record the outcome; a lost lease means another instance owns it.
-        transaction.executeWithoutResult(status -> repository.findLeasedForUpdate(id, WORKER_ID).ifPresentOrElse(event -> {
+        transaction.executeWithoutResult(status -> repository.findLeasedForUpdate(id, WORKER_ID).ifPresent(event -> {
             event.setAttempts(event.getAttempts() + 1);
             event.setLeaseUntil(null);
             event.setLastError(error == null ? null : error.substring(0, Math.min(1000, error.length())));
@@ -139,7 +126,7 @@ public class TransactionalOutboxWorker {
                 event.setAvailableAt(OffsetDateTime.now().plusSeconds(Math.min(300, 1L << Math.min(8, event.getAttempts()))));
             }
             repository.save(event);
-        }, () -> log.warn("Outbox event {} result not recorded: lease lost or row not visible", id)));
+        }));
     }
 
     private String string(Map<String, Object> payload, String key) {
