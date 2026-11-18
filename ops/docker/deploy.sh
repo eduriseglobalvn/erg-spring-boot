@@ -139,7 +139,7 @@ find "$ROOT/backups" -name 'erg-pre-*.dump' -mtime +30 -delete
 
 log "rehearse on a restored copy"
 N=erg-rehearsal PW=$(openssl rand -hex 16)
-cleanup() { docker rm -f $N-pg $N-redis $N-app >/dev/null 2>&1 || true; docker network rm $N >/dev/null 2>&1 || true; }
+cleanup() { docker rm -f -v $N-pg $N-redis $N-app >/dev/null 2>&1 || true; docker network rm $N >/dev/null 2>&1 || true; }
 cleanup; trap cleanup EXIT
 docker network create --internal $N >/dev/null
 docker run -d --name $N-pg --network $N -e POSTGRES_USER=erg -e POSTGRES_PASSWORD="$PW" -e POSTGRES_DB=erg postgres:17-alpine >/dev/null
