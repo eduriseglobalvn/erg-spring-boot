@@ -93,9 +93,11 @@ spring:
           auth: ${SPRING_MAIL_SMTP_AUTH:${SMTP__AUTH:true}}
           # JavaMail defaults to infinite socket timeouts; a hung relay would block the
           # shared scheduler thread that drives the outbox and every other background job.
-          connectiontimeout: ${SPRING_MAIL_SMTP_CONNECTION_TIMEOUT:5000}
-          timeout: ${SPRING_MAIL_SMTP_TIMEOUT:5000}
-          writetimeout: ${SPRING_MAIL_SMTP_WRITE_TIMEOUT:5000}
+          # 30 s, not 5 s: the production relay takes ~9 s to accept a mail from the server, so 5 s
+          # dropped every send. Stays under the outbox lease (60 s, renewed per event).
+          connectiontimeout: ${SPRING_MAIL_SMTP_CONNECTION_TIMEOUT:30000}
+          timeout: ${SPRING_MAIL_SMTP_TIMEOUT:30000}
+          writetimeout: ${SPRING_MAIL_SMTP_WRITE_TIMEOUT:30000}
           ssl:
             enable: ${SPRING_MAIL_SSL_ENABLED:${SMTP__SSL:false}}
           starttls:
