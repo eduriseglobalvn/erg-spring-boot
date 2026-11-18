@@ -194,6 +194,7 @@ class NotificationDeviceServiceWebPushTest {
             assertThat(config.publicKey()).isNull();
 
             fcm.getCredentials().setServiceAccountPath(credentials.resolveSibling("missing-fcm.json").toString());
+            fcm.setProvider("fcm");
             var missing = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush), fcm)
                     .webPushConfig();
             assertThat(missing.provider()).isEqualTo("fcm");
@@ -207,6 +208,19 @@ class NotificationDeviceServiceWebPushTest {
         } finally {
             java.nio.file.Files.deleteIfExists(credentials);
         }
+    }
+
+    @Test
+    void blankProviderFallsBackToWebPushWhenFcmCannotSend() {
+        // Production shape: GOOGLE_APPLICATION_CREDENTIALS set, no FIREBASE_PROJECT_ID, VAPID keys configured.
+        NotificationPushProperties push = enabledPush();
+        push.getCredentials().setServiceAccountPath("/run/secrets/google.json");
+        var config = new NotificationDeviceService(devices, topics, cipher, new WebPushVapidKeys(webPush), push)
+                .webPushConfig();
+        assertThat(push.resolvedProvider()).isEqualTo("webpush");
+        assertThat(push.sendsTransport("WEB_PUSH")).isTrue();
+        assertThat(config.enabled()).isTrue();
+        assertThat(config.publicKey()).isEqualTo(webPush.getPublicKey());
     }
 
     @Test

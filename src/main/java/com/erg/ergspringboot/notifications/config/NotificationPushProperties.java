@@ -48,8 +48,9 @@ public class NotificationPushProperties {
         if (PROVIDER_FCM.equals(explicit) || PROVIDER_WEB_PUSH.equals(explicit)) {
             return explicit;
         }
-        return isBlank(credentials.staticAccessToken) && isBlank(credentials.serviceAccountPath)
-                ? PROVIDER_WEB_PUSH : PROVIDER_FCM;
+        // Blank provider: FCM only when it can actually send. A stray GOOGLE_APPLICATION_CREDENTIALS without
+        // FIREBASE_PROJECT_ID used to pick FCM and report push disabled even with VAPID keys configured.
+        return fcmReady() ? PROVIDER_FCM : PROVIDER_WEB_PUSH;
     }
 
     /** FCM can send: a project id plus a static token or a readable credentials file (only its path is checked). */
