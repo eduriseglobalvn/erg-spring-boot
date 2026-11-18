@@ -1,7 +1,16 @@
 apiVersion: 1
 
+# Grafana cannot change the uid of an already provisioned datasource ("data source not found"), so both are
+# dropped and created again at every start; they hold no state of their own.
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: Loki
+    orgId: 1
+
 datasources:
   - name: Prometheus
+    uid: Prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
@@ -10,6 +19,7 @@ datasources:
       timeInterval: 5s
 
   - name: Loki
+    uid: Loki
     type: loki
     access: proxy
     url: http://loki:3100

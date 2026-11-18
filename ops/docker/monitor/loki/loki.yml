@@ -26,7 +26,7 @@ schema_config:
         period: 24h
 
 limits_config:
-  retention_period: 168h # 7 days retention (sufficient for troubleshooting while saving SSD space)
+  retention_period: 720h # 30 days: long enough to look back at an incident reported late; ~200 GB of disk is free
   max_query_series: 5000
   ingestion_rate_mb: 8
   ingestion_burst_size_mb: 16

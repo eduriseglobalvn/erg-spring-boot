@@ -7,6 +7,10 @@ route:
   group_interval: 5m
   repeat_interval: 4h
   routes:
+    # Capacity trends change over weeks: one reminder a week, not every 4 hours.
+    - matchers: [alertname=~"Upgrade.+"]
+      receiver: __RECEIVER__
+      repeat_interval: 168h
     - matchers: [severity="critical"]
       receiver: __RECEIVER__
       repeat_interval: 1h

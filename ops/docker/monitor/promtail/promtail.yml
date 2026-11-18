@@ -22,15 +22,28 @@ scrape_configs:
       - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
         target_label: 'project'
     pipeline_stages:
-      - json:
-          expressions:
-            log: log
-            stream: stream
-            time: time
-      # Fallback pattern for Spring Boot logs inside docker container
-      - regex:
-          source: log
-          expression: '^(?P<time>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+(?P<level>[A-Z]{4,5})\s+\[(?P<app>[^,]*),(?P<traceId>[^,]*),(?P<spanId>[^,]*)]'
-      - labels:
-          level:
-          traceId:
+      # Spring Boot line: "<time>  LEVEL 1 --- [app] [thread] logger : message". A stack trace stays one entry.
+      - match:
+          selector: '{service="backend"}'
+          stages:
+            - multiline:
+                firstline: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+                max_wait_time: 3s
+                max_lines: 200
+            - regex:
+                expression: '^\S+\s+(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s'
+            - labels:
+                level:
+      # nginx access log is JSON (log_format erg_json in nginx/native.conf); 5xx/4xx/ok becomes the level label so
+      # error rates are cheap to query. Everything else (uri, request_id, request_time) is read with `| json`.
+      - match:
+          selector: '{service="nginx"}'
+          stages:
+            - json:
+                expressions:
+                  status: status
+            - template:
+                source: level
+                template: '{{ if not .status }}{{ else if ge (int .status) 500 }}ERROR{{ else if ge (int .status) 400 }}WARN{{ else }}INFO{{ end }}'
+            - labels:
+                level:

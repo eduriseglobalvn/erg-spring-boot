@@ -7,10 +7,11 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=15d
-      - --storage.tsdb.retention.size=6GB
+      # 90 days so the peak-hour and capacity dashboards can compare months; the size cap is the real bound.
+      - --storage.tsdb.retention.time=90d
+      - --storage.tsdb.retention.size=20GB
       - --web.enable-lifecycle
-    mem_limit: 512m
+    mem_limit: 768m
     volumes:
       - ./monitor/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitor/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -117,6 +118,48 @@ services:
       - edge
     ports:
       - "127.0.0.1:9100:9100"
+
+  # Per-container CPU, memory and restarts (the backend's own metrics do not cover Postgres, Redis, nginx).
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    restart: unless-stopped
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+      - --disable_metrics=percpu,sched,tcp,udp,hugetlb,referenced_memory,cpu_topology,resctrl,advtcp,memory_numa,process
+    privileged: true
+    devices:
+      - /dev/kmsg
+    mem_limit: 192m
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - edge
+
+  # SMART health of the single SSD: the one failure that takes everything with it.
+  smartctl-exporter:
+    image: prometheuscommunity/smartctl-exporter:v0.14.0
+    restart: unless-stopped
+    privileged: true
+    user: root
+    mem_limit: 64m
+    networks:
+      - edge
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.27.0
+    restart: unless-stopped
+    command: --config.file=/etc/blackbox/blackbox.yml
+    mem_limit: 64m
+    volumes:
+      - ./monitor/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks:
+      - edge
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.17.1

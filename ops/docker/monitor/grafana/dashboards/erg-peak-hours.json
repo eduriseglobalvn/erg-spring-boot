@@ -1,0 +1,1268 @@
+{
+  "uid": "erg-peak-hours",
+  "title": "ERG · Giờ cao điểm",
+  "tags": [
+    "erg",
+    "usage"
+  ],
+  "schemaVersion": 39,
+  "refresh": "5m",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 12,
+      "type": "text",
+      "title": "Cách đọc",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Trang này trả lời **giờ nào, ngày nào hệ thống được dùng nhiều nhất** (giờ Việt Nam). Đổi khoảng thời gian ở góc phải để so tuần/tháng (dữ liệu giữ 90 ngày). Số đăng nhập phản ánh lúc học sinh **bắt đầu vào**; số lượt gọi API phản ánh lúc hệ thống **bận nhất**. Chưa tách được theo vai trò (học sinh/giáo viên): cần backend bổ sung số đo người đang hoạt động theo vai trò."
+      }
+    },
+    {
+      "id": 13,
+      "type": "heatmap",
+      "title": "Lượt gọi API theo giờ trong ngày × từng ngày",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 6h))",
+          "refId": "H00",
+          "legendFormat": "00:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 5h))",
+          "refId": "H01",
+          "legendFormat": "01:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 4h))",
+          "refId": "H02",
+          "legendFormat": "02:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 3h))",
+          "refId": "H03",
+          "legendFormat": "03:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 2h))",
+          "refId": "H04",
+          "legendFormat": "04:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 1h))",
+          "refId": "H05",
+          "legendFormat": "05:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h]))",
+          "refId": "H06",
+          "legendFormat": "06:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -1h))",
+          "refId": "H07",
+          "legendFormat": "07:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -2h))",
+          "refId": "H08",
+          "legendFormat": "08:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -3h))",
+          "refId": "H09",
+          "legendFormat": "09:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -4h))",
+          "refId": "H10",
+          "legendFormat": "10:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -5h))",
+          "refId": "H11",
+          "legendFormat": "11:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -6h))",
+          "refId": "H12",
+          "legendFormat": "12:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -7h))",
+          "refId": "H13",
+          "legendFormat": "13:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -8h))",
+          "refId": "H14",
+          "legendFormat": "14:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -9h))",
+          "refId": "H15",
+          "legendFormat": "15:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -10h))",
+          "refId": "H16",
+          "legendFormat": "16:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -11h))",
+          "refId": "H17",
+          "legendFormat": "17:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -12h))",
+          "refId": "H18",
+          "legendFormat": "18:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -13h))",
+          "refId": "H19",
+          "legendFormat": "19:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -14h))",
+          "refId": "H20",
+          "legendFormat": "20:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -15h))",
+          "refId": "H21",
+          "legendFormat": "21:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -16h))",
+          "refId": "H22",
+          "legendFormat": "22:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -17h))",
+          "refId": "H23",
+          "legendFormat": "23:00",
+          "interval": "1d"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "yAxis": {
+          "axisLabel": "Giờ trong ngày"
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Blues",
+          "steps": 64
+        },
+        "tooltip": {
+          "mode": "single",
+          "yHistogram": false,
+          "showColorScale": true
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        }
+      },
+      "description": "Cột là ngày, hàng là giờ trong ngày (giờ Việt Nam). Ô càng đậm càng nhiều lượt gọi.",
+      "interval": "1d",
+      "maxDataPoints": 120
+    },
+    {
+      "id": 14,
+      "type": "bargauge",
+      "title": "Trung bình lượt gọi API mỗi giờ trong ngày",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 6h))",
+          "refId": "H00",
+          "legendFormat": "00:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 5h))",
+          "refId": "H01",
+          "legendFormat": "01:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 4h))",
+          "refId": "H02",
+          "legendFormat": "02:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 3h))",
+          "refId": "H03",
+          "legendFormat": "03:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 2h))",
+          "refId": "H04",
+          "legendFormat": "04:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset 1h))",
+          "refId": "H05",
+          "legendFormat": "05:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h]))",
+          "refId": "H06",
+          "legendFormat": "06:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -1h))",
+          "refId": "H07",
+          "legendFormat": "07:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -2h))",
+          "refId": "H08",
+          "legendFormat": "08:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -3h))",
+          "refId": "H09",
+          "legendFormat": "09:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -4h))",
+          "refId": "H10",
+          "legendFormat": "10:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -5h))",
+          "refId": "H11",
+          "legendFormat": "11:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -6h))",
+          "refId": "H12",
+          "legendFormat": "12:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -7h))",
+          "refId": "H13",
+          "legendFormat": "13:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -8h))",
+          "refId": "H14",
+          "legendFormat": "14:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -9h))",
+          "refId": "H15",
+          "legendFormat": "15:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -10h))",
+          "refId": "H16",
+          "legendFormat": "16:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -11h))",
+          "refId": "H17",
+          "legendFormat": "17:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -12h))",
+          "refId": "H18",
+          "legendFormat": "18:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -13h))",
+          "refId": "H19",
+          "legendFormat": "19:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -14h))",
+          "refId": "H20",
+          "legendFormat": "20:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -15h))",
+          "refId": "H21",
+          "legendFormat": "21:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -16h))",
+          "refId": "H22",
+          "legendFormat": "22:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h] offset -17h))",
+          "refId": "H23",
+          "legendFormat": "23:00",
+          "interval": "1d"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        },
+        "orientation": "vertical",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "valueMode": "color"
+      },
+      "description": "Trung bình của từng giờ trên cả khoảng thời gian đang chọn. Cột cao nhất là giờ cao điểm.",
+      "interval": "1d"
+    },
+    {
+      "id": 15,
+      "type": "bargauge",
+      "title": "Trung bình lượt đăng nhập thành công mỗi giờ trong ngày",
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset 6h))",
+          "refId": "H00",
+          "legendFormat": "00:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset 5h))",
+          "refId": "H01",
+          "legendFormat": "01:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset 4h))",
+          "refId": "H02",
+          "legendFormat": "02:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset 3h))",
+          "refId": "H03",
+          "legendFormat": "03:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset 2h))",
+          "refId": "H04",
+          "legendFormat": "04:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset 1h))",
+          "refId": "H05",
+          "legendFormat": "05:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h]))",
+          "refId": "H06",
+          "legendFormat": "06:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -1h))",
+          "refId": "H07",
+          "legendFormat": "07:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -2h))",
+          "refId": "H08",
+          "legendFormat": "08:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -3h))",
+          "refId": "H09",
+          "legendFormat": "09:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -4h))",
+          "refId": "H10",
+          "legendFormat": "10:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -5h))",
+          "refId": "H11",
+          "legendFormat": "11:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -6h))",
+          "refId": "H12",
+          "legendFormat": "12:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -7h))",
+          "refId": "H13",
+          "legendFormat": "13:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -8h))",
+          "refId": "H14",
+          "legendFormat": "14:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -9h))",
+          "refId": "H15",
+          "legendFormat": "15:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -10h))",
+          "refId": "H16",
+          "legendFormat": "16:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -11h))",
+          "refId": "H17",
+          "legendFormat": "17:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -12h))",
+          "refId": "H18",
+          "legendFormat": "18:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -13h))",
+          "refId": "H19",
+          "legendFormat": "19:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -14h))",
+          "refId": "H20",
+          "legendFormat": "20:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -15h))",
+          "refId": "H21",
+          "legendFormat": "21:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -16h))",
+          "refId": "H22",
+          "legendFormat": "22:00",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(erg_auth_login_count_total{result=~\"(?i)success.*\"}[1h] offset -17h))",
+          "refId": "H23",
+          "legendFormat": "23:00",
+          "interval": "1d"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        },
+        "orientation": "vertical",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "valueMode": "color"
+      },
+      "description": "Giờ nào người dùng bắt đầu vào hệ thống nhiều nhất.",
+      "interval": "1d"
+    },
+    {
+      "id": 16,
+      "type": "bargauge",
+      "title": "Trung bình lượt gọi API theo thứ trong tuần",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 1)",
+          "refId": "D1",
+          "legendFormat": "Thứ 2",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 2)",
+          "refId": "D2",
+          "legendFormat": "Thứ 3",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 3)",
+          "refId": "D3",
+          "legendFormat": "Thứ 4",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 4)",
+          "refId": "D4",
+          "legendFormat": "Thứ 5",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 5)",
+          "refId": "D5",
+          "legendFormat": "Thứ 6",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 6)",
+          "refId": "D6",
+          "legendFormat": "Thứ 7",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1d] offset -17h)) and on() (day_of_week(vector(time())) == 0)",
+          "refId": "D0",
+          "legendFormat": "Chủ nhật",
+          "interval": "1d"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "valueMode": "color"
+      },
+      "interval": "1d"
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Đỉnh trong ngày: lượt gọi API mỗi giây (cao nhất 5 phút)",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "max_over_time(erg:api_requests_per_second:5m[1d])",
+          "refId": "A",
+          "legendFormat": "Đỉnh trong ngày",
+          "interval": "1d"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "avg_over_time(erg:api_requests_per_second:5m[1d])",
+          "refId": "B",
+          "legendFormat": "Trung bình ngày",
+          "interval": "1d"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Đường «đỉnh» tăng dần qua các tuần là dấu hiệu sớm nhất của việc sắp cần nâng cấp."
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Lượt gọi API mỗi giờ",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(increase(http_server_requests_seconds_count{uri=~\"/api/.*\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "Lượt gọi / giờ",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "drawStyle": "bars"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Đăng nhập mỗi giờ (thành công / thất bại)",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum by (result) (increase(erg_auth_login_count_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{result}}",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Nộp bài mỗi giờ",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum by (result) (increase(erg_lms_attempt_submit_seconds_count[1h]))",
+          "refId": "A",
+          "legendFormat": "{{result}}",
+          "interval": "1h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            },
+            "drawStyle": "bars"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Phiên Tomcat đang mở",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(tomcat_sessions_active_current_sessions)",
+          "refId": "A",
+          "legendFormat": "Phiên"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ]
+}

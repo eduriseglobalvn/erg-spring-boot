@@ -174,16 +174,6 @@ groups:
           summary: "No successful database backup in the last 26 hours"
           description: "ops/backup/backup.sh (cron 20:00 UTC = 03:00 Vietnam) did not finish; check /opt/erg/ops/backup/backup.log."
 
-      # Fires until the off-host copy (fable G1-04) writes this metric: a backup on the same disk is not a backup.
-      - alert: OffsiteBackupStale
-        expr: time() - erg_backup_offsite_last_success_timestamp_seconds > 26 * 3600 or absent(erg_backup_offsite_last_success_timestamp_seconds)
-        for: 15m
-        labels:
-          severity: critical
-        annotations:
-          summary: "No successful off-host backup copy in the last 26 hours"
-          description: "The encrypted off-host upload after ops/backup/backup.sh did not succeed; a disk failure would lose the data and its local backups together."
-
       - alert: OffsiteBackupStale
         expr: time() - erg_backup_offsite_last_success_timestamp_seconds > 26 * 3600 or absent(erg_backup_offsite_last_success_timestamp_seconds)
         for: 15m
@@ -201,3 +191,96 @@ groups:
         annotations:
           summary: "Backend memory near its 3 GB container limit"
           description: "JVM committed memory is {{ $value | humanize1024 }}B; the kernel kills the backend at the limit."
+
+  - name: erg-availability-alerts
+    rules:
+      - alert: PublicEndpointDown
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} không truy cập được từ bên ngoài"
+          description: "Kiểm tra qua Cloudflare thất bại 3 phút liền. Xem cloudflared, nginx và container tương ứng."
+
+      - alert: TlsCertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Chứng chỉ của {{ $labels.instance }} còn {{ $value | printf \"%.0f\" }} ngày"
+          description: "Cloudflare thường tự gia hạn; còn dưới 14 ngày nghĩa là việc gia hạn đang hỏng."
+
+      - alert: DiskSmartUnhealthy
+        expr: smartctl_device_smart_status == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ổ {{ $labels.device }} báo SMART hỏng"
+          description: "Server chỉ có một ổ SSD: kiểm tra backup ngoài máy ngay và chuẩn bị thay ổ."
+
+      - alert: ContainerRestartLoop
+        expr: changes(container_start_time_seconds{name=~"erg-.+"}[15m]) > 2
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} khởi động lại liên tục"
+          description: "Khởi động lại {{ $value | printf \"%.0f\" }} lần trong 15 phút. Xem docker logs của container."
+
+      - alert: ContainerMemoryNearLimit
+        expr: container_memory_working_set_bytes{name=~"erg-.+"} / (container_spec_memory_limit_bytes{name=~"erg-.+"} > 0) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} dùng trên 90% giới hạn RAM"
+          description: "Đang ở {{ $value | humanizePercentage }}; chạm giới hạn thì kernel sẽ kill container."
+
+  # Slow trends that answer "when do we need a bigger server". Recorded every minute, judged hourly over 7 days.
+  - name: erg-capacity-recordings
+    interval: 1m
+    rules:
+      - record: erg:host_cpu_used_percent:5m
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+      - record: erg:api_latency_p95_seconds:5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri=~"/api/.*"}[5m])))
+      - record: erg:api_requests_per_second:5m
+        expr: sum(rate(http_server_requests_seconds_count{uri=~"/api/.*"}[5m]))
+
+  - name: erg-capacity-upgrade-alerts
+    interval: 1h
+    rules:
+      - alert: UpgradeCpuSustained
+        expr: quantile_over_time(0.95, erg:host_cpu_used_percent:5m[7d]) > 70
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nên lên kế hoạch nâng CPU"
+          description: "Trong 7 ngày qua, 5% thời gian bận nhất CPU vượt {{ $value | printf \"%.0f\" }}% (ngưỡng 70%). Xem dashboard «Sức chứa»."
+
+      - alert: UpgradeMemorySustained
+        expr: quantile_over_time(0.05, node_memory_MemAvailable_bytes[7d]) < 3 * 1024 * 1024 * 1024
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nên lên kế hoạch nâng RAM"
+          description: "Trong 7 ngày qua, lúc căng nhất RAM trống chỉ còn {{ $value | humanize1024 }}B (ngưỡng 3 GiB)."
+
+      - alert: UpgradeDiskFullWithin60Days
+        expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[7d], 60 * 86400) < 0
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ổ đĩa sẽ đầy trong vòng 60 ngày"
+          description: "Theo tốc độ tăng 7 ngày qua. Dọn log/backup cũ hoặc nâng ổ đĩa."
+
+      - alert: UpgradeApiLatencySustained
+        expr: quantile_over_time(0.95, erg:api_latency_p95_seconds:5m[7d]) > 0.8
+        labels:
+          severity: warning
+        annotations:
+          summary: "API chậm kéo dài"
+          description: "Trong 7 ngày qua, p95 thời gian phản hồi ở giờ cao điểm là {{ $value | printf \"%.2f\" }} giây (ngưỡng 0,8 giây). Xem dashboard «API chi tiết» để tìm endpoint chậm trước khi nâng máy."
