@@ -9,10 +9,12 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** Local/dev artifact adapter. Production can replace this bean with R2/S3. */
+/** Local/dev artifact adapter; R2LearningStandardsArtifactStorage takes over when the private R2 store is on. */
 @Component
+@ConditionalOnProperty(name = "erg.timekeeping.photos.r2.enabled", havingValue = "false", matchIfMissing = true)
 public final class FileSystemLearningStandardsArtifactStorage implements LearningStandardsArtifactStorage {
     private static final long MAX_ARTIFACT_BYTES = 512L * 1024L * 1024L;
     private final Path root;
