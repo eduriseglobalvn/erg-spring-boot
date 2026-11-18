@@ -139,11 +139,10 @@ public class User extends BaseEntity {
 
     private Long authzVersion = 1L;
 
-    /**
-     * First-login steps: only the temporary password is replaced (owner rule 16-17/11: the recovery email is never a gate).
-     * Verifying the email first (owner note 18/11) waits for a first-login email screen in the web app.
-     */
+    /** First-login steps, in order: a staff account verifies its recovery email before it replaces the temporary password. */
     public java.util.List<String> firstLoginSteps() {
-        return Boolean.TRUE.equals(mustChangePassword) ? java.util.List.of("CHANGE_PASSWORD") : java.util.List.of();
+        if (!Boolean.TRUE.equals(mustChangePassword)) return java.util.List.of();
+        return Boolean.TRUE.equals(recoveryEmailVerified)
+                ? java.util.List.of("CHANGE_PASSWORD") : java.util.List.of("VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD");
     }
 }

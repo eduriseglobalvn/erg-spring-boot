@@ -104,15 +104,13 @@ class AccountVerificationServiceTest {
     }
 
     @Test
-    void nonGoogleAccountCannotUsePrimaryEmailAsRecoveryEmail() {
+    void anAccountMayVerifyItsOwnSignInAddress() {
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user()));
 
-        var error = assertThrows(
-                com.erg.ergspringboot.exception.AccountLifecycleException.class,
-                () -> service.requestRecoveryEmailChallenge("user-1", "erg", "Primary@Example.com")
-        );
+        var challenge = service.requestRecoveryEmailChallenge("user-1", "erg", " ");
 
-        org.junit.jupiter.api.Assertions.assertEquals("RECOVERY_EMAIL_REQUIRED", error.getCode());
+        verify(mailSender).sendRecoveryEmailCode(eq("primary@example.com"), any(), any());
+        org.junit.jupiter.api.Assertions.assertNotNull(challenge.challengeId());
     }
 
     private User user() {

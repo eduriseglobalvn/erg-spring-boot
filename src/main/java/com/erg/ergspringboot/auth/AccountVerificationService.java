@@ -58,29 +58,15 @@ public class AccountVerificationService {
         return requestRecoveryEmailChallenge(userId, tenantId, requestedEmail, null);
     }
 
-    public static boolean isGoogleEmail(String email) {
-        if (email == null) return false;
-        String normalized = email.trim().toLowerCase();
-        return normalized.endsWith("@gmail.com") || normalized.endsWith("@googlemail.com");
-    }
-
     @Transactional
     public RecoveryEmailChallengeResponse requestRecoveryEmailChallenge(
             String userId, String tenantId, String requestedEmail, UserAuditContext auditContext
     ) {
         User user = findUser(userId, tenantId);
-        boolean isGoogleUser = isGoogleEmail(user.getEmail());
-        String email = (isGoogleUser && (requestedEmail == null || requestedEmail.isBlank() || requestedEmail.equalsIgnoreCase(user.getEmail())))
-                ? normalizeEmail(user.getEmail())
-                : normalizeEmail(requestedEmail);
-
-        // A Google account may verify its own primary address as recovery email; that is the only
-        // exemption from "must differ". The cross-account conflict check applies to every address.
-        boolean isSelfGoogleVerification = isGoogleUser && email.equalsIgnoreCase(user.getEmail());
-        if (!isSelfGoogleVerification && email.equalsIgnoreCase(user.getEmail())) {
-            throw failure(HttpStatus.BAD_REQUEST, "RECOVERY_EMAIL_REQUIRED",
-                    "recovery email must differ from primary email");
-        }
+        // Owner rule 18/11: an account needs an address that really receives mail before it may replace its temporary
+        // password. Its own sign-in address counts once the code sent there is typed back; blank means that address.
+        String email = requestedEmail == null || requestedEmail.isBlank()
+                ? normalizeEmail(user.getEmail()) : normalizeEmail(requestedEmail);
         if (userRepository.existsByRecoveryEmailIgnoreCaseAndIdNot(email, userId)) {
             throw failure(HttpStatus.CONFLICT, "RECOVERY_EMAIL_CONFLICT",
                     "recovery email is already used by another account");
