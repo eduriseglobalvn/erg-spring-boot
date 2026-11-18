@@ -100,6 +100,9 @@ class DemoSeedPurgeMigrationIntegrationTest {
         try (Connection connection = connect(url); var statement = connection.createStatement()) {
             statement.execute("set app.maintenance_mode = 'true'");
             assertThat(number(statement, "select count(*) from users where id = 'usr_super_admin'")).isOne();
+            // V171: the admin proves a mailbox before the first password change, like every other staff account.
+            assertThat(number(statement, "select count(*) from users where id = 'usr_super_admin'"
+                    + " and must_change_password and not recovery_email_verified")).isOne();
             assertThat(number(statement, "select (select count(*) from users) + (select count(*) from education_units)"
                     + " + (select count(*) from user_roles) + (select count(*) from user_access_scopes)")).isEqualTo(4);
             assertThat(number(statement, DEMO_ROWS + " + (select count(*) from curriculum_subjects)"
