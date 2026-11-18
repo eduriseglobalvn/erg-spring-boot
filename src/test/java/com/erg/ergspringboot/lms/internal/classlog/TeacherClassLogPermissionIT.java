@@ -6,7 +6,7 @@ import com.erg.ergspringboot.calendar.TeachingScheduleFixtures;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** B3: V54 stripped class-log and attendance write from teachers; V159 gives them back. */
+/** B3: teachers write the class log and attendance (V159); since V160 the one teacher role is Giáo viên, Vận hành only reads. */
 class TeacherClassLogPermissionIT extends TeachingScheduleFixtures {
 
     private List<String> grants(String role) {
@@ -15,14 +15,10 @@ class TeacherClassLogPermissionIT extends TeachingScheduleFixtures {
     }
 
     @Test
-    void everyTeacherRoleThatMayWriteTheClassLogAndAttendanceHoldsThePermissions() {
+    void theTeacherRoleWritesTheClassLogAndAttendanceAndOperationsOnlyReads() {
         assertThat(grants("lms.instructor")).contains("lms.class_log.read", "lms.class_log.write",
                 "lms.attendance.read", "lms.attendance.write");
-        for (String role : List.of("lms_teacher_standard", "lms_homeroom_teacher", "lms_subject_teacher",
-                "lms_teacher_assistant", "lms_teacher_lead")) {
-            assertThat(grants(role)).as(role).contains("lms.class_log.read", "lms.class_log.write", "lms.attendance.write");
-        }
-        assertThat(grants("lms_teacher_readonly")).contains("lms.class_log.read")
+        assertThat(grants("operations")).contains("lms.class_log.read")
                 .doesNotContain("lms.class_log.write", "lms.attendance.write");
     }
 }

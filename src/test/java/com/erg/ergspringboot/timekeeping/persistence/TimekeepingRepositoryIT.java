@@ -105,28 +105,23 @@ class TimekeepingRepositoryIT {
     }
 
     @Test
-    void v135GrantsTimekeepingPermissionsToExplicitRoles() {
-        assertThat(granted("timekeeping.self", "role_lms_teacher_standard")).isTrue();
+    void businessRolesHoldTheTimekeepingPermissionsOfTheCatalog() {
+        // Since V160: teachers punch for themselves; Phòng đào tạo approves and manages; Vận hành only reads.
         assertThat(granted("timekeeping.self", "role_lms_teacher")).isTrue();
-        assertThat(granted("timekeeping.approve", "role_lms_teacher_lead")).isTrue();
-        assertThat(granted("timekeeping.approve", "role_school_vice_principal")).isTrue();
-        assertThat(granted("timekeeping.approve", "role_school_manager")).isTrue();
-        assertThat(granted("timekeeping.manage", "role_lms_admin")).isTrue();
-        assertThat(granted("timekeeping.manage", "role_super_admin")).isTrue();
-        assertThat(granted("timekeeping.manage", "role_system_admin")).isTrue();
+        assertThat(granted("timekeeping.approve", "role_lms_teacher")).isFalse();
+        assertThat(granted("timekeeping.manage", "role_lms_teacher")).isFalse();
 
         assertThat(granted("timekeeping.self", "role_pdt_operator")).isTrue();
-        assertThat(granted("timekeeping.approve", "role_pdt_operator")).isFalse();
-        assertThat(granted("timekeeping.manage", "role_pdt_operator")).isFalse();
-        assertThat(granted("timekeeping.manage", "role_school_manager")).isFalse();
-        assertThat(granted("timekeeping.manage", "role_lms_teacher_lead")).isFalse();
+        assertThat(granted("timekeeping.approve", "role_pdt_operator")).isTrue();
+        assertThat(granted("timekeeping.manage", "role_pdt_operator")).isTrue();
+
+        assertThat(granted("timekeeping.read", "role_operations")).isTrue();
+        assertThat(granted("timekeeping.approve", "role_operations")).isFalse();
+        assertThat(granted("timekeeping.manage", "role_operations")).isFalse();
         assertThat(jdbc.queryForObject("""
                 select count(*) from role_permissions rp join permissions p on p.id = rp.permission_id
                 where p.name like 'timekeeping.%' and rp.role_id = 'role_lms_student'
                 """, Integer.class)).isZero();
-        assertThat(jdbc.queryForObject(
-                "select name from roles where id = 'role_school_vice_principal'", String.class))
-                .isEqualTo("school.vice_principal");
     }
 
     @Test

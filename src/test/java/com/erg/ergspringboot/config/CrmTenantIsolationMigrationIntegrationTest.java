@@ -7,7 +7,6 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
@@ -64,16 +63,6 @@ class CrmTenantIsolationMigrationIntegrationTest {
                 assertThat(single(statement, "select count(*)::text from pg_policies where tablename = '" + table
                         + "' and qual like '%app.tenant_id%' and with_check like '%app.tenant_id%'")).as(table).isEqualTo("1");
             }
-            List<String> approvers = new ArrayList<>();
-            try (ResultSet roles = statement.executeQuery("""
-                    select r.name from roles r
-                    join role_permissions rp on rp.role_id = r.id
-                    join permissions p on p.id = rp.permission_id
-                    where p.name = 'crm.handover.approve'
-                    """)) {
-                while (roles.next()) approvers.add(roles.getString(1));
-            }
-            assertThat(approvers).contains("seo.manager", "seo.lead").doesNotContain("seo.staff");
         }
     }
 

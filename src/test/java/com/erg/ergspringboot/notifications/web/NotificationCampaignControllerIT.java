@@ -196,18 +196,18 @@ class NotificationCampaignControllerIT {
         @SuppressWarnings("unchecked")
         List<String> permissions = entityManager.createNativeQuery("""
                 select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
-                where rp.role_id = 'role_lms_teacher_standard'
+                where rp.role_id = 'role_lms_teacher'
                 """).getResultList();
         assertThat(permissions).contains("notification.campaign.send");
         String granted = String.join(",", permissions);
 
         mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "gv-std")
-                        .header("X-Roles", "lms_teacher_standard").header("X-Permissions", granted)
+                        .header("X-Roles", "lms.instructor").header("X-Permissions", granted)
                         .contentType("application/json").content(classAudienceJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(3));
         mockMvc.perform(post(BASE + "/estimate").header("X-Tenant-ID", TENANT).header("X-User-ID", "gv-std")
-                        .header("X-Roles", "lms_teacher_standard").header("X-Permissions", granted)
+                        .header("X-Roles", "lms.instructor").header("X-Permissions", granted)
                         .contentType("application/json")
                         .content("{\"wholeTenant\":false,\"classIds\":[\"class-other\"]}"))
                 .andExpect(status().isForbidden());
@@ -215,8 +215,8 @@ class NotificationCampaignControllerIT {
 
     @Test
     void theJobFailsACampaignWhoseCreatorNoLongerHoldsTheSendPermission() {
-        // Read-only teacher role: still a teacher of 7A, but without notification.campaign.send.
-        entityManager.find(User.class, "gv-std").getRoles().add(entityManager.find(Role.class, "role_lms_teacher_readonly"));
+        // Vận hành is read-only: still the homeroom teacher of 7A, but without notification.campaign.send.
+        entityManager.find(User.class, "gv-std").getRoles().add(entityManager.find(Role.class, "role_operations"));
         NotificationCampaignEntity due = campaigns.save(
                 campaign("gv-std", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1)));
         entityManager.flush();
@@ -267,7 +267,7 @@ class NotificationCampaignControllerIT {
     }
 
     @Test
-    void seededLmsAdminReachesOnlyTheSchoolsItManages() throws Exception {
+    void phongDaoTaoReachesEverySchoolOfTheTenantButNoTenantWideAudience() throws Exception {
         String granted = seedLmsAdmin("la-1");
 
         mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
@@ -279,9 +279,12 @@ class NotificationCampaignControllerIT {
                 .andExpect(jsonPath("$.data.total").value(3));
         mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
                         .content("{\"wholeTenant\":false,\"schoolIds\":[\"school-far\"]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
         mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
                         .content("{\"wholeTenant\":false,\"classIds\":[\"class-far\"]}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted)
+                        .content("{\"wholeTenant\":false,\"schoolIds\":[\"school-elsewhere\"]}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(asLmsAdmin(post(BASE + "/estimate"), "la-1", granted).content("{\"wholeTenant\":true}"))
                 .andExpect(status().isForbidden());
@@ -291,13 +294,13 @@ class NotificationCampaignControllerIT {
     }
 
     @Test
-    void theJobAppliesTheSameUnitScopeToASeededLmsAdmin() {
+    void theJobAppliesTheSameScopeToPhongDaoTao() {
         seedLmsAdmin("la-1");
         NotificationCampaignEntity own = campaign("la-1", CampaignStatus.SCHEDULED, OffsetDateTime.now().minusMinutes(1));
         own.setAudience(new CampaignAudience(false, List.of("school-camp"), null, null, null, null, null));
         NotificationCampaignEntity foreign = campaign("la-1", CampaignStatus.SCHEDULED,
                 OffsetDateTime.now().minusMinutes(1));
-        foreign.setAudience(new CampaignAudience(false, List.of("school-far"), null, null, null, null, null));
+        foreign.setAudience(new CampaignAudience(false, List.of("school-elsewhere"), null, null, null, null, null));
         campaigns.save(own);
         campaigns.save(foreign);
         entityManager.flush();
@@ -313,11 +316,11 @@ class NotificationCampaignControllerIT {
     @Test
     void theJobHonoursRolesHeldOnlyThroughActiveAssignments() {
         seedFarSchool();
-        // lms.admin and a teacher role held ONLY through role assignments (no user_roles rows), like HTTP sees them.
+        // Phòng đào tạo and the teacher role held ONLY through role assignments (no user_roles rows), like HTTP sees them.
         entityManager.persist(user("la-asg"));
-        assign("la-asg", "role_lms_admin", "school-camp", null, null);
+        assign("la-asg", "role_pdt_operator", "school-camp", null, null);
         entityManager.persist(user("gv-asg"));
-        assign("gv-asg", "role_lms_teacher_standard", "school-camp", null, null);
+        assign("gv-asg", "role_lms_teacher", "school-camp", null, null);
         Classroom taught = new Classroom();
         taught.setId("class-asg");
         taught.setTenantId(TENANT);
@@ -342,12 +345,12 @@ class NotificationCampaignControllerIT {
         entityManager.persist(student);
         // Same roles, but the assignment is revoked or expired: nobody at dispatch.
         entityManager.persist(user("la-revoked"));
-        assign("la-revoked", "role_lms_admin", "school-camp", OffsetDateTime.now().minusDays(1), null);
+        assign("la-revoked", "role_pdt_operator", "school-camp", OffsetDateTime.now().minusDays(1), null);
         entityManager.persist(user("gv-expired"));
-        assign("gv-expired", "role_lms_teacher_standard", "school-camp", null, OffsetDateTime.now().minusDays(1));
+        assign("gv-expired", "role_lms_teacher", "school-camp", null, OffsetDateTime.now().minusDays(1));
 
         NotificationCampaignEntity adminOwn = due("la-asg", schools("school-camp"));
-        NotificationCampaignEntity adminForeign = due("la-asg", schools("school-far"));
+        NotificationCampaignEntity adminForeign = due("la-asg", schools("school-elsewhere"));
         NotificationCampaignEntity teacherOwn = due("gv-asg", classesOf("class-asg"));
         NotificationCampaignEntity teacherForeign = due("gv-asg", classesOf(CLASS_ID));
         NotificationCampaignEntity revoked = due("la-revoked", schools("school-camp"));
@@ -385,17 +388,17 @@ class NotificationCampaignControllerIT {
         return new CampaignAudience(false, null, null, List.of(ids), null, null, null);
     }
 
-    /** User holding the seeded lms.admin role, assigned to school-camp only; returns the role's real permissions. */
+    /** User holding Phòng đào tạo (reaches every unit of the tenant, V160); returns the role's real permissions. */
     private String seedLmsAdmin(String userId) {
         seedFarSchool();
         User admin = user(userId);
-        admin.getRoles().add(entityManager.find(Role.class, "role_lms_admin"));
+        admin.getRoles().add(entityManager.find(Role.class, "role_pdt_operator"));
         entityManager.persist(admin);
-        assign(userId, "role_lms_admin", "school-camp", null, null);
+        assign(userId, "role_pdt_operator", "school-camp", null, null);
         @SuppressWarnings("unchecked")
         List<String> permissions = entityManager.createNativeQuery("""
                 select p.name from role_permissions rp join permissions p on p.id = rp.permission_id
-                where rp.role_id = 'role_lms_admin'
+                where rp.role_id = 'role_pdt_operator'
                 """).getResultList();
         assertThat(permissions).contains("notification.campaign.send");
         return String.join(",", permissions);
@@ -445,7 +448,7 @@ class NotificationCampaignControllerIT {
 
     private static MockHttpServletRequestBuilder asLmsAdmin(
             MockHttpServletRequestBuilder request, String userId, String granted) {
-        return request.header("X-Tenant-ID", TENANT).header("X-User-ID", userId).header("X-Roles", "lms.admin")
+        return request.header("X-Tenant-ID", TENANT).header("X-User-ID", userId).header("X-Roles", "pdt_operator")
                 .header("X-Permissions", granted).contentType("application/json");
     }
 
@@ -470,8 +473,9 @@ class NotificationCampaignControllerIT {
     private static MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder request, String userId, String role) {
         return request.header("X-Tenant-ID", TENANT)
                 .header("X-User-ID", userId)
-                .header("X-Roles", role)
-                .header("X-Permissions", "notification.campaign.send");
+                // Tenant-wide admin is the wildcard holder alone; a teacher needs the teacher workspace gate (V160).
+                .header("X-Roles", "admin".equals(role) ? "system.super_admin" : "lms.instructor")
+                .header("X-Permissions", "admin".equals(role) ? "*" : "notification.campaign.send,teacher.workspace.access");
     }
 
     private static String classAudienceJson() {

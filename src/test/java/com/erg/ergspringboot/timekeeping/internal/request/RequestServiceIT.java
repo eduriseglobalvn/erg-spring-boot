@@ -577,15 +577,22 @@ public class RequestServiceIT {
             for (String user : List.of(f.teacher, f.lead, f.vp, f.vp2)) {
                 jdbc.update("insert into users (id, tenant_id, email, full_name, status, created_at, updated_at)"
                         + " values (?, ?, ?, ?, 'active', now(), now())", user, tenant, user + "@example.test", "Tên " + user);
+                // The manager works outside the school: a SCHOOL_ROLE step is held by every approver of the school,
+                // and the fixture wants the manager on step 1 only.
+                if (user.equals(f.lead)) continue;
                 jdbc.update("insert into user_access_scopes (id, user_id, education_unit_id, role, created_at, updated_at)"
                         + " values (?, ?, ?, 'lms.instructor', now(), now())", "scope_" + user, user, f.school);
             }
             jdbc.update("insert into employee_profiles (id, tenant_id, user_id, employee_code, joined_at, manager_id)"
                     + " values (?, ?, ?, ?, '2016-08-01', ?)", "ep_" + f.teacher, tenant, f.teacher, "E" + f.teacher, f.lead);
-            // the manager must hold timekeeping.approve to be given the MANAGER step (teacher lead role)
-            jdbc.update("insert into user_roles (user_id, role_id) values (?, 'role_lms_teacher_lead')", f.lead);
-            for (String vp : List.of(f.vp, f.vp2)) {
-                jdbc.update("insert into user_roles (user_id, role_id) values (?, 'role_school_vice_principal')", vp);
+            // Approvers hold timekeeping.approve without timekeeping.manage. No business role is shaped like that since
+            // V160 (only Phòng đào tạo and Quản trị approve, and both also manage), so the chain is tested with a test-only role.
+            jdbc.update("insert into roles (id, created_at, updated_at, name, description, is_default)"
+                    + " values ('role_tk_test_approver', now(), now(), 'tk.test.approver', 'test only', false) on conflict do nothing");
+            jdbc.update("insert into role_permissions (role_id, permission_id) select 'role_tk_test_approver', id from permissions"
+                    + " where name in ('timekeeping.self', 'timekeeping.approve') on conflict do nothing");
+            for (String approver : List.of(f.lead, f.vp, f.vp2)) {
+                jdbc.update("insert into user_roles (user_id, role_id) values (?, 'role_tk_test_approver')", approver);
             }
             jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays,"
                     + " created_at, updated_at) values (?, ?, ?, 'Ca sáng', '07:30', '11:30', 1.0, '{1,2,3,4,5}',"

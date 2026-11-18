@@ -96,8 +96,9 @@ class LmsTeacherHomeworkWorkspaceQueryCountIntegrationTest {
                 .allSatisfy(item -> assertThat(item.status()).isEqualTo("active"));
 
         assertThat(statistics.getPrepareStatementCount())
-                .as("teacherHomeworkWorkspace uses nine fixed projection/page statements; the count must not grow with row cardinality")
-                .isLessThanOrEqualTo(9);
+                // 10th–12th: recipient and submitted counts for the page of cards, one batch statement each (roster, saved rows, submitted).
+                .as("teacherHomeworkWorkspace uses twelve fixed projection/page statements; the count must not grow with row cardinality")
+                .isLessThanOrEqualTo(12);
         assertThat(statistics.getEntityLoadCount())
                 .as("projection read should not materialize assignment/attempt/class graphs")
                 .isZero();

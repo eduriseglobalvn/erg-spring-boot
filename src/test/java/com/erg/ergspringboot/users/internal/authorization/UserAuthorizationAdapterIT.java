@@ -53,10 +53,11 @@ class UserAuthorizationAdapterIT {
         entityManager.flush();
         // cycle: center -> school-a -> annex -> center
         entityManager.find(EducationUnit.class, "center").setParentId("annex");
-        assign("u-1", "role_pdt_operator", "center", null, null);
-        assign("u-1", "role_pdt_operator", "foreign", null, null);
-        assign("u-1", "role_pdt_operator", "revoked-root", OffsetDateTime.now().minusDays(1), null);
-        assign("u-1", "role_pdt_operator", "expired-root", null, OffsetDateTime.now().minusDays(1));
+        // Phòng đào tạo reaches the whole tenant, so unit scoping is shown with the teacher role.
+        assign("u-1", "role_lms_teacher", "center", null, null);
+        assign("u-1", "role_lms_teacher", "foreign", null, null);
+        assign("u-1", "role_lms_teacher", "revoked-root", OffsetDateTime.now().minusDays(1), null);
+        assign("u-1", "role_lms_teacher", "expired-root", null, OffsetDateTime.now().minusDays(1));
         entityManager.flush();
         entityManager.clear();
 

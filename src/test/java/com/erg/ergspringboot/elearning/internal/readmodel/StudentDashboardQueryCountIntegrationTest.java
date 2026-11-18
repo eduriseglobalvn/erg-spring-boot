@@ -53,7 +53,7 @@ class StudentDashboardQueryCountIntegrationTest {
                 null,
                 null,
                 List.of("student"),
-                List.of("elearning.assignment.read_self"),
+                List.of("elearning.assignment.read_self", "student.workspace.access"),
                 List.of(),
                 List.of("elearning"),
                 "student",
