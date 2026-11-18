@@ -58,7 +58,10 @@ class TransactionalOutboxWorkerTest {
         OutboxEvent event = event();
         when(repository.findDueForUpdate(any(), any(Integer.class))).thenReturn(List.of(event));
         when(repository.renewLease(eq("event-1"), eq(TransactionalOutboxWorker.WORKER_ID), any())).thenReturn(1);
-        when(repository.findLeasedForUpdate("event-1", TransactionalOutboxWorker.WORKER_ID)).thenReturn(Optional.of(event));
+        // RLS only shows the row when app.tenant_id is set, so the failure result must be recorded in tenant scope.
+        when(repository.findLeasedForUpdate("event-1", TransactionalOutboxWorker.WORKER_ID)).thenAnswer(invocation ->
+                TenantContext.current() != null && "tenant-a".equals(TenantContext.current().tenantId())
+                        ? Optional.of(event) : Optional.empty());
         doThrow(new IllegalStateException("smtp timeout"))
                 .when(smtp).sendTeacherInvite("teacher@example.com", "Teacher", "secret");
         TransactionalOutboxWorker worker = new TransactionalOutboxWorker(
