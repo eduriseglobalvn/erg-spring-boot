@@ -1,4 +1,4 @@
-package com.erg.ergspringboot.common.response.lms;
+package com.erg.ergspringboot.lms;
 
 import java.time.OffsetDateTime;
 import java.util.List;

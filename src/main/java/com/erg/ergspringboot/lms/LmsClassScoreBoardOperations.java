@@ -1,8 +1,8 @@
 package com.erg.ergspringboot.lms;
 
-import com.erg.ergspringboot.common.response.lms.LmsClassScoreBoardResponses.ClassScoreBoardResponse;
-import com.erg.ergspringboot.common.response.lms.LmsClassScoreBoardResponses.ScoreBoardAttempt;
-import com.erg.ergspringboot.common.response.lms.LmsClassScoreBoardResponses.ScoreBoardStudent;
+import com.erg.ergspringboot.lms.LmsClassScoreBoardResponses.ClassScoreBoardResponse;
+import com.erg.ergspringboot.lms.LmsClassScoreBoardResponses.ScoreBoardAttempt;
+import com.erg.ergspringboot.lms.LmsClassScoreBoardResponses.ScoreBoardStudent;
 import com.erg.ergspringboot.lms.persistence.ClassStudentScoreRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;

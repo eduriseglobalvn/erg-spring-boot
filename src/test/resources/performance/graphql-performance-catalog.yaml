@@ -577,7 +577,7 @@ fields:
     cold-warm-scenario: authenticated-cold-warm-redis-down
     fixture-id: graphql-heavy-read-v1
   - coordinate: LmsQuery.classScoreBoard
-    owner: com.erg.ergspringboot.controller.lms.graphql.LmsClassScoreBoardGraphQlController.classScoreBoard
+    owner: com.erg.ergspringboot.lms.internal.readmodel.LmsClassScoreBoardGraphQlController.classScoreBoard
     auth: tenant-and-permission
     classification: persistent-read
     risk: high-cost-bounded-read

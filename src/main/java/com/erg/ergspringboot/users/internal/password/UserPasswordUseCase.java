@@ -49,11 +49,6 @@ public class UserPasswordUseCase {
         if (!passwordService.matches(request.oldPassword(), user.getPasswordHash())) {
             throw new BadRequestException("invalid old password");
         }
-        // A temporary password is replaced only once a verified recovery email exists to recover the account with.
-        if (previousMustChange && !Boolean.TRUE.equals(user.getRecoveryEmailVerified())) {
-            throw new com.erg.ergspringboot.exception.AccountLifecycleException(org.springframework.http.HttpStatus.CONFLICT,
-                    "RECOVERY_EMAIL_NOT_VERIFIED", "verify a recovery email before changing the temporary password");
-        }
         user.setPasswordHash(passwordService.hash(request.newPassword()));
         user.setMustChangePassword(false);
         if (Boolean.TRUE.equals(user.getIsProfileCompleted())

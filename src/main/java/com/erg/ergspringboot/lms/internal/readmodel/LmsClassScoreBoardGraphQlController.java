@@ -1,6 +1,6 @@
-package com.erg.ergspringboot.controller.lms.graphql;
+package com.erg.ergspringboot.lms.internal.readmodel;
 
-import com.erg.ergspringboot.common.response.lms.LmsClassScoreBoardResponses.ClassScoreBoardResponse;
+import com.erg.ergspringboot.lms.LmsClassScoreBoardResponses.ClassScoreBoardResponse;
 import com.erg.ergspringboot.lms.LmsAcademicRecordOperations;
 import com.erg.ergspringboot.lms.LmsClassScoreBoardOperations;
 import com.erg.ergspringboot.lms.authorization.LmsClassRead;

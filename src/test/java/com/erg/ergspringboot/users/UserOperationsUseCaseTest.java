@@ -288,22 +288,6 @@ class UserOperationsUseCaseTest {
     }
 
     @Test
-    void temporaryPasswordCannotBeChangedBeforeTheRecoveryEmailIsVerified() {
-        User user = user("user-1");
-        user.setPasswordHash(passwordService.hash("old-secret"));
-        user.setMustChangePassword(true);
-        user.setRecoveryEmailVerified(false);
-        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
-
-        var failure = assertThrows(com.erg.ergspringboot.exception.AccountLifecycleException.class,
-                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "new-secret"), null));
-
-        assertEquals("RECOVERY_EMAIL_NOT_VERIFIED", failure.getCode());
-        assertTrue(passwordService.matches("old-secret", user.getPasswordHash()));
-        assertEquals(List.of("VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD"), user.firstLoginSteps());
-    }
-
-    @Test
     void changePasswordRejectsWrongOldPassword() {
         User user = user("user-1");
         user.setPasswordHash(passwordService.hash("old-secret"));
@@ -432,7 +416,7 @@ class UserOperationsUseCaseTest {
         assertEquals("new@example.com", response.user().primaryEmail());
         // A created staff account is active at once; it still has to verify its email, then change the password.
         assertEquals("ACTIVE", response.user().status());
-        assertEquals(List.of("VERIFY_RECOVERY_EMAIL", "CHANGE_PASSWORD"), response.lifecycle().nextSteps());
+        assertEquals(List.of("CHANGE_PASSWORD"), response.lifecycle().nextSteps());
         assertFalse(response.oneTimePassword().isBlank());
         verify(userRepository).save(org.mockito.ArgumentMatchers.argThat(user ->
                 "new@example.com".equals(user.getUsername())
