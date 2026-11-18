@@ -27,6 +27,14 @@ IMAGE=erg-spring:$SHA-jvm
 C="docker compose --env-file $ENV_FILE -f $DOCKER_DIR/compose.yml -f $DOCKER_DIR/compose.native.yml -f $DOCKER_DIR/compose.monitor.yml"
 STEP=start SWITCHED=0
 log() { STEP=$*; echo "=== [$(date -u +%H:%M:%S)] $*"; }
+wait_healthy() {
+  local s
+  for _ in $(seq 1 90); do
+    s=$(docker inspect -f '{{.State.Health.Status}} {{.State.Running}}' "$1")
+    case "$s" in "healthy true") return 0;; *false|unhealthy*) break;; esac; sleep 2
+  done
+  echo "$1 did not become healthy ($s)"; docker logs "$1" 2>&1 | grep -E 'ERROR|FAILED|Caused by' | tail -20; return 1
+}
 
 # Telegram notice to the ops chat, with the alert bot's token. The token goes through curl's stdin config so it
 # never shows in `ps`. Without a token this does nothing, and a failed send never fails the deploy.
@@ -42,7 +50,19 @@ on_error() {
   [ "$BASHPID" = "$$" ] || return 0 # a failure inside $(...) is reported once, by the main shell
   trap - ERR
   local state="Production chưa bị đụng, vẫn chạy bản cũ."
-  [ "$SWITCHED" = 1 ] && state="Production ĐÃ bắt đầu chuyển sang bản mới và chưa ổn: xem /logs backend, cân nhắc /rollback."
+  if [ "$SWITCHED" = 1 ]; then
+    state="Production ĐÃ bắt đầu chuyển sang bản mới và chưa ổn: xem /logs backend, cân nhắc /rollback."
+    # Back to the image that was running. Migrations are forward-only and stay applied; the rehearsal
+    # above already proved the new schema starts, and the previous image ignores newer migrations.
+    if [ -n "${PREVIOUS:-}" ] && [ "$PREVIOUS" != "$IMAGE" ]; then
+      sed -i "s|^ERG_APP_IMAGE=.*|ERG_APP_IMAGE=$PREVIOUS|" "$ENV_FILE"
+      if $C up -d --no-deps backend && wait_healthy erg-backend-1; then
+        state="Bản mới không ổn nên đã TỰ QUAY LẠI $PREVIOUS, backend healthy. Migration của bản mới vẫn nằm trong database."
+      else
+        state="Bản mới không ổn và quay lại $PREVIOUS cũng KHÔNG healthy: cần người xử lý ngay (/logs backend)."
+      fi
+    fi
+  fi
   notify "❌ Deploy ${SHA:0:7} lỗi ở bước \"$STEP\" (dòng $1) sau $((SECONDS / 60)) phút. $state"
 }
 trap 'on_error $LINENO' ERR
@@ -101,6 +121,14 @@ log "build $IMAGE"
 DOCKER_BUILDKIT=1 nice -n 10 docker build -q --target jvm-runtime \
   --label org.opencontainers.image.revision="$SHA" -t "$IMAGE" "$ROOT/src" >/dev/null
 
+# A new server has no containers yet: bring up the empty database and Redis so the backup and the
+# rehearsal below run exactly as on any later deploy (the rehearsal then applies every migration from V1).
+if ! docker inspect erg-postgres-1 >/dev/null 2>&1; then
+  log "first install: start postgres and redis"
+  $C up -d postgres redis-state redis-cache
+  wait_healthy erg-postgres-1
+fi
+
 log "back up postgres"
 install -d -m 700 "$ROOT/backups"
 DUMP=$ROOT/backups/erg-pre-$SHA-$(date -u +%Y%m%dT%H%M%SZ).dump
@@ -130,14 +158,6 @@ docker run -d --name $N-app --network $N --env-file "$ENV_FILE" \
   -e ERG_SCHEDULING_ENABLED=false -e ERG_OUTBOX_WORKER_ENABLED=false -e NOTIFICATIONS__WORKER__ENABLED=false \
   -e ERG_REPORTING_WORKER_ENABLED=false -e NOTIFICATIONS__PUSH__ENABLED=false -e SPRING_MAIL_HOST=mail.invalid \
   "$IMAGE" >/dev/null
-wait_healthy() {
-  local s
-  for _ in $(seq 1 90); do
-    s=$(docker inspect -f '{{.State.Health.Status}} {{.State.Running}}' "$1")
-    case "$s" in "healthy true") return 0;; *false|unhealthy*) break;; esac; sleep 2
-  done
-  echo "$1 did not become healthy ($s)"; docker logs "$1" 2>&1 | grep -E 'ERROR|FAILED|Caused by' | tail -20; return 1
-}
 wait_healthy $N-app
 docker logs $N-app 2>&1 | grep -E 'Successfully applied|is up to date|Started ' | cut -c1-200
 cleanup; trap - EXIT
@@ -150,9 +170,13 @@ sed -i "s|^ERG_APP_IMAGE=.*|ERG_APP_IMAGE=$IMAGE|" "$ENV_FILE"
 $C config --quiet
 $C up -d --no-deps backend
 wait_healthy erg-backend-1
+# Start whatever is not running yet (first install, a new service in this commit); never recreates a running one.
+$C up -d --no-recreate
 # Single-file bind mounts keep the old inode after the unpack, so these must be recreated to see new config.
 $C up -d --no-deps --force-recreate nginx alertmanager prometheus grafana node-exporter
 wait_healthy erg-nginx-1
+# The frontend's nginx resolved "nginx" once at start; the recreate above may have given it a new address.
+docker restart erg-system-fe >/dev/null 2>&1 || true
 docker logs erg-backend-1 2>&1 | grep -E 'Successfully applied|is up to date' | cut -c1-200
 log "deployed $SHA (previous image: ${PREVIOUS:-none}, backup: $DUMP)"
 notify "✅ Deploy ${SHA:0:7} xong sau $((SECONDS / 60)) phút, backend và nginx đã healthy. Bản trước: ${PREVIOUS:-không có} (quay lại bằng /rollback)."

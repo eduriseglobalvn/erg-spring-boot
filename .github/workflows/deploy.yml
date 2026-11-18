@@ -1,0 +1,123 @@
+name: deploy-production
+
+# Merge to main -> CI green -> this deploys that commit to the ERG server. No script to run by hand.
+# - During school hours (06:30-21:30 Vietnam time) the deploy is postponed: the server builds the image
+#   itself and the switch drops requests for about a minute. The 21:35 schedule picks the commit up.
+# - "Run workflow" with force deploys now (urgent fix), optionally a chosen commit.
+# - The job reaches the server through the Cloudflare tunnel with a key that can only run
+#   ops/docker/ci-entry.sh (status/deploy). The server builds, backs up, rehearses the migrations,
+#   switches, health-checks and rolls back by itself; this workflow only hands over the source.
+# Moving to another server: change DEPLOY_HOST and DEPLOY_HOST_KEY below and the DEPLOY_SSH_KEY secret.
+on:
+  workflow_run:
+    workflows: ['erg-spring-ci']
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '35 14 * * *' # 21:35 Asia/Ho_Chi_Minh
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit to deploy (40 hex). Empty = newest main commit whose CI passed.'
+        required: false
+        default: ''
+      force:
+        description: 'Deploy now even during school hours'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_TARGET: backend
+  CI_WORKFLOW_FILE: ci.yml
+  DEPLOY_HOST: ssh.erg.edu.vn
+  DEPLOY_USER: erg
+  # The server's public SSH host key (not a secret): /etc/ssh/ssh_host_ed25519_key.pub
+  DEPLOY_HOST_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOBWPvMd0gjBZrghBYyKDmcXVJR0IO9JGHfYgqK3R4s6
+
+jobs:
+  deploy:
+    # Forks never deploy; a CI run only counts when it was a green push to main (not a pull request).
+    if: >-
+      github.repository == 'eduriseglobalvn/erg-spring-boot' &&
+      (github.event_name != 'workflow_run' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 75
+    steps:
+      - name: Pick the commit and check the clock
+        id: pick
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ inputs.sha }}
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          sha=$INPUT_SHA
+          if [ -z "$sha" ]; then
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$CI_WORKFLOW_FILE/runs?branch=main&event=push&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // empty')
+          fi
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::No deployable commit: need a 40-hex sha or a green CI run on main"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          now=$(TZ=Asia/Ho_Chi_Minh date +%H:%M); minutes=$((10#${now%:*} * 60 + 10#${now#*:}))
+          if [ "$INPUT_FORCE" != true ] && [ "$minutes" -ge 390 ] && [ "$minutes" -lt 1290 ]; then
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "### Postponed: $now in Vietnam is school hours. ${sha:0:7} deploys at 21:35, or run this workflow with force." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.pick.outputs.go == 'true'
+        with:
+          ref: ${{ steps.pick.outputs.sha }}
+          persist-credentials: false
+      - name: Open the SSH route through the Cloudflare tunnel
+        if: steps.pick.outputs.go == 'true'
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          [ -n "$DEPLOY_SSH_KEY" ] || { echo "::error::Secret DEPLOY_SSH_KEY is not set in the production environment"; exit 1; }
+          # cloudflared from Cloudflare's signed apt repository (same source as the server's bootstrap).
+          curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' \
+            | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq cloudflared
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          echo "$DEPLOY_HOST $DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
+          printf '%s\n' 'Host erg-prod' "  HostName $DEPLOY_HOST" "  User $DEPLOY_USER" '  IdentityFile ~/.ssh/deploy' \
+            '  IdentitiesOnly yes' '  StrictHostKeyChecking yes' '  ServerAliveInterval 30' \
+            '  ProxyCommand cloudflared access ssh --hostname %h' > ~/.ssh/config
+      - name: Deploy
+        if: steps.pick.outputs.go == 'true'
+        shell: bash
+        env:
+          SHA: ${{ steps.pick.outputs.sha }}
+          INPUT_FORCE: ${{ inputs.force }}
+        run: |
+          deployed=$(ssh erg-prod "status $DEPLOY_TARGET")
+          if [ "$deployed" = "$SHA" ]; then
+            echo "### ${SHA:0:7} is already running on the server. Nothing to do." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          force=''; [ "$INPUT_FORCE" = true ] && force=force
+          set +e
+          git archive --format=tar "$SHA" | ssh erg-prod "deploy $DEPLOY_TARGET $SHA $force"
+          code=$?
+          set -e
+          if [ "$code" = 75 ]; then # the server's own clock check, or another deploy held the lock
+            echo "### The server postponed ${SHA:0:7} (school hours or another deploy running). The 21:35 run retries." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          [ "$code" = 0 ] || { echo "::error::Deploy of ${SHA:0:7} failed on the server (exit $code). The server reported the step to Telegram and rolled back if it had switched."; exit "$code"; }
+          echo "### Deployed ${SHA:0:7} (was ${deployed:0:7})." >> "$GITHUB_STEP_SUMMARY"

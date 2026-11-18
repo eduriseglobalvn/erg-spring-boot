@@ -26,8 +26,8 @@ class NginxSecurityConfigContractTest {
                 "limit_req zone=erg_login burst=100 nodelay;",
                 "limit_req zone=erg_graphql burst=300 nodelay;",
                 "limit_req zone=erg_general burst=600;");
-        // OPS-03: attendance selfies (2 MB) and multipart requests (3 MB) must reach the backend, not die as 413.
-        assertThat(config).contains("client_max_body_size 4m;");
+        // OPS-03: uploads up to 30 MB (owner's decision 18/11/2026) plus multipart overhead must reach the backend, not die as 413.
+        assertThat(config).contains("client_max_body_size 32m;");
         String env = Files.readString(Path.of("ops/docker/.env.production.example"));
         assertThat(env).contains(
                 "ERG_AUTH_LOGIN_RATE_LIMIT_SOURCE_PER_MINUTE=100",
