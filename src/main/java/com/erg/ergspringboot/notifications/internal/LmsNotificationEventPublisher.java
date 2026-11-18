@@ -67,8 +67,8 @@ public class LmsNotificationEventPublisher {
         if (studentUserIds == null || studentUserIds.isEmpty()) {
             return;
         }
-        String title = "Bai tap moi: " + safeLabel(assignmentTitle);
-        String bodyPreview = "Co bai tap moi duoc tao trong lop. Vui long kiem tra va hoan thanh dung han.";
+        String title = "Bài tập mới: " + safeLabel(assignmentTitle);
+        String bodyPreview = "Có bài tập mới được giao cho lớp. Vui lòng kiểm tra và hoàn thành đúng hạn.";
 
         NotificationCommand command = new NotificationCommand(
                 tenantId,
@@ -117,9 +117,9 @@ public class LmsNotificationEventPublisher {
             return;
         }
         try {
-            String title = "Sap den han: " + safeLabel(assignmentTitle);
-            String bodyPreview = "Bai tap \"" + safeLabel(assignmentTitle)
-                    + "\" sap den han vao " + safeLabel(dueAt) + ". Vui long nop bai dung thoi gian.";
+            String title = "Sắp đến hạn: " + safeLabel(assignmentTitle);
+            String bodyPreview = "Bài tập \"" + safeLabel(assignmentTitle)
+                    + "\" sắp đến hạn vào " + safeLabel(dueAt) + ". Vui lòng nộp bài đúng thời gian.";
 
             NotificationCommand command = new NotificationCommand(
                     tenantId,
@@ -172,9 +172,9 @@ public class LmsNotificationEventPublisher {
             return;
         }
         try {
-            String title = "Qua han: " + safeLabel(assignmentTitle);
-            String bodyPreview = "Bai tap \"" + safeLabel(assignmentTitle)
-                    + "\" da qua han vao " + safeLabel(dueAt) + ". Vui long nop bai som nhat co the.";
+            String title = "Quá hạn: " + safeLabel(assignmentTitle);
+            String bodyPreview = "Bài tập \"" + safeLabel(assignmentTitle)
+                    + "\" đã quá hạn vào " + safeLabel(dueAt) + ". Vui lòng nộp bài sớm nhất có thể.";
 
             NotificationCommand command = new NotificationCommand(
                     tenantId,
@@ -232,9 +232,9 @@ public class LmsNotificationEventPublisher {
         if (teacherUserIds == null || teacherUserIds.isEmpty()) {
             return;
         }
-        String title = "Bai lam da duoc nop: " + safeLabel(assignmentTitle);
-        String bodyPreview = "Hoc sinh " + safeLabel(studentName)
-                + " da nop bai cho \"" + safeLabel(assignmentTitle) + "\".";
+        String title = "Bài làm đã được nộp: " + safeLabel(assignmentTitle);
+        String bodyPreview = "Học sinh " + safeLabel(studentName)
+                + " đã nộp bài cho \"" + safeLabel(assignmentTitle) + "\".";
 
         NotificationCommand command = new NotificationCommand(
                 tenantId,
@@ -297,10 +297,10 @@ public class LmsNotificationEventPublisher {
         if (recipientUserIds == null || recipientUserIds.isEmpty()) {
             return;
         }
-        String title = "Can ho tro: " + safeLabel(studentName) + " - " + safeLabel(assignmentTitle);
-        String bodyPreview = "Hoc sinh " + safeLabel(studentName)
-                + " dat diem thap (" + formatScore(score) + "/" + formatScore(maxScore)
-                + ") cho bai tap \"" + safeLabel(assignmentTitle) + "\". Vui long xem xet ho tro.";
+        String title = "Cần hỗ trợ: " + safeLabel(studentName) + " - " + safeLabel(assignmentTitle);
+        String bodyPreview = "Học sinh " + safeLabel(studentName)
+                + " đạt điểm thấp (" + formatScore(score) + "/" + formatScore(maxScore)
+                + ") cho bài tập \"" + safeLabel(assignmentTitle) + "\". Vui lòng xem xét hỗ trợ.";
 
         NotificationCommand command = new NotificationCommand(
                 tenantId,

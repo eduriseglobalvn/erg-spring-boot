@@ -54,7 +54,7 @@ class LmsNotificationEventPublisherTest {
         assertThat(cmd.createdBy()).isEqualTo(CREATED_BY);
         assertThat(cmd.idempotencyKey()).isEqualTo("evt-1");
         assertThat(cmd.userIds()).isEqualTo(studentUserIds);
-        assertThat(cmd.title()).contains("Bai tap moi");
+        assertThat(cmd.title()).contains("Bài tập mới");
         assertThat(cmd.data()).containsKeys("assignmentId", "classId");
     }
 
@@ -79,7 +79,7 @@ class LmsNotificationEventPublisherTest {
         assertThat(cmd.eventType()).isEqualTo("ASSIGNMENT_DUE_SOON");
         assertThat(cmd.createdBy()).as("no users row named system; FK to users").isNull();
         assertThat(cmd.priority()).isEqualTo("normal");
-        assertThat(cmd.title()).contains("Sap den han");
+        assertThat(cmd.title()).contains("Sắp đến hạn");
     }
 
     @Test
@@ -90,7 +90,7 @@ class LmsNotificationEventPublisherTest {
         assertThat(cmd.eventType()).isEqualTo("ASSIGNMENT_OVERDUE");
         assertThat(cmd.createdBy()).isNull();
         assertThat(cmd.priority()).isEqualTo("high");
-        assertThat(cmd.title()).contains("Qua han");
+        assertThat(cmd.title()).contains("Quá hạn");
     }
 
     @Test
@@ -105,7 +105,7 @@ class LmsNotificationEventPublisherTest {
         // created_by references users(id): the student's login account, never the lms_students id.
         assertThat(cmd.createdBy()).isEqualTo(STUDENT_USER_ID);
         assertThat(cmd.data().get("studentId")).isEqualTo(STUDENT_ID);
-        assertThat(cmd.title()).contains("da duoc nop");
+        assertThat(cmd.title()).contains("đã được nộp");
     }
 
     @Test
