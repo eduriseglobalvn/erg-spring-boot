@@ -11,7 +11,7 @@ import org.springframework.util.AntPathMatcher;
  */
 public final class AuditCaptureRules {
 
-    public enum Decision { CAPTURE, SELF_SERVICE, ALREADY_AUDITED }
+    public enum Decision { CAPTURE, SELF_SERVICE, ALREADY_AUDITED, READ_ONLY }
 
     private static final AntPathMatcher MATCHER = new AntPathMatcher();
 
@@ -30,6 +30,14 @@ public final class AuditCaptureRules {
             "/api/v1/lms/attempts/*/answers/*",
             "/api/v1/lms/attempts/*/sync",
             "/api/v1/lms/attempts/*/submit");
+
+    /** POST only because the query is a body (X-003): computes or previews, changes nothing. */
+    public static final List<String> READ_ONLY_REST = List.of(
+            "/api/v1/notification-campaigns/estimate",
+            "/api/v1/notification-campaigns/people/resolve",
+            "/api/v1/calendar/preview",
+            "/api/v1/users/*/preview",
+            "/api/v1/lcms/quizzes/*/validate");
 
     /** Endpoints whose use case already writes a detailed audit record (AuthorizationMutationAuditService). */
     public static final List<String> ALREADY_AUDITED_REST = List.of(
@@ -53,6 +61,7 @@ public final class AuditCaptureRules {
     public static Decision classifyRest(String pathOrPattern) {
         if (matchesAny(SELF_SERVICE_REST, pathOrPattern)) return Decision.SELF_SERVICE;
         if (matchesAny(ALREADY_AUDITED_REST, pathOrPattern)) return Decision.ALREADY_AUDITED;
+        if (matchesAny(READ_ONLY_REST, pathOrPattern)) return Decision.READ_ONLY;
         return Decision.CAPTURE;
     }
 

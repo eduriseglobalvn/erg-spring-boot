@@ -61,4 +61,31 @@ class AuditOutboxWriterTest {
         assertThat(AuditOutboxWriter.argumentResourceId(Map.of("input", Map.of("id", "q-9")))).isEqualTo("q-9");
         assertThat(AuditOutboxWriter.argumentResourceId(Map.of("name", "x"))).isNull();
     }
+
+    record Created(String id, String name) {}
+
+    @Test
+    void aCreateWithoutPathVariableTakesTheIdOfTheReturnedObject() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/notification-campaigns");
+        request.setAttribute(CreatedResourceIdAdvice.ATTRIBUTE, "c-new");
+        assertThat(AuditOutboxWriter.resourceIdOf(request)).isEqualTo("c-new");
+        request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, new java.util.LinkedHashMap<>(Map.of("id", "c-1")));
+        assertThat(AuditOutboxWriter.resourceIdOf(request)).isEqualTo("c-1");
+
+        assertThat(AuditOutboxWriter.idOf(com.erg.ergspringboot.common.response.ApiResponse.success(200, "ok", new Created("r-1", "x"), "/", "req")))
+                .isEqualTo("r-1");
+        assertThat(AuditOutboxWriter.idOf(Map.of("id", "m-1"))).isEqualTo("m-1");
+        assertThat(AuditOutboxWriter.idOf("plain")).isNull();
+        assertThat(AuditOutboxWriter.idOf(java.util.List.of(new Created("r-2", "y")))).isNull();
+        assertThat(AuditOutboxWriter.idOf(null)).isNull();
+    }
+
+    @Test
+    void actionIsAStableBusinessName() {
+        assertThat(AuditOutboxWriter.actionOf("POST", "/api/v1/notification-campaigns/{id}/send")).isEqualTo("notification-campaigns.send");
+        assertThat(AuditOutboxWriter.actionOf("POST", "/api/v1/notification-campaigns")).isEqualTo("notification-campaigns.create");
+        assertThat(AuditOutboxWriter.actionOf("PUT", "/api/v1/notification-campaigns/{id}")).isEqualTo("notification-campaigns.update");
+        assertThat(AuditOutboxWriter.actionOf("DELETE", "/api/v1/lms/classes/{classId}/students/{studentId}")).isEqualTo("lms.classes.students.delete");
+        assertThat(AuditOutboxWriter.actionOf("POST", "/api/v1/lcms/quizzes/{quizId}/publish")).isEqualTo("lcms.quizzes.publish");
+    }
 }

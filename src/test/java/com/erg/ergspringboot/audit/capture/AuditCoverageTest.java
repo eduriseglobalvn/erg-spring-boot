@@ -70,7 +70,7 @@ class AuditCoverageTest {
     @Test
     void noSkipEntryIsStale() {
         List<String> stale = new ArrayList<>();
-        for (String pattern : concat(AuditCaptureRules.SELF_SERVICE_REST, AuditCaptureRules.ALREADY_AUDITED_REST)) {
+        for (String pattern : concat(concat(AuditCaptureRules.SELF_SERVICE_REST, AuditCaptureRules.ALREADY_AUDITED_REST), AuditCaptureRules.READ_ONLY_REST)) {
             if (restWrites.stream().noneMatch(path -> AuditCaptureRules.matchesAny(List.of(pattern), path))) stale.add(pattern);
         }
         for (String name : concat(List.copyOf(AuditCaptureRules.SELF_SERVICE_MUTATIONS),
@@ -84,6 +84,14 @@ class AuditCoverageTest {
     void skipListsDoNotOverlap() {
         assertThat(AuditCaptureRules.SELF_SERVICE_MUTATIONS).doesNotContainAnyElementsOf(AuditCaptureRules.ALREADY_AUDITED_MUTATIONS);
         assertThat(AuditCaptureRules.SELF_SERVICE_REST).doesNotContainAnyElementsOf(AuditCaptureRules.ALREADY_AUDITED_REST);
+        assertThat(AuditCaptureRules.READ_ONLY_REST).doesNotContainAnyElementsOf(AuditCaptureRules.SELF_SERVICE_REST)
+                .doesNotContainAnyElementsOf(AuditCaptureRules.ALREADY_AUDITED_REST);
+    }
+
+    @Test
+    void readOnlyPostsAreNotCaptured() {
+        assertThat(AuditCaptureRules.classifyRest("/api/v1/notification-campaigns/estimate")).isEqualTo(Decision.READ_ONLY);
+        assertThat(AuditCaptureRules.classifyRest("/api/v1/notification-campaigns/{id}/send")).isEqualTo(Decision.CAPTURE);
     }
 
     private static List<String> concat(List<String> a, List<String> b) {

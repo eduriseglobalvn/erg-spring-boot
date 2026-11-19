@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.audit;
 
+import com.erg.ergspringboot.audit.capture.AuditOutboxWriter;
 import com.erg.ergspringboot.audit.internal.AuditLegalHoldService;
 import com.erg.ergspringboot.audit.internal.AuditQueryService;
 import com.erg.ergspringboot.audit.internal.AuditWriteService;
@@ -15,11 +16,19 @@ public class AuditOperations {
     private final AuditWriteService writes;
     private final AuditQueryService reads;
     private final AuditLegalHoldService legalHolds;
+    private final AuditOutboxWriter outbox;
 
-    public AuditOperations(AuditWriteService writes, AuditQueryService reads, AuditLegalHoldService legalHolds) {
+    public AuditOperations(AuditWriteService writes, AuditQueryService reads, AuditLegalHoldService legalHolds,
+                           AuditOutboxWriter outbox) {
         this.writes = writes;
         this.reads = reads;
         this.legalHolds = legalHolds;
+        this.outbox = outbox;
+    }
+
+    /** Queues a record through the outbox: no hash-chain lock, never throws. For hot paths such as login. */
+    public void capture(AuditRecord record) {
+        outbox.write(record);
     }
 
     /** Places or releases a legal hold; requires {@code audit.manage} (checked in the service). */
