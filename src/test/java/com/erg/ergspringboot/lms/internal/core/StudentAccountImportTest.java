@@ -4,6 +4,8 @@ import static com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.Bu
 import static com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.CreateStudentRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +20,7 @@ import com.erg.ergspringboot.users.persistence.UserActivityRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -47,7 +50,7 @@ class StudentAccountImportTest {
         onRoster.setAcademicClassId("class-1");
         onRoster.setStudentCode("9A1-2");
         onRoster.setFullName("Nguyễn Minh Trâm Anh");
-        when(students.findByTenantIdAndAcademicClassIdOrderByFullNameAsc("tenant-1", "class-1")).thenReturn(List.of(onRoster));
+        when(students.findByTenantIdAndSchoolIdAndFullNameIgnoreCase("tenant-1", "school-1", "nguyễn minh trâm anh")).thenReturn(List.of(onRoster));
         when(students.save(any(Student.class))).thenAnswer(call -> call.getArgument(0));
         when(accounts.provisionForImport(any(), any(), any(), any(), any(), any(), any()))
                 .thenAnswer(call -> new StudentAccountProvisioner.ImportedAccount("usr-1", call.getArgument(2)));
@@ -86,5 +89,48 @@ class StudentAccountImportTest {
         assertThat(result.replayed()).isOne();
         verify(accounts, never()).provisionForImport(any(), any(), any(), any(), any(), any(), any());
         verify(students, never()).save(any());
+    }
+
+    @Test
+    void aCodeLessRowIsTheStudentWithThatNameAndBirthdayInsteadOfASecondCopy() {
+        EducationUnit school = new EducationUnit();
+        school.setId("school-1");
+        school.setTenantId("tenant-1");
+        when(schools.findByIdAndTenantId("school-1", "tenant-1")).thenReturn(Optional.of(school));
+        OffsetDateTime birthday = OffsetDateTime.parse("2012-05-10T00:00:00Z");
+        Student known = new Student();
+        known.setId("student-1");
+        known.setSchoolId("school-1");
+        known.setAcademicClassId("class-1");
+        known.setStudentCode("HS-AAAAAA");
+        known.setFullName("Lê Văn Bình");
+        known.setBirthday(birthday);
+        when(students.findByTenantIdAndSchoolIdAndFullNameIgnoreCase("tenant-1", "school-1", "Lê Văn Bình")).thenReturn(List.of(known));
+
+        // Same child, sheet put in another class: still the same student, not a duplicate.
+        var result = service.importStudents("school-1", new BulkStudentImportRequest(List.of(new CreateStudentRequest(
+                "", "Lê Văn Bình", "class-2", null, null, null, birthday, null, null,
+                null, null, null, null, null, null, "ACTIVE"))), null, access);
+
+        assertThat(result.replayed()).isOne();
+        assertThat(result.items()).extracting("id").containsExactly("student-1");
+        verify(students, never()).save(any());
+    }
+
+    @Test
+    void aCodeLessNewStudentGetsAGeneratedCode() {
+        EducationUnit school = new EducationUnit();
+        school.setId("school-1");
+        school.setTenantId("tenant-1");
+        when(schools.findByIdAndTenantId("school-1", "tenant-1")).thenReturn(Optional.of(school));
+        when(students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(eq("tenant-1"), eq("school-1"), anyString())).thenReturn(Optional.empty());
+        when(students.save(any(Student.class))).thenAnswer(call -> call.getArgument(0));
+
+        var result = service.importStudents("school-1", new BulkStudentImportRequest(List.of(new CreateStudentRequest(
+                null, "Trần An", null, null, null, null, null, null, null,
+                null, null, null, null, null, null, "ACTIVE"))), null, access);
+
+        assertThat(result.created()).isOne();
+        assertThat(result.items().get(0).studentCode()).matches("HS-[2-9A-HJ-NP-Z]{6}");
     }
 }
