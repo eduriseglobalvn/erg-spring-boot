@@ -78,8 +78,11 @@ public class AuthSession extends BaseEntity {
 
     private OffsetDateTime revokedAt;
 
-    // Student ticked "ghi nhớ đăng nhập": refresh slides the expiry (RememberedStudentSession).
+    // Ticked "ghi nhớ đăng nhập": refresh slides the expiry (RememberedSession).
     private boolean rememberMe;
+
+    // A remembered staff session slides 7 days within 30; false means the student rule (30 within 90).
+    private boolean rememberStaff;
 
     private String revokedReason;
 }
