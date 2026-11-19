@@ -51,6 +51,7 @@ public class LmsOperationalCommandService {
     private final StudentAccountProvisioner accounts;
     private final LmsReadCacheInvalidator caches;
     private final ClassAssignmentBackfill assignmentBackfill;
+    private final StudentIdentity identity;
 
 
     public LmsOperationalCommandService(
@@ -86,6 +87,7 @@ public class LmsOperationalCommandService {
         this.schools = schools;
         this.activities = activities;
         this.guard = new LmsOperationalScopeGuard(classrooms, students, schools);
+        this.identity = new StudentIdentity(students);
     }
 
     @Transactional
@@ -156,8 +158,9 @@ public class LmsOperationalCommandService {
     public StudentResponse createStudent(String schoolId, CreateStudentRequest request, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
         guard.school(access, schoolId);
-        String code = required(request.studentCode(), "Student code");
-        if (students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, code).isPresent()) {
+        String code = trim(request.studentCode());
+        if (code == null) code = identity.newCode(access.tenantId(), schoolId);
+        else if (students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, code).isPresent()) {
             throw new ConflictException("Student code already exists in this school.");
         }
         Classroom classroom = request.academicClassId() == null || request.academicClassId().isBlank()
@@ -228,15 +231,17 @@ public class LmsOperationalCommandService {
         List<StudentResponse> result = new ArrayList<>();
         List<String> replayedIds = new ArrayList<>();
         for (CreateStudentRequest item : request.items()) {
-            var existing = students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, item.studentCode().trim());
+            String code = trim(item.studentCode());
+            var existing = code == null ? java.util.Optional.<Student>empty()
+                    : students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, code);
             if (existing.isPresent()
                     && !normalize(existing.get().getFullName()).equals(normalize(item.fullName()))) {
                 throw new ConflictException("Import student code belongs to a different student.");
             }
-            // An account import for a student already on the roster (same class + name, imported earlier without
-            // a login) gives that student its account instead of creating a duplicate.
-            if (existing.isEmpty() && trim(item.password()) != null) {
-                existing = unlinkedClassmate(schoolId, item, access);
+            // A code-less row, or an account row for a student imported earlier under another code, is the student
+            // already on the roster with that name (and birthday or class): reuse it instead of creating a duplicate.
+            if (existing.isEmpty() && (code == null || trim(item.password()) != null)) {
+                existing = identity.existing(access.tenantId(), schoolId, item);
             }
             if (existing.isPresent()) {
                 Student student = existing.get();
@@ -336,15 +341,6 @@ public class LmsOperationalCommandService {
                 .filter(existing -> !existing.getId().equals(student.getId()))
                 .ifPresent(existing -> { throw new ConflictException("Login account is already linked to another student."); });
         student.setAuthUserId(authUserId);
-    }
-
-    private java.util.Optional<Student> unlinkedClassmate(String schoolId, CreateStudentRequest item, UserAccessContext access) {
-        String classId = trim(item.academicClassId());
-        if (classId == null) return java.util.Optional.empty();
-        return students.findByTenantIdAndAcademicClassIdOrderByFullNameAsc(access.tenantId(), classId).stream()
-                .filter(student -> schoolId.equals(student.getSchoolId()) && student.getAuthUserId() == null)
-                .filter(student -> normalize(student.getFullName()).equals(normalize(item.fullName())))
-                .findFirst();
     }
 
     private Student attachAccount(UserAccessContext access, String schoolId, Student student, CreateStudentRequest item) {
