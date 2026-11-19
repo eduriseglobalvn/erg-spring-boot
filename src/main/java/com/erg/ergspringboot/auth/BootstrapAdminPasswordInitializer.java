@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * ENV-002: gives the seeded admin a first password the installer knows. While the admin row still carries the
  * migration's temporary hash (nobody has changed it), the password becomes {@code ERG_BOOTSTRAP_ADMIN_PASSWORD}
- * and must be changed at first login. A password that was ever changed is never touched again.
+ * and must be changed at first login. A password that was ever changed is never touched again. There is no
+ * default: without the variable the admin keeps the unusable migration hash and startup logs a warning.
  */
 @Component
 public class BootstrapAdminPasswordInitializer {
@@ -28,7 +29,7 @@ public class BootstrapAdminPasswordInitializer {
     private final String bootstrapPassword;
 
     public BootstrapAdminPasswordInitializer(JdbcTemplate jdbc, PasswordService passwords,
-            @Value("${erg.bootstrap.admin-password:Admin123}") String bootstrapPassword) {
+            @Value("${erg.bootstrap.admin-password:}") String bootstrapPassword) {
         this.jdbc = jdbc;
         this.passwords = passwords;
         this.bootstrapPassword = bootstrapPassword;
@@ -47,7 +48,11 @@ public class BootstrapAdminPasswordInitializer {
         jdbc.queryForObject("select set_config('app.maintenance_mode', 'true', true)", String.class);
         Integer untouched = jdbc.queryForObject(
                 "select count(*) from users where id = 'usr_super_admin' and password_hash = ?", Integer.class, MIGRATION_HASH);
-        if (untouched == null || untouched == 0 || bootstrapPassword == null || bootstrapPassword.isBlank()) {
+        if (untouched == null || untouched == 0) {
+            return false;
+        }
+        if (bootstrapPassword == null || bootstrapPassword.isBlank()) {
+            log.warn("Admin usr_super_admin has no usable password: set ERG_BOOTSTRAP_ADMIN_PASSWORD and restart");
             return false;
         }
         // The hash is compared again in the UPDATE, so two instances starting together cannot overwrite each other.

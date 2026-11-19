@@ -59,7 +59,8 @@ class MutationAuditInterceptorTest {
         assertThat(record.outcome()).isEqualTo(AuditOutcome.SUCCESS);
         assertThat(record.tenantId()).isEqualTo("tenant-a");
         assertThat(record.actorId()).isEqualTo("u-1");
-        assertThat(record.action()).isEqualTo("POST /api/v1/users/{id}/reset");
+        assertThat(record.action()).isEqualTo("users.reset");
+        assertThat(record.details()).containsEntry("pattern", "/api/v1/users/{id}/reset").containsEntry("method", "POST");
         assertThat(record.resourceType()).isEqualTo("USERS");
         assertThat(record.details()).containsEntry("status", 200).containsKey("roles");
     }

@@ -56,22 +56,26 @@ public class GraphQlMutationAuditInstrumentation extends SimplePerformantInstrum
             try {
                 value = fetcher.get(environment);
             } catch (Exception failure) {
-                record(principal, field, outcomeOf(failure), requestId, details);
+                record(principal, field, outcomeOf(failure), requestId, details, null);
                 throw failure;
             }
             if (value instanceof CompletionStage<?> stage) {
                 return stage.whenComplete((result, failure) ->
-                        record(principal, field, failure == null ? AuditOutcome.SUCCESS : outcomeOf(failure), requestId, details));
+                        record(principal, field, failure == null ? AuditOutcome.SUCCESS : outcomeOf(failure), requestId, details,
+                                failure == null ? AuditOutboxWriter.idOf(result) : null));
             }
-            record(principal, field, AuditOutcome.SUCCESS, requestId, details);
+            record(principal, field, AuditOutcome.SUCCESS, requestId, details, AuditOutboxWriter.idOf(value));
             return value;
         };
     }
 
-    private void record(ErgPrincipal principal, String field, AuditOutcome outcome, String requestId, Map<String, Object> details) {
+    /** {@code resultId}: id of the returned object, the only id a create has (X-003). */
+    private void record(ErgPrincipal principal, String field, AuditOutcome outcome, String requestId,
+                        Map<String, Object> details, String resultId) {
         if (principal == null || outcome == null) return;
+        String argumentId = AuditOutboxWriter.argumentResourceId(details.get("arguments"));
         writer.write(AuditOutboxWriter.record(principal, field, "GRAPHQL",
-                AuditOutboxWriter.argumentResourceId(details.get("arguments")), outcome, requestId, details));
+                argumentId != null ? argumentId : resultId, outcome, requestId, details));
     }
 
     private static AuditOutcome outcomeOf(Throwable failure) {

@@ -26,8 +26,10 @@ class GraphQlMutationAuditInstrumentationTest {
     void setUp() {
         String sdl = """
                 type Query { ping: String }
+                type SchoolClass { id: String }
                 type Mutation {
                   renameClass(name: String): String
+                  createClass(name: String): SchoolClass
                   deleteClass: String
                   markStudentAnnouncementRead: String
                 }
@@ -36,6 +38,7 @@ class GraphQlMutationAuditInstrumentationTest {
                 .type("Query", type -> type.dataFetcher("ping", env -> "pong"))
                 .type("Mutation", type -> type
                         .dataFetcher("renameClass", env -> "ok")
+                        .dataFetcher("createClass", env -> java.util.Map.of("id", "class-new"))
                         .dataFetcher("deleteClass", env -> { throw new ForbiddenException("no"); })
                         .dataFetcher("markStudentAnnouncementRead", env -> "ok"))
                 .build();
@@ -62,6 +65,15 @@ class GraphQlMutationAuditInstrumentationTest {
         assertThat(record.outcome()).isEqualTo(AuditOutcome.SUCCESS);
         assertThat(record.actorId()).isEqualTo("u-1");
         assertThat(record.details()).containsKey("arguments");
+    }
+
+    @Test
+    void createMutationRecordsTheIdOfTheCreatedObject() {
+        graphQl.execute("mutation { createClass(name: \"1A\") { id } }");
+
+        ArgumentCaptor<AuditRecord> captor = ArgumentCaptor.forClass(AuditRecord.class);
+        verify(writer).write(captor.capture());
+        assertThat(captor.getValue().resourceId()).isEqualTo("class-new");
     }
 
     @Test

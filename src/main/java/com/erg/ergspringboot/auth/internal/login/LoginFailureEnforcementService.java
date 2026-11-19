@@ -1,5 +1,8 @@
 package com.erg.ergspringboot.auth.internal.login;
 
+import com.erg.ergspringboot.audit.AuditOperations;
+import com.erg.ergspringboot.audit.AuditOutcome;
+import com.erg.ergspringboot.audit.AuditRecord;
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttempt;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
@@ -13,7 +16,9 @@ import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import com.erg.ergspringboot.platform.security.ErgAuthProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +45,7 @@ public class LoginFailureEnforcementService {
     private final AuthSessionRepository sessionRepository;
     private final AuthLoginAttemptRepository attemptRepository;
     private SecurityEventRepository securityEventRepository;
+    private AuditOperations audit;
 
     @Autowired
     public LoginFailureEnforcementService(
@@ -104,6 +110,35 @@ public class LoginFailureEnforcementService {
         this.securityEventRepository = securityEventRepository;
     }
 
+    @Autowired(required = false)
+    void setAuditOperations(AuditOperations audit) {
+        this.audit = audit;
+    }
+
+    /**
+     * X-003: every login, success or failure, lands in the audit log the admin reads. Email and password
+     * are never written; the attempt row keeps the email for lockout counting.
+     */
+    void auditLogin(String userId, String tenantId, AuthClientContext context, String portal,
+                    boolean success, String reason) {
+        if (audit == null) {
+            return;
+        }
+        String tenant = tenantId == null || tenantId.isBlank() ? DEFAULT_TENANT : tenantId.trim();
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("portal", portal);
+        if (reason != null) details.put("reason", reason);
+        if (context != null) {
+            details.put("ip", context.ipAddress());
+            details.put("userAgent", context.userAgent());
+            details.put("deviceName", context.deviceName());
+        }
+        audit.capture(new AuditRecord(tenant, userId, "TENANT", tenant,
+                success ? "auth.login.success" : "auth.login.failed", "USER", userId,
+                success ? AuditOutcome.SUCCESS : AuditOutcome.FAILURE, null, null, null, details,
+                null, OffsetDateTime.now(ZoneOffset.UTC), null));
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordInvalidCredentials(
             User user, String attemptedEmail, AuthClientContext context, String portal
@@ -140,6 +175,7 @@ public class LoginFailureEnforcementService {
         attempt.setReason(reason);
         attempt.setCreatedAt(now);
         attemptRepository.save(attempt);
+        auditLogin(attempt.getUserId(), tenantId, context, portal, false, reason);
 
         if (!enforceThreshold || user == null) {
             return;

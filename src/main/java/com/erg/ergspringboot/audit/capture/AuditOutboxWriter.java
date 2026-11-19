@@ -102,16 +102,67 @@ public class AuditOutboxWriter {
         Map<String, Object> params = new LinkedHashMap<>();
         request.getParameterMap().forEach((key, values) -> params.put(key, values.length == 1 ? values[0] : List.of(values)));
         details.put("params", params);
-        return record(principal, request.getMethod() + " " + pattern, resourceTypeOf(pattern), resourceIdOf(request), outcome,
+        // A 403 from the filter chain has no matched pattern, only the raw path with ids in it.
+        String action = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE) != null
+                ? actionOf(request.getMethod(), pattern) : request.getMethod() + " " + pattern;
+        return record(principal, action, resourceTypeOf(pattern), resourceIdOf(request), outcome,
                 RequestCorrelation.current(request), details);
     }
 
-    /** The target of the call: the last path variable, e.g. {@code {id}} of {@code /notification-campaigns/{id}/send}; null when the path has none. */
+    /**
+     * Stable business name of a REST write (X-003), e.g. {@code notification-campaigns.send} for
+     * {@code POST /api/v1/notification-campaigns/{id}/send} and {@code notification-campaigns.create} for
+     * {@code POST /api/v1/notification-campaigns}. A literal right after a path variable is the verb;
+     * otherwise the HTTP method gives it. The raw method and pattern stay in {@code details}.
+     */
+    static String actionOf(String method, String pattern) {
+        List<String> names = new java.util.ArrayList<>();
+        boolean afterVariable = false;
+        boolean endsWithVerb = false;
+        for (String segment : pattern.split("/")) {
+            if (segment.isBlank() || (names.isEmpty() && (segment.equals("api") || segment.matches("v\\d+")))) continue;
+            boolean variable = segment.startsWith("{");
+            if (!variable) names.add(segment);
+            endsWithVerb = !variable && afterVariable;
+            afterVariable = variable;
+        }
+        if (names.isEmpty()) return method + " " + pattern;
+        String name = String.join(".", names);
+        if (endsWithVerb) return name;
+        return name + "." + switch (method) {
+            case "POST" -> "create";
+            case "PUT", "PATCH" -> "update";
+            case "DELETE" -> "delete";
+            default -> method.toLowerCase(java.util.Locale.ROOT);
+        };
+    }
+
+    /**
+     * The target of the call: the last path variable, e.g. {@code {id}} of {@code /notification-campaigns/{id}/send};
+     * for a create without one, the id of the returned object ({@link CreatedResourceIdAdvice}); else null.
+     */
     static String resourceIdOf(HttpServletRequest request) {
-        if (!(request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE) instanceof Map<?, ?> variables)) return null;
         String last = null;
-        for (Object value : variables.values()) if (value != null) last = value.toString();
+        if (request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE) instanceof Map<?, ?> variables) {
+            for (Object value : variables.values()) if (value != null) last = value.toString();
+        }
+        if (last == null && request.getAttribute(CreatedResourceIdAdvice.ATTRIBUTE) instanceof String created) return created;
         return last;
+    }
+
+    /** The {@code id} of a returned object: a Map entry, a record component or a getter; unwraps {@code ApiResponse.data}. */
+    static String idOf(Object value) {
+        if (value instanceof com.erg.ergspringboot.common.response.ApiResponse<?> envelope) value = envelope.data();
+        if (value instanceof graphql.execution.DataFetcherResult<?> result) value = result.getData();
+        if (value instanceof Map<?, ?> map) return map.get("id") instanceof String id && !id.isBlank() ? id : null;
+        if (value == null || value instanceof CharSequence || value instanceof Iterable<?> || value.getClass().isArray()
+                || value.getClass().getName().startsWith("java.")) return null;
+        try {
+            Object id = value.getClass().getMethod(value.getClass().isRecord() ? "id" : "getId").invoke(value);
+            return id == null || id.toString().isBlank() ? null : id.toString();
+        } catch (ReflectiveOperationException | RuntimeException noId) {
+            return null;
+        }
     }
 
     /** Target id of a GraphQL mutation: an {@code id} argument, or an {@code id} inside its {@code input} object. */

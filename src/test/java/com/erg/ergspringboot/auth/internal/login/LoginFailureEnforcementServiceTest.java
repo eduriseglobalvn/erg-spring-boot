@@ -66,6 +66,26 @@ class LoginFailureEnforcementServiceTest {
         verify(sessionRepository, never()).saveAll(any());
     }
 
+    /** X-003: a failed login is in the audit log, without the typed email. */
+    @Test
+    void failedLoginIsAuditedWithoutTheEmail() {
+        com.erg.ergspringboot.audit.AuditOperations audit = org.mockito.Mockito.mock(com.erg.ergspringboot.audit.AuditOperations.class);
+        LoginFailureEnforcementService service = new LoginFailureEnforcementService(userRepository, sessionRepository, attemptRepository);
+        service.setAuditOperations(audit);
+
+        service.recordFailure(user(), "teacher@example.com",
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", "fp"), "lms", "invalid_credentials", false);
+
+        ArgumentCaptor<com.erg.ergspringboot.audit.AuditRecord> record = ArgumentCaptor.forClass(com.erg.ergspringboot.audit.AuditRecord.class);
+        verify(audit).capture(record.capture());
+        assertThat(record.getValue().action()).isEqualTo("auth.login.failed");
+        assertThat(record.getValue().outcome()).isEqualTo(com.erg.ergspringboot.audit.AuditOutcome.FAILURE);
+        assertThat(record.getValue().resourceId()).isEqualTo("user-1");
+        assertThat(record.getValue().tenantId()).isEqualTo("tenant-a");
+        assertThat(record.getValue().details()).containsEntry("reason", "invalid_credentials").containsEntry("ip", "127.0.0.1");
+        assertThat(record.getValue().details().toString()).doesNotContain("teacher@example.com");
+    }
+
     @Test
     void credentialResetLiftsTheTemporaryLockout() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
