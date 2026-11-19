@@ -90,11 +90,11 @@ class StudentCredentialResetServiceTest {
     }
 
     @Test
-    void resetSetsThePasswordBackToTheUsername() {
+    void resetSetsThePasswordBackToTheDefault() {
         givenStudentInClass("student.workspace.access");
         User user = users.findByIdAndTenantId("u1", "t1").orElseThrow();
         user.setUsername("thcstcd.nguyenvana0123");
-        assertEquals("thcstcd.nguyenvana0123", service.reset(teacherOf("c1"), "c1", "stu-1", null, null, null).password());
+        assertEquals(StudentCredentialResetService.DEFAULT_PASSWORD, service.reset(teacherOf("c1"), "c1", "stu-1", null, null, null).password());
     }
 
     @Test
@@ -102,7 +102,7 @@ class StudentCredentialResetServiceTest {
         givenStudentInClass("student.workspace.access");
         StudentCredentialResetResponse response = service.reset(teacherOf("c1"), "c1", "stu-1", "req", "1.1.1.1", "ua");
         assertEquals("hs01", response.username());
-        assertEquals(10, response.password().length()); // "hs01" is too short to be its own password
+        assertEquals(StudentCredentialResetService.DEFAULT_PASSWORD, response.password());
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(users).save(saved.capture());
         assertEquals("hashed", saved.getValue().getPasswordHash());
