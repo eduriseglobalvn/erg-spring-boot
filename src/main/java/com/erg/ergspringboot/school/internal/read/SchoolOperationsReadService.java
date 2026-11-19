@@ -37,7 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SchoolOperationsReadService {
-    private static final int MAX_WORKSPACE_STUDENTS = 1_000;
+    // shortcut: the school detail page loads every student at once (a school of 1,500 failed at 1,000); page it if a school passes 10,000.
+    private static final int MAX_WORKSPACE_STUDENTS = 10_000;
     private static final int MAX_WORKSPACE_CLASSES = 500;
     private static final int MAX_WORKSPACE_SUBJECTS = 500;
     private final SchoolOperationsReadRepository readRepository;
