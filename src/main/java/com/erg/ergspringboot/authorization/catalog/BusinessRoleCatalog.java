@@ -33,7 +33,7 @@ public final class BusinessRoleCatalog {
             "lms.assignment.read", "lms.assignment.update", "lms.attempt.grade",
             "lms.attendance.read", "lms.attendance.write", "lms.class.read",
             "lms.class_log.read", "lms.class_log.write", "lms.dashboard.read",
-            "lms.exercise.create", "lms.exercise.read", "lms.exercise.update", "lms.grade.read", "lms.grade.write",
+            "lms.exercise.create", "lms.exercise.read", "lms.quiz.read", "learning.outcomes.read", "lms.exercise.update", "lms.grade.read", "lms.grade.write",
             "lms.notification.preferences.update", "lms.notification.read", "lms.portal.access",
             "notification.campaign.send",
             "lms.report.read", "lms.resource.create", "lms.resource.read", "lms.resource.share",
@@ -45,7 +45,7 @@ public final class BusinessRoleCatalog {
             "student.workspace.access",
             "elearning.announcement.read_self", "elearning.assignment.read_self", "elearning.dashboard.read",
             "elearning.discussion.write_self", "lms.assignment.read_self", "lms.assignment.submit",
-            "lms.quiz.play", "lms.schedule.read_self");
+            "lms.quiz.play", "lms.schedule.read_self", "learning.outcomes.read");
 
     private static final Set<PermissionFunction> NOT_LMS = EnumSet.of(
             PermissionFunction.CRM, PermissionFunction.AUDIT, PermissionFunction.AUTHORIZATION,

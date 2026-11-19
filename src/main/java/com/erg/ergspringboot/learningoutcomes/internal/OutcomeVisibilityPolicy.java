@@ -3,10 +3,12 @@ package com.erg.ergspringboot.learningoutcomes.internal;
 import static com.erg.ergspringboot.learningoutcomes.internal.OutcomeValues.required;
 import static com.erg.ergspringboot.learningoutcomes.internal.OutcomeValues.trimToNull;
 
+import com.erg.ergspringboot.authorization.catalog.BusinessRoleCatalog;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.learningoutcomes.persistence.CompetencyAttainment;
 import com.erg.ergspringboot.learningoutcomes.persistence.LearningPath;
 import com.erg.ergspringboot.learningoutcomes.persistence.OutcomeCertificate;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
@@ -23,6 +25,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class OutcomeVisibilityPolicy {
 
+    private final StudentRepository students;
+
+    public OutcomeVisibilityPolicy(StudentRepository students) {
+        this.students = students;
+    }
+
     String tenant(UserAccessContext access) {
         if (access == null || access.userId() == null || access.userId().isBlank()) {
             throw new ForbiddenException("authenticated access context is required");
@@ -32,8 +40,32 @@ public class OutcomeVisibilityPolicy {
 
     void ensureLearnerAccess(UserAccessContext access, String learnerId) {
         String learner = required(learnerId, "learnerId", 96);
-        if (learner.equals(access.userId()) || hasManagePermission()) return;
+        if (learner.equals(access.userId()) || hasManagePermission() || teacherScopeCovers(access, learner)) return;
         throw new ForbiddenException("learner is outside the current access context");
+    }
+
+    /** Owner rule 18/11/2026: a teacher reads outcomes of learners in the classes or schools they are assigned to. */
+    private boolean teacherScopeCovers(UserAccessContext access, String learnerId) {
+        ErgPrincipal principal = currentPrincipal();
+        // Students may carry their own class scope: only the teacher role gets the scoped read, never a classmate.
+        if (principal == null || !principal.roles().contains(BusinessRoleCatalog.TEACHER)) return false;
+        if (!access.hasManagedClassScope() && !access.hasManagedEducationUnitScope()) return false;
+        return students.findFirstByTenantIdAndAuthUserId(access.tenantId(), learnerId)
+                .filter(student -> (access.hasManagedClassScope() && hasText(student.getAcademicClassId())
+                        && access.canAccessClass(student.getAcademicClassId()))
+                        || (access.hasManagedEducationUnitScope() && hasText(student.getSchoolId())
+                        && access.canAccessEducationUnit(student.getSchoolId())))
+                .isPresent();
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private ErgPrincipal currentPrincipal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getPrincipal() instanceof ErgPrincipal principal ? principal : null;
     }
 
     boolean hasManagePermission() {

@@ -249,6 +249,7 @@ account.self.update
 elearning.discussion.moderate
 elearning.leaderboard.manage
 elearning.student.preview
+learning.outcomes.read
 lms.assignment.assign
 lms.assignment.create
 lms.assignment.progress.read
@@ -269,6 +270,7 @@ lms.grade.write
 lms.notification.preferences.update
 lms.notification.read
 lms.portal.access
+lms.quiz.read
 lms.report.read
 lms.resource.create
 lms.resource.read
@@ -293,6 +295,7 @@ elearning.announcement.read_self
 elearning.assignment.read_self
 elearning.dashboard.read
 elearning.discussion.write_self
+learning.outcomes.read
 lms.assignment.read_self
 lms.assignment.submit
 lms.quiz.play
