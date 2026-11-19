@@ -140,8 +140,10 @@ class AuthOperationsFlowTest {
         assertEquals("Chrome", session.getDeviceName());
         assertEquals("fingerprint", session.getDeviceFingerprint());
         assertEquals("127.0.0.1", session.getIpAddress());
-        assertEquals(Duration.ofHours(8), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
-        assertFalse(session.isRememberMe());
+        // Staff (admin included) who tick "ghi nhớ đăng nhập" get a 7-day sliding session (BUG-PR-001).
+        assertEquals(Duration.ofDays(7), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
+        assertTrue(session.isRememberMe());
+        assertTrue(session.isRememberStaff());
         assertNotEquals(response.refreshToken(), session.getRefreshTokenHash());
 
         assertEquals("active@example.com", response.user().email());
@@ -808,6 +810,59 @@ class AuthOperationsFlowTest {
                 new RefreshRequest("student-refresh", "device-a"),
                 new AuthClientContext("203.0.113.1", "JUnit", "device-a", null, "fp-a")));
         assertEquals(createdAt.plusDays(90), session.getExpiresAt());
+    }
+
+    @Test
+    void rememberedStudentSessionIsNotMarkedStaff() {
+        assertFalse(loginStudent(true).isRememberStaff());
+    }
+
+    @Test
+    void staffLoginWithoutRememberMeKeepsEightHourSession() {
+        AuthSession session = loginStaff(false);
+
+        assertEquals(Duration.ofHours(8), Duration.between(session.getLastActiveAt(), session.getExpiresAt()));
+        assertFalse(session.isRememberMe());
+        assertFalse(session.isRememberStaff());
+    }
+
+    @Test
+    void refreshSlidesRememberedStaffSessionSevenDaysAhead() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        AuthSession session = refreshableSession(now.minusDays(3), now.minusDays(3).plusDays(7));
+        session.setRememberStaff(true);
+
+        refreshStudent(session);
+
+        assertTrue(Duration.between(now.plusDays(7), session.getExpiresAt()).abs().toMinutes() < 1);
+    }
+
+    @Test
+    void refreshNeverExtendsRememberedStaffSessionPastThirtyDaysFromLogin() {
+        OffsetDateTime createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(26);
+        AuthSession session = refreshableSession(createdAt, createdAt.plusDays(29));
+        session.setRememberStaff(true);
+
+        refreshStudent(session);
+
+        assertEquals(createdAt.plusDays(30), session.getExpiresAt());
+    }
+
+    private AuthSession loginStaff(boolean rememberMe) {
+        User user = activeUser("admin-1", "admin@example.com", "secret123");
+        Role role = new Role();
+        role.setName("admin");
+        role.setPermissions(new java.util.LinkedHashSet<>(List.of(perm("admin.workspace.access"))));
+        user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
+        when(userRepository.findForLogin("admin@example.com")).thenReturn(Optional.of(user));
+
+        authService.login(
+                new LoginRequest("admin@example.com", "secret123", "web-1", "Chrome", null, "lms", rememberMe),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null));
+
+        ArgumentCaptor<AuthSession> saved = ArgumentCaptor.forClass(AuthSession.class);
+        verify(sessionRepository).save(saved.capture());
+        return saved.getValue();
     }
 
     private static Permission perm(String name) {
