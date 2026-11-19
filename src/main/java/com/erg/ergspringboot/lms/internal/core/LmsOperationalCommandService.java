@@ -252,8 +252,7 @@ public class LmsOperationalCommandService {
         }
         audit(access, "LMS_STUDENT_IMPORT", schoolId, Map.of("requested", request.items().size(), "idempotencyKey", key == null ? "none" : key));
         evictSchool(access.tenantId(), schoolId);
-        return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayedIds.size(),
-                replayedIds.size(), result, replayedIds);
+        return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayedIds.size(), replayedIds.size(), result, replayedIds);
     }
 
     @Transactional

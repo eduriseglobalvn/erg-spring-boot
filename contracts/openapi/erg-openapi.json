@@ -6681,6 +6681,12 @@
             "format": "int32",
             "type": "integer"
           },
+          "replayedStudentIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "requested": {
             "format": "int32",
             "type": "integer"
