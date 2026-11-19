@@ -50,10 +50,13 @@ type LcmsQuery {
   assignmentReport(assignmentId: String!, page: Int, size: Int): AssignmentReport!
   schoolDirectory(input: SchoolDirectoryInput): SchoolDirectoryWorkspace!
   schoolOperations(input: SchoolOperationsInput!): SchoolOperationsWorkspace!
+  schoolStudents(input: SchoolStudentsInput!): SchoolStudentPage!
 }
 
 input SchoolDirectoryInput { tenantId: String, search: String, status: String, schoolType: String, page: Int, size: Int }
 input SchoolOperationsInput { tenantId: String, schoolId: String! }
+"""status: studying | at-risk | inactive. size: 1..200, default 20."""
+input SchoolStudentsInput { tenantId: String, schoolId: String!, search: String, grade: String, className: String, status: String, page: Int, size: Int }
 
 type SchoolDirectoryWorkspace {
   items: [SchoolDirectoryItem!]!
@@ -84,7 +87,7 @@ type SchoolOperationsWorkspace {
   academicYears: [SchoolAcademicYear!]!
   grades: [SchoolGrade!]!
   classes: [SchoolClass!]!
-  students: [SchoolStudent!]!
+  students: [SchoolStudent!]! @deprecated(reason: "Always empty; page students with schoolStudents.")
   subjects: [SchoolSubject!]!
   permissions: SchoolOperationsPermissions!
 }
@@ -104,7 +107,9 @@ type SchoolOperationsProfile {
   version: String!
 }
 
-type SchoolOperationsSummary { classCount: Int!, activeClassCount: Int!, studentCount: Int!, gradeCount: Int! }
+type SchoolOperationsSummary { classCount: Int!, activeClassCount: Int!, studentCount: Int!, gradeCount: Int!, students: SchoolStudentStats!, scoredStudentCount: Int!, averageScore: Float }
+type SchoolStudentStats { total: Int!, atRisk: Int!, studying: Int!, profileComplete: Int!, assigned: Int! }
+type SchoolStudentPage { items: [SchoolStudent!]!, page: Int!, size: Int!, totalItems: Int!, totalPages: Int!, hasNext: Boolean!, hasPrevious: Boolean!, stats: SchoolStudentStats! }
 type SchoolOperationsPermissions { canCreateSchool: Boolean!, canUpdateSchool: Boolean!, canArchiveSchool: Boolean!, canManageClasses: Boolean! }
 type SchoolAcademicYear { id: String!, startYear: Int!, endYear: Int!, displayName: String!, status: String!, startsOn: String, endsOn: String, version: String! }
 type SchoolGrade { id: String!, academicYearId: String!, gradeCode: String!, label: String!, sortOrder: Int!, status: String!, source: String! }

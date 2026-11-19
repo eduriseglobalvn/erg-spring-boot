@@ -2,6 +2,7 @@ package com.erg.ergspringboot.lms.persistence;
 
 import com.erg.ergspringboot.lms.persistence.projection.ClassRiskSummaryProjection;
 import com.erg.ergspringboot.lms.persistence.projection.OverdueStudentProjection;
+import com.erg.ergspringboot.lms.persistence.projection.SchoolStudentStatsProjection;
 import com.erg.ergspringboot.lms.persistence.projection.StudentRosterProjection;
 import java.util.List;
 import java.util.Collection;
@@ -212,4 +213,55 @@ public interface StudentRepository extends JpaRepository<Student, String> {
             double lowScoreThreshold) {
         return summarizeClassWorkspaceRisks(tenantId, academicClassId, lowScoreThreshold, com.erg.ergspringboot.lms.LmsStatePolicy.completedAttemptStates());
     }
+    /** Shared filter of the school student list; status is the UI group: studying, at-risk or inactive. */
+    String SCHOOL_STUDENT_FILTER = """
+            from Student student
+            left join Classroom classroom on classroom.id = student.academicClassId and classroom.tenantId = student.tenantId
+            where student.tenantId = :tenantId
+              and student.schoolId = :schoolId
+              and (:search is null
+                   or lower(student.fullName) like :search
+                   or lower(student.studentCode) like :search
+                   or student.parentPhone like :search)
+              and (:grade is null or classroom.grade = :grade)
+              and (:className is null or classroom.name = :className)
+              and (:status is null
+                   or (:status = 'at-risk' and upper(student.status) = 'AT_RISK')
+                   or (:status = 'studying' and upper(student.status) in ('ACTIVE', 'ENROLLED'))
+                   or (:status = 'inactive' and (student.status is null
+                        or upper(student.status) not in ('AT_RISK', 'ACTIVE', 'ENROLLED'))))
+            """;
+
+    @Query(value = "select student " + SCHOOL_STUDENT_FILTER + " order by student.fullName asc, student.id asc",
+            countQuery = "select count(student.id) " + SCHOOL_STUDENT_FILTER)
+    Page<Student> findSchoolStudents(String tenantId, String schoolId, String search, String grade,
+            String className, String status, Pageable pageable);
+
+    /** assignedClassIds: classes with at least one subject; never empty (pass a placeholder id). */
+    @Query("""
+            select new com.erg.ergspringboot.lms.persistence.projection.SchoolStudentStatsProjection(
+                count(student.id),
+                coalesce(sum(case when upper(student.status) = 'AT_RISK' then 1 else 0 end), 0),
+                coalesce(sum(case when upper(student.status) in ('ACTIVE', 'ENROLLED') then 1 else 0 end), 0),
+                coalesce(sum(case when student.studentCode is not null and classroom.name is not null
+                    and classroom.grade is not null then 1 else 0 end), 0),
+                coalesce(sum(case when student.academicClassId in :assignedClassIds then 1 else 0 end), 0))
+            """ + SCHOOL_STUDENT_FILTER)
+    SchoolStudentStatsProjection summarizeSchoolStudents(String tenantId, String schoolId, String search, String grade,
+            String className, String status, Collection<String> assignedClassIds);
+
+    @Query("""
+            select student.academicClassId, count(student.id) from Student student
+            where student.tenantId = :tenantId and student.schoolId = :schoolId and student.academicClassId is not null
+            group by student.academicClassId
+            """)
+    List<Object[]> countSchoolStudentsByClass(String tenantId, String schoolId);
+
+    /** Row 0: [number of students with a score, their average score or null]. */
+    @Query(value = """
+            select count(*), avg(cast(metrics ->> 'averageScore' as double precision))
+            from lms_students
+            where tenant_id = :tenantId and school_id = :schoolId and metrics ->> 'averageScore' is not null
+            """, nativeQuery = true)
+    List<Object[]> scoreSchoolStudents(String tenantId, String schoolId);
 }
