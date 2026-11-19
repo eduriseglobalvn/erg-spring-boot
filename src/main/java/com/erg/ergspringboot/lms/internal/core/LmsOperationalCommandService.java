@@ -226,7 +226,7 @@ public class LmsOperationalCommandService {
         guard.school(access, schoolId);
         String key = normalizeKey(idempotencyKey);
         List<StudentResponse> result = new ArrayList<>();
-        int replayed = 0;
+        List<String> replayedIds = new ArrayList<>();
         for (CreateStudentRequest item : request.items()) {
             var existing = students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, item.studentCode().trim());
             if (existing.isPresent()
@@ -245,14 +245,15 @@ public class LmsOperationalCommandService {
                     continue;
                 }
                 result.add(studentResponse(student));
-                replayed++;
+                replayedIds.add(student.getId());
                 continue;
             }
             result.add(createStudent(schoolId, item, access));
         }
         audit(access, "LMS_STUDENT_IMPORT", schoolId, Map.of("requested", request.items().size(), "idempotencyKey", key == null ? "none" : key));
         evictSchool(access.tenantId(), schoolId);
-        return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayed, replayed, result);
+        return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayedIds.size(),
+                replayedIds.size(), result, replayedIds);
     }
 
     @Transactional

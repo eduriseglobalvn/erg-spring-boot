@@ -29,5 +29,7 @@ public final class LmsOperationalResponses {
                                          int replayed, List<EnrollmentResponse> items) {}
 
     public record BulkStudentImportResponse(String idempotencyKey, int requested, int created,
-                                            int replayed, List<StudentResponse> items) {}
+                                            int replayed, List<StudentResponse> items,
+                                            /** Rows already on the roster and returned untouched, so the caller issues no new password for them. */
+                                            List<String> replayedStudentIds) {}
 }

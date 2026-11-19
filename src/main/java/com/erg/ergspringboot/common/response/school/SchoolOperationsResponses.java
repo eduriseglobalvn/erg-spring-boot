@@ -30,7 +30,18 @@ public final class SchoolOperationsResponses {
             String contactEmail, String currentAcademicYearId, long version
     ) {}
 
-    public record SchoolOperationsSummary(long classCount, long activeClassCount, long studentCount, int gradeCount) {}
+    public record SchoolOperationsSummary(
+            long classCount, long activeClassCount, long studentCount, int gradeCount,
+            SchoolStudentStats students, long scoredStudentCount, Double averageScore
+    ) {}
+
+    /** status counts of a school's students (or of a filtered slice); "assigned" = in a class that has subjects. */
+    public record SchoolStudentStats(long total, long atRisk, long studying, long profileComplete, long assigned) {}
+
+    public record SchoolStudentPage(
+            List<SchoolStudent> items, int page, int size, long totalItems, int totalPages,
+            boolean hasNext, boolean hasPrevious, SchoolStudentStats stats
+    ) {}
 
     public record SchoolClass(String id, String name, String grade, String homeroomTeacher, long studentCount, String status) {}
 

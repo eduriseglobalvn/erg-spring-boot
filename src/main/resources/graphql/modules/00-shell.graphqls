@@ -50,4 +50,5 @@ type LcmsQuery {
   assignmentReport(assignmentId: String!, page: Int, size: Int): AssignmentReport!
   schoolDirectory(input: SchoolDirectoryInput): SchoolDirectoryWorkspace!
   schoolOperations(input: SchoolOperationsInput!): SchoolOperationsWorkspace!
+  schoolStudents(input: SchoolStudentsInput!): SchoolStudentPage!
 }

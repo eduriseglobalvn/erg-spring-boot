@@ -17,6 +17,7 @@ import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.persistence.projection.SchoolStudentStatsProjection;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.school.persistence.SchoolAcademicYearRepository;
 import com.erg.ergspringboot.school.persistence.SchoolGradeRepository;
@@ -37,8 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SchoolOperationsReadService {
-    // shortcut: the school detail page loads every student at once (a school of 1,500 failed at 1,000); page it if a school passes 10,000.
-    private static final int MAX_WORKSPACE_STUDENTS = 10_000;
+    private static final int MAX_STUDENT_PAGE_SIZE = 200;
     private static final int MAX_WORKSPACE_CLASSES = 500;
     private static final int MAX_WORKSPACE_SUBJECTS = 500;
     private final SchoolOperationsReadRepository readRepository;
@@ -99,67 +99,95 @@ public class SchoolOperationsReadService {
         boolean includeYears = selected.contains("academicYears");
         boolean includeGrades = selected.contains("grades");
         boolean includeClasses = selected.contains("classes");
-        boolean includeStudents = selected.contains("students");
         boolean includeSubjects = selected.contains("subjects");
-        boolean needStudents = includeStudents || includeSubjects || includeClasses;
-        boolean needClassrooms = includeClasses || includeStudents;
-        boolean needSubjects = includeSubjects || includeStudents;
         List<SchoolAcademicYear> years = includeYears
                 ? yearRepository.findByTenantIdAndSchoolIdOrderByStartYearDesc(tenantId, schoolId) : List.of();
         List<SchoolGrade> grades = profile.getCurrentAcademicYearId() == null ? List.of()
                 : includeGrades ? gradeRepository.findByTenantIdAndSchoolIdAndAcademicYearIdOrderBySortOrderAsc(
                         tenantId, schoolId, profile.getCurrentAcademicYearId()) : List.of();
-        List<Classroom> classrooms = needClassrooms
+        List<Classroom> classrooms = includeClasses
                 ? bounded(classroomRepository.findByTenantIdAndSchoolIdOrderByNameAsc(
                         tenantId, schoolId, PageRequest.of(0, MAX_WORKSPACE_CLASSES + 1)),
                         MAX_WORKSPACE_CLASSES, "classes")
                 : List.of();
-        List<Student> students = needStudents
-                ? bounded(studentRepository.findByTenantIdAndSchoolIdOrderByFullNameAsc(
-                        tenantId, schoolId, PageRequest.of(0, MAX_WORKSPACE_STUDENTS + 1)),
-                        MAX_WORKSPACE_STUDENTS, "students")
-                : List.of();
-        // shortcut: allocations of every school year count; filter by the current year once years carry a "2026-2027" key.
-        List<CurriculumClassSubjectAllocation> allocations = needSubjects
-                ? allocationRepository.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(tenantId, schoolId)
-                : List.of();
-        Map<String, List<String>> subjectIdsByClass = allocations.stream().collect(Collectors.groupingBy(
-                CurriculumClassSubjectAllocation::getAcademicClassId,
-                Collectors.mapping(CurriculumClassSubjectAllocation::getSubjectId, Collectors.toList())));
-        List<CurriculumSubject> subjects = bounded(subjectRepository.findAllById(allocations.stream()
-                        .map(CurriculumClassSubjectAllocation::getSubjectId).distinct().toList()).stream()
+        Map<String, List<String>> subjectIdsByClass = subjectIdsByClass(tenantId, schoolId);
+        List<CurriculumSubject> subjects = includeSubjects ? bounded(subjectRepository.findAllById(subjectIdsByClass.values().stream()
+                        .flatMap(List::stream).distinct().toList()).stream()
                         .filter(subject -> tenantId.equals(subject.getTenantId()))
                         .sorted(java.util.Comparator.comparing(CurriculumSubject::getName)).toList(),
-                MAX_WORKSPACE_SUBJECTS, "subjects");
+                MAX_WORKSPACE_SUBJECTS, "subjects") : List.of();
         long activeClasses = includeClasses
                 ? classrooms.stream().filter(item -> "active".equalsIgnoreCase(item.getStatus())).count()
                 : classroomRepository.countByTenantIdAndSchoolIdAndStatusIgnoreCase(tenantId, schoolId, "active");
         long classCount = includeClasses ? classrooms.size() : classroomRepository.countByTenantIdAndSchoolId(tenantId, schoolId);
-        long studentCount = needStudents ? students.size() : studentRepository.countByTenantIdAndSchoolId(tenantId, schoolId);
         long gradeCount = includeGrades ? grades.size()
                 : profile.getCurrentAcademicYearId() == null ? 0
                 : gradeRepository.countByTenantIdAndSchoolIdAndAcademicYearId(
                         tenantId, schoolId, profile.getCurrentAcademicYearId());
-        Map<String, Classroom> classroomById = classrooms.stream().collect(Collectors.toMap(Classroom::getId, Function.identity()));
-        Map<String, Long> studentsByClass = students.stream()
-                .filter(student -> student.getAcademicClassId() != null)
-                .collect(Collectors.groupingBy(Student::getAcademicClassId, Collectors.counting()));
-        Map<String, List<String>> subjectIdsByStudent = students.stream()
-                .collect(Collectors.toMap(Student::getId, student -> student.getAcademicClassId() == null ? List.<String>of()
-                        : subjectIdsByClass.getOrDefault(student.getAcademicClassId(), List.of()).stream().distinct().toList()));
-        Map<String, Long> studentsBySubject = subjectIdsByStudent.values().stream()
-                .flatMap(List::stream)
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        // Counts come from SQL so a school of any size never loads its students here; the list is paged by students().
+        SchoolStudentStats studentStats = studentStats(studentRepository.summarizeSchoolStudents(
+                tenantId, schoolId, null, null, null, null, assignedClassIds(subjectIdsByClass)));
+        Object[] score = studentRepository.scoreSchoolStudents(tenantId, schoolId).getFirst();
+        Map<String, Long> studentsByClass = includeClasses || includeSubjects
+                ? studentRepository.countSchoolStudentsByClass(tenantId, schoolId).stream()
+                        .collect(Collectors.toMap(row -> (String) row[0], row -> ((Number) row[1]).longValue()))
+                : Map.of();
+        Map<String, Long> studentsBySubject = new java.util.HashMap<>();
+        subjectIdsByClass.forEach((classId, subjectIds) -> subjectIds.forEach(subjectId ->
+                studentsBySubject.merge(subjectId, studentsByClass.getOrDefault(classId, 0L), Long::sum)));
         return new SchoolOperationsWorkspace(
                 new SchoolOperationsProfile(unit.getId(), unit.getName(), unit.getSlug(), profile.getSchoolType(),
                         profile.getOnboardingStatus(), profile.getAddress(), profile.getDistrict(), profile.getPrincipalName(),
                         profile.getContactPhone(), profile.getContactEmail(), profile.getCurrentAcademicYearId(), profile.getVersion()),
-                new SchoolOperationsSummary(classCount, activeClasses, studentCount, Math.toIntExact(gradeCount)),
+                new SchoolOperationsSummary(classCount, activeClasses, studentStats.total(), Math.toIntExact(gradeCount),
+                        studentStats, value((Number) score[0]), score[1] == null ? null : ((Number) score[1]).doubleValue()),
                 years.stream().map(this::yearResponse).toList(), grades.stream().map(this::gradeResponse).toList(),
                 classrooms.stream().map(classroom -> classResponse(classroom, studentsByClass)).toList(),
-                includeStudents ? students.stream().map(student -> studentResponse(student, classroomById, subjectIdsByStudent)).toList() : List.of(),
-                includeSubjects ? subjects.stream().map(subject -> subjectResponse(subject, studentsBySubject)).toList() : List.of(),
+                List.of(),
+                subjects.stream().map(subject -> subjectResponse(subject, studentsBySubject)).toList(),
                 new SchoolOperationsPermissions(canCreate, canUpdate, canArchive, canManageClasses));
+    }
+
+    /** One page of a school's students, filtered in SQL; stats cover the whole filtered set, not just the page. */
+    @Transactional(readOnly = true)
+    public SchoolStudentPage students(String tenantId, String schoolId, String search, String grade, String className,
+            String status, Integer page, Integer size) {
+        int safePage = page == null ? 0 : Math.max(0, page);
+        int safeSize = size == null ? 20 : Math.max(1, Math.min(MAX_STUDENT_PAGE_SIZE, size));
+        String like = lower(search) == null ? null : "%" + lower(search) + "%";
+        String safeGrade = trimmed(grade);
+        String safeClassName = trimmed(className);
+        String safeStatus = lower(status);
+        Map<String, List<String>> subjectIdsByClass = subjectIdsByClass(tenantId, schoolId);
+        Page<Student> result = studentRepository.findSchoolStudents(tenantId, schoolId, like, safeGrade, safeClassName,
+                safeStatus, PageRequest.of(safePage, safeSize));
+        Map<String, Classroom> classroomById = classroomRepository.findAllById(result.getContent().stream()
+                        .map(Student::getAcademicClassId).filter(java.util.Objects::nonNull).distinct().toList()).stream()
+                .filter(classroom -> tenantId.equals(classroom.getTenantId()))
+                .collect(Collectors.toMap(Classroom::getId, Function.identity()));
+        SchoolStudentStats stats = studentStats(studentRepository.summarizeSchoolStudents(tenantId, schoolId, like,
+                safeGrade, safeClassName, safeStatus, assignedClassIds(subjectIdsByClass)));
+        return new SchoolStudentPage(
+                result.getContent().stream().map(student -> studentResponse(student, classroomById, subjectIdsByClass)).toList(),
+                safePage, safeSize, result.getTotalElements(), result.getTotalPages(), result.hasNext(), result.hasPrevious(), stats);
+    }
+
+    // shortcut: allocations of every school year count; filter by the current year once years carry a "2026-2027" key.
+    private Map<String, List<String>> subjectIdsByClass(String tenantId, String schoolId) {
+        return allocationRepository.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(tenantId, schoolId).stream()
+                .collect(Collectors.groupingBy(CurriculumClassSubjectAllocation::getAcademicClassId,
+                        Collectors.mapping(CurriculumClassSubjectAllocation::getSubjectId,
+                                Collectors.collectingAndThen(Collectors.toList(), ids -> ids.stream().distinct().toList()))));
+    }
+
+    private Collection<String> assignedClassIds(Map<String, List<String>> subjectIdsByClass) {
+        // An empty IN list is invalid SQL; a placeholder id matches no class.
+        return subjectIdsByClass.isEmpty() ? List.of("__none__") : subjectIdsByClass.keySet();
+    }
+
+    private SchoolStudentStats studentStats(SchoolStudentStatsProjection row) {
+        return new SchoolStudentStats(value(row.total()), value(row.atRisk()), value(row.studying()),
+                value(row.profileComplete()), value(row.assigned()));
     }
 
     private SchoolDirectoryItem directoryItem(SchoolDirectoryRowProjection row) {
@@ -185,9 +213,10 @@ public class SchoolOperationsReadService {
     }
 
     private SchoolStudent studentResponse(
-            Student student, Map<String, Classroom> classroomById, Map<String, List<String>> subjectIdsByStudent) {
+            Student student, Map<String, Classroom> classroomById, Map<String, List<String>> subjectIdsByClass) {
         Classroom classroom = classroomById.get(student.getAcademicClassId());
-        List<String> subjectIds = subjectIdsByStudent.getOrDefault(student.getId(), List.of());
+        List<String> subjectIds = student.getAcademicClassId() == null ? List.of()
+                : subjectIdsByClass.getOrDefault(student.getAcademicClassId(), List.of());
         return new SchoolStudent(student.getId(), student.getStudentCode(), student.getFullName(),
                 student.getBirthday() == null ? null : student.getBirthday().toLocalDate().toString(),
                 classroom == null ? null : classroom.getGrade(), classroom == null ? null : classroom.getName(),
@@ -210,6 +239,7 @@ public class SchoolOperationsReadService {
     }
 
     private String lower(String value) { return value == null || value.isBlank() ? null : value.trim().toLowerCase(Locale.ROOT); }
+    private String trimmed(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private String upper(String value) { return value == null || value.isBlank() ? null : value.trim().toUpperCase(Locale.ROOT); }
     private long value(Number value) { return value == null ? 0 : value.longValue(); }
 }

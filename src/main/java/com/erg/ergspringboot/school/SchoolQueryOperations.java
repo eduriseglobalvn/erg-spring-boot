@@ -2,6 +2,7 @@ package com.erg.ergspringboot.school;
 
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolDirectoryWorkspace;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
+import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolStudentPage;
 import com.erg.ergspringboot.school.internal.read.SchoolOperationsReadService;
 import java.util.Collection;
 import java.util.Set;
@@ -30,5 +31,12 @@ public class SchoolQueryOperations {
     ) {
         return reads.operations(tenantId, schoolId, canCreate, canUpdate, canArchive, canManageClasses,
                 selectedFields);
+    }
+
+    public SchoolStudentPage students(
+            String tenantId, String schoolId, String search, String grade, String className, String status,
+            Integer page, Integer size
+    ) {
+        return reads.students(tenantId, schoolId, search, grade, className, status, page, size);
     }
 }

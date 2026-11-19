@@ -106,6 +106,7 @@ class LmsOperationalCommandServiceTest {
         assertThat(result.idempotencyKey()).isEqualTo("batch-1");
         assertThat(result.created()).isZero();
         assertThat(result.replayed()).isOne();
+        assertThat(result.replayedStudentIds()).containsExactly("student-1");
         verify(students, never()).save(any());
     }
 

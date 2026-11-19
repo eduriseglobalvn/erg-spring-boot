@@ -2,6 +2,7 @@ package com.erg.ergspringboot.controller.lcms.graphql;
 
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolDirectoryWorkspace;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
+import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolStudentPage;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.AccessScopeAssembler;
@@ -60,9 +61,26 @@ public class LcmsSchoolOperationsGraphQlController {
                 accessSupport.isAllowed(principal, "lms.class.manage", "*"), selected);
     }
 
+    @SchemaMapping(typeName = "LcmsQuery", field = "schoolStudents")
+    @LcmsSchoolRead
+    public SchoolStudentPage schoolStudents(@Argument SchoolStudentsInput input) {
+        if (input == null || input.schoolId() == null || input.schoolId().isBlank()) {
+            throw new IllegalArgumentException("schoolId is required.");
+        }
+        ErgPrincipal principal = accessSupport.currentPrincipal();
+        accessSupport.assertPermission(principal, "lms.school.read", "lms.school.update", "lms.manage", "*");
+        String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
+        accessSupport.assertEducationUnitScope(principal, input.schoolId());
+        return queries.students(tenantId, input.schoolId(), input.search(), input.grade(), input.className(),
+                input.status(), input.page(), input.size());
+    }
+
     public record SchoolDirectoryInput(String tenantId, String search, String status, String schoolType, Integer page, Integer size) {
         static SchoolDirectoryInput empty() { return new SchoolDirectoryInput(null, null, null, null, null, null); }
     }
 
     public record SchoolOperationsInput(String tenantId, String schoolId) {}
+
+    public record SchoolStudentsInput(String tenantId, String schoolId, String search, String grade, String className,
+            String status, Integer page, Integer size) {}
 }
