@@ -30,7 +30,8 @@ public final class LmsOperationalRequests {
     ) {}
 
     public record CreateStudentRequest(
-            @NotBlank @Size(max = 255) String studentCode,
+            /** Optional: a blank code gets a generated one (HS-XXXXXX). */
+            @Size(max = 255) String studentCode,
             @NotBlank @Size(max = 255) String fullName,
             String academicClassId,
             @Email @Size(max = 255) String email,

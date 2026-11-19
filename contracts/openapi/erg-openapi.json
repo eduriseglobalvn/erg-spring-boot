@@ -9039,8 +9039,7 @@
           }
         },
         "required": [
-          "fullName",
-          "studentCode"
+          "fullName"
         ],
         "type": "object"
       },
