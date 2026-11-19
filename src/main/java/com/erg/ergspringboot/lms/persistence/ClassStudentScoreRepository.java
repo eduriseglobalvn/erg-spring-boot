@@ -2,7 +2,6 @@ package com.erg.ergspringboot.lms.persistence;
 
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.projection.ClassScoreBoardAttemptProjection;
-import com.erg.ergspringboot.lms.persistence.projection.ClassStudentCurrentAssignmentProjection;
 import com.erg.ergspringboot.lms.persistence.projection.ClassStudentScoreProjection;
 import java.util.Collection;
 import java.util.List;
@@ -43,32 +42,6 @@ public interface ClassStudentScoreRepository extends Repository<Attempt, String>
         if (studentIds.isEmpty()) return List.of();
         return summarizeClassStudentScores(tenantId, academicClassId, studentIds, LmsStatePolicy.completedAttemptStates());
     }
-
-    /** Per student, the assignment of their newest attempt in this class, in progress or handed in. */
-    @Query("""
-            select new com.erg.ergspringboot.lms.persistence.projection.ClassStudentCurrentAssignmentProjection(
-                attempt.studentId, assignment.id, assignment.title, attempt.status
-            )
-            from Attempt attempt
-            join Assignment assignment
-                on assignment.tenantId = attempt.tenantId
-                and assignment.id = attempt.assignmentId
-            where attempt.tenantId = :tenantId
-              and assignment.academicClassId = :academicClassId
-              and attempt.studentId in :studentIds
-              and attempt.startedAt = (
-                  select max(newer.startedAt)
-                  from Attempt newer
-                  join Assignment newerAssignment
-                      on newerAssignment.tenantId = newer.tenantId
-                      and newerAssignment.id = newer.assignmentId
-                  where newer.tenantId = attempt.tenantId
-                    and newer.studentId = attempt.studentId
-                    and newerAssignment.academicClassId = :academicClassId
-              )
-            """)
-    List<ClassStudentCurrentAssignmentProjection> findCurrentAssignments(String tenantId, String academicClassId,
-            Collection<String> studentIds);
 
     /** Every handed-in attempt of a class, newest first, for its score board. */
     @Query("""
