@@ -61,7 +61,7 @@ public final class PermissionCatalog {
         add(list, PermissionFunction.MATERIALS_EXAMS, PermissionKind.XEM,
                 "lms.exercise.read", "lms.quiz.read", "lms.resource.read", "documents.read", "content.resource.read");
         add(list, PermissionFunction.MATERIALS_EXAMS, PermissionKind.SUA,
-                "lms.exercise.create", "lms.exercise.update", "lms.exercise.delete", "lms.exercise.assign", "lms.quiz.create", "lms.quiz.publish", "lms.resource.create", "lms.resource.update", "lms.resource.delete", "lms.resource.share", "documents.manage");
+                "lms.exercise.create", "lms.exercise.update", "lms.exercise.delete", "lms.exercise.assign", "lms.games.host", "lms.quiz.create", "lms.quiz.publish", "lms.resource.create", "lms.resource.update", "lms.resource.delete", "lms.resource.share", "documents.manage");
         add(list, PermissionFunction.CURRICULUM, PermissionKind.XEM,
                 "curriculum.read", "lms.subject.read");
         add(list, PermissionFunction.CURRICULUM, PermissionKind.SUA,
@@ -109,7 +109,7 @@ public final class PermissionCatalog {
         add(list, PermissionFunction.NOTIFICATIONS, PermissionKind.WORKSPACE,
                 "lms.notification.preferences.update");
         add(list, PermissionFunction.ELEARNING, PermissionKind.WORKSPACE,
-                "elearning.discussion.write_self", "lms.assignment.submit", "lms.quiz.play");
+                "elearning.discussion.write_self", "lms.assignment.submit", "lms.quiz.play", "lms.games.play");
         return List.copyOf(list);
     }
 

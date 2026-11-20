@@ -317,6 +317,8 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.require("public-disclosure.manage", auth, context))
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/public-disclosure/**")
                         .access((auth, context) -> permissions.require("public-disclosure.manage", auth, context))
+                        // Game sockets: authenticated here; the handshake interceptor checks the games permission.
+                        .requestMatchers("/ws/games/**").authenticated()
                         .requestMatchers("/api/v1/**").authenticated()
                         .anyRequest().denyAll()
                 )
