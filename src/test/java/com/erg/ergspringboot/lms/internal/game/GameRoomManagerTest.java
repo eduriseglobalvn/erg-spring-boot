@@ -103,6 +103,9 @@ class GameRoomManagerTest {
         manager.connect(host.session, room, "teacher");
         manager.connect(student.session, room, "s1");
         assertThat(student.last("room.state").path("screen").asString("")).isEqualTo("LOBBY");
+        manager.locked(room, at -> manager.tick(room, at));
+        assertThat(host.last("room.lobby").path("classSize").asInt()).isEqualTo(1);
+        assertThat(host.last("room.lobby").path("count").asInt()).isEqualTo(1);
         assertThat(student.last("room.state").path("question").isMissingNode()).isTrue();
 
         // Only the host may start.
@@ -134,9 +137,14 @@ class GameRoomManagerTest {
         tick(room);
         assertThat(student.last("leaderboard").path("me").path("total").asInt()).isGreaterThanOrEqualTo(110);
         assertThat(host.last("leaderboard").path("top")).hasSize(1);
+        assertThat(host.last("leaderboard").path("top").get(0).path("firewall").asBoolean(true)).isFalse();
         int boards = (int) host.types().stream().filter("leaderboard"::equals).count();
         tick(room);
         assertThat(host.types().stream().filter("leaderboard"::equals).count()).isEqualTo(boards);
+
+        now += 1_100;
+        send(room, student, "{\"type\":\"answer\",\"data\":{\"questionId\":\"q1\",\"answer\":{\"choiceId\":\"b\"}}}");
+        send(room, student, "{\"type\":\"next\",\"data\":{}}");
 
         // The student opens a second socket: the old socket is closed.
         Wire second = new Wire(mapper);
@@ -152,6 +160,11 @@ class GameRoomManagerTest {
         JsonNode ended = second.last("room.ended");
         assertThat(ended.path("final")).hasSize(1);
         assertThat(ended.path("me").path("rank").asInt()).isEqualTo(1);
+        JsonNode weak = ended.path("me").path("weakQuestions");
+        assertThat(weak).hasSize(1);
+        assertThat(weak.get(0).path("questionId").asString("")).isEqualTo("q1");
+        assertThat(weak.get(0).path("index").asInt(-1)).isEqualTo(1);
+        assertThat(weak.get(0).path("wrongCount").asInt()).isEqualTo(1);
         verify(writer).enqueue(room);
 
         // Messages sent after the end change nothing and cause no second write.

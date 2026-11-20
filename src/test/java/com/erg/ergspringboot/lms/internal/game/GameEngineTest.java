@@ -110,6 +110,19 @@ class GameEngineTest {
     }
 
     @Test
+    void leaderboardRowsCarryTheFirewallFlag() {
+        Room room = room(10, "LESSON");
+        Player p = started(room);
+        for (int i = 0; i < 3; i++) {
+            answer(room, p, "ok");
+            assertThat(GameViews.top(room, 5).get(0).get("firewall")).isEqualTo(i == 2);
+            passLoot(room, p);
+        }
+        answer(room, p, "no");
+        assertThat(GameViews.top(room, 5).get(0).get("firewall")).isEqualTo(false);
+    }
+
+    @Test
     void multiPartAnswerCountsOnlyWhenEverythingIsRight() {
         Room room = room(5, "LESSON");
         Player p = started(room);

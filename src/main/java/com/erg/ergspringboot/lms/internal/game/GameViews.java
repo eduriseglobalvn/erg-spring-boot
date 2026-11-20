@@ -63,6 +63,7 @@ final class GameViews {
             row.put("coins", p.coins);
             row.put("total", p.total());
             row.put("rank", i + 1);
+            row.put("firewall", p.firewall);
             top.add(row);
         }
         return top;
@@ -88,7 +89,9 @@ final class GameViews {
         List<Map<String, Object>> weak = new ArrayList<>();
         for (int index : p.everWrong) {
             Question q = room.questions.get(index);
-            weak.add(Map.of("questionId", q.id, "title", q.title == null ? "" : q.title));
+            long wrongCount = p.log.stream().filter(r -> r.questionId().equals(q.id) && !r.correct()).count();
+            weak.add(Map.of("questionId", q.id, "title", q.title == null ? "" : q.title,
+                    "index", index, "wrongCount", (int) wrongCount));
         }
         me.put("weakQuestions", weak);
         return me;
@@ -129,7 +132,7 @@ final class GameViews {
             Player p = room.players.get(c.userId());
             if (p != null) players.add(Map.of("playerId", p.userId, "displayName", p.displayName));
         }
-        return Map.of("players", players, "count", players.size());
+        return Map.of("players", players, "count", players.size(), "classSize", room.roster.size());
     }
 
     static Map<String, Object> questionMessage(Room room, Player p) {
