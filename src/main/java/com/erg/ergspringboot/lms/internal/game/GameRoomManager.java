@@ -290,7 +290,7 @@ public class GameRoomManager {
         if (!room.open()) return;
         if (room.lobbyDirty) {
             room.lobbyDirty = false;
-            broadcast(room, "room.lobby", GameViews.lobby(room));
+            for (Conn c : room.connections.values()) send(room, c, "room.lobby", GameViews.lobby(room, c.host()));
         }
         boolean live = room.status == Status.RUNNING || room.status == Status.PAUSED;
         if (live && room.boardDirty && now - room.lastBoardAt >= 1000) {
@@ -373,12 +373,13 @@ public class GameRoomManager {
     }
 
     private void sendLeaderboards(Room room) {
-        List<Map<String, Object>> top = GameViews.top(room, 5);
+        List<Map<String, Object>> hostTop = GameViews.top(room, GameViews.HOST_TOP);
+        List<Map<String, Object>> studentTop = hostTop.subList(0, Math.min(GameViews.STUDENT_TOP, hostTop.size()));
         for (Conn c : room.connections.values()) {
             Player p = room.players.get(c.userId());
             if (!c.host() && (!room.rules.showLeaderboard() || p == null)) continue;
             Map<String, Object> data = new LinkedHashMap<>();
-            data.put("top", top);
+            data.put("top", c.host() ? hostTop : studentTop);
             if (p != null) data.put("me", Map.of("rank", GameViews.rank(room, p), "total", p.total()));
             send(room, c, "leaderboard", data);
         }

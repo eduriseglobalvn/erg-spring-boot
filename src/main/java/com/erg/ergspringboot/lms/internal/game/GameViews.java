@@ -8,14 +8,19 @@ import com.erg.ergspringboot.lms.internal.game.GameModel.Screen;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Status;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Read-only views of a room: ranking and the JSON-shaped payloads sent to clients. No state changes here. */
 final class GameViews {
 
     private GameViews() { }
+
+    static final int HOST_TOP = 8;
+    static final int STUDENT_TOP = 5;
 
     private static final Comparator<Player> BY_SCORE = Comparator
             .comparingInt(Player::total).reversed()
@@ -109,13 +114,34 @@ final class GameViews {
             row.put("questionId", q.id);
             row.put("title", q.title == null ? "" : q.title);
             row.put("wrongRate", s[0] == 0 ? 0.0 : (double) s[1] / s[0]);
+            int index = room.questions.indexOf(q);
+            int wrongPlayers = 0;
+            int answeredPlayers = 0;
+            for (Player p : room.players.values()) {
+                if (p.everWrong.contains(index)) wrongPlayers++;
+                if (p.attempts.containsKey(index)) answeredPlayers++;
+            }
+            row.put("wrongPlayers", wrongPlayers);
+            row.put("answeredPlayers", answeredPlayers);
             per.add(row);
+        }
+        per.sort(Comparator.comparingInt((Map<String, Object> r) -> (int) r.get("wrongPlayers")).reversed());
+        int firewallOn = 0;
+        int progress = 0;
+        for (Player p : room.players.values()) {
+            if (p.firewall) firewallOn++;
+            progress += p.correct;
         }
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("answeredTotal", answered);
         stats.put("accuracy", answered == 0 ? 0.0 : (double) (answered - wrong) / answered);
         stats.put("perQuestion", per);
         stats.put("playersOnline", playersOnline);
+        stats.put("playerCount", room.players.size());
+        stats.put("avgProgress", room.players.isEmpty() ? 0.0 : Math.round(progress * 10.0 / room.players.size()) / 10.0);
+        stats.put("questionTotal", room.questions.size());
+        stats.put("firewallOn", firewallOn);
+        stats.put("hackWins", 0);
         return stats;
     }
     static Map<String, Object> phase(Room room) {
@@ -126,13 +152,25 @@ final class GameViews {
         return phase;
     }
 
-    static Map<String, Object> lobby(Room room) {
+    /** {@code missing} (roster minus joined players) is for the host only; students get an empty list. */
+    static Map<String, Object> lobby(Room room, boolean host) {
         List<Map<String, Object>> players = new ArrayList<>();
+        Set<String> joined = new HashSet<>();
         for (Conn c : room.connections.values()) {
             Player p = room.players.get(c.userId());
-            if (p != null) players.add(Map.of("playerId", p.userId, "displayName", p.displayName));
+            if (p != null) {
+                players.add(Map.of("playerId", p.userId, "displayName", p.displayName));
+                joined.add(p.userId);
+            }
         }
-        return Map.of("players", players, "count", players.size(), "classSize", room.roster.size());
+        List<Map<String, Object>> missing = new ArrayList<>();
+        if (host) {
+            room.roster.forEach((id, name) -> {
+                if (!joined.contains(id)) missing.add(Map.of("userId", id, "displayName", name == null ? "" : name));
+            });
+        }
+        return Map.of("players", players, "count", players.size(), "classSize", room.roster.size(),
+                "missing", missing);
     }
 
     static Map<String, Object> questionMessage(Room room, Player p) {
@@ -180,9 +218,9 @@ final class GameViews {
             state.put("loot", Map.of("pickedSlot", p.pickedSlot, "slots", slots));
         }
         if (room.rules.showLeaderboard() || conn.host()) {
-            state.put("leaderboard", Map.of("top", top(room, 5)));
+            state.put("leaderboard", Map.of("top", top(room, conn.host() ? HOST_TOP : STUDENT_TOP)));
         }
-        if (room.status == Status.LOBBY || room.status == Status.COUNTDOWN) state.put("lobby", lobby(room));
+        if (room.status == Status.LOBBY || room.status == Status.COUNTDOWN) state.put("lobby", lobby(room, conn.host()));
         if (room.status == Status.COUNTDOWN) state.put("countdownStartsAt", room.countdownEndsAt);
         if (room.status == Status.ENDED || room.status == Status.CANCELLED) state.put("ended", ended(room, conn));
         return state;

@@ -1,5 +1,7 @@
 package com.erg.ergspringboot.lms.internal.game;
 
+import static org.hamcrest.Matchers.closeTo;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -120,12 +122,67 @@ class GameRoomHttpIntegrationTest {
                 .andExpect(status().isTooManyRequests());
     }
 
+    @Test
+    void classWrongRoomsLastGameAndAccuracyComeFromEarlierEndedRooms() throws Exception {
+        seed();
+        mockMvc.perform(as(get("/api/v1/lms/games/sources").param("classId", "class-games"), "usr-games-teacher", "*"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].classSize").value(2))
+                .andExpect(jsonPath("$.data[0].classWrongCount").value(0))
+                .andExpect(jsonPath("$.data[0].lastGame").doesNotExist());
+        // No wrong answers yet: nothing to play.
+        mockMvc.perform(as(post("/api/v1/lms/games/rooms"), "usr-games-teacher", "*").content(create(10, "CLASS_WRONG")))
+                .andExpect(status().isUnprocessableEntity());
+        mockMvc.perform(as(post("/api/v1/lms/games/rooms"), "usr-games-teacher", "*").content(create(10, "NOPE")))
+                .andExpect(status().isBadRequest());
+
+        // An earlier ended room: q0 wrong then right, q1 right (2 of 3 correct); a wrong essay-like id is ignored.
+        entityManager.createNativeQuery("""
+                insert into game_room (id, tenant_id, game_type, join_code, quiz_version_id, class_id, host_user_id,
+                    status, duration_minutes, question_count, created_at, ended_at)
+                values ('gr-old', :t, 'HACK', '1234', 'qv-games', 'class-games', 'usr-games-teacher', 'ENDED', 10, 2,
+                    now() - interval '2 hours', now() - interval '1 hour')
+                """).setParameter("t", TENANT).executeUpdate();
+        entityManager.createNativeQuery("""
+                insert into game_answer (room_id, user_id, question_id, attempt_no, context, correct, answered_ms)
+                values ('gr-old', 'usr-games-a', 'q0', 1, 'play', false, 900),
+                       ('gr-old', 'usr-games-a', 'q0', 2, 'play', true, 900),
+                       ('gr-old', 'usr-games-b', 'q1', 1, 'play', true, 900)
+                """).executeUpdate();
+
+        mockMvc.perform(as(get("/api/v1/lms/games/sources").param("classId", "class-games"), "usr-games-teacher", "*"))
+                .andExpect(jsonPath("$.data[0].classWrongCount").value(1))
+                .andExpect(jsonPath("$.data[0].lastGame.roomId").value("gr-old"))
+                .andExpect(jsonPath("$.data[0].lastGame.gameType").value("HACK"))
+                .andExpect(jsonPath("$.data[0].lastGame.className").value("Games 6A"));
+        // Exercise bank asks without a class: lastGame only, class fields null.
+        mockMvc.perform(as(get("/api/v1/lms/games/sources"), "usr-games-teacher", "*"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].lastGame.roomId").value("gr-old"))
+                .andExpect(jsonPath("$.data[0].classSize").doesNotExist())
+                .andExpect(jsonPath("$.data[0].classWrongCount").doesNotExist());
+        mockMvc.perform(as(post("/api/v1/lms/games/rooms"), "usr-games-teacher", "*").content(create(10, "CLASS_WRONG")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questionCount").value(1))
+                .andExpect(jsonPath("$.data.questionSet").value("CLASS_WRONG"))
+                .andExpect(jsonPath("$.data.quizId").value("qz-games"))
+                .andExpect(jsonPath("$.data.quizVersionId").value("qv-games"))
+                .andExpect(jsonPath("$.data.accuracy").doesNotExist());
+        mockMvc.perform(as(get("/api/v1/lms/games/rooms"), "usr-games-teacher", "*"))
+                .andExpect(jsonPath("$.data[?(@.id == 'gr-old')].accuracy", contains(closeTo(2.0 / 3, 0.001))))
+                .andExpect(jsonPath("$.data[?(@.id == 'gr-old')].questionSet", contains("ALL")));
+    }
+
     private static String create(int minutes) {
+        return create(minutes, "ALL");
+    }
+
+    private static String create(int minutes, String questionSet) {
         return """
-                {"gameType":"HACK","quizVersionId":"qv-games","classId":"class-games","durationMinutes":%d,
+                {"gameType":"HACK","quizVersionId":"qv-games","classId":"class-games","durationMinutes":%d,"questionSet":"%s",
                  "rules":{"allowHack":true,"emergencyPatch":false,"showLeaderboard":true,"showSolution":true,
                           "allowLateJoin":true,"questionOrder":"RANDOM"}}
-                """.formatted(minutes);
+                """.formatted(minutes, questionSet);
     }
 
     private void seed() {

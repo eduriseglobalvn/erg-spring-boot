@@ -63,14 +63,16 @@ public class GameResultWriter {
         transaction.executeWithoutResult(status -> {
             jdbc.update("""
                     insert into game_room (id, tenant_id, game_type, join_code, quiz_version_id, class_id, host_user_id,
-                        status, duration_minutes, question_count, rules_json, created_at, started_at, ended_at)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)
+                        status, duration_minutes, question_count, rules_json, created_at, started_at, ended_at,
+                        question_set)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)
                     on conflict (id) do nothing
                     """,
                     room.id, room.tenantId, room.gameType, room.code, room.quizVersionId, room.classId,
                     room.hostUserId, room.status == Status.CANCELLED ? "CANCELLED" : "ENDED", room.durationMinutes,
                     room.questions.size(), mapper.writeValueAsString(room.rules), ts(room.createdAt),
-                    room.startedAt == 0 ? null : ts(room.startedAt), ts(room.endedAt));
+                    room.startedAt == 0 ? null : ts(room.startedAt), ts(room.endedAt),
+                    room.questionSet);
             List<Player> ranked = GameViews.ranking(room);
             List<Object[]> players = new ArrayList<>();
             List<Object[]> answers = new ArrayList<>();
@@ -98,9 +100,11 @@ public class GameResultWriter {
     /** Ended rooms of a host, newest first (the live ones come from memory). */
     public List<RoomRow> history(String tenantId, String hostUserId, int limit) {
         return jdbc.query("""
-                select r.id, r.game_type, r.join_code, r.status, r.class_id, r.quiz_version_id, q.title as quiz_title, r.duration_minutes,
+                select r.id, r.game_type, r.join_code, r.status, r.class_id, r.quiz_version_id, r.question_set, v.quiz_id, q.title as quiz_title, r.duration_minutes,
                        r.question_count, r.rules_json::text as rules_json, r.created_at, r.started_at, r.ended_at,
-                       (select count(*) from game_player p where p.room_id = r.id) as player_count
+                       (select count(*) from game_player p where p.room_id = r.id) as player_count,
+                       (select (count(*) filter (where a.correct))::float8 / nullif(count(*), 0)
+                          from game_answer a where a.room_id = r.id and a.context = 'play') as accuracy
                 from game_room r
                 left join quiz_versions v on v.id = r.quiz_version_id
                 left join lms_quizzes q on q.id = v.quiz_id and q.tenant_id = r.tenant_id
@@ -112,13 +116,15 @@ public class GameResultWriter {
                         rs.getTimestamp("created_at").getTime(),
                         rs.getTimestamp("started_at") == null ? 0 : rs.getTimestamp("started_at").getTime(),
                         rs.getTimestamp("ended_at") == null ? 0 : rs.getTimestamp("ended_at").getTime(),
-                        rs.getInt("player_count")), tenantId, hostUserId, limit);
+                        rs.getInt("player_count"), rs.getString("quiz_id"), rs.getString("question_set"),
+                        rs.getObject("accuracy") == null ? null : rs.getDouble("accuracy")), tenantId, hostUserId, limit);
     }
 
     /** One persisted room as read back for the history list. */
     public record RoomRow(String id, String gameType, String code, String status, String classId, String quizVersionId,
                           String quizTitle, int durationMinutes, int questionCount, String rulesJson, long createdAt, long startedAt,
-                          long endedAt, int playerCount) { }
+                          long endedAt, int playerCount, String quizId, String questionSet,
+                          Double accuracy) { }
 
     private static Timestamp ts(long epochMs) {
         return Timestamp.from(Instant.ofEpochMilli(epochMs));

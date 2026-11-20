@@ -82,7 +82,10 @@ public final class GameModel {
         public String tenantId;
         public String gameType = GAME_TYPE_HACK;
         public String code;
+        public String quizId;
         public String quizVersionId;
+        /** ALL or CLASS_WRONG. */
+        public String questionSet = "ALL";
         public String quizTitle;
         public String classId;
         public String className;

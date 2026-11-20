@@ -27,15 +27,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class LmsGameController {
 
     private final GameRoomService service;
+    private final GameSourceService sources;
 
-    public LmsGameController(GameRoomService service) {
+    public LmsGameController(GameRoomService service, GameSourceService sources) {
         this.service = service;
+        this.sources = sources;
     }
 
     @GetMapping("/sources")
     @LmsGamesHost
-    public ApiResponse<List<SourceItem>> sources(@RequestParam String classId, HttpServletRequest request) {
-        return ok("Game sources", service.sources(UserAccessContext.from(request), classId), request);
+    public ApiResponse<List<SourceItem>> sources(@RequestParam(required = false) String classId, HttpServletRequest request) {
+        return ok("Game sources", sources.sources(UserAccessContext.from(request), classId), request);
     }
 
     @PostMapping("/rooms")

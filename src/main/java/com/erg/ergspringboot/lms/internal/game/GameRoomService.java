@@ -16,7 +16,6 @@ import com.erg.ergspringboot.lms.internal.game.GameDtos.JoinRequest;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.JoinResponse;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.RoomSummary;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.RulesRequest;
-import com.erg.ergspringboot.lms.internal.game.GameDtos.SourceItem;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Question;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Room;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Rules;
@@ -58,7 +57,12 @@ public class GameRoomService {
     /** Kinds the game cannot grade on its own. */
     static final Set<String> FILTERED_KINDS = Set.of("essay", "likert_scale");
     private static final int MAX_JOIN_FAILURES = 5;
-    private static final int ROSTER_LIMIT = 500;
+    static final int ROSTER_LIMIT = 500;
+    /** The same rule as {@code loadQuestions}: what a room can actually play. */
+    static final String PLAYABLE_SQL = """
+             qq.kind not in ('essay', 'likert_scale') and qq.grading_policy = 'auto'
+             and qq.answer_key is not null and qq.answer_key::text <> '{}'
+            """;
 
     private final QuizVersionRepository versions;
     private final QuizVersionQuestionRepository questions;
@@ -90,44 +94,6 @@ public class GameRoomService {
         this.mapper = mapper;
     }
 
-    // ---- sources --------------------------------------------------------------------------------------------
-
-    public List<SourceItem> sources(UserAccessContext access, String classId) {
-        requireClass(access, classId);
-        record Row(String versionId, String quizId, String title, int number, Instant publishedAt, String kind, int count) { }
-        List<Row> rows = jdbc.query("""
-                select v.id as version_id, v.quiz_id, q.title, v.version_number, v.published_at, qq.kind, count(*) as n
-                from quiz_versions v
-                join lms_quizzes q on q.id = v.quiz_id and q.tenant_id = v.tenant_id
-                join quiz_version_questions qq on qq.quiz_version_id = v.id
-                where v.tenant_id = ? and v.is_active and v.published_at is not null and q.deleted_at is null
-                group by v.id, v.quiz_id, q.title, v.version_number, v.published_at, qq.kind
-                order by v.published_at desc
-                """, (rs, i) -> new Row(rs.getString("version_id"), rs.getString("quiz_id"), rs.getString("title"),
-                rs.getInt("version_number"), rs.getTimestamp("published_at").toInstant(), rs.getString("kind"),
-                rs.getInt("n")), access.tenantId());
-        Map<String, List<Row>> byVersion = new LinkedHashMap<>();
-        rows.forEach(r -> byVersion.computeIfAbsent(r.versionId(), k -> new ArrayList<>()).add(r));
-        List<SourceItem> items = new ArrayList<>();
-        for (List<Row> group : byVersion.values()) {
-            Row first = group.get(0);
-            Map<String, Integer> filtered = new LinkedHashMap<>();
-            int total = 0;
-            int skipped = 0;
-            for (Row r : group) {
-                total += r.count();
-                if (FILTERED_KINDS.contains(r.kind())) {
-                    filtered.put(r.kind(), r.count());
-                    skipped += r.count();
-                }
-            }
-            items.add(new SourceItem(first.versionId(), first.quizId(), first.title(), first.number(),
-                    first.publishedAt().toString(), total, total - skipped, skipped, filtered));
-            if (items.size() >= 100) break;
-        }
-        return items;
-    }
-
     // ---- create ---------------------------------------------------------------------------------------------
 
     public RoomSummary create(UserAccessContext access, CreateRoomRequest request) {
@@ -139,6 +105,10 @@ public class GameRoomService {
         if (request.quizVersionId() == null || request.quizVersionId().isBlank()) {
             throw new BadRequestException("quizVersionId is required");
         }
+        String questionSet = request.questionSet() == null ? "ALL" : request.questionSet();
+        if (!questionSet.equals("ALL") && !questionSet.equals("CLASS_WRONG")) {
+            throw new BadRequestException("questionSet must be ALL or CLASS_WRONG");
+        }
         requireClass(access, request.classId());
         Classroom classroom = classes.findByTenantIdAndId(access.tenantId(), request.classId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found"));
@@ -149,7 +119,9 @@ public class GameRoomService {
         Room room = new Room();
         room.id = UUID.randomUUID().toString();
         room.tenantId = access.tenantId();
+        room.quizId = version.getQuizId();
         room.quizVersionId = version.getId();
+        room.questionSet = questionSet;
         room.quizTitle = quizzes.findByIdAndTenantId(version.getQuizId(), access.tenantId())
                 .map(q -> q.getTitle()).orElse("");
         room.classId = classroom.getId();
@@ -160,6 +132,20 @@ public class GameRoomService {
         room.createdAt = System.currentTimeMillis();
         room.questions = loadQuestions(access.tenantId(), version);
         if (room.questions.isEmpty()) throw new BadRequestException("The quiz has no playable questions");
+        if (questionSet.equals("CLASS_WRONG")) {
+            Set<String> wrong = new java.util.HashSet<>(jdbc.queryForList("""
+                    select distinct a.question_id
+                    from game_answer a
+                    join game_room r on r.id = a.room_id
+                    join quiz_versions rv on rv.id = r.quiz_version_id
+                    where r.tenant_id = ? and r.class_id = ? and r.status = 'ENDED' and rv.quiz_id = ?
+                      and a.context = 'play' and not a.correct
+                    """, String.class, access.tenantId(), classroom.getId(), version.getQuizId()));
+            room.questions = new ArrayList<>(room.questions.stream().filter(q -> wrong.contains(q.id)).toList());
+            if (room.questions.isEmpty()) {
+                throw new UnprocessableException("This class has no wrong answers on this quiz yet");
+            }
+        }
         for (Student s : students.findAudienceStudentsInClasses(access.tenantId(), List.of(classroom.getId()),
                 PageRequest.of(0, ROSTER_LIMIT))) {
             room.roster.put(s.getAuthUserId(), s.getFullName() == null ? s.getStudentCode() : s.getFullName());
@@ -294,9 +280,10 @@ public class GameRoomService {
                 .forEach(c -> classNames.put(c.getId(), c.getName()));
         for (var row : rows) {
             byId.computeIfAbsent(row.id(), id -> new RoomSummary(row.id(), row.gameType(), row.code(), row.status(),
-                    row.classId(), classNames.get(row.classId()), row.quizTitle(), row.durationMinutes(),
-                    parseRules(row.rulesJson()), row.playerCount(), row.questionCount(), iso(row.createdAt()),
-                    iso(row.startedAt()), iso(row.endedAt())));
+                    row.classId(), classNames.get(row.classId()), row.quizId(), row.quizVersionId(), row.quizTitle(),
+                    row.questionSet(), row.durationMinutes(), parseRules(row.rulesJson()), row.playerCount(),
+                    row.questionCount(), row.accuracy(), iso(row.createdAt()), iso(row.startedAt()),
+                    iso(row.endedAt())));
         }
         return byId.values().stream()
                 .filter(s -> wanted.isEmpty() || wanted.contains(s.status()))
@@ -313,8 +300,15 @@ public class GameRoomService {
     }
 
     RoomSummary summary(Room room) {
+        int answered = 0;
+        int wrong = 0;
+        for (int[] s : room.questionStats.values()) {
+            answered += s[0];
+            wrong += s[1];
+        }
         return new RoomSummary(room.id, room.gameType, room.code, room.status.name(), room.classId, room.className,
-                room.quizTitle, room.durationMinutes, room.rules, room.players.size(), room.questions.size(),
+                room.quizId, room.quizVersionId, room.quizTitle, room.questionSet, room.durationMinutes, room.rules,
+                room.players.size(), room.questions.size(), answered == 0 ? null : (double) (answered - wrong) / answered,
                 iso(room.createdAt), iso(room.startedAt), iso(room.endedAt));
     }
 
@@ -322,9 +316,16 @@ public class GameRoomService {
         return epochMs == 0 ? null : Instant.ofEpochMilli(epochMs).toString();
     }
 
-    private static void requireClass(UserAccessContext access, String classId) {
+    static void requireClass(UserAccessContext access, String classId) {
         if (classId == null || classId.isBlank()) throw new BadRequestException("classId is required");
         if (!access.canAccessClass(classId)) throw new ForbiddenException("You do not manage this class");
+    }
+
+    /** The request is well formed but cannot be played (422). */
+    public static final class UnprocessableException extends ApiException {
+        public UnprocessableException(String message) {
+            super(HttpStatus.UNPROCESSABLE_ENTITY, "UNPROCESSABLE", "Unprocessable Entity", message);
+        }
     }
 
     /** Too many wrong room codes in a minute. */
