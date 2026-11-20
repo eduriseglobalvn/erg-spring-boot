@@ -2632,6 +2632,32 @@
         },
         "type": "object"
       },
+      "ApiResponseJoinResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/JoinResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseLatestSubmittedAttemptResponse": {
         "properties": {
           "data": {
@@ -3333,6 +3359,35 @@
         },
         "type": "object"
       },
+      "ApiResponseListRoomSummary": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RoomSummary"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListSaturdayModeView": {
         "properties": {
           "data": {
@@ -3396,6 +3451,35 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/SiteConfig"
+            },
+            "type": "array"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListSourceItem": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SourceItem"
             },
             "type": "array"
           },
@@ -4630,6 +4714,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/RoleResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRoomSummary": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RoomSummary"
           },
           "errors": {},
           "message": {
@@ -8881,14 +8991,21 @@
       },
       "CreateRoomRequest": {
         "properties": {
-          "roomName": {
+          "classId": {
             "type": "string"
           },
-          "schoolId": {
+          "durationMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "gameType": {
             "type": "string"
           },
-          "tenantId": {
+          "quizVersionId": {
             "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/RulesRequest"
           }
         },
         "type": "object"
@@ -10951,6 +11068,22 @@
           "learnerId",
           "learningPathId"
         ],
+        "type": "object"
+      },
+      "JoinRequest": {
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "JoinResponse": {
+        "properties": {
+          "roomId": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "KpiDefinition": {
@@ -14173,6 +14306,102 @@
         },
         "type": "object"
       },
+      "RoomSummary": {
+        "properties": {
+          "classId": {
+            "type": "string"
+          },
+          "className": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "endedAt": {
+            "type": "string"
+          },
+          "gameType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "playerCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "questionCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "quizTitle": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Rules": {
+        "properties": {
+          "allowHack": {
+            "type": "boolean"
+          },
+          "allowLateJoin": {
+            "type": "boolean"
+          },
+          "emergencyPatch": {
+            "type": "boolean"
+          },
+          "questionOrder": {
+            "type": "string"
+          },
+          "showLeaderboard": {
+            "type": "boolean"
+          },
+          "showSolution": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "RulesRequest": {
+        "properties": {
+          "allowHack": {
+            "type": "boolean"
+          },
+          "allowLateJoin": {
+            "type": "boolean"
+          },
+          "emergencyPatch": {
+            "type": "boolean"
+          },
+          "questionOrder": {
+            "type": "string"
+          },
+          "showLeaderboard": {
+            "type": "boolean"
+          },
+          "showSolution": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "RunRequest": {
         "properties": {
           "cursor": {
@@ -15184,6 +15413,46 @@
               "type": "string"
             },
             "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "SourceItem": {
+        "properties": {
+          "filteredByKind": {
+            "additionalProperties": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "filteredCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "playableCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "questionCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "quizId": {
+            "type": "string"
+          },
+          "quizVersionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "versionNumber": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -18637,7 +18906,7 @@
     },
     "/api/v1/calendar": {
       "post": {
-        "operationId": "create_5",
+        "operationId": "create_6",
         "requestBody": {
           "content": {
             "application/json": {
@@ -21509,7 +21778,7 @@
     },
     "/api/v1/lcms/questions": {
       "post": {
-        "operationId": "create_4",
+        "operationId": "create_5",
         "requestBody": {
           "content": {
             "application/json": {
@@ -21786,7 +22055,7 @@
     },
     "/api/v1/lcms/quizzes": {
       "post": {
-        "operationId": "create_3",
+        "operationId": "create_4",
         "parameters": [
           {
             "in": "header",
@@ -22230,7 +22499,7 @@
     },
     "/api/v1/lcms/schools": {
       "post": {
-        "operationId": "create_2",
+        "operationId": "create_3",
         "requestBody": {
           "content": {
             "application/json": {
@@ -24012,7 +24281,7 @@
     },
     "/api/v1/lms/assignments": {
       "post": {
-        "operationId": "create_1",
+        "operationId": "create_2",
         "parameters": [
           {
             "in": "header",
@@ -24717,6 +24986,154 @@
         },
         "tags": [
           "lms-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/games/rooms": {
+      "get": {
+        "operationId": "list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRoomSummary"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-game-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoomRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoomSummary"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-game-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/games/rooms/join": {
+      "post": {
+        "operationId": "join",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseJoinResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-game-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/games/rooms/{id}": {
+      "get": {
+        "operationId": "get_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoomSummary"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-game-controller"
+        ]
+      }
+    },
+    "/api/v1/lms/games/sources": {
+      "get": {
+        "operationId": "sources",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "classId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListSourceItem"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "lms-game-controller"
         ]
       }
     },
@@ -25639,7 +26056,7 @@
     },
     "/api/v1/notifications": {
       "get": {
-        "operationId": "list_1",
+        "operationId": "list_2",
         "parameters": [
           {
             "in": "query",
@@ -27779,7 +28196,7 @@
     },
     "/api/v1/timekeeping/approvals": {
       "get": {
-        "operationId": "list",
+        "operationId": "list_1",
         "parameters": [
           {
             "in": "query",

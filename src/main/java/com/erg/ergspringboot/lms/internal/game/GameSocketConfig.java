@@ -7,7 +7,6 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.web.ErgHttpProperties;
 import java.util.Arrays;
 import java.util.Map;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -23,7 +22,6 @@ import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
-import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 
 /**
  * {@code /ws/games/{roomId}}: plain JSON text frames (no STOMP). The upgrade request goes through the normal security
@@ -55,13 +53,6 @@ public class GameSocketConfig implements WebSocketConfigurer {
         registry.addHandler(new Handler(manager), PATH)
                 .addInterceptors(new Interceptor())
                 .setAllowedOriginPatterns(origins);
-    }
-
-    @Bean
-    ServletServerContainerFactoryBean gameWebSocketContainer() {
-        ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
-        container.setMaxTextMessageBufferSize(32 * 1024);
-        return container;
     }
 
     private final class Interceptor implements HandshakeInterceptor {
