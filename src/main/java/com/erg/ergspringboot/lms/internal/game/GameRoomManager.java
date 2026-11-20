@@ -13,7 +13,6 @@ import com.erg.ergspringboot.lms.internal.quiz.runtime.GradingEngine;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -28,9 +27,6 @@ import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -52,8 +48,6 @@ import tools.jackson.databind.ObjectMapper;
 public class GameRoomManager {
 
     private static final Logger LOG = LoggerFactory.getLogger(GameRoomManager.class);
-    private static final String KEY_PREFIX = "erg:games:room:";
-    private static final Duration SNAPSHOT_TTL = Duration.ofHours(2);
     private static final long ENDED_KEEP_MS = 10 * 60_000L;
     private static final long SNAPSHOT_EVERY_MS = 3_000L;
     private static final int MAX_MESSAGE_CHARS = 16_384;
@@ -63,7 +57,7 @@ public class GameRoomManager {
     private final GameEngine engine;
     private final GameBalance balance;
     private final ObjectMapper mapper;
-    private final StringRedisTemplate redis;
+    private final GameSnapshotStore store;
     private final GameResultWriter writer;
     private final ScheduledExecutorService ticker = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "game-ticker");
@@ -76,13 +70,13 @@ public class GameRoomManager {
             GradingEngine grading,
             GameBalance balance,
             ObjectMapper mapper,
-            @Qualifier("stateStringRedisTemplate") ObjectProvider<StringRedisTemplate> redis,
+            GameSnapshotStore store,
             GameResultWriter writer
     ) {
         this.balance = balance;
         this.engine = new GameEngine(balance, grading::grade, ThreadLocalRandom.current());
         this.mapper = mapper;
-        this.redis = redis.getIfAvailable();
+        this.store = store;
         this.writer = writer;
     }
 
@@ -179,7 +173,7 @@ public class GameRoomManager {
                 send(room, old, "error", Map.of("code", "REPLACED", "message", "Opened on another device"));
                 room.outbox.add(new Out(old, null));
             }
-            send(room, conn, "room.state", state(room, conn, now));
+            send(room, conn, "room.state", GameViews.state(room, conn, now));
             room.lobbyDirty = true;
         });
     }
@@ -210,7 +204,7 @@ public class GameRoomManager {
 
     private void handle(Room room, Conn conn, String type, JsonNode data, long now) {
         switch (type) {
-            case "resume" -> send(room, conn, "room.state", state(room, conn, now));
+            case "resume" -> send(room, conn, "room.state", GameViews.state(room, conn, now));
             case "answer" -> {
                 Player p = player(room, conn);
                 Map<String, Object> result = engine.answer(room, p, data.path("questionId").asString(""),
@@ -225,25 +219,25 @@ public class GameRoomManager {
             case "next" -> {
                 Player p = player(room, conn);
                 if (engine.next(room, p, now)) {
-                    if (p.screen == Screen.QUESTION) send(room, conn, "question", questionMessage(room, p));
-                    else send(room, conn, "room.state", state(room, conn, now));
+                    if (p.screen == Screen.QUESTION) send(room, conn, "question", GameViews.questionMessage(room, p));
+                    else send(room, conn, "room.state", GameViews.state(room, conn, now));
                 }
             }
             case "host.start" -> {
                 requireHost(conn);
                 engine.startCountdown(room, now);
                 broadcast(room, "room.countdown", Map.of("startsAt", room.countdownEndsAt, "serverNow", now));
-                broadcast(room, "room.phase", phase(room));
+                broadcast(room, "room.phase", GameViews.phase(room));
             }
             case "host.pause" -> {
                 requireHost(conn);
                 engine.pause(room, now);
-                broadcast(room, "room.phase", phase(room));
+                broadcast(room, "room.phase", GameViews.phase(room));
             }
             case "host.resume" -> {
                 requireHost(conn);
                 engine.resume(room, now);
-                broadcast(room, "room.phase", phase(room));
+                broadcast(room, "room.phase", GameViews.phase(room));
             }
             case "host.end" -> {
                 requireHost(conn);
@@ -287,8 +281,8 @@ public class GameRoomManager {
         }
         if (engine.tick(room, now)) {
             if (room.status == Status.RUNNING) {
-                broadcast(room, "room.phase", phase(room));
-                for (Conn c : room.connections.values()) send(room, c, "room.state", state(room, c, now));
+                broadcast(room, "room.phase", GameViews.phase(room));
+                for (Conn c : room.connections.values()) send(room, c, "room.state", GameViews.state(room, c, now));
             } else if (room.status == Status.ENDING) {
                 closeOut(room, now);
             }
@@ -296,7 +290,7 @@ public class GameRoomManager {
         if (!room.open()) return;
         if (room.lobbyDirty) {
             room.lobbyDirty = false;
-            broadcast(room, "room.lobby", lobby(room));
+            broadcast(room, "room.lobby", GameViews.lobby(room));
         }
         boolean live = room.status == Status.RUNNING || room.status == Status.PAUSED;
         if (live && room.boardDirty && now - room.lastBoardAt >= 1000) {
@@ -315,7 +309,7 @@ public class GameRoomManager {
         if (live && now - room.lastStatsAt >= 2000) {
             room.lastStatsAt = now;
             for (Conn c : room.connections.values()) {
-                if (c.host()) send(room, c, "class.stats", engine.classStats(room, onlinePlayers(room)));
+                if (c.host()) send(room, c, "class.stats", GameViews.classStats(room, onlinePlayers(room)));
             }
         }
         if (room.stateDirty && now - room.lastSnapshotAt >= SNAPSHOT_EVERY_MS) snapshot(room, now);
@@ -324,12 +318,12 @@ public class GameRoomManager {
     /** ENDING (or cancelled) to the final result: broadcasts phases and {@code room.ended}, queues the DB write. */
     private void closeOut(Room room, long now) {
         if (room.status == Status.ENDING) {
-            broadcast(room, "room.phase", phase(room));
+            broadcast(room, "room.phase", GameViews.phase(room));
             engine.finish(room, now);
         }
         if (room.status != Status.ENDED && room.status != Status.CANCELLED) return;
-        broadcast(room, "room.phase", phase(room));
-        for (Conn c : room.connections.values()) send(room, c, "room.ended", ended(room, c));
+        broadcast(room, "room.phase", GameViews.phase(room));
+        for (Conn c : room.connections.values()) send(room, c, "room.ended", GameViews.ended(room, c));
         codes.remove(room.code, room.id);
         if (!room.persisted) {
             room.persisted = true;
@@ -342,44 +336,20 @@ public class GameRoomManager {
         rooms.remove(room.id);
         codes.remove(room.code, room.id);
         for (Conn c : room.connections.values()) room.outbox.add(new Out(c, null));
-        if (redis != null) {
-            try {
-                redis.delete(KEY_PREFIX + room.id);
-            } catch (RuntimeException failure) {
-                LOG.debug("Could not drop game snapshot: {}", failure.toString());
-            }
-        }
+        store.delete(room.id);
     }
-
-    // ---- redis snapshot -------------------------------------------------------------------------------------
 
     private void snapshot(Room room, long now) {
         room.lastSnapshotAt = now;
         room.stateDirty = false;
-        if (redis == null) return;
-        try {
-            redis.opsForValue().set(KEY_PREFIX + room.id, mapper.writeValueAsString(room), SNAPSHOT_TTL);
-        } catch (RuntimeException failure) {
-            LOG.warn("Game snapshot failed for room {}: {}", room.id, failure.toString());
-        }
+        store.save(room);
     }
 
     private void restore() {
-        if (redis == null) return;
-        try {
-            var keys = redis.keys(KEY_PREFIX + "*");
-            if (keys == null) return;
-            for (String key : keys) {
-                String json = redis.opsForValue().get(key);
-                if (json == null) continue;
-                Room room = mapper.readValue(json, Room.class);
-                rooms.put(room.id, room);
-                if (room.open()) codes.put(room.code, room.id);
-                room.persisted = !room.open();
-            }
-            LOG.info("Restored {} game room(s) from Redis", rooms.size());
-        } catch (RuntimeException failure) {
-            LOG.warn("Could not restore game rooms: {}", failure.toString());
+        for (Room room : store.loadAll()) {
+            rooms.put(room.id, room);
+            if (room.open()) codes.put(room.code, room.id);
+            room.persisted = !room.open();
         }
     }
 
@@ -403,88 +373,18 @@ public class GameRoomManager {
     }
 
     private void sendLeaderboards(Room room) {
-        List<Map<String, Object>> top = engine.top(room, 5);
+        List<Map<String, Object>> top = GameViews.top(room, 5);
         for (Conn c : room.connections.values()) {
             Player p = room.players.get(c.userId());
             if (!c.host() && (!room.rules.showLeaderboard() || p == null)) continue;
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("top", top);
-            if (p != null) data.put("me", Map.of("rank", engine.rank(room, p), "total", p.total()));
+            if (p != null) data.put("me", Map.of("rank", GameViews.rank(room, p), "total", p.total()));
             send(room, c, "leaderboard", data);
         }
     }
 
     private int onlinePlayers(Room room) {
         return (int) room.connections.values().stream().filter(c -> !c.host()).count();
-    }
-
-    Map<String, Object> phase(Room room) {
-        Map<String, Object> phase = new LinkedHashMap<>();
-        phase.put("phase", room.status.name());
-        phase.put("endsAt", room.endsAt == 0 ? null : room.endsAt);
-        phase.put("pausedRemainingMs", room.pausedRemainingMs);
-        return phase;
-    }
-
-    private Map<String, Object> lobby(Room room) {
-        List<Map<String, Object>> players = new ArrayList<>();
-        for (Conn c : room.connections.values()) {
-            Player p = room.players.get(c.userId());
-            if (p != null) players.add(Map.of("playerId", p.userId, "displayName", p.displayName));
-        }
-        return Map.of("players", players, "count", players.size());
-    }
-
-    private Map<String, Object> questionMessage(Room room, Player p) {
-        Map<String, Object> message = new LinkedHashMap<>();
-        int total = room.questions.size();
-        message.put("index", Math.min(p.correct + 1, total));
-        message.put("total", total);
-        message.put("question", room.questions.get(p.current).payload);
-        return message;
-    }
-
-    private Map<String, Object> ended(Room room, Conn conn) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("final", room.finalRows);
-        Player p = room.players.get(conn.userId());
-        if (p != null) data.put("me", engine.finalMe(room, p));
-        return data;
-    }
-
-    /** Full snapshot for a socket: what {@code resume} and a fresh connection receive. */
-    Map<String, Object> state(Room room, Conn conn, long now) {
-        Map<String, Object> state = new LinkedHashMap<>();
-        Player p = conn.host() ? null : room.players.get(conn.userId());
-        state.put("phase", room.status.name());
-        state.put("serverNow", now);
-        state.put("endsAt", room.endsAt == 0 ? null : room.endsAt);
-        state.put("pausedRemainingMs", room.pausedRemainingMs);
-        state.put("me", p == null ? null : engine.playerState(room, p));
-        Screen screen = p != null ? p.screen : switch (room.status) {
-            case LOBBY -> Screen.LOBBY;
-            case COUNTDOWN -> Screen.COUNTDOWN;
-            case ENDED, CANCELLED -> Screen.ENDED;
-            default -> Screen.QUESTION;
-        };
-        state.put("screen", screen.name());
-        if (p != null && screen == Screen.QUESTION && p.current >= 0) state.put("question", questionMessage(room, p));
-        if (p != null && (screen == Screen.EXPLAIN || screen == Screen.LOOT_PICK || screen == Screen.LOOT_RESULT)) {
-            state.put("lastResult", p.lastResult);
-        }
-        // Not in the contract table: lets a reconnect rebuild the loot screens.
-        if (p != null && screen == Screen.LOOT_PICK) state.put("loot", Map.of("slots", 3));
-        if (p != null && screen == Screen.LOOT_RESULT) {
-            List<Map<String, Object>> slots = new ArrayList<>();
-            p.slots.forEach(l -> slots.add(Map.of("kind", l.kind(), "coins", l.coins())));
-            state.put("loot", Map.of("pickedSlot", p.pickedSlot, "slots", slots));
-        }
-        if (room.rules.showLeaderboard() || conn.host()) {
-            state.put("leaderboard", Map.of("top", engine.top(room, 5)));
-        }
-        if (room.status == Status.LOBBY || room.status == Status.COUNTDOWN) state.put("lobby", lobby(room));
-        if (room.status == Status.COUNTDOWN) state.put("countdownStartsAt", room.countdownEndsAt);
-        if (room.status == Status.ENDED || room.status == Status.CANCELLED) state.put("ended", ended(room, conn));
-        return state;
     }
 }

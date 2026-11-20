@@ -277,8 +277,8 @@ class GameEngineTest {
         a.stars = 100;
         b.stars = 100;
         b.coins = 50;
-        assertThat(engine.rank(room, b)).isEqualTo(1);
-        assertThat(engine.rank(room, a)).isEqualTo(2);
+        assertThat(GameViews.rank(room, b)).isEqualTo(1);
+        assertThat(GameViews.rank(room, a)).isEqualTo(2);
     }
 
     @Test

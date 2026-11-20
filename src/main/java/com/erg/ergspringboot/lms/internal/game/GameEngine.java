@@ -12,7 +12,6 @@ import com.erg.ergspringboot.lms.internal.game.GameModel.Status;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,9 +144,9 @@ public final class GameEngine {
         room.endedAt = now;
         room.endsAt = Math.min(room.endsAt, now);
         room.pausedRemainingMs = 0;
-        List<Player> ranked = ranking(room);
+        List<Player> ranked = GameViews.ranking(room);
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (int i = 0; i < ranked.size(); i++) rows.add(finalRow(ranked.get(i), i + 1));
+        for (int i = 0; i < ranked.size(); i++) rows.add(GameViews.finalRow(ranked.get(i), i + 1));
         room.finalRows = rows;
         room.players.values().forEach(p -> p.screen = Screen.ENDED);
         room.stateDirty = true;
@@ -223,7 +222,7 @@ public final class GameEngine {
         result.put("correctAnswer", q.answerKey);
         result.put("solution", room.rules.showSolution() ? solution(q, correct) : "");
         result.put("starsGained", stars);
-        result.put("me", playerState(room, player));
+        result.put("me", GameViews.playerState(room, player));
         if (requeue != null) result.put("requeueAfter", requeue);
         player.lastResult = result;
         room.boardDirty = true;
@@ -248,7 +247,7 @@ public final class GameEngine {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("pickedSlot", slot);
         result.put("slots", slots);
-        result.put("me", playerState(room, player));
+        result.put("me", GameViews.playerState(room, player));
         room.boardDirty = true;
         room.stateDirty = true;
         return result;
@@ -296,106 +295,5 @@ public final class GameEngine {
     private void feed(Room room, long now, String text, String tone) {
         room.feed.add(new FeedItem(now, text, tone));
         if (room.feed.size() > MAX_FEED) room.feed.remove(0);
-    }
-
-    // ---- views ---------------------------------------------------------------------------------------------
-
-    private static final Comparator<Player> BY_SCORE = Comparator
-            .comparingInt(Player::total).reversed()
-            .thenComparing(Comparator.comparingInt((Player p) -> p.stars).reversed())
-            .thenComparing(p -> p.displayName);
-
-    public List<Player> ranking(Room room) {
-        List<Player> list = new ArrayList<>(room.players.values());
-        list.sort(BY_SCORE);
-        return list;
-    }
-
-    public int rank(Room room, Player player) {
-        int better = 0;
-        for (Player other : room.players.values()) {
-            if (other != player && BY_SCORE.compare(other, player) < 0) better++;
-        }
-        return better + 1;
-    }
-
-    public Map<String, Object> playerState(Room room, Player p) {
-        Map<String, Object> state = new LinkedHashMap<>();
-        state.put("playerId", p.userId);
-        state.put("displayName", p.displayName);
-        state.put("stars", p.stars);
-        state.put("coins", p.coins);
-        state.put("streak", p.streak);
-        state.put("firewall", p.firewall);
-        state.put("rank", rank(room, p));
-        state.put("playerCount", room.players.size());
-        state.put("answeredCount", p.answered);
-        state.put("correctCount", p.correct);
-        return state;
-    }
-
-    public List<Map<String, Object>> top(Room room, int n) {
-        List<Player> ranked = ranking(room);
-        List<Map<String, Object>> top = new ArrayList<>();
-        for (int i = 0; i < Math.min(n, ranked.size()); i++) {
-            Player p = ranked.get(i);
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("playerId", p.userId);
-            row.put("displayName", p.displayName);
-            row.put("stars", p.stars);
-            row.put("coins", p.coins);
-            row.put("total", p.total());
-            row.put("rank", i + 1);
-            top.add(row);
-        }
-        return top;
-    }
-
-    public Map<String, Object> finalRow(Player p, int rank) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("playerId", p.userId);
-        row.put("displayName", p.displayName);
-        row.put("stars", p.stars);
-        row.put("coins", p.coins);
-        row.put("total", p.total());
-        row.put("rank", rank);
-        row.put("correctCount", p.correct);
-        row.put("answeredCount", p.answered);
-        row.put("longestStreak", p.longestStreak);
-        return row;
-    }
-
-    /** {@code me} of {@code room.ended}: the final row plus the questions this player got wrong at least once. */
-    public Map<String, Object> finalMe(Room room, Player p) {
-        Map<String, Object> me = finalRow(p, rank(room, p));
-        List<Map<String, Object>> weak = new ArrayList<>();
-        for (int index : p.everWrong) {
-            Question q = room.questions.get(index);
-            weak.add(Map.of("questionId", q.id, "title", q.title == null ? "" : q.title));
-        }
-        me.put("weakQuestions", weak);
-        return me;
-    }
-
-    public Map<String, Object> classStats(Room room, int playersOnline) {
-        int answered = 0;
-        int wrong = 0;
-        List<Map<String, Object>> per = new ArrayList<>();
-        for (Question q : room.questions) {
-            int[] s = room.questionStats.getOrDefault(q.id, new int[2]);
-            answered += s[0];
-            wrong += s[1];
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("questionId", q.id);
-            row.put("title", q.title == null ? "" : q.title);
-            row.put("wrongRate", s[0] == 0 ? 0.0 : (double) s[1] / s[0]);
-            per.add(row);
-        }
-        Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("answeredTotal", answered);
-        stats.put("accuracy", answered == 0 ? 0.0 : (double) (answered - wrong) / answered);
-        stats.put("perQuestion", per);
-        stats.put("playersOnline", playersOnline);
-        return stats;
     }
 }

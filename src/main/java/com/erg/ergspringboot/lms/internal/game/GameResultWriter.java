@@ -32,7 +32,6 @@ public class GameResultWriter {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final TransactionTemplate transaction;
-    private final GameEngine ranking;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "game-result-writer");
         thread.setDaemon(true);
@@ -47,7 +46,6 @@ public class GameResultWriter {
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.transaction = new TransactionTemplate(transactionManager);
-        this.ranking = new GameEngine(new GameBalance(), null, null);
     }
 
     /** Queues the batch write of a finished room; never blocks the game thread. */
@@ -73,7 +71,7 @@ public class GameResultWriter {
                     room.hostUserId, room.status == Status.CANCELLED ? "CANCELLED" : "ENDED", room.durationMinutes,
                     room.questions.size(), mapper.writeValueAsString(room.rules), ts(room.createdAt),
                     room.startedAt == 0 ? null : ts(room.startedAt), ts(room.endedAt));
-            List<Player> ranked = ranking.ranking(room);
+            List<Player> ranked = GameViews.ranking(room);
             List<Object[]> players = new ArrayList<>();
             List<Object[]> answers = new ArrayList<>();
             for (int i = 0; i < ranked.size(); i++) {
