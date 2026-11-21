@@ -26,6 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserPasswordUseCase {
     private static final String DEFAULT_TENANT = "erg";
+    // Checked here, not as a schema pattern: a pattern in the published contract is a breaking change for old clients.
+    private static final java.util.regex.Pattern STRONG = java.util.regex.Pattern.compile(
+            "^(?=.*\\p{Lu})(?=.*\\p{Ll})(?=.*[^\\p{L}\\p{N}\\s]).*$", java.util.regex.Pattern.DOTALL);
     private final UserRepository userRepository;
     private final AuthSessionRepository sessionRepository;
     private final UserActivityRepository activityRepository;
@@ -42,6 +45,9 @@ public class UserPasswordUseCase {
     @Transactional
     public PasswordChangeResponse change(String userId, String tenantId, String currentSessionId,
             ChangePasswordRequest request, UserAuditContext audit) {
+        if (!STRONG.matcher(request.newPassword()).matches()) {
+            throw new BadRequestException("Mật khẩu cần có chữ hoa, chữ thường và ký tự đặc biệt");
+        }
         User user = userRepository.findByIdAndTenantId(userId, tenant(tenantId))
                 .orElseThrow(() -> new ResourceNotFoundException("user not found"));
         boolean previousMustChange = Boolean.TRUE.equals(user.getMustChangePassword());

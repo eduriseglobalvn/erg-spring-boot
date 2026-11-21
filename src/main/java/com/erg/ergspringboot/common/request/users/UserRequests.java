@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Map;
@@ -32,8 +31,6 @@ public final class UserRequests {
     public record ChangePasswordRequest(
             @JsonProperty("old_password") @NotBlank String oldPassword,
             @JsonProperty("new_password") @NotBlank @Size(min = 6, max = 128)
-            @Pattern(regexp = "^(?=.*\\p{Lu})(?=.*\\p{Ll})(?=.*[^\\p{L}\\p{N}\\s]).*$",
-                    message = "Mật khẩu cần có chữ hoa, chữ thường và ký tự đặc biệt")
             String newPassword
     ) {
     }

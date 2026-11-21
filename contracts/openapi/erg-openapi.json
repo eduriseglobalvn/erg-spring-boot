@@ -7910,7 +7910,6 @@
           "new_password": {
             "maxLength": 128,
             "minLength": 6,
-            "pattern": "^(?=.*\\p{Lu})(?=.*\\p{Ll})(?=.*[^\\p{L}\\p{N}\\s]).*$",
             "type": "string"
           },
           "old_password": {

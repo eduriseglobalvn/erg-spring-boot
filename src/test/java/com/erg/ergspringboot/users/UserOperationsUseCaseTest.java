@@ -271,9 +271,9 @@ class UserOperationsUseCaseTest {
                 .thenReturn(List.of(currentSession, otherSession));
 
         var response = operations.changePassword(
-                "user-1", "erg", "session-1", new ChangePasswordRequest("old-secret", "new-secret"), null);
+                "user-1", "erg", "session-1", new ChangePasswordRequest("old-secret", "New-secret"), null);
 
-        assertTrue(passwordService.matches("new-secret", user.getPasswordHash()));
+        assertTrue(passwordService.matches("New-secret", user.getPasswordHash()));
         assertFalse(user.getMustChangePassword());
         assertEquals("ACTIVE", user.getStatus());
         assertEquals(null, currentSession.getRevokedReason());
@@ -288,6 +288,12 @@ class UserOperationsUseCaseTest {
     }
 
     @Test
+    void aNewPasswordWithoutUpperLowerAndSpecialCharacterIsRejected() {
+        assertThrows(com.erg.ergspringboot.exception.BadRequestException.class,
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "newsecret1"), null));
+    }
+
+    @Test
     void temporaryPasswordCannotBeChangedBeforeTheRecoveryEmailIsVerified() {
         User user = user("user-1");
         user.setPasswordHash(passwordService.hash("old-secret"));
@@ -296,7 +302,7 @@ class UserOperationsUseCaseTest {
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
         var failure = assertThrows(com.erg.ergspringboot.exception.AccountLifecycleException.class,
-                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "new-secret"), null));
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "New-secret"), null));
 
         assertEquals("RECOVERY_EMAIL_NOT_VERIFIED", failure.getCode());
         assertTrue(passwordService.matches("old-secret", user.getPasswordHash()));
@@ -311,7 +317,7 @@ class UserOperationsUseCaseTest {
 
         assertThrows(
                 BadRequestException.class,
-                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("wrong", "new-secret"), null)
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("wrong", "New-secret"), null)
         );
     }
 
