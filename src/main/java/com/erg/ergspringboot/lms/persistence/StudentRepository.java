@@ -16,6 +16,8 @@ public interface StudentRepository extends JpaRepository<Student, String> {
 
     List<Student> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
+    long countByTenantIdAndIdIn(String tenantId, Collection<String> ids);
+
     Optional<Student> findByTenantIdAndId(String tenantId, String id);
 
     /** A student code is unique inside one school only: two schools both have a class 6A1 with student no. 1 (BUG-A-003). */

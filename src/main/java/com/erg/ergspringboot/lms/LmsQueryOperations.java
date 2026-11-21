@@ -37,4 +37,9 @@ public class LmsQueryOperations {
             String userId) {
         return reads.studentGroups(tenantId, classId, readableClassIds, userId);
     }
+
+    public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, List<String> readableClassIds,
+            String userId, boolean includeMembers) {
+        return reads.studentGroups(tenantId, classId, readableClassIds, userId, includeMembers);
+    }
 }

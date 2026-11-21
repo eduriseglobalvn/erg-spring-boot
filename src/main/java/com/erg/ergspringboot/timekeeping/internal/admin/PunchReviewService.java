@@ -5,6 +5,7 @@ import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.ReviewDecision;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PunchReviewCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RecentPunch;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
 import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
@@ -43,6 +44,12 @@ public class PunchReviewService {
     }
 
     public RecentPunch review(String tenantId, String actorId, String punchId, PunchReviewCommand command) {
+        return review(tenantId, SchoolScope.TENANT, actorId, punchId, command);
+    }
+
+    /** A scoped caller reviews only punches of their schools (403 otherwise). */
+    public RecentPunch review(String tenantId, SchoolScope scope, String actorId, String punchId,
+            PunchReviewCommand command) {
         if (command == null || command.decision() == null) throw AdminSupport.bad("DECISION_REQUIRED", "Chọn quyết định");
         String comment = command.comment() == null || command.comment().isBlank() ? null : command.comment().strip();
         if (command.decision() == ReviewDecision.REJECT && comment == null) {
@@ -52,13 +59,14 @@ public class PunchReviewService {
         // the day's periods are read before the transaction opens: no second pooled connection inside it
         Optional<List<TeacherPeriod>> dayPeriods = punches.findByIdAndTenantId(punchId, tenantId)
                 .map(p -> calendar.read(tenantId, p.getUserId(), p.getWorkDate(), p.getWorkDate())).orElse(null);
-        return write.execute(status -> reviewInTransaction(tenantId, actorId, punchId, command, comment, dayPeriods));
+        return write.execute(status -> reviewInTransaction(tenantId, scope, actorId, punchId, command, comment, dayPeriods));
     }
 
-    private RecentPunch reviewInTransaction(String tenantId, String actorId, String punchId, PunchReviewCommand command,
-            String comment, Optional<List<TeacherPeriod>> dayPeriods) {
+    private RecentPunch reviewInTransaction(String tenantId, SchoolScope scope, String actorId, String punchId,
+            PunchReviewCommand command, String comment, Optional<List<TeacherPeriod>> dayPeriods) {
         TkPunch punch = punches.findByIdAndTenantId(punchId, tenantId)
                 .orElseThrow(() -> AdminSupport.notFound("Không tìm thấy lượt chấm"));
+        scope.require(punch.getSchoolId());
         PunchStatus before = punch.getStatus();
         if (before != PunchStatus.FLAGGED && before != PunchStatus.PENDING_REVIEW) {
             throw AdminSupport.conflict("NOT_REVIEWABLE", "Lượt chấm này không cần duyệt");

@@ -93,15 +93,24 @@ class CalendarEventMutationUseCaseTest {
     }
 
     @Test
-    void aPlatformWideBulkDeleteWithNoSchoolListReadsEverySchoolInsteadOfAnEmptyInList() {
-        when(links.findEventIdsByTeacherInAnySchool(eq("t1"), eq("u1"), any(OffsetDateTime.class), any(OffsetDateTime.class),
-                eq("PUBLISHED"))).thenReturn(List.of("ev9"));
+    void aBulkDeleteWithNoSchoolListIsRefusedBeforeAnythingIsRead() {
+        for (List<String> none : java.util.Arrays.asList(null, List.<String>of(), List.of(" "))) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                    useCase.deleteTeacherSchedule("t1", "u1", none, "2026-12-01", "2026-12-31", "admin"))
+                    .isInstanceOf(com.erg.ergspringboot.exception.BadRequestException.class);
+        }
+        verify(links, never()).findEventIdsByTeacher(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void aBulkDeleteWithNamedSchoolsCancelsThePublishedPeriods() {
+        when(links.findEventIdsByTeacher(eq("t1"), eq("u1"), eq(List.of("s1")), any(OffsetDateTime.class),
+                any(OffsetDateTime.class), eq("PUBLISHED"))).thenReturn(List.of("ev9"));
         when(events.findAllById(any())).thenReturn(List.of());
         when(events.cancelByIds(eq("t1"), eq(List.of("ev9")), eq("ADMIN_CANCEL"), eq("admin"), any())).thenReturn(1);
 
-        var result = useCase.deleteTeacherSchedule("t1", "u1", List.of(), "2026-12-01", "2026-12-31", "admin");
+        var result = useCase.deleteTeacherSchedule("t1", "u1", List.of("s1"), "2026-12-01", "2026-12-31", "admin");
 
         assertThat(result.affectedEventCount()).isEqualTo(1);
-        verify(links, never()).findEventIdsByTeacher(any(), any(), any(), any(), any(), any());
     }
 }

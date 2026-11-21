@@ -11,8 +11,10 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizRuntimePackageService;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,9 +32,18 @@ public class LmsResourceQueryUseCase {
     private final LmsAssignmentAccessPolicy policy;
     private final LmsCallerPermissions permissions;
 
+    private final QuizVersionRepository quizVersions;
+
     public LmsResourceQueryUseCase(LmsQuizService quizzes, QuizRuntimePackageService packages,
             LmsAssignmentAccessPolicy policy, LmsCallerPermissions permissions) {
+        this(quizzes, packages, policy, permissions, null);
+    }
+
+    @Autowired
+    public LmsResourceQueryUseCase(LmsQuizService quizzes, QuizRuntimePackageService packages,
+            LmsAssignmentAccessPolicy policy, LmsCallerPermissions permissions, QuizVersionRepository quizVersions) {
         this.quizzes = quizzes; this.packages = packages; this.policy = policy; this.permissions = permissions;
+        this.quizVersions = quizVersions;
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
@@ -42,6 +53,7 @@ public class LmsResourceQueryUseCase {
     public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) {
         String tenant = tenant(access.tenantId());
         if (permissions.hasAny(AUTHORING_READ)) {
+            requireVisibleToAuthor(tenant, quizId, access.userId());
             QuizPackageResponse published = packages.activePackage(tenant, quizId).orElse(null);
             return published != null ? published : legacy(requireQuiz(tenant, quizId));
         }
@@ -49,6 +61,17 @@ public class LmsResourceQueryUseCase {
     }
 
     public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return getQuizPackage(quizId, access).quiz(); }
+
+    /**
+     * Same rule as assignment creation: a teacher (no publish right) never reads another teacher's own quiz; system quizzes
+     * and the training office (publish right) are unrestricted. Reported as missing so the id's existence is not confirmed.
+     */
+    private void requireVisibleToAuthor(String tenant, String quizId, String userId) {
+        if (quizVersions == null || permissions.hasAny("lms.quiz.publish", "*")) return;
+        if (quizVersions.countTeacherQuizzesNotOwnedBy(tenant, List.of(quizId), userId) > 0) {
+            throw new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found");
+        }
+    }
 
     /** Authorization runs on the small queries; the Quiz row is loaded only for the legacy fallback or to tell 404 from 403. */
     private QuizPackageResponse learnerPackage(String tenant, String quizId, String assignmentId, UserAccessContext access) {

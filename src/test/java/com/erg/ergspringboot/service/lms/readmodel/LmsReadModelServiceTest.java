@@ -132,6 +132,20 @@ class LmsReadModelServiceTest {
     }
 
     @Test
+    void studentGroupsWithoutMembersSkipsTheMemberQueryAndKeepsTheCount() {
+        StudentGroup group = new StudentGroup("erg", "Owned group", "class-1", null, null, "teacher-1", 2);
+        group.setId("group-1");
+        when(studentGroupRepository.findByTenantIdAndOwnerUserIdOrClassIdInOrderByCreatedAtDesc(
+                eq("erg"), eq("teacher-1"), eq(Set.of("class-1")), any(Pageable.class))).thenReturn(List.of(group));
+
+        StudentGroupWorkspaceResponse response = service.studentGroups("erg", null, List.of("class-1"), "teacher-1", false);
+
+        assertThat(response.groups().getFirst().studentIds()).isEmpty();
+        assertThat(response.groups().getFirst().studentCount()).isEqualTo(2);
+        verifyNoMoreInteractions(studentGroupMemberRepository);
+    }
+
+    @Test
     void studentGroupsReturnsScopedGroupsWithMemberIdsWithoutNestedLookups() {
         OffsetDateTime now = OffsetDateTime.now();
         StudentGroup ownedGroup = new StudentGroup("erg", "Owned group", "class-1", "Owner note", "#0ea5e9", "teacher-1", 2);

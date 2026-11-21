@@ -160,6 +160,22 @@ fields:
     generation-domain: graphql-business-read
     cold-warm-scenario: authenticated-cold-warm
     fixture-id: graphql-student-discussion-moderation-v1
+  - coordinate: ElearningQuery.discussionModerationComments
+    owner: com.erg.ergspringboot.controller.elearning.graphql.StudentEngagementGraphQlController.discussionModerationComments
+    auth: tenant-user-class-permission
+    classification: persistent-read
+    risk: bounded-read
+    statement-budget: 12
+    row-budget: 2000
+    payload-budget-bytes: 1048576
+    selection-scenario: explicit-selection-and-pagination
+    latency-budget-ms: 750
+    cacheability: none
+    cache-ttl-seconds: 0
+    cache-scope: none
+    generation-domain: graphql-business-read
+    cold-warm-scenario: authenticated-cold-warm
+    fixture-id: graphql-student-discussion-moderation-v1
   - coordinate: Mutation.setStudentDiscussionHidden
     owner: com.erg.ergspringboot.controller.elearning.graphql.StudentEngagementGraphQlController.setStudentDiscussionHidden
     auth: tenant-user-class-permission

@@ -31,7 +31,9 @@ public final class SessionResponses {
             List<SessionBootstrapUnit> manageableUnits,
             List<SessionBootstrapClass> manageableClasses,
             String tenantId,
-            List<String> workspaces
+            List<String> workspaces,
+            /** True when manageableClasses was cut at 500; page the rest through GET /sessions/scope?unitId=. */
+            boolean classesTruncated
     ) {
     }
 

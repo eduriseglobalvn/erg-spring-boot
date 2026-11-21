@@ -174,13 +174,17 @@ final class SessionUnitScopeResolver {
      * {@code teacherId} non-null means a plain teacher (no back-office workspace): only the classes they are homeroom
      * teacher of, have assigned work to, or teach in the published timetable; never every class of the school.
      */
-    List<SessionBootstrapClass> resolveManageableClasses(String tenantId, List<ManagedUnit> managedUnits, String teacherId) {
+    ManagedClasses resolveManageableClasses(String tenantId, List<ManagedUnit> managedUnits, String teacherId) {
         List<SessionBootstrapClass> rows = classRows(tenantId, managedUnits, teacherId, MAX_BOOTSTRAP_CLASSES);
         if (rows.size() <= MAX_BOOTSTRAP_CLASSES) {
-            return rows;
+            return new ManagedClasses(rows, false);
         }
         log.warn("session bootstrap classes capped at {} for tenant {}; the caller manages more", MAX_BOOTSTRAP_CLASSES, tenantId);
-        return rows.subList(0, MAX_BOOTSTRAP_CLASSES);
+        return new ManagedClasses(rows.subList(0, MAX_BOOTSTRAP_CLASSES), true);
+    }
+
+    /** {@code truncated}: the list was cut at the bootstrap cap; the client pages the rest through /sessions/scope. */
+    record ManagedClasses(List<SessionBootstrapClass> rows, boolean truncated) {
     }
 
     /** At most {@code limit + 1} rows: the extra row tells the caller the list was cut. */

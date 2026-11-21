@@ -2,7 +2,7 @@ version: 2
 profiles:
   runtime-union: test + erg.auth.bff-enabled=true + erg.process-local.enabled=true
 rest:
-  route-count: 323
+  route-count: 324
   routes:
     - route: DELETE /api/content/items/{contentItemId} => com.erg.ergspringboot.controller.learningcontent.LearningContentController.deleteContentItem
       classification: persistent-write
@@ -757,6 +757,14 @@ rest:
       cache-policy: tenant-generation-or-none
       pagination-policy: required-for-collections
     - route: GET /api/v1/calendar/batches/{batchId} => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.batchDetail
+      classification: persistent-read
+      statement-budget: 12
+      row-budget: 1000
+      payload-budget-bytes: 2097152
+      state-owner: postgresql
+      cache-policy: tenant-generation-or-none
+      pagination-policy: required-for-collections
+    - route: GET /api/v1/calendar/catalog/search => com.erg.ergspringboot.controller.calendar.rest.CalendarRestController.catalogSearch
       classification: persistent-read
       statement-budget: 12
       row-budget: 1000

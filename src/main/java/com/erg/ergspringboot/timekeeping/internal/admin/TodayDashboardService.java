@@ -12,6 +12,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RecentPunch;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemindResult;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteCount;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TodayDashboard;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
@@ -89,9 +90,14 @@ public class TodayDashboardService {
 
     /** {@code schoolId} null = every school with shifts or sites; {@code date} null = today in Vietnam. */
     public TodayDashboard today(String tenantId, String schoolId, LocalDate date) {
+        return today(tenantId, SchoolScope.TENANT, schoolId, date);
+    }
+
+    /** A scoped caller sees only their managed schools: {@code schoolId} outside them is 403, omitted = all of theirs. */
+    public TodayDashboard today(String tenantId, SchoolScope scope, String schoolId, LocalDate date) {
         LocalDate day = date == null ? support.today() : date;
-        Set<String> schools = schoolId != null ? Set.of(support.requireSchool(tenantId, schoolId).getId())
-                : configuredSchools(tenantId);
+        Set<String> schools = schoolId != null ? Set.of(support.requireSchool(tenantId, scope, schoolId).getId())
+                : scope.restrict(configuredSchools(tenantId));
         Instant now = support.clock().instant();
 
         Map<String, String> schoolOf = context.schoolsOf(tenantId,
@@ -169,6 +175,11 @@ public class TodayDashboardService {
 
     /** "Nhắc chấm công" to tenant users without a counted IN today; one outbox key per person and day. */
     public RemindResult remind(String tenantId, String actorId, List<String> userIds) {
+        return remind(tenantId, SchoolScope.TENANT, actorId, userIds);
+    }
+
+    /** A scoped caller can only remind people whose school is in their scope; the others count as skipped. */
+    public RemindResult remind(String tenantId, SchoolScope scope, String actorId, List<String> userIds) {
         if (userIds == null || userIds.isEmpty() || userIds.size() > REMIND_MAX) {
             throw AdminSupport.bad("INVALID_USERS", "Chọn từ 1 đến 200 nhân sự");
         }
@@ -184,7 +195,8 @@ public class TodayDashboardService {
         Set<String> working = schoolsWithShift(tenantId, new HashSet<>(schoolOf.values()), day);
         int sent = 0;
         for (String userId : wanted) {
-            if (!known.contains(userId) || punchedIn.contains(userId) || !working.contains(schoolOf.get(userId))) {
+            if (!known.contains(userId) || punchedIn.contains(userId) || !working.contains(schoolOf.get(userId))
+                    || !scope.allows(schoolOf.get(userId))) {
                 continue;
             }
             try {

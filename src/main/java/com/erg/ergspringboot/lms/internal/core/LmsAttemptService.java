@@ -95,6 +95,15 @@ public class LmsAttemptService {
                 tenantId, quizId, allClasses, classIds, allUnits, unitIds, pageable);
     }
 
+    /** As above; with {@code classScopeWithoutSchool} a class named in {@code classIds} needs no matching education unit. */
+    public org.springframework.data.domain.Page<com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection>
+            findScopedQuizAttemptSummaries(String tenantId, String quizId, boolean allClasses,
+                    java.util.Collection<String> classIds, boolean allUnits, java.util.Collection<String> unitIds,
+                    boolean classScopeWithoutSchool, org.springframework.data.domain.Pageable pageable) {
+        return repository.findScopedQuizAttemptSummaries(
+                tenantId, quizId, allClasses, classIds, allUnits, unitIds, classScopeWithoutSchool, pageable);
+    }
+
     /**
      * Holds starts of one learner on one assignment quiz until the transaction ends, so a double click or a second
      * tab waits and then resumes the attempt the first one opened instead of failing with 409 or 500.

@@ -56,16 +56,6 @@ public interface CalendarEventTeacherRepository extends JpaRepository<CalendarEv
                                        @Param("to") OffsetDateTime to,
                                        @Param("status") String status);
 
-    /** Same, in every school of the tenant (a platform-wide caller named no school). */
-    @Query("SELECT et.eventId FROM CalendarEventTeacher et JOIN CalendarEvent e ON e.id = et.eventId " +
-           "WHERE e.tenantId = :tenantId AND et.tenantId = :tenantId AND et.teacherUserId = :teacherUserId " +
-           "AND e.status = :status AND e.startAt >= :from AND e.startAt < :to")
-    List<String> findEventIdsByTeacherInAnySchool(@Param("tenantId") String tenantId,
-                                                  @Param("teacherUserId") String teacherUserId,
-                                                  @Param("from") OffsetDateTime from,
-                                                  @Param("to") OffsetDateTime to,
-                                                  @Param("status") String status);
-
     @Query("SELECT COUNT(et) FROM CalendarEventTeacher et JOIN CalendarEvent e ON e.id = et.eventId " +
            "WHERE e.tenantId = :tenantId AND et.tenantId = :tenantId AND e.batchId = :batchId")
     long countByBatch(@Param("tenantId") String tenantId, @Param("batchId") String batchId);

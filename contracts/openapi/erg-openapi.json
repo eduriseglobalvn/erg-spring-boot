@@ -1100,6 +1100,32 @@
         },
         "type": "object"
       },
+      "ApiResponseCalendarCatalogSearchResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CalendarCatalogSearchResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseCalendarDeletePayload": {
         "properties": {
           "data": {
@@ -7031,6 +7057,9 @@
             },
             "type": "array"
           },
+          "catalogTruncated": {
+            "type": "boolean"
+          },
           "classes": {
             "items": {
               "$ref": "#/components/schemas/CalendarClassOptionResponse"
@@ -7066,6 +7095,31 @@
               "$ref": "#/components/schemas/CalendarTeacherOptionResponse"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CalendarCatalogSearchResponse": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -11013,6 +11067,26 @@
         ],
         "type": "object"
       },
+      "Item": {
+        "properties": {
+          "academicYear": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "KpiDefinition": {
         "properties": {
           "definition": {
@@ -14774,6 +14848,9 @@
       },
       "SessionBootstrapResponse": {
         "properties": {
+          "classesTruncated": {
+            "type": "boolean"
+          },
           "currentScope": {
             "$ref": "#/components/schemas/SessionBootstrapScope"
           },
@@ -18964,6 +19041,75 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCalendarBatchPayload"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "calendar-rest-controller"
+        ]
+      }
+    },
+    "/api/v1/calendar/catalog/search": {
+      "get": {
+        "operationId": "catalogSearch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "schoolIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCalendarCatalogSearchResponse"
                 }
               }
             },

@@ -50,6 +50,10 @@ public class CalendarReadUseCase implements CalendarReadPort {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private CalendarCatalogCache catalogCache;
 
+    /** Catalog search read; null in plain unit tests. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CalendarCatalogSearchUseCase catalogSearch;
+
     public CalendarReadUseCase(
             CalendarEventRepository eventRepository,
             CalendarEventTeacherRepository eventTeacherRepository,
@@ -186,6 +190,13 @@ public class CalendarReadUseCase implements CalendarReadPort {
     @Override
     public CalendarBatchDetailResponse teachingScheduleBatch(String tenantId, String batchId) {
         return scheduleBatchQueries.detail(tenantId, batchId);
+    }
+
+    @Override
+    public com.erg.ergspringboot.calendar.CalendarCatalogSearchResponse catalogSearch(
+            String tenantId, String kind, List<String> schoolIds, String q, Integer page, Integer size) {
+        if (catalogSearch == null) throw new IllegalStateException("Calendar catalog search is not available");
+        return catalogSearch.search(tenantId, kind, schoolIds, q, page, size);
     }
 
     private CalendarReferenceMaps buildReferenceMaps(

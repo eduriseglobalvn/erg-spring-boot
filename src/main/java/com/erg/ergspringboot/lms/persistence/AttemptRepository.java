@@ -18,6 +18,8 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
 
     Optional<Attempt> findByTenantIdAndId(String tenantId, String id);
 
+    boolean existsByTenantIdAndAssignmentId(String tenantId, String assignmentId);
+
     /** Literal predicate so the planner can use the partial unique index uq_lms_attempts_single_in_progress (lower(status)). */
     @Query("select a from Attempt a where a.tenantId = :tenantId and a.assignmentId = :assignmentId and a.quizId = :quizId "
             + "and a.studentId = :studentId and lower(a.status) = 'in_progress'")
@@ -142,6 +144,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
     /**
      * Paged roster with the caller's class/education-unit scope applied in SQL, so a page is never cut
      * before filtering. Mirrors the in-memory rule: an assignment without a class is visible to every reviewer.
+     * With {@code classScopeWithoutSchool} a class named in {@code classIds} is enough, as in the in-memory rule.
      */
     @Query(value = """
             select new com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection(
@@ -167,9 +170,10 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
               and attempt.quizId = :quizId
               and (coalesce(assignment.academicClassId, '') = ''
                    or (classroom.id is not null
-                       and (:allClasses = true or assignment.academicClassId in :classIds)
-                       and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
-                            or classroom.schoolId in :unitIds)))
+                       and ((:classScopeWithoutSchool = true and assignment.academicClassId in :classIds)
+                            or ((:allClasses = true or assignment.academicClassId in :classIds)
+                                and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
+                                     or classroom.schoolId in :unitIds)))))
             order by attempt.updatedAt desc, attempt.id desc
             """, countQuery = """
             select count(attempt.id)
@@ -182,9 +186,10 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
               and attempt.quizId = :quizId
               and (coalesce(assignment.academicClassId, '') = ''
                    or (classroom.id is not null
-                       and (:allClasses = true or assignment.academicClassId in :classIds)
-                       and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
-                            or classroom.schoolId in :unitIds)))
+                       and ((:classScopeWithoutSchool = true and assignment.academicClassId in :classIds)
+                            or ((:allClasses = true or assignment.academicClassId in :classIds)
+                                and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
+                                     or classroom.schoolId in :unitIds)))))
             """)
     Page<AttemptSummaryProjection> findScopedQuizAttemptSummaries(
             @Param("tenantId") String tenantId,
@@ -193,8 +198,15 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
             @Param("classIds") Collection<String> classIds,
             @Param("allUnits") boolean allUnits,
             @Param("unitIds") Collection<String> unitIds,
+            @Param("classScopeWithoutSchool") boolean classScopeWithoutSchool,
             Pageable pageable
     );
+
+    /** School rule only: a class named in {@code classIds} must also match the education unit. */
+    default Page<AttemptSummaryProjection> findScopedQuizAttemptSummaries(String tenantId, String quizId, boolean allClasses,
+            Collection<String> classIds, boolean allUnits, Collection<String> unitIds, Pageable pageable) {
+        return findScopedQuizAttemptSummaries(tenantId, quizId, allClasses, classIds, allUnits, unitIds, false, pageable);
+    }
 
     @Query("""
             select new com.erg.ergspringboot.lms.persistence.projection.AttemptScoreProjection(

@@ -105,6 +105,11 @@ public class ElearningOperations {
         return moderation.feed(moderator(moderator), classId, page, size);
     }
 
+    public StudentDiscussionCommentPageResponse discussionModerationComments(
+            DiscussionModerator moderator, String postId, String parentId, int page, int size) {
+        return moderation.comments(moderator(moderator), postId, parentId, page, size);
+    }
+
     public StudentDiscussionModerationResponse setDiscussionHidden(
             DiscussionModerator moderator, String targetType, String targetId, boolean hidden) {
         return moderation.setHidden(moderator(moderator), targetType, targetId, hidden);

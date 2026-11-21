@@ -222,6 +222,39 @@ class StudentDiscussionModerationIntegrationTest {
                 "select count(*) from student_discussion_comments where post_id = 'post-scope'", Integer.class)).isZero();
     }
 
+    @Test
+    void moderationCommentsIncludeHiddenItemsAndFollowTheModeratorClassScope() {
+        insertPost("post-modpage");
+        for (int i = 0; i < 25; i++) insertComment("g-root-" + i, "post-modpage", null);
+        for (int i = 0; i < 3; i++) insertComment("g-reply-" + i, "post-modpage", "g-root-0");
+        StudentDiscussionModerationService moderation = moderationService();
+        Moderator admin = new Moderator(tenantId, "usr_admin", true);
+        moderation.setHidden(admin, "COMMENT", "g-root-0", true);
+
+        var first = moderation.comments(admin, "post-modpage", null, 0, 500);
+        var second = moderation.comments(admin, "post-modpage", null, 1, 20);
+        assertThat(first.size()).isEqualTo(50);
+        assertThat(first.totalItems()).isEqualTo(25); // the hidden comment still counts for moderators
+        assertThat(second.items()).extracting(StudentDiscussionCommentResponse::id).contains("g-root-0");
+        assertThat(second.items().getFirst().hidden()).isTrue();
+        assertThat(second.items().getFirst().replyCount()).isEqualTo(3);
+        assertThat(moderation.comments(admin, "post-modpage", "g-root-0", 0, 2).hasNext()).isTrue();
+        assertThat(moderation.comments(admin, "post-modpage", "g-root-0", 0, 0).size()).isEqualTo(1);
+        assertThat(studentService().comments(new StudentEngagementService.CommentsScope(
+                tenantId, STUDENT_USER, "post-modpage", null, 0, 50)).totalItems()).isEqualTo(24);
+
+        Moderator teacher = new Moderator(tenantId, TEACHER_USER, false);
+        when(classrooms.findTeacherClassOptions(tenantId, TEACHER_USER))
+                .thenReturn(List.of(new ClassOptionProjection("other-class", null, "Lớp khác", null, null, "ACTIVE")));
+        assertThatThrownBy(() -> moderation.comments(teacher, "post-modpage", null, 0, 20))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> moderation.comments(admin, "post-missing", null, 0, 20))
+                .isInstanceOf(ResourceNotFoundException.class);
+        when(classrooms.findTeacherClassOptions(tenantId, TEACHER_USER))
+                .thenReturn(List.of(new ClassOptionProjection(classId, null, "Lớp", null, null, "ACTIVE")));
+        assertThat(moderation.comments(teacher, "post-modpage", null, 0, 20).totalItems()).isEqualTo(25);
+    }
+
     private List<StudentDiscussionPostResponse> studentFeed() {
         return studentService().feed(new FeedScope(tenantId, STUDENT_USER, 0, 50)).items();
     }

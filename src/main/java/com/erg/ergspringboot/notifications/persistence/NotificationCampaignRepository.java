@@ -41,6 +41,21 @@ public interface NotificationCampaignRepository extends JpaRepository<Notificati
             """)
     int claimDue(@Param("tenantId") String tenantId, @Param("id") String id, @Param("now") OffsetDateTime now);
 
+    /** Cross-tenant list of campaigns whose fan-out is not finished (maintenance scope), oldest first. */
+    List<NotificationCampaignEntity> findTop100ByStatusOrderByUpdatedAtAsc(CampaignStatus status);
+
+    /** Fan-out finished: SENDING -> SENT exactly once; 0 rows means it already ended some other way. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update NotificationCampaignEntity c
+            set c.status = com.erg.ergspringboot.notifications.CampaignStatus.SENT, c.updatedAt = :now,
+                c.sentAt = :now, c.resolvedCount = :resolved
+            where c.tenantId = :tenantId and c.id = :id
+              and c.status = com.erg.ergspringboot.notifications.CampaignStatus.SENDING
+            """)
+    int completeSending(@Param("tenantId") String tenantId, @Param("id") String id,
+            @Param("resolved") int resolved, @Param("now") OffsetDateTime now);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update NotificationCampaignEntity c

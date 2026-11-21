@@ -7,6 +7,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.DayCell;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.Timesheet;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TimesheetIssues;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TimesheetRow;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
@@ -65,8 +66,14 @@ public class TimesheetService {
     @Transactional(readOnly = true)
     public Timesheet timesheet(String tenantId, String schoolId, String period, String team, String q, int page,
             int size) {
+        return timesheet(tenantId, SchoolScope.TENANT, schoolId, period, team, q, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Timesheet timesheet(String tenantId, SchoolScope scope, String schoolId, String period, String team,
+            String q, int page, int size) {
         YearMonth month = AdminSupport.period(period);
-        support.requireSchool(tenantId, schoolId);
+        support.requireSchool(tenantId, scope, schoolId);
         int pageSize = Math.max(1, Math.min(size, MAX_SIZE));
         int pageNo = Math.max(0, page);
         LocalDate from = month.atDay(1);

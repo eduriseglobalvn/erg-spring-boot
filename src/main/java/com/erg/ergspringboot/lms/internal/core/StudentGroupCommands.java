@@ -8,6 +8,7 @@ import com.erg.ergspringboot.lms.persistence.StudentGroup;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMember;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
 import com.erg.ergspringboot.lms.persistence.StudentGroupRepository;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -26,15 +27,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(value = "postgresTransactionManager")
 public class StudentGroupCommands {
 
+    static final int MAX_MEMBERS = 500;
     private final StudentGroupRepository studentGroupRepository;
     private final StudentGroupMemberRepository studentGroupMemberRepository;
+    private final StudentRepository studentRepository;
 
     public StudentGroupCommands(
             StudentGroupRepository studentGroupRepository,
-            StudentGroupMemberRepository studentGroupMemberRepository
+            StudentGroupMemberRepository studentGroupMemberRepository,
+            StudentRepository studentRepository
     ) {
         this.studentGroupRepository = studentGroupRepository;
         this.studentGroupMemberRepository = studentGroupMemberRepository;
+        this.studentRepository = studentRepository;
     }
 
     // PERF-05: stays tenant-wide (ErgTieredCache.clear() only clears the caller's tenant). A group appears in lists keyed
@@ -45,6 +50,7 @@ public class StudentGroupCommands {
             throw new BadRequestException("group name is required");
         }
         List<String> studentIds = request.studentIds() == null ? List.of() : request.studentIds();
+        validateMembers(tenantId, studentIds, 0);
         StudentGroup group = new StudentGroup();
         group.setTenantId(tenantId);
         group.setName(request.name().trim());
@@ -96,6 +102,7 @@ public class StudentGroupCommands {
         }
         // Replace membership wholesale when studentIds is supplied (null = leave unchanged).
         if (request != null && request.studentIds() != null) {
+            validateMembers(tenantId, request.studentIds(), group.getStudentCount() == null ? 0 : group.getStudentCount());
             studentGroupMemberRepository.deleteByGroupIdAndTenantId(groupId, tenantId);
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             Set<String> ids = new LinkedHashSet<>(request.studentIds());
@@ -130,6 +137,22 @@ public class StudentGroupCommands {
                 .orElseThrow(() -> new ResourceNotFoundException("student group not found"));
         studentGroupMemberRepository.deleteByGroupIdAndTenantId(groupId, tenantId);
         studentGroupRepository.delete(group);
+    }
+
+    /**
+     * At most {@link #MAX_MEMBERS} distinct members (a group that already exceeds it may shrink or stay, never grow) and
+     * every id must belong to the tenant; the error names how many are invalid, never the ids.
+     */
+    private void validateMembers(String tenantId, List<String> studentIds, int currentCount) {
+        Set<String> ids = new LinkedHashSet<>(studentIds);
+        if (ids.size() > MAX_MEMBERS && ids.size() > currentCount) {
+            throw new BadRequestException("Một nhóm có tối đa " + MAX_MEMBERS + " học sinh.");
+        }
+        if (ids.isEmpty()) return;
+        long found = studentRepository.countByTenantIdAndIdIn(tenantId, ids);
+        if (found < ids.size()) {
+            throw new BadRequestException((ids.size() - found) + " học sinh không hợp lệ hoặc không thuộc đơn vị này.");
+        }
     }
 
     private String blankToNull(String value) {

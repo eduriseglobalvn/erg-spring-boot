@@ -62,6 +62,7 @@ class CalendarPublishedScenarioTest {
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationCampaignService campaigns;
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationCampaignQueryService campaignQueries;
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.ScheduledCampaignDispatchJob campaignJob;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.CampaignFanOut campaignFanOut;
 
     @Test
     void publishedEventEventuallyEnqueuesOneIdempotentNotificationPerTeacher(Scenario scenario) {

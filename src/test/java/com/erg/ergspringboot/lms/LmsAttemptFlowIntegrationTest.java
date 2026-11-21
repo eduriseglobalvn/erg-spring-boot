@@ -200,6 +200,13 @@ class LmsAttemptFlowIntegrationTest {
                 false, List.of("class-other"), true, List.of("x"), page).getTotalElements()).isZero();
         assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
                 true, List.of("x"), false, List.of("school-other"), page).getTotalElements()).isZero();
+        // class-only scope: the class named in the scope is enough on the non-paged rule, not on the school-checked one
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                false, List.of("class-flow"), false, List.of("none"), page).getTotalElements()).isZero();
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                false, List.of("class-flow"), false, List.of("none"), true, page).getTotalElements()).isEqualTo(1);
+        assertThat(attemptRepository.findScopedQuizAttemptSummaries(TENANT, "qz_math_g6_base",
+                false, List.of("class-other"), false, List.of("none"), true, page).getTotalElements()).isZero();
     }
 
     @Test

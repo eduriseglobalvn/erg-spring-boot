@@ -214,6 +214,15 @@ public class StudentEngagementGraphQlController {
                 input.page() == null ? 0 : input.page(), input.size() == null ? 20 : input.size());
     }
 
+    @SchemaMapping(typeName = "ElearningQuery", field = "discussionModerationComments")
+    @ElearningDiscussionModerate
+    public StudentDiscussionCommentPageResponse discussionModerationComments(
+            @Argument String postId, @Argument String parentId, @Argument Integer page, @Argument Integer size,
+            @Argument String tenantId) {
+        return service.discussionModerationComments(moderator(tenantId), postId, parentId,
+                page == null ? 0 : page, size == null ? 20 : size);
+    }
+
     @MutationMapping
     @ElearningDiscussionModerate
     public StudentDiscussionModerationResponse setStudentDiscussionHidden(@Argument SetStudentDiscussionHiddenInput input) {

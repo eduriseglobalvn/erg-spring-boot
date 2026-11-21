@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class LmsStudentReadModelUseCase {
     private static final List<String> NO_SCOPE = List.of("__no-scope__");
+    /** Pending owner decision (R3): false keeps /students/page requiring a school match for a class named in the scope. */
+    static final boolean CLASS_SCOPE_WITHOUT_SCHOOL_ON_PAGE = true;
     private final LmsClassroomService classrooms;
     private final LmsAssignmentService assignments;
     private final LmsAttemptService attempts;
@@ -78,25 +80,13 @@ public class LmsStudentReadModelUseCase {
         quizzes.findByTenantIdAndId(tenant(access.tenantId()), quizId)
                 .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
         String tenant = tenant(access.tenantId());
+        List<String> classIds = list(access.managedClassIds());
         List<String> unitIds = list(access.managedEducationUnitIds());
-        if (!unitIds.isEmpty()) {
-            // Scope in SQL (same query as /students/page), so the newest-500 cut applies to the caller's own rows only.
-            List<String> classIds = list(access.managedClassIds());
-            return attempts.findScopedQuizAttemptSummaries(tenant, quizId, classIds.contains("*"),
-                    classIds.isEmpty() ? NO_SCOPE : classIds, unitIds.contains("*"), unitIds,
-                    org.springframework.data.domain.PageRequest.of(0, 500)).getContent().stream().map(this::attemptSummary).toList();
-        }
-        // shortcut: a caller with only class scope (no education unit) keeps the old newest-500 in-memory filter, see R3
-        var source = attempts.findQuizAttemptSummaries(tenant, quizId);
-        Map<String, Assignment> byId = assignments.findByTenantIdAndIdIn(tenant,
-                        source.stream().map(com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection::assignmentId)
-                                .filter(Objects::nonNull).distinct().toList())
-                .stream().collect(java.util.stream.Collectors.toMap(Assignment::getId, item -> item, (a,b) -> a));
-        Map<String, Classroom> classes = classrooms(tenant, new ArrayList<>(byId.values()));
-        return source.stream().filter(item -> {
-            Assignment assignment = byId.get(item.assignmentId());
-            return assignment != null && allowed(assignment.getAcademicClassId(), access, classes);
-        }).map(this::attemptSummary).toList();
+        // Scope in SQL, so the newest-500 cut applies to the caller's own rows only. A class named in the caller's
+        // class scope counts without a school match, like the in-memory rule (BUG-A-050).
+        return attempts.findScopedQuizAttemptSummaries(tenant, quizId, classIds.contains("*"),
+                classIds.isEmpty() ? NO_SCOPE : classIds, unitIds.contains("*"), unitIds.isEmpty() ? NO_SCOPE : unitIds, true,
+                org.springframework.data.domain.PageRequest.of(0, 500)).getContent().stream().map(this::attemptSummary).toList();
     }
 
     public com.erg.ergspringboot.common.response.PageResponse<AttemptResponse> quizStudentsPage(
@@ -110,7 +100,7 @@ public class LmsStudentReadModelUseCase {
         // An empty IN list is invalid SQL on some dialects; the sentinel id matches no row.
         var result = attempts.findScopedQuizAttemptSummaries(tenant, quizId,
                 classIds.contains("*"), classIds.isEmpty() ? NO_SCOPE : classIds,
-                unitIds.contains("*"), unitIds.isEmpty() ? NO_SCOPE : unitIds, request);
+                unitIds.contains("*"), unitIds.isEmpty() ? NO_SCOPE : unitIds, CLASS_SCOPE_WITHOUT_SCHOOL_ON_PAGE, request);
         return new com.erg.ergspringboot.common.response.PageResponse<>(
                 result.getContent().stream().map(this::attemptSummary).toList(), result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages(), result.hasNext(), result.hasPrevious());

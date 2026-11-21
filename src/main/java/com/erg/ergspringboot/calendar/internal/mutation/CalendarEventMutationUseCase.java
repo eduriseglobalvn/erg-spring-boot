@@ -127,6 +127,7 @@ public class CalendarEventMutationUseCase {
             String dateFrom,
             String dateTo,
             String actorId) {
+        requireSchoolIds(schoolIds);
         LocalDate fromDate = requiredDate(dateFrom, "dateFrom");
         LocalDate toDate = requiredDate(dateTo, "dateTo");
         if (fromDate.isAfter(toDate)) {
@@ -157,12 +158,16 @@ public class CalendarEventMutationUseCase {
         return new CalendarDeletePayload(teacherUserId, true, affected);
     }
 
-    /** An empty school list only reaches here from a platform-wide caller (the scope service refuses it otherwise): every school. */
     private List<String> teacherEventIds(String tenantId, String teacherUserId, List<String> schoolIds, OffsetDateTime from,
             OffsetDateTime to, String status) {
-        return schoolIds == null || schoolIds.isEmpty()
-                ? eventTeachers.findEventIdsByTeacherInAnySchool(tenantId, teacherUserId, from, to, status)
-                : eventTeachers.findEventIdsByTeacher(tenantId, teacherUserId, schoolIds, from, to, status);
+        return eventTeachers.findEventIdsByTeacher(tenantId, teacherUserId, schoolIds, from, to, status);
+    }
+
+    /** Owner decision: the schools are always named, even by a tenant-wide caller; the controllers call this before scope resolution. */
+    public static void requireSchoolIds(List<String> schoolIds) {
+        if (schoolIds == null || schoolIds.stream().noneMatch(id -> id != null && !id.isBlank())) {
+            throw new BadRequestException("Phải chọn ít nhất một trường (schoolIds) để xóa lịch dạy của giáo viên.");
+        }
     }
 
     private CalendarEvent findEvent(String eventId) {

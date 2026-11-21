@@ -4,6 +4,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ShiftCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ShiftConfig;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteConfig;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
 import com.erg.ergspringboot.timekeeping.internal.schedule.SchoolSetupCache;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
@@ -58,18 +59,31 @@ public class SiteShiftConfigService {
 
     @Transactional(readOnly = true)
     public List<SiteConfig> sites(String tenantId, String schoolId) {
-        List<TkSite> rows = schoolId == null ? sites.findByTenantIdOrderByNameAsc(tenantId)
-                : sites.findByTenantIdAndSchoolIdOrderByNameAsc(tenantId, support.requireSchool(tenantId, schoolId).getId());
+        return sites(tenantId, SchoolScope.TENANT, schoolId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SiteConfig> sites(String tenantId, SchoolScope scope, String schoolId) {
+        List<TkSite> rows = schoolId == null
+                ? sites.findByTenantIdOrderByNameAsc(tenantId).stream().filter(s -> scope.allows(s.getSchoolId())).toList()
+                : sites.findByTenantIdAndSchoolIdOrderByNameAsc(tenantId,
+                        support.requireSchool(tenantId, scope, schoolId).getId());
         return rows.stream().map(SiteShiftConfigService::site).toList();
     }
 
     @Transactional
     public SiteConfig saveSite(String tenantId, String actorId, String id, SiteCommand c) {
+        return saveSite(tenantId, SchoolScope.TENANT, actorId, id, c);
+    }
+
+    @Transactional
+    public SiteConfig saveSite(String tenantId, SchoolScope scope, String actorId, String id, SiteCommand c) {
         if (c == null) throw AdminSupport.bad("BODY_REQUIRED", "Thiếu dữ liệu");
         TkSite row = id == null ? new TkSite() : sites.findByIdAndTenantId(id, tenantId).orElseThrow(siteNotFound());
+        if (id != null) scope.require(row.getSchoolId());
         Map<String, Object> before = id == null ? null : AdminSupport.summary(site(row));
         String movedFrom = id == null ? null : row.getSchoolId();
-        support.requireSchool(tenantId, c.schoolId());
+        support.requireSchool(tenantId, scope, c.schoolId());
         String name = AdminSupport.text(c.name(), 255, "NAME_REQUIRED", "Nhập tên vị trí");
         if (c.lat() == null || c.lng() == null || c.lat().abs().compareTo(BigDecimal.valueOf(90)) > 0
                 || c.lng().abs().compareTo(BigDecimal.valueOf(180)) > 0) {
@@ -98,7 +112,13 @@ public class SiteShiftConfigService {
 
     @Transactional
     public void deleteSite(String tenantId, String actorId, String id) {
+        deleteSite(tenantId, SchoolScope.TENANT, actorId, id);
+    }
+
+    @Transactional
+    public void deleteSite(String tenantId, SchoolScope scope, String actorId, String id) {
         TkSite row = sites.findByIdAndTenantId(id, tenantId).orElseThrow(siteNotFound());
+        scope.require(row.getSchoolId());
         boolean used = punches.existsByTenantIdAndSiteId(tenantId, id);
         if (used) {
             row.setActive(false);
@@ -114,18 +134,30 @@ public class SiteShiftConfigService {
 
     @Transactional(readOnly = true)
     public List<ShiftConfig> shifts(String tenantId, String schoolId) {
-        List<TkShift> rows = schoolId == null ? shifts.findByTenantId(tenantId)
+        return shifts(tenantId, SchoolScope.TENANT, schoolId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShiftConfig> shifts(String tenantId, SchoolScope scope, String schoolId) {
+        List<TkShift> rows = schoolId == null
+                ? shifts.findByTenantId(tenantId).stream().filter(s -> scope.allows(s.getSchoolId())).toList()
                 : shifts.findByTenantIdAndSchoolIdOrderByStartTimeAsc(tenantId,
-                        support.requireSchool(tenantId, schoolId).getId());
+                        support.requireSchool(tenantId, scope, schoolId).getId());
         return rows.stream().map(SiteShiftConfigService::shift).toList();
     }
 
     @Transactional
     public ShiftConfig saveShift(String tenantId, String actorId, String id, ShiftCommand c) {
+        return saveShift(tenantId, SchoolScope.TENANT, actorId, id, c);
+    }
+
+    @Transactional
+    public ShiftConfig saveShift(String tenantId, SchoolScope scope, String actorId, String id, ShiftCommand c) {
         if (c == null) throw AdminSupport.bad("BODY_REQUIRED", "Thiếu dữ liệu");
         TkShift existing = id == null ? null : shifts.findByIdAndTenantId(id, tenantId).orElseThrow(shiftNotFound());
+        if (existing != null) scope.require(existing.getSchoolId());
         Map<String, Object> before = existing == null ? null : AdminSupport.summary(shift(existing));
-        support.requireSchool(tenantId, c.schoolId());
+        support.requireSchool(tenantId, scope, c.schoolId());
         String name = AdminSupport.text(c.name(), 255, "NAME_REQUIRED", "Nhập tên ca");
         if (c.startTime() == null || c.endTime() == null || c.startTime().isBefore(EARLIEST_START)
                 || c.endTime().isAfter(LATEST_END) || !c.endTime().isAfter(c.startTime())) {
@@ -181,7 +213,13 @@ public class SiteShiftConfigService {
 
     @Transactional
     public void deleteShift(String tenantId, String actorId, String id) {
+        deleteShift(tenantId, SchoolScope.TENANT, actorId, id);
+    }
+
+    @Transactional
+    public void deleteShift(String tenantId, SchoolScope scope, String actorId, String id) {
         TkShift row = shifts.findByIdAndTenantId(id, tenantId).orElseThrow(shiftNotFound());
+        scope.require(row.getSchoolId());
         boolean used = punches.existsByTenantIdAndShiftId(tenantId, id) || days.existsByTenantIdAndShiftId(tenantId, id)
                 || remoteRules.existsByTenantIdAndShiftId(tenantId, id);
         if (used) {

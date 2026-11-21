@@ -33,7 +33,7 @@ class NotificationAudienceResolverTest {
     private final LmsAudienceReadPort lms = mock(LmsAudienceReadPort.class);
     private final UserDirectoryPort users = mock(UserDirectoryPort.class);
     private final AudienceAccountQueries accounts = mock(AudienceAccountQueries.class);
-    private final NotificationAudienceResolver resolver = new NotificationAudienceResolver(lms, users, accounts);
+    private final NotificationAudienceResolver resolver = new NotificationAudienceResolver(lms, users, accounts, 5_000);
 
     /** User ids the directory does not know at all / knows as suspended. */
     private final Set<String> unknownUsers = new HashSet<>();
@@ -112,6 +112,21 @@ class NotificationAudienceResolverTest {
                 .isEqualTo(5000);
     }
 
+    @Test
+    void theCapIsConfigurableSoATwentyThousandStudentTenantCanBeReached() {
+        List<String> everyone = IntStream.rangeClosed(1, 20_000).mapToObj(i -> "u" + i).toList();
+        when(accounts.countActiveStudents(TENANT, null)).thenReturn(20_000L);
+        when(accounts.activeStudentUserIds(eq(TENANT), anyInt())).thenReturn(everyone);
+        CampaignAudience students = new CampaignAudience(false, null, null, null, null, List.of("STUDENT"), null);
+
+        NotificationAudienceResolver wide = new NotificationAudienceResolver(lms, users, accounts, 50_000);
+        assertThat(wide.resolve(TENANT, students).breakdown().total()).isEqualTo(20_000);
+
+        NotificationAudienceResolver narrow = new NotificationAudienceResolver(lms, users, accounts, 10_000);
+        assertThatThrownBy(() -> narrow.resolve(TENANT, students))
+                .isInstanceOf(AudienceTooLargeException.class)
+                .hasMessage("Tối đa 10.000 người nhận mỗi lần gửi");
+    }
 
     @Test
     void wholeStudentBodyOverTheCapFailsOnTheSqlCountBeforeAnyIdIsLoaded() {

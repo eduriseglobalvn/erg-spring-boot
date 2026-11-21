@@ -10,6 +10,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRowResultResponse;
 import com.erg.ergspringboot.exception.ConflictException;
+import com.erg.ergspringboot.exception.TeachingScheduleException;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
@@ -160,6 +161,7 @@ public class CalendarBulkCreateUseCase {
             }
         }
 
+        requireWithinEventCap(input);
         if (!attemptAdvisoryLock(tenantId, input.schoolId())) {
             throw new ConflictException("Another bulk schedule operation is in progress for this school.");
         }
@@ -272,6 +274,21 @@ public class CalendarBulkCreateUseCase {
                 expansion.assignments().stream().filter(a -> !off.contains(a.getEventId())).toList(),
                 expansion.clientRowIdByEventId().entrySet().stream().filter(e -> !off.contains(e.getKey()))
                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, java.util.LinkedHashMap::new)));
+    }
+
+    static final int MAX_BULK_EVENTS = 20_000;
+
+    /** Upper bound of the expansion (rows x classes x weeks, holidays only lower it), computed before anything is allocated. */
+    static void requireWithinEventCap(CalendarBulkCreateRequest input) {
+        long total = 0;
+        for (CalendarBulkRowRequest row : input.rows() == null ? List.<CalendarBulkRowRequest>of() : input.rows()) {
+            total += (row.classIds() == null ? 0L : row.classIds().size()) * Math.max(input.repeatWeeks(), 0);
+            if (total > MAX_BULK_EVENTS) {
+                throw TeachingScheduleException.badRequest("CALENDAR_BULK_TOO_LARGE",
+                        "Yêu cầu tạo quá nhiều tiết (tối đa " + MAX_BULK_EVENTS
+                                + "); hãy giảm số lớp, số tuần hoặc chia thành nhiều lần.");
+            }
+        }
     }
 
     public String payloadHash(CalendarBulkCreateRequest input) {

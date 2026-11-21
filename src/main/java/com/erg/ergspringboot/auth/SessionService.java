@@ -92,8 +92,10 @@ public class SessionService {
         // A student manages nothing: skip the teacher scope queries entirely.
         List<SessionUnitScopeResolver.ManagedUnit> managedUnits =
                 identity.studentOnly() ? List.of() : unitScopes.resolveManageableUnits(caller);
-        List<SessionBootstrapClass> manageableClasses = identity.studentOnly() ? List.of()
+        SessionUnitScopeResolver.ManagedClasses classes = identity.studentOnly()
+                ? new SessionUnitScopeResolver.ManagedClasses(List.of(), false)
                 : unitScopes.resolveManageableClasses(caller.tenantId(), managedUnits, caller.teacherId());
+        List<SessionBootstrapClass> manageableClasses = classes.rows();
         SessionBootstrapScope currentScope = unitScopes.resolveCurrentScope(
                 requestedAccess, managedUnits, manageableClasses, caller.canAccessGlobalErg());
         return new SessionBootstrapResponse(
@@ -105,7 +107,8 @@ public class SessionService {
                 unitScopes.toBootstrapUnits(managedUnits),
                 manageableClasses,
                 identity.session().getTenantId(),
-                identity.workspaces()
+                identity.workspaces(),
+                classes.truncated()
         );
     }
 

@@ -19,21 +19,8 @@ import com.erg.ergspringboot.notifications.CampaignAudience;
 import com.erg.ergspringboot.notifications.CampaignStatus;
 import com.erg.ergspringboot.notifications.NotificationCampaignRequests.CampaignDraftRequest;
 import com.erg.ergspringboot.notifications.NotificationPriority;
-import com.erg.ergspringboot.notifications.NotificationTokenCipher;
-import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
-import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
-import com.erg.ergspringboot.notifications.internal.NotificationMetrics;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
-import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationEntity;
-import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationRepository;
-import com.erg.ergspringboot.notifications.persistence.NotificationMessageEntity;
-import com.erg.ergspringboot.notifications.persistence.NotificationMessageRepository;
-import com.erg.ergspringboot.notifications.persistence.NotificationOutboxEntity;
-import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
-import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceEntity;
-import com.erg.ergspringboot.notifications.persistence.NotificationPreferenceRepository;
-import com.erg.ergspringboot.notifications.persistence.NotificationRecipientRepository;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.users.UserAccountProjection;
 import com.erg.ergspringboot.users.UserAuthorizationPort;
@@ -43,8 +30,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -73,85 +58,61 @@ class NotificationCampaignServiceTest {
     @Mock private NotificationCampaignQueryService queries;
     @Mock private UserAuthorizationPort authorizations;
     @Mock private UserDirectoryPort users;
-    @Mock private NotificationMessageRepository messages;
-    @Mock private NotificationRecipientRepository recipients;
-    @Mock private NotificationDeviceRegistrationRepository devices;
-    @Mock private NotificationOutboxRepository outbox;
-    @Mock private NotificationPreferenceRepository preferences;
-    @Mock private NotificationMetrics metrics;
+    @Mock private CampaignFanOut fanOut;
 
     private NotificationCampaignService service;
 
     @BeforeEach
     void setUp() {
-        NotificationPushProperties fcm = new NotificationPushProperties();
-        fcm.setProjectId("erg-test");
-        fcm.getCredentials().setStaticAccessToken("test-token");
-        NotificationCommandService commands = new NotificationCommandService(messages, recipients, devices, outbox,
-                fcm, new NotificationTokenCipher(new NotificationPushProperties()),
-                metrics, preferences);
-        service = new NotificationCampaignService(campaigns, guard, resolver, commands, queries, authorizations, users,
+        service = new NotificationCampaignService(campaigns, guard, resolver, fanOut, queries, authorizations, users,
                 new ErgPolicyService(), Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(guard.isAdmin(any(CampaignActor.class)))
                 .thenAnswer(invocation -> invocation.<CampaignActor>getArgument(0).roles().contains("admin"));
         lenient().when(campaigns.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(messages.saveAll(any())).thenAnswer(invocation -> {
-            Collection<NotificationMessageEntity> saved = invocation.getArgument(0);
-            int[] next = {0};
-            saved.forEach(message -> message.setId("msg-" + next[0]++));
-            return new ArrayList<>(saved);
-        });
     }
 
     @Test
-    void sendOnDraftCreatesOneMessagePerRecipientWithPushOutboxAndMarksSent() {
+    void sendMarksSendingAndTriggersTheFanOutWithoutWritingAnyRecipient() {
         NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.INFO);
         when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
-        List<String> people = people(32);
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people));
-        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any()))
-                .thenReturn(people.stream().map(NotificationCampaignServiceTest::device).toList());
+        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(32)));
 
         service.send(ADMIN, "c1");
 
-        List<NotificationMessageEntity> sentMessages = captureMessages();
-        assertThat(sentMessages).hasSize(32).allSatisfy(message -> {
-            assertThat(message.getCampaignId()).isEqualTo("c1");
-            assertThat(message.getPriority()).isEqualTo("INFO");
-            assertThat(message.getTitle()).isEqualTo("Họp phụ huynh");
-        });
-        assertThat(captureOutbox()).hasSize(32)
-                .allSatisfy(entry -> assertThat(entry.getPayload()).doesNotContainKey("bypassPreferences"));
-        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENT);
+        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENDING);
         assertThat(campaign.getResolvedCount()).isEqualTo(32);
-        assertThat(campaign.getSentAt()).isEqualTo(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
-        InOrder order = inOrder(guard, resolver, messages, campaigns);
+        InOrder order = inOrder(guard, resolver, campaigns, fanOut);
         order.verify(guard).assertAllowed(ADMIN, CLASS_7A);
         order.verify(resolver).resolve(TENANT, CLASS_7A);
-        order.verify(messages).saveAll(any());
         order.verify(campaigns).save(campaign);
+        order.verify(fanOut).triggerAfterCommit(TENANT, "c1");
+        verify(fanOut, never()).run(any(), any());
     }
 
     @Test
-    void sendWithoutPushWritesInboxOnly() {
-        NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.INFO);
-        campaign.setPushEnabled(false);
-        when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(3)));
+    void aSecondSendOnASendingOrSentCampaignReturnsItWithoutDoingAnything() {
+        for (CampaignStatus status : List.of(CampaignStatus.SENDING, CampaignStatus.SENT)) {
+            when(campaigns.lockByTenantIdAndId(TENANT, "c1"))
+                    .thenReturn(Optional.of(campaign("c1", "admin-1", status, NotificationPriority.INFO)));
 
-        service.send(ADMIN, "c1");
+            service.send(ADMIN, "c1");
+        }
 
-        assertThat(captureMessages()).hasSize(3);
-        verifyNoInteractions(devices, outbox);
+        verify(queries, org.mockito.Mockito.times(2)).toResponse(any());
+        verifyNoInteractions(resolver, fanOut);
+        verify(guard, never()).assertAllowed(any(CampaignActor.class), any());
+        verify(campaigns, never()).save(any());
     }
 
     @Test
-    void sendOnSentCampaignIsAConflictAndWritesNothing() {
-        when(campaigns.lockByTenantIdAndId(TENANT, "c1"))
-                .thenReturn(Optional.of(campaign("c1", "admin-1", CampaignStatus.SENT, NotificationPriority.INFO)));
+    void sendOnACancelledOrFailedCampaignIsAConflictAndWritesNothing() {
+        for (CampaignStatus status : List.of(CampaignStatus.CANCELLED, CampaignStatus.FAILED)) {
+            when(campaigns.lockByTenantIdAndId(TENANT, "c1"))
+                    .thenReturn(Optional.of(campaign("c1", "admin-1", status, NotificationPriority.INFO)));
 
-        assertThatThrownBy(() -> service.send(ADMIN, "c1")).isInstanceOf(ConflictException.class);
-        verifyNoInteractions(resolver, messages);
+            assertThatThrownBy(() -> service.send(ADMIN, "c1")).isInstanceOf(ConflictException.class);
+        }
+        verifyNoInteractions(resolver, fanOut);
         verify(campaigns, never()).save(any());
     }
 
@@ -162,70 +123,8 @@ class NotificationCampaignServiceTest {
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of()));
 
         assertThatThrownBy(() -> service.send(ADMIN, "c1")).isInstanceOf(BadRequestException.class);
-        verifyNoInteractions(messages);
-    }
-
-    @Test
-    void urgentPushIgnoresOptOutAndFlagsThePayload() {
-        NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.URGENT);
-        when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of("u0", "u1")));
-        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any()))
-                .thenReturn(List.of(device("u0"), device("u1")));
-
-        service.send(ADMIN, "c1");
-
-        assertThat(captureOutbox()).hasSize(2)
-                .allSatisfy(entry -> assertThat(entry.getPayload()).containsEntry("bypassPreferences", "true"));
-        verifyNoInteractions(preferences);
-    }
-
-    @Test
-    void nonUrgentPushHonoursThePushOptOut() {
-        NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.IMPORTANT);
-        when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of("u0", "u1")));
-        NotificationPreferenceEntity optOut = new NotificationPreferenceEntity();
-        optOut.setUserId("u1");
-        optOut.setPortal("lms");
-        optOut.setPushEnabled(false);
-        when(preferences.findByTenantIdAndEventTypeAndUserIdIn(eq(TENANT), eq("CAMPAIGN"), any()))
-                .thenReturn(List.of(optOut));
-        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any()))
-                .thenReturn(List.of(device("u0"), device("u1")));
-
-        service.send(ADMIN, "c1");
-
-        assertThat(captureMessages()).hasSize(2);
-        assertThat(captureOutbox()).singleElement()
-                .satisfies(entry -> assertThat(entry.getPayload()).containsEntry("deviceRegistrationId", "dev-u0"));
-    }
-
-    @Test
-    void pushReachesDevicesOfEveryPortalAndHonoursThatPortalsOptOut() {
-        NotificationCampaignEntity campaign = campaign("c1", "admin-1", CampaignStatus.DRAFT, NotificationPriority.INFO);
-        when(campaigns.lockByTenantIdAndId(TENANT, "c1")).thenReturn(Optional.of(campaign));
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(List.of("student", "muted")));
-        NotificationPreferenceEntity optOut = new NotificationPreferenceEntity();
-        optOut.setUserId("muted");
-        optOut.setPortal("elearning");
-        optOut.setPushEnabled(false);
-        NotificationPreferenceEntity otherPortal = new NotificationPreferenceEntity();
-        otherPortal.setUserId("student");
-        otherPortal.setPortal("lms");
-        otherPortal.setPushEnabled(false);
-        when(preferences.findByTenantIdAndEventTypeAndUserIdIn(eq(TENANT), eq("CAMPAIGN"), any()))
-                .thenReturn(List.of(optOut, otherPortal));
-        NotificationDeviceRegistrationEntity phone = device("student");
-        phone.setPortal("elearning");
-        NotificationDeviceRegistrationEntity mutedPhone = device("muted");
-        mutedPhone.setPortal("elearning");
-        when(devices.findByTenantIdAndUserIdInAndEnabledTrue(eq(TENANT), any())).thenReturn(List.of(phone, mutedPhone));
-
-        service.send(ADMIN, "c1");
-
-        assertThat(captureOutbox()).singleElement().satisfies(entry -> assertThat(entry.getPayload())
-                .containsEntry("deviceRegistrationId", "dev-student").containsEntry("portal", "elearning"));
+        verifyNoInteractions(fanOut);
+        verify(campaigns, never()).save(any());
     }
 
     @Test
@@ -258,11 +157,13 @@ class NotificationCampaignServiceTest {
     }
 
     @Test
-    void cancelOnlyAppliesToScheduledCampaigns() {
-        when(campaigns.lockByTenantIdAndId(TENANT, "c1"))
-                .thenReturn(Optional.of(campaign("c1", "admin-1", CampaignStatus.SENT, NotificationPriority.INFO)));
+    void cancelOnlyAppliesToScheduledCampaignsNotOnesAlreadySending() {
+        for (CampaignStatus status : List.of(CampaignStatus.SENT, CampaignStatus.SENDING)) {
+            when(campaigns.lockByTenantIdAndId(TENANT, "c1"))
+                    .thenReturn(Optional.of(campaign("c1", "admin-1", status, NotificationPriority.INFO)));
 
-        assertThatThrownBy(() -> service.cancel(ADMIN, "c1")).isInstanceOf(ConflictException.class);
+            assertThatThrownBy(() -> service.cancel(ADMIN, "c1")).isInstanceOf(ConflictException.class);
+        }
         verify(campaigns, never()).save(any());
     }
 
@@ -312,6 +213,15 @@ class NotificationCampaignServiceTest {
     }
 
     @Test
+    void anUpdateOfASendingCampaignIsRefused() {
+        when(campaigns.lockByTenantIdAndId(TENANT, "c1"))
+                .thenReturn(Optional.of(campaign("c1", "admin-1", CampaignStatus.SENDING, NotificationPriority.INFO)));
+
+        assertThatThrownBy(() -> service.update(ADMIN, "c1", draft(CLASS_7A, null))).isInstanceOf(ConflictException.class);
+        verify(campaigns, never()).save(any());
+    }
+
+    @Test
     void estimateChecksScopeBeforeResolving() {
         when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(4)));
 
@@ -338,11 +248,11 @@ class NotificationCampaignServiceTest {
 
         assertThat(service.dispatchDue(TENANT, "c1")).isFalse();
 
-        verifyNoInteractions(resolver, guard, messages);
+        verifyNoInteractions(resolver, guard, fanOut);
     }
 
     @Test
-    void scheduledDispatchRevalidatesTheCreatorAndResolvesRecipientsAgain() {
+    void scheduledDispatchRevalidatesTheCreatorAndLeavesTheCampaignSendingForTheFanOut() {
         NotificationCampaignEntity campaign = campaign("c1", "teacher-1", CampaignStatus.SENDING, NotificationPriority.INFO);
         campaign.setEstimatedCount(31);
         when(campaigns.claimDue(eq(TENANT), eq("c1"), any())).thenReturn(1);
@@ -352,15 +262,13 @@ class NotificationCampaignServiceTest {
         when(authorizations.findEffective("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
                 "teacher-1", TENANT, List.of("lms_teacher_standard"), List.of("lms.assignment.read", "notification.campaign.send"),
                 List.of(), List.of())));
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(30)));
 
         assertThat(service.dispatchDue(TENANT, "c1")).isTrue();
 
         verify(guard).assertAllowed(new CampaignActor(TENANT, "teacher-1", Set.of("lms_teacher_standard"),
                 List.of("lms.assignment.read", "notification.campaign.send"), List.of()), CLASS_7A);
-        assertThat(captureMessages()).hasSize(30);
-        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENT);
-        assertThat(campaign.getResolvedCount()).isEqualTo(30);
+        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENDING);
+        verifyNoInteractions(resolver);
     }
 
     @Test
@@ -376,7 +284,7 @@ class NotificationCampaignServiceTest {
         assertThat(service.dispatchDue(TENANT, "c1")).isFalse();
 
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.FAILED);
-        verifyNoInteractions(resolver, messages);
+        verifyNoInteractions(resolver);
     }
 
     @Test
@@ -394,7 +302,7 @@ class NotificationCampaignServiceTest {
         assertThat(service.dispatchDue(TENANT, "c1")).isFalse();
 
         assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.FAILED);
-        verifyNoInteractions(resolver, messages, outbox);
+        verifyNoInteractions(resolver);
     }
 
     @Test
@@ -404,15 +312,13 @@ class NotificationCampaignServiceTest {
         // A creator wrongly reduced to "nobody" would be denied here and end FAILED.
         lenient().doThrow(new AccessDeniedException("no")).when(guard)
                 .assertAllowed(CampaignActor.none(TENANT, "teacher-1"), CLASS_7A);
-        when(resolver.resolve(TENANT, CLASS_7A)).thenReturn(resolved(people(2)));
 
         assertThat(service.dispatchDue(TENANT, "c1")).isTrue();
 
         verify(guard).assertAllowed(new CampaignActor(TENANT, "teacher-1", Set.of("lms_teacher_standard"),
                 List.of("notification.*", "lms.assignment.read"), List.of()), CLASS_7A);
 
-        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENT);
-        assertThat(captureMessages()).hasSize(2);
+        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.SENDING);
     }
 
     @Test
@@ -428,7 +334,7 @@ class NotificationCampaignServiceTest {
 
             assertThat(campaign.getStatus()).as(deny).isEqualTo(CampaignStatus.FAILED);
         }
-        verifyNoInteractions(resolver, messages);
+        verifyNoInteractions(resolver);
     }
 
     private NotificationCampaignEntity dueCampaignOf(String creator) {
@@ -444,20 +350,6 @@ class NotificationCampaignServiceTest {
                 .thenReturn(List.of(new UserAccountProjection("teacher-1", TENANT, "GV", null, "ACTIVE")));
         when(authorizations.findEffective("teacher-1", TENANT)).thenReturn(Optional.of(new UserAuthorizationProjection(
                 "teacher-1", TENANT, List.of("lms_teacher_standard"), rolePermissions, List.of(), denied)));
-    }
-
-    private List<NotificationMessageEntity> captureMessages() {
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<NotificationMessageEntity>> captor = ArgumentCaptor.forClass(Collection.class);
-        verify(messages).saveAll(captor.capture());
-        return List.copyOf(captor.getValue());
-    }
-
-    private List<NotificationOutboxEntity> captureOutbox() {
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<NotificationOutboxEntity>> captor = ArgumentCaptor.forClass(List.class);
-        verify(outbox).saveAll(captor.capture());
-        return captor.getValue();
     }
 
     private static NotificationCampaignEntity campaign(
@@ -489,17 +381,6 @@ class NotificationCampaignServiceTest {
 
     private static List<String> people(int count) {
         return IntStream.range(0, count).mapToObj(index -> "u" + index).toList();
-    }
-
-    private static NotificationDeviceRegistrationEntity device(String userId) {
-        NotificationDeviceRegistrationEntity device = new NotificationDeviceRegistrationEntity();
-        device.setId("dev-" + userId);
-        device.setTenantId(TENANT);
-        device.setUserId(userId);
-        device.setPortal("lms");
-        device.setRegistrationToken("token-" + userId);
-        device.setEnabled(true);
-        return device;
     }
 
     private static OffsetDateTime at(Instant instant) {

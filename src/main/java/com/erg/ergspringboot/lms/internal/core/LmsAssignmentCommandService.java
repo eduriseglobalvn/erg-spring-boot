@@ -22,6 +22,7 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
+import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
@@ -68,6 +69,7 @@ public class LmsAssignmentCommandService {
     private final LmsSyncOperationService sync;
     private final ApplicationEventPublisher events;
     private AssignmentRecipientLogins recipientLogins;
+    private AttemptRepository attemptRepository;
 
     @Autowired
     public LmsAssignmentCommandService(
@@ -109,6 +111,11 @@ public class LmsAssignmentCommandService {
         this.policy = policy;
         this.sync = sync;
         this.events = events;
+    }
+
+    @Autowired(required = false)
+    public void setAttemptRepository(AttemptRepository attemptRepository) {
+        this.attemptRepository = attemptRepository;
     }
 
     /** Optional: without it every assignment write drops the tenant's student dashboards, as before. */
@@ -245,6 +252,10 @@ public class LmsAssignmentCommandService {
         String tenantId = AuthenticatedTenant.require(access.tenantId());
         Assignment assignment = requireAssignment(tenantId, assignmentId);
         policy.ensureManagedScope(assignment, access);
+        // lms_attempts references the assignment: answer 409 up front instead of a late integrity error.
+        if (attemptRepository != null && attemptRepository.existsByTenantIdAndAssignmentId(tenantId, assignmentId)) {
+            throw new AssignmentHasAttemptsException();
+        }
         List<String> logins = recipientLogins(tenantId, assignmentId);
         recipientRepository.deleteByAssignmentId(assignmentId);
         resourceRepository.deleteByAssignmentId(assignmentId);

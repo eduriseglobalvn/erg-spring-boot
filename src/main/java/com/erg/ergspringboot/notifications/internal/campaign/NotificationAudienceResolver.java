@@ -10,6 +10,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -18,32 +20,42 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationAudienceResolver {
 
+    /** Bound for each explicit list of a request (picked people, classes...) and for sender-scope checks. */
     public static final int MAX_RECIPIENTS = 5_000;
-    private static final int FETCH_LIMIT = MAX_RECIPIENTS + 1;
-    private static final Pageable FETCH_PAGE = PageRequest.ofSize(FETCH_LIMIT);
+    public static final int DEFAULT_MAX_CAMPAIGN_RECIPIENTS = 50_000;
 
     private enum Kind { TEACHER, STUDENT, STAFF, PICKED }
 
     private final LmsAudienceReadPort lms;
     private final UserDirectoryPort users;
     private final AudienceAccountQueries accounts;
+    /** Whole-audience cap; ids only are read (never entities), so tens of thousands stay cheap. */
+    private final int maxRecipients;
+    private final int fetchLimit;
+    private final Pageable fetchPage;
 
-    public NotificationAudienceResolver(LmsAudienceReadPort lms, UserDirectoryPort users, AudienceAccountQueries accounts) {
+    @Autowired
+    public NotificationAudienceResolver(LmsAudienceReadPort lms, UserDirectoryPort users, AudienceAccountQueries accounts,
+            @Value("${erg.notifications.campaign.max-recipients:" + DEFAULT_MAX_CAMPAIGN_RECIPIENTS + "}")
+            int maxRecipients) {
         this.lms = lms;
         this.users = users;
         this.accounts = accounts;
+        this.maxRecipients = Math.max(1, maxRecipients);
+        this.fetchLimit = this.maxRecipients + 1;
+        this.fetchPage = PageRequest.ofSize(fetchLimit);
     }
 
     public ResolvedAudience resolve(String tenantId, CampaignAudience audience) {
         Set<String> picked = new LinkedHashSet<>(audience.userIds());
-        if (picked.size() > MAX_RECIPIENTS) {
-            throw new AudienceTooLargeException();
+        if (picked.size() > maxRecipients) {
+            throw new AudienceTooLargeException(maxRecipients);
         }
         Map<String, Kind> reached = new LinkedHashMap<>();
         resolveStudents(tenantId, audience, reached);
         resolveTeachers(tenantId, audience, reached);
         if (audience.wholeTenant() || audience.roles().contains("STAFF")) {
-            add(reached, Kind.STAFF, users.findActiveStaffUserIds(tenantId, FETCH_PAGE));
+            add(reached, Kind.STAFF, users.findActiveStaffUserIds(tenantId, fetchPage));
         }
         int duplicates = addPicked(tenantId, picked, reached);
         int pickedCount = count(reached, Kind.PICKED) + duplicates;
@@ -60,32 +72,32 @@ public class NotificationAudienceResolver {
         if (!classIds.isEmpty()) {
             requireStudentsWithinLimit(tenantId, classIds);
             add(reached, Kind.STUDENT,
-                    withActiveLogin(tenantId, lms.studentUserIdsInClasses(tenantId, List.copyOf(classIds), FETCH_LIMIT)));
+                    withActiveLogin(tenantId, lms.studentUserIdsInClasses(tenantId, List.copyOf(classIds), fetchLimit)));
         }
         if (!audience.groupIds().isEmpty()) {
             add(reached, Kind.STUDENT,
-                    withActiveLogin(tenantId, lms.studentUserIdsInGroups(tenantId, audience.groupIds(), FETCH_LIMIT)));
+                    withActiveLogin(tenantId, lms.studentUserIdsInGroups(tenantId, audience.groupIds(), fetchLimit)));
         }
         if (audience.wholeTenant() || audience.roles().contains("STUDENT")) {
             requireStudentsWithinLimit(tenantId, null);
-            add(reached, Kind.STUDENT, accounts.activeStudentUserIds(tenantId, FETCH_LIMIT));
+            add(reached, Kind.STUDENT, accounts.activeStudentUserIds(tenantId, fetchLimit));
         }
     }
 
     private void resolveTeachers(String tenantId, CampaignAudience audience, Map<String, Kind> reached) {
         List<UserAccountProjection> teachers = List.of();
         if (audience.wholeTenant() || audience.roles().contains("TEACHER")) {
-            teachers = users.findCalendarTeachersByTenant(tenantId, FETCH_PAGE);
+            teachers = users.findCalendarTeachersByTenant(tenantId, fetchPage);
         } else if (!audience.schoolIds().isEmpty()) {
-            teachers = users.findCalendarTeachersByTenantAndSchoolIds(tenantId, audience.schoolIds(), FETCH_PAGE);
+            teachers = users.findCalendarTeachersByTenantAndSchoolIds(tenantId, audience.schoolIds(), fetchPage);
         }
         add(reached, Kind.TEACHER, teachers.stream().map(UserAccountProjection::id).toList());
     }
 
     /** Counts in SQL first, so an audience that can only end in "too large" fails before any id is loaded. */
     private void requireStudentsWithinLimit(String tenantId, Collection<String> classIds) {
-        if (accounts.countActiveStudents(tenantId, classIds) > MAX_RECIPIENTS) {
-            throw new AudienceTooLargeException();
+        if (accounts.countActiveStudents(tenantId, classIds) > maxRecipients) {
+            throw new AudienceTooLargeException(maxRecipients);
         }
     }
 
@@ -117,14 +129,14 @@ public class NotificationAudienceResolver {
         return userIds.isEmpty() ? new LinkedHashSet<>() : accounts.activeUserIds(tenantId, userIds);
     }
 
-    private static void add(Map<String, Kind> reached, Kind kind, List<String> ids) {
+    private void add(Map<String, Kind> reached, Kind kind, List<String> ids) {
         ids.forEach(id -> reached.putIfAbsent(id, kind));
         requireWithinLimit(reached);
     }
 
-    private static void requireWithinLimit(Map<String, Kind> reached) {
-        if (reached.size() > MAX_RECIPIENTS) {
-            throw new AudienceTooLargeException();
+    private void requireWithinLimit(Map<String, Kind> reached) {
+        if (reached.size() > maxRecipients) {
+            throw new AudienceTooLargeException(maxRecipients);
         }
     }
 

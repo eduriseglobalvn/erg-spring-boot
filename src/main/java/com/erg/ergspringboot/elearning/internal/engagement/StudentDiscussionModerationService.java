@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.elearning.internal.engagement;
 
 import com.erg.ergspringboot.common.response.elearning.DiscussionFeedSnapshot;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentPageResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationResponse;
@@ -54,6 +55,28 @@ public class StudentDiscussionModerationService {
         // Includes hidden items (flagged); the class-shared page is cached 20 s and evicted by every writer below.
         DiscussionFeedSnapshot snapshot = feeds.snapshot(moderator.tenantId(), safeClassId, safePage, safeSize, "ALL", null, "-", true);
         return reader.feedResponse(snapshot, moderator.tenantId(), moderator.userId(), safePage, safeSize);
+    }
+
+    /**
+     * Pages the comments of a post (or the replies of one top-level comment) including hidden ones. The post's class must be
+     * in the moderator's scope, as for the feed; a post outside it is reported as not found so its existence is not leaked.
+     */
+    @Transactional(readOnly = true)
+    public StudentDiscussionCommentPageResponse comments(Moderator moderator, String postId, String parentId, int page, int size) {
+        String post = postId == null ? "" : postId.trim();
+        if (post.isEmpty() || post.length() > 36) throw new BadRequestException("postId is required.");
+        String classId = jdbc.query("select academic_class_id from student_discussion_threads where tenant_id = ? and id = ?",
+                rs -> rs.next() ? rs.getString(1) : null, moderator.tenantId(), post);
+        try {
+            if (classId == null) throw new ResourceNotFoundException("Discussion post was not found.");
+            requireClass(moderator, classId);
+        } catch (ForbiddenException outOfScope) {
+            throw new ResourceNotFoundException("Discussion post was not found.");
+        }
+        String parent = parentId == null || parentId.isBlank() ? null : parentId.trim();
+        if (parent != null) reader.requireRootComment(moderator.tenantId(), post, parent, true);
+        return reader.commentPage(moderator.tenantId(), moderator.userId(), post, parent, Math.max(0, page),
+                Math.max(1, Math.min(50, size)), true);
     }
 
     /** The teacher pins a thread to the top of the class list; unpinning clears it. */

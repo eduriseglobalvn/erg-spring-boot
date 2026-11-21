@@ -7,6 +7,8 @@ type ElearningQuery {
   discussionComments(postId: String!, parentId: String, page: Int = 0, size: Int = 20, tenantId: String): StudentDiscussionCommentPage!
   discussionModerationClasses(tenantId: String): [StudentDiscussionModerationClass!]!
   discussionModerationFeed(input: StudentDiscussionModerationFeedInput!): StudentDiscussionFeed!
+  "Moderator view of discussionComments: includes hidden comments and replies; the post's class must be in the moderator's scope (else not found). size is capped at 50."
+  discussionModerationComments(postId: String!, parentId: String, page: Int = 0, size: Int = 20, tenantId: String): StudentDiscussionCommentPage!
   studentClassLeaderboard(input: StudentClassLeaderboardInput, viewerOnly: Boolean = false): ClassLeaderboard!
   leaderboardClasses(tenantId: String): [LeaderboardClass!]!
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!

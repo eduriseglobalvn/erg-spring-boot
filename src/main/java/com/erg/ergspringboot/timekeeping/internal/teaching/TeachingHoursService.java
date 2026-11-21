@@ -21,6 +21,7 @@ import com.erg.ergspringboot.timekeeping.TeachingViews.TeachingPeriodRow;
 import com.erg.ergspringboot.timekeeping.TeachingViews.TeachingRow;
 import com.erg.ergspringboot.timekeeping.TeachingWeek;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.teaching.TeachingSheets.Line;
 import com.erg.ergspringboot.timekeeping.internal.teaching.TeachingSheets.Tiet;
 import com.erg.ergspringboot.timekeeping.persistence.TkTeachingConfirmation;
@@ -208,13 +209,20 @@ public class TeachingHoursService {
 
     @Transactional(readOnly = true)
     public TeachingMonthSheet monthSheet(String tenantId, YearMonth month, String role) {
-        return sheet(tenantId, month, TeachingSheets.role(role), null);
+        return sheet(tenantId, month, TeachingSheets.role(role), null, null);
     }
 
     /** As above for a month still open whose published events the caller already read ({@link #openMonthEvents}). */
     @Transactional(readOnly = true)
     public TeachingMonthSheet monthSheet(String tenantId, YearMonth month, String role, List<TeachingPeriod> events) {
-        return sheet(tenantId, month, TeachingSheets.role(role), events);
+        return sheet(tenantId, month, TeachingSheets.role(role), events, null);
+    }
+
+    /** As above showing only the rows (and counting only the teachers) of the schools in {@code scope}. */
+    @Transactional(readOnly = true)
+    public TeachingMonthSheet monthSheet(String tenantId, SchoolScope scope, YearMonth month, String role,
+            List<TeachingPeriod> events) {
+        return sheet(tenantId, month, TeachingSheets.role(role), events, scope.schools());
     }
 
     /** The published events of the month, or null once HR closed it (the sheet is then read from its snapshot). */
@@ -223,15 +231,21 @@ public class TeachingHoursService {
         return isClosed(tenantId, month) ? null : monthEvents(tenantId, month);
     }
 
-    /** {@code preloaded} are the month's published events when the caller already read them (export), else null. */
-    private TeachingMonthSheet sheet(String tenantId, YearMonth month, String role, List<TeachingPeriod> preloaded) {
+    /**
+     * {@code preloaded} are the month's published events when the caller already read them (export), else null.
+     * {@code only} limits the sheet to those schools (null = every school).
+     */
+    private TeachingMonthSheet sheet(String tenantId, YearMonth month, String role, List<TeachingPeriod> preloaded,
+            Set<String> only) {
         List<TeachingWeek> weeks = TeachingWeekSplitter.split(month);
         boolean closed = isClosed(tenantId, month);
-        List<TeachingPeriod> all = closed ? List.of() : preloaded != null ? preloaded : monthEvents(tenantId, month);
+        List<TeachingPeriod> all = (closed ? List.<TeachingPeriod>of() : preloaded != null ? preloaded : monthEvents(tenantId, month))
+                .stream().filter(e -> only == null || only.contains(e.schoolId())).toList();
         List<Line> lines;
         Set<String> teachers;
         if (closed) {
-            List<SnapshotLine> snap = snapshotLines(tenantId, month);
+            List<SnapshotLine> snap = snapshotLines(tenantId, month).stream()
+                    .filter(l -> only == null || only.contains(l.line.schoolId())).toList();
             lines = snap.stream().filter(l -> role.equals(l.role)).map(l -> l.line).toList();
             teachers = snap.stream().map(l -> l.line.teacherId()).collect(Collectors.toSet());
         } else {
@@ -270,29 +284,43 @@ public class TeachingHoursService {
     @Transactional(readOnly = true)
     public TeachingPeriodPage periods(String tenantId, String role, LocalDate from, LocalDate to, String schoolId,
             String teacherId, String q, int page) {
+        return periods(tenantId, SchoolScope.TENANT, role, from, to, schoolId, teacherId, q, page);
+    }
+
+    /** {@code scope} limits the schools read: a school outside it is 403, none asked = every school of the scope. */
+    @Transactional(readOnly = true)
+    public TeachingPeriodPage periods(String tenantId, SchoolScope scope, String role, LocalDate from, LocalDate to,
+            String schoolId, String teacherId, String q, int page) {
         String wanted = TeachingSheets.role(role);
         LocalDate start = from != null ? from : LocalDate.of(today().getYear(), 1, 1);
         LocalDate end = to != null ? to : start.withDayOfYear(start.lengthOfYear());
         if (end.isBefore(start)) throw new TimekeepingException(HttpStatus.BAD_REQUEST, "INVALID_RANGE", "Khoảng ngày không hợp lệ");
         String needle = blank(q) ? null : q.strip().toLowerCase(Locale.ROOT);
-        if (needle == null) { // paging, counting and ordering run in SQL: a page click no longer expands the whole range
+        List<String> schools = scope.schoolsFor(schoolId); // null = every school of the tenant
+        if (needle == null && (schools == null || schools.size() == 1)) {
+            // paging, counting and ordering run in SQL: a page click no longer expands the whole range
             int pageNo = Math.max(page, 0);
-            PeriodSlice slice = calendar.periodSlice(tenantId, start, end, wanted, blank(schoolId) ? null : schoolId,
+            PeriodSlice slice = calendar.periodSlice(tenantId, start, end, wanted, schools == null ? null : schools.get(0),
                     blank(teacherId) ? null : teacherId, pageNo * PAGE_SIZE, PAGE_SIZE);
             checkExportSize(slice.total());
             List<Tiet> slicePeriods = slice.rows().stream().map(r -> new Tiet(r.event(), r.periodNo(),
                     TeachingSheets.dateOf(r.event()), r.from(), r.to())).toList();
             return new TeachingPeriodPage(periodRows(tenantId, slicePeriods), slice.total(), pageNo, PAGE_SIZE);
         }
-        // shortcut: the text filter also matches the lesson content, which only the class log knows, so a search still
-        // expands the range; narrow it with schoolId, teacherId or dates (the size cap applies), or index the titles.
-        List<TeachingPeriod> events = TeachingSheets.ofRole(calendar.periods(tenantId, start, end,
-                TeachingPeriodReadPort.PUBLISHED, blank(schoolId) ? null : schoolId, blank(teacherId) ? null : teacherId),
-                wanted);
+        // shortcut: the text filter also matches the lesson content, which only the class log knows, and the calendar port
+        // reads one school at a time, so a search (or a caller of several schools) still expands the range; narrow it with
+        // schoolId, teacherId or dates (the size cap applies), or give the port a school list / index the titles.
+        List<TeachingPeriod> events = TeachingSheets.ofRole(publishedEvents(tenantId, start, end, schools,
+                blank(teacherId) ? null : teacherId), wanted);
         checkExportSize(events);
         List<Tiet> tiets = TeachingSheets.expand(events).stream().sorted(Comparator.comparing(Tiet::from)
                 .thenComparing(t -> t.event().schoolName()).thenComparing(t -> t.event().className())
                 .thenComparingInt(Tiet::periodNo)).toList();
+        if (needle == null) {
+            int skip = Math.min(Math.max(page, 0) * PAGE_SIZE, tiets.size());
+            return new TeachingPeriodPage(periodRows(tenantId, tiets.subList(skip, Math.min(tiets.size(), skip + PAGE_SIZE))),
+                    tiets.size(), Math.max(page, 0), PAGE_SIZE);
+        }
         List<TeachingPeriodRow> matching = periodRows(tenantId, tiets).stream().filter(r -> matches(r, needle)).toList();
         int skip = Math.min(Math.max(page, 0) * PAGE_SIZE, matching.size());
         return new TeachingPeriodPage(matching.subList(skip, Math.min(matching.size(), skip + PAGE_SIZE)), matching.size(),
@@ -313,13 +341,20 @@ public class TeachingHoursService {
     /** The year (or one {@code month} of it) of one {@code schoolId} or of every school; refuses more than {@link #MAX_EXPORT_PERIODS}. */
     @Transactional(readOnly = true)
     public TeachingExport export(String tenantId, int year, String schoolId, Integer month) {
+        return export(tenantId, SchoolScope.TENANT, year, schoolId, month);
+    }
+
+    /** As above for the schools of {@code scope}: a school outside it is 403, none asked = every school of the scope. */
+    @Transactional(readOnly = true)
+    public TeachingExport export(String tenantId, SchoolScope scope, int year, String schoolId, Integer month) {
+        List<String> schools = scope.schoolsFor(schoolId);
         if (month != null && (month < 1 || month > 12)) {
             throw new TimekeepingException(HttpStatus.BAD_REQUEST, "INVALID_MONTH", "Tháng phải từ 1 đến 12");
         }
         LocalDate from = month == null ? LocalDate.of(year, 1, 1) : LocalDate.of(year, month, 1);
         LocalDate to = month == null ? LocalDate.of(year, 12, 31) : YearMonth.of(year, month).atEndOfMonth();
-        List<TeachingPeriod> events = calendar.periods(tenantId, from, to, TeachingPeriodReadPort.PUBLISHED,
-                blank(schoolId) ? null : schoolId, null);
+        Set<String> only = scope.wide() ? null : Set.copyOf(schools);
+        List<TeachingPeriod> events = publishedEvents(tenantId, from, to, schools, null);
         checkExportSize(events);
         // shortcut: the filtered range is expanded and its lesson titles read in one go, bounded by MAX_EXPORT_PERIODS.
         List<Tiet> mainPeriods = sorted(TeachingSheets.expand(TeachingSheets.ofRole(events, MAIN)));
@@ -334,10 +369,19 @@ public class TeachingHoursService {
             YearMonth ym = YearMonth.of(year, m);
             List<TeachingPeriod> inMonth = events.stream().filter(e -> YearMonth.from(TeachingSheets.dateOf(e)).equals(ym)).toList();
             if (inMonth.isEmpty() && !isClosed(tenantId, ym)) continue;
-            mainMonths.add(sheet(tenantId, ym, MAIN, inMonth));
-            assistantMonths.add(sheet(tenantId, ym, ASSISTANT, inMonth));
+            // a tenant-wide caller keeps the whole closed-month snapshot, as before
+            mainMonths.add(sheet(tenantId, ym, MAIN, inMonth, only));
+            assistantMonths.add(sheet(tenantId, ym, ASSISTANT, inMonth, only));
         }
         return new TeachingExport(year, main, assistant, mainMonths, assistantMonths);
+    }
+
+    /** Published events narrowed to {@code schools} (null = every school); the port reads one school per call. */
+    private List<TeachingPeriod> publishedEvents(String tenantId, LocalDate from, LocalDate to, List<String> schools,
+            String teacherId) {
+        if (schools == null) return calendar.periods(tenantId, from, to, TeachingPeriodReadPort.PUBLISHED, null, teacherId);
+        return schools.stream().flatMap(s -> calendar.periods(tenantId, from, to, TeachingPeriodReadPort.PUBLISHED, s,
+                teacherId).stream()).toList();
     }
 
     static void checkExportSize(List<TeachingPeriod> events) {

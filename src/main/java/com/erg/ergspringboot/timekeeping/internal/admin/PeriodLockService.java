@@ -2,6 +2,7 @@ package com.erg.ergspringboot.timekeeping.internal.admin;
 
 import com.erg.ergspringboot.timekeeping.PeriodStage;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PeriodLockView;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.day.DayAggregationService;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLock;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLockRepository;
@@ -36,8 +37,13 @@ public class PeriodLockService {
 
     @Transactional
     public PeriodLockView lock(String tenantId, String actorId, String schoolId, String period) {
+        return lock(tenantId, SchoolScope.TENANT, actorId, schoolId, period);
+    }
+
+    @Transactional
+    public PeriodLockView lock(String tenantId, SchoolScope scope, String actorId, String schoolId, String period) {
         YearMonth month = AdminSupport.period(period);
-        support.requireSchool(tenantId, schoolId);
+        support.requireSchool(tenantId, scope, schoolId);
         TkPeriodLock row = locks.findByTenantIdAndSchoolIdAndPeriod(tenantId, schoolId, period).orElse(null);
         if (row != null && row.getReopenedAt() == null) return view(row);
         if (!support.today().isAfter(month.atEndOfMonth())) {
@@ -67,10 +73,16 @@ public class PeriodLockService {
 
     @Transactional
     public PeriodLockView reopen(String tenantId, String actorId, String schoolId, String period, String reason) {
+        return reopen(tenantId, SchoolScope.TENANT, actorId, schoolId, period, reason);
+    }
+
+    @Transactional
+    public PeriodLockView reopen(String tenantId, SchoolScope scope, String actorId, String schoolId, String period,
+            String reason) {
         AdminSupport.period(period);
         if (reason == null || reason.isBlank()) throw AdminSupport.bad("REASON_REQUIRED", "Nhập lý do mở lại kỳ");
         if (reason.length() > 1000) throw AdminSupport.bad("REASON_TOO_LONG", "Lý do tối đa 1000 ký tự");
-        support.requireSchool(tenantId, schoolId);
+        support.requireSchool(tenantId, scope, schoolId);
         TkPeriodLock row = locks.findByTenantIdAndSchoolIdAndPeriod(tenantId, schoolId, period)
                 .filter(lock -> lock.getReopenedAt() == null)
                 .orElseThrow(() -> AdminSupport.conflict("PERIOD_NOT_LOCKED", "Kỳ công chưa chốt"));

@@ -42,6 +42,8 @@ input AssignmentProgressWorkspaceInput {
 input StudentGroupsInput {
   tenantId: String
   classId: String
+  "false returns studentIds as [] and only studentCount per group (default true)"
+  includeMembers: Boolean
 }
 
 input QuestionBankWorkspaceInput {
@@ -539,6 +541,7 @@ type LearningResourceLibrary {
   resources: LearningResourceCardPage!
   progress: [LearningResourceProgress!]!
   recentOpened: [LearningRecentResource!]!
+  taxonomyTruncated: Boolean!
 }
 
 type LearningResourceCardPage {

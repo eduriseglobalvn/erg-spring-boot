@@ -32,7 +32,9 @@ public class LmsReadModelUseCase implements LmsReadModelPort {
     }
 
     @Override public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) { return assignmentProgress.summary(tenantId, assignmentId); }
-    @Override public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds, String ownerUserId) { return studentGroups.query(tenantId, classId, allowedClassIds, ownerUserId); }
+    @Override public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds, String ownerUserId) { return studentGroups.query(tenantId, classId, allowedClassIds, ownerUserId, true); }
+    @Override public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds,
+            String ownerUserId, boolean includeMembers) { return studentGroups.query(tenantId, classId, allowedClassIds, ownerUserId, includeMembers); }
     @Override public AssignmentProgressWorkspaceResponse assignmentProgressWorkspace(String tenantId, String assignmentId, String attemptStatus, Integer page, Integer size) { return assignmentProgress.workspace(tenantId, assignmentId, attemptStatus, page, size); }
     @Override public Page<ClassWorkspaceProjection> schoolClassWorkspaces(String tenantId, String schoolId, String status, Pageable pageable) { return classWorkspace.schoolClasses(tenantId, schoolId, status, pageable); }
     @Override public ClassWorkspaceResponse classWorkspace(String tenantId, String classId, String schoolId, String studentStatus, Integer page, Integer size, String assignmentStatus, Integer assignmentPage, Integer assignmentSize) { return classWorkspace(tenantId, classId, schoolId, studentStatus, page, size, assignmentStatus, assignmentPage, assignmentSize, false, false); }

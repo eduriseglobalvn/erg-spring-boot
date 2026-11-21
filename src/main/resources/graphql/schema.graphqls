@@ -240,6 +240,8 @@ type ElearningQuery {
   discussionComments(postId: String!, parentId: String, page: Int = 0, size: Int = 20, tenantId: String): StudentDiscussionCommentPage!
   discussionModerationClasses(tenantId: String): [StudentDiscussionModerationClass!]!
   discussionModerationFeed(input: StudentDiscussionModerationFeedInput!): StudentDiscussionFeed!
+  "Moderator view of discussionComments: includes hidden comments and replies; the post's class must be in the moderator's scope (else not found). size is capped at 50."
+  discussionModerationComments(postId: String!, parentId: String, page: Int = 0, size: Int = 20, tenantId: String): StudentDiscussionCommentPage!
   studentClassLeaderboard(input: StudentClassLeaderboardInput, viewerOnly: Boolean = false): ClassLeaderboard!
   leaderboardClasses(tenantId: String): [LeaderboardClass!]!
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
@@ -453,6 +455,8 @@ input AssignmentProgressWorkspaceInput {
 input StudentGroupsInput {
   tenantId: String
   classId: String
+  "false returns studentIds as [] and only studentCount per group (default true)"
+  includeMembers: Boolean
 }
 
 input QuestionBankWorkspaceInput {
@@ -950,6 +954,7 @@ type LearningResourceLibrary {
   resources: LearningResourceCardPage!
   progress: [LearningResourceProgress!]!
   recentOpened: [LearningRecentResource!]!
+  taxonomyTruncated: Boolean!
 }
 
 type LearningResourceCardPage {
@@ -1346,7 +1351,7 @@ enum TeachingScheduleStatus { DRAFT PUBLISHED CANCELLED }
 
 input TeachingCalendarWorkspaceInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, schoolIds: [String!], teacherIds: [String!], classIds: [String!], subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
 input MyTeachingCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, schoolIds: [String!], classIds: [String!], subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
-input MyStudentCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!] }
+input MyStudentCalendarInput { tenantId: String, from: String!, to: String!, viewMode: TeachingCalendarViewMode, subjectIds: [String!], levelIds: [String!], statuses: [TeachingScheduleStatus!], includeCatalog: Boolean }
 input TeachingScheduleBulkInput { tenantId: String, idempotencyKey: String, schoolId: String!, academicYear: String, applyFrom: String!, repeatWeeks: Int!, note: String, overrideConflicts: Boolean, resolveMode: TeachingScheduleResolveMode, rows: [TeachingScheduleBulkRowInput!]! }
 input TeachingScheduleBulkRowInput { clientRowId: String!, classIds: [String!]!, weekday: Int!, session: String, periodStart: Int!, periodCount: Int!, startTime: String!, endTime: String!, subjectId: String!, levelId: String, roomId: String, roomName: String, mainTeacherIds: [String!]!, assistantTeacherIds: [String!], note: String }
 input TeachingScheduleEventUpdateInput { tenantId: String, eventId: String!, roomId: String, roomName: String, note: String, expectedVersion: Int }
@@ -1364,7 +1369,7 @@ type TeachingCalendarFilterOptions { schools: [TeachingCalendarFilterOption!]!, 
 type TeachingCalendarFilterOption { id: String!, label: String!, count: Int!, colorKey: String }
 type TeachingCalendarLaneSummary { id: String!, label: String!, count: Int!, colorKey: String }
 type TeachingCalendarColorGroup { key: String!, label: String!, kind: String! }
-type TeachingScheduleCatalog { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarClassOption!]!, teachers: [TeachingCalendarTeacherOption!]!, assistantTeachers: [TeachingCalendarTeacherOption!]!, subjects: [TeachingCalendarSubjectOption!]!, levels: [TeachingCalendarLevelOption!]!, rooms: [TeachingCalendarRoomOption!]! }
+type TeachingScheduleCatalog { schools: [TeachingCalendarFilterOption!]!, classes: [TeachingCalendarClassOption!]!, teachers: [TeachingCalendarTeacherOption!]!, assistantTeachers: [TeachingCalendarTeacherOption!]!, subjects: [TeachingCalendarSubjectOption!]!, levels: [TeachingCalendarLevelOption!]!, rooms: [TeachingCalendarRoomOption!]!, catalogTruncated: Boolean! }
 type TeachingCalendarClassOption { id: String!, schoolId: String!, label: String!, grade: String, academicYear: String }
 type TeachingCalendarTeacherOption { id: String!, label: String!, colorKey: String }
 type TeachingCalendarSubjectOption { id: String!, label: String! }
@@ -1540,6 +1545,8 @@ input SaveTeachingScheduleDraftInput {
   periodTemplateId: ID!
   expectedVersion: Int
   rows: [TeachingScheduleDraftRowInput!]!
+  "Optional (max 100 chars). Only for a NEW batch (batchId null): a retry with the same key returns the batch the first save created."
+  idempotencyKey: String
 }
 type TeachingScheduleRowIdPair { clientRowId: String!, eventId: ID! }
 type TeachingScheduleDraftResult {

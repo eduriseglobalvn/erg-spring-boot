@@ -304,6 +304,12 @@ public class NotificationCommandService {
                 CAMPAIGN_EVENT_TYPE, "notification_campaign", delivery.campaignId(), delivery.title(), preview,
                 null, delivery.priority().name(), CAMPAIGN_PORTAL, delivery.userIds(), null, data);
         Set<String> userIds = normalizedUserIds(delivery.userIds());
+        // Resumable fan-out: a person who already has this campaign's message (unique tenant_id + dedupe_key) is skipped.
+        Set<String> stored = new java.util.HashSet<>();
+        messageRepository.findByTenantIdAndDedupeKeyIn(delivery.tenantId(),
+                userIds.stream().map(userId -> campaignDedupeKey(delivery.campaignId(), userId)).toList())
+                .forEach(existing -> stored.add(existing.getDedupeKey()));
+        userIds.removeIf(userId -> stored.contains(campaignDedupeKey(delivery.campaignId(), userId)));
         Map<String, NotificationMessageEntity> messages = new java.util.LinkedHashMap<>();
         for (String userId : userIds) {
             NotificationMessageEntity message = new NotificationMessageEntity();
@@ -312,6 +318,7 @@ public class NotificationCommandService {
             message.setSourceType(command.sourceType());
             message.setSourceId(delivery.campaignId());
             message.setCampaignId(delivery.campaignId());
+            message.setDedupeKey(campaignDedupeKey(delivery.campaignId(), userId));
             message.setTitle(delivery.title());
             message.setBodyPreview(preview);
             message.setPriority(delivery.priority().name());
@@ -357,6 +364,10 @@ public class NotificationCommandService {
         }
         metrics.created(CAMPAIGN_EVENT_TYPE, CAMPAIGN_PORTAL, recipients.size(), outboxes.size());
         return new NotificationCommandResult(delivery.campaignId(), recipients.size(), outboxes.size());
+    }
+
+    static String campaignDedupeKey(String campaignId, String userId) {
+        return "campaign:" + campaignId + ":" + userId;
     }
 
     /** The push payload carries the device's portal so the SW/tab handlers of that portal react to it. */

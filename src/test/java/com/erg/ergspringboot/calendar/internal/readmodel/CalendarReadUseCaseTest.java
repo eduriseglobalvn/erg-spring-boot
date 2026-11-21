@@ -1030,20 +1030,6 @@ class CalendarReadUseCaseTest {
         }
 
         @Test
-        void shouldRejectCatalogAboveFiveHundredOptions() {
-            List<CurriculumSubject> subjects = IntStream.range(0, 501)
-                    .mapToObj(index -> createSubject("subject-" + index, "Subject " + index))
-                    .toList();
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
-                    .thenReturn(subjects);
-
-            BadRequestException failure = assertThrows(BadRequestException.class,
-                    () -> fullCatalog.catalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7)));
-            assertTrue(failure.getMessage().contains("500"));
-            assertTrue(failure.getMessage().contains("subjects"));
-        }
-
-        @Test
         void shouldAggregateAllReferenceData() {
             EducationUnit schoolA = createSchool(SCHOOL_ID_A, "School A");
             EducationUnit schoolB = createSchool(SCHOOL_ID_B, "School B");

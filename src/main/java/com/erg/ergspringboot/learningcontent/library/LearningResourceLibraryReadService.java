@@ -16,7 +16,6 @@ import com.erg.ergspringboot.learningcontent.persistence.ContentItemRepository;
 import com.erg.ergspringboot.learningcontent.persistence.ContentItemRepository.LearningResourceCardProjection;
 import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository;
 import com.erg.ergspringboot.learningcontent.persistence.TopicContentItemRepository.TopicContentCountProjection;
-import com.erg.ergspringboot.exception.BadRequestException;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -87,15 +86,16 @@ public class LearningResourceLibraryReadService {
         // (plus the caller's own private items); drafts and other teachers' private items stay hidden.
         String normalizedStatus = contentManager ? normalized(status) : ACTIVE;
         String viewerId = contentManager ? null : (blankToNull(userId) == null ? "" : userId.trim());
-        List<CurriculumSubject> subjects = loadSubjects(resolvedTenantId, normalizedStatus, subjectId);
+        boolean[] truncated = {false}; // a level cut at the cap: the tree is partial, the client filters to see the rest
+        List<CurriculumSubject> subjects = loadSubjects(resolvedTenantId, normalizedStatus, subjectId, truncated);
         List<String> subjectIds = subjects.stream().map(CurriculumSubject::getId).toList();
         List<CurriculumLevel> levels = subjectIds.isEmpty()
                 ? List.of()
-                : loadLevels(resolvedTenantId, normalizedStatus, subjectIds, categoryId);
+                : loadLevels(resolvedTenantId, normalizedStatus, subjectIds, categoryId, truncated);
         List<String> levelIds = levels.stream().map(CurriculumLevel::getId).toList();
         List<CurriculumTopic> topics = levelIds.isEmpty()
                 ? List.of()
-                : loadTopics(resolvedTenantId, normalizedStatus, levelIds, firstNonBlank(topicId, sectionId));
+                : loadTopics(resolvedTenantId, normalizedStatus, levelIds, firstNonBlank(topicId, sectionId), truncated);
 
         Map<String, CurriculumLevel> levelsById = levels.stream()
                 .collect(Collectors.toMap(CurriculumLevel::getId, Function.identity()));
@@ -127,16 +127,17 @@ public class LearningResourceLibraryReadService {
                 taxonomyTree,
                 resources,
                 List.<LearningResourceProgressResponse>of(),
-                List.<LearningRecentResourceResponse>of()
+                List.<LearningRecentResourceResponse>of(),
+                truncated[0]
         );
     }
 
-    private List<CurriculumSubject> loadSubjects(String tenantId, String status, String subjectId) {
+    private List<CurriculumSubject> loadSubjects(String tenantId, String status, String subjectId, boolean[] truncated) {
         Pageable limit = PageRequest.of(0, HARD_MAX_TAXONOMY_NODES_PER_LEVEL + 1);
         List<CurriculumSubject> subjects = status == null
                 ? subjectRepository.findByTenantIdOrderBySortOrderAscNameAsc(tenantId, limit)
                 : subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(tenantId, status, limit);
-        rejectOversizedTaxonomy("subjects", subjects);
+        subjects = bounded(subjects, truncated);
         String filter = blankToNull(subjectId);
         if (filter == null) {
             return subjects;
@@ -148,7 +149,8 @@ public class LearningResourceLibraryReadService {
             String tenantId,
             String status,
             List<String> subjectIds,
-            String levelId
+            String levelId,
+            boolean[] truncated
     ) {
         Pageable limit = PageRequest.of(0, HARD_MAX_TAXONOMY_NODES_PER_LEVEL + 1);
         List<CurriculumLevel> levels = status == null
@@ -159,7 +161,7 @@ public class LearningResourceLibraryReadService {
                         status,
                         limit
                 );
-        rejectOversizedTaxonomy("levels", levels);
+        levels = bounded(levels, truncated);
         String filter = blankToNull(levelId);
         if (filter == null) {
             return levels;
@@ -171,7 +173,8 @@ public class LearningResourceLibraryReadService {
             String tenantId,
             String status,
             List<String> levelIds,
-            String topicId
+            String topicId,
+            boolean[] truncated
     ) {
         Pageable limit = PageRequest.of(0, HARD_MAX_TAXONOMY_NODES_PER_LEVEL + 1);
         List<CurriculumTopic> topics = status == null
@@ -182,7 +185,7 @@ public class LearningResourceLibraryReadService {
                         status,
                         limit
                 );
-        rejectOversizedTaxonomy("topics", topics);
+        topics = bounded(topics, truncated);
         String filter = blankToNull(topicId);
         if (filter == null) {
             return topics;
@@ -190,12 +193,11 @@ public class LearningResourceLibraryReadService {
         return topics.stream().filter(topic -> topic.getId().equals(filter)).toList();
     }
 
-    private void rejectOversizedTaxonomy(String nodeType, List<?> nodes) {
-        if (nodes != null && nodes.size() > HARD_MAX_TAXONOMY_NODES_PER_LEVEL) {
-            throw new BadRequestException(
-                    "learningResourceLibrary taxonomy is too large; filter by subjectId, gradeId, or topicId"
-            );
-        }
+    /** Cuts a level at the cap instead of failing the whole library; the response says the tree is partial. */
+    private static <T> List<T> bounded(List<T> nodes, boolean[] truncated) {
+        if (nodes == null || nodes.size() <= HARD_MAX_TAXONOMY_NODES_PER_LEVEL) return nodes;
+        truncated[0] = true;
+        return nodes.subList(0, HARD_MAX_TAXONOMY_NODES_PER_LEVEL);
     }
 
     private Map<String, Long> resourceCountsByNode(
