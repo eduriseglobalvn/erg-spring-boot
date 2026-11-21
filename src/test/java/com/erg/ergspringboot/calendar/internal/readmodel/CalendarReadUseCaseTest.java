@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -123,6 +124,9 @@ class CalendarReadUseCaseTest {
                 eventTeacherRepository, classroomRepository, subjectRepository, levelRepository,
                 educationUnitRepository, roomRepository, userDirectory);
         // Existing fixtures stub the pre-bounded methods; bridge them to the new DB-limited overloads.
+        lenient().when(educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(
+                anyString(), anyCollection(), any(Pageable.class)))
+                .thenAnswer(invocation -> educationUnitRepository.findByIdInOrderByNameAsc(invocation.getArgument(1)));
         lenient().when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
                 anyString(), anyList(), any(Pageable.class)))
                 .thenAnswer(invocation -> classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
@@ -202,7 +206,7 @@ class CalendarReadUseCaseTest {
                 any(OffsetDateTime.class), any(OffsetDateTime.class),
                 eq(List.of("DRAFT", "PUBLISHED")),
                 anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any()))
+                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(events);
     }
 

@@ -24,9 +24,26 @@ class CacheDescriptorContributorTest {
                 .stream().flatMap(contributor -> contributor.descriptors(mapper).stream()).toList();
         Set<String> names = new HashSet<>(descriptors.stream().map(descriptor -> descriptor.name()).toList());
 
-        assertThat(descriptors).hasSize(26);
-        assertThat(names).hasSize(26);
-        assertThat(names).contains("lmsClassWorkspace", "quizRuntimePackage", "calendarWorkspace", "curriculumTree");
+        assertThat(descriptors).hasSize(27);
+        assertThat(names).hasSize(27);
+        assertThat(names).contains("lmsStudentIdentity", "quizStartInfo");
+        assertThat(names).contains("lmsClassWorkspace", "quizRuntimePackage", "calendarWorkspace", "curriculumTree",
+                "studentTier", "studentFrames", "tierCutoffs", "notificationUnread");
+        assertThat(names).doesNotContain("lmsSchoolClasses", "contentLibraryBootstrap", "contentStudioBootstrap",
+                "contentResources", "contentResourceDetail");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void studentTierEncodesAndDecodesDespiteTheGraphQlProtectedGetter() {
+        var mapper = JsonMapper.builder().findAndAddModules().build();
+        var descriptor = (CacheDescriptor<Object>) new LmsCacheDescriptorContributor().descriptors(mapper).stream()
+                .filter(candidate -> candidate.name().equals("studentTier")).findFirst().orElseThrow();
+        var codec = new JacksonCacheValueCodec(mapper);
+        var tier = new com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.MyTierResponse(
+                "bk", 3, 2, 20, 150, true, 4, true, null, null, null);
+
+        assertThat(codec.decode(descriptor, codec.encode(descriptor, tier).bytes())).isEqualTo(tier);
     }
 
     @Test
@@ -53,6 +70,33 @@ class CacheDescriptorContributorTest {
 
         assertThat(encoded.cacheable()).isTrue();
         assertThat(codec.decode(descriptor, encoded.bytes())).isEqualTo(pkg);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void studentIdentityAndQuizStartInfoAreSmallTypedRecordsThatRoundTrip() {
+        var mapper = JsonMapper.builder().findAndAddModules().build();
+        var codec = new JacksonCacheValueCodec(mapper);
+        var all = new LmsCacheDescriptorContributor().descriptors(mapper);
+        var identityDescriptor = (CacheDescriptor<Object>) all.stream()
+                .filter(candidate -> candidate.name().equals("lmsStudentIdentity")).findFirst().orElseThrow();
+        var startDescriptor = (CacheDescriptor<Object>) all.stream()
+                .filter(candidate -> candidate.name().equals("quizStartInfo")).findFirst().orElseThrow();
+        var identity = new com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity(
+                "stu-1", "usr-1", "class-1", "school-1", "Nguyen An", "ENROLLED");
+        var none = com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity.NONE;
+        var info = new com.erg.ergspringboot.lms.QuizStartInfo(true, "Quiz", "test", "ver-1", 2, true, "pkg-1", "hash",
+                "ver-1", "7", "server-authoritative", 20);
+
+        assertThat(codec.decode(identityDescriptor, codec.encode(identityDescriptor, identity).bytes())).isEqualTo(identity);
+        // "No student" is cached as a value, so it must survive the codec as well.
+        var decodedNone = (com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity)
+                codec.decode(identityDescriptor, codec.encode(identityDescriptor, none).bytes());
+        assertThat(decodedNone.exists()).isFalse();
+        assertThat(codec.decode(startDescriptor, codec.encode(startDescriptor, info).bytes())).isEqualTo(info);
+        // Scoped by the login (key {tenantId, authUserId}) so a student write evicts exactly that learner.
+        assertThat(identityDescriptor.scopeFor(List.of("t1", "usr-1"))).isEqualTo("usr-1");
+        assertThat(identityDescriptor.l1Ttl()).hasSeconds(60);
     }
 
     @Test

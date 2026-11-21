@@ -14,8 +14,20 @@ public final class LcmsWorkspaceResponses {
             List<QuestionBankOptionResponse> subjects,
             List<QuestionBankOptionResponse> levels,
             List<QuestionBankOptionResponse> topics,
-            List<QuestionBankQuizOptionResponse> quizzes
+            List<QuestionBankQuizOptionResponse> quizzes,
+            boolean quizzesTruncated
     ) {
+
+        public QuestionBankWorkspaceResponse(
+                String tenantId,
+                PageResponse<QuestionBankQuestionRowResponse> questions,
+                List<QuestionBankOptionResponse> subjects,
+                List<QuestionBankOptionResponse> levels,
+                List<QuestionBankOptionResponse> topics,
+                List<QuestionBankQuizOptionResponse> quizzes
+        ) {
+            this(tenantId, questions, subjects, levels, topics, quizzes, false);
+        }
     }
 
     public record QuestionBankQuestionRowResponse(

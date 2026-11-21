@@ -21,6 +21,7 @@ import com.erg.ergspringboot.timekeeping.persistence.TkRequest;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestStep;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestStepRepository;
+import com.erg.ergspringboot.timekeeping.persistence.TkShift;
 import com.erg.ergspringboot.timekeeping.persistence.TkShiftRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkSite;
 import com.erg.ergspringboot.timekeeping.persistence.TkSiteRepository;
@@ -97,14 +98,16 @@ public class TodayDashboardService {
                 users.findActiveUserIdsHoldingPermission(tenantId, AdminSupport.SELF, day));
         Set<String> roster = schoolOf.entrySet().stream().filter(e -> schools.contains(e.getValue()))
                 .map(Map.Entry::getKey).collect(Collectors.toCollection(LinkedHashSet::new));
-        List<TkPunch> dayPunches = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, day).stream()
-                .filter(p -> schools.contains(p.getSchoolId())).toList();
+        // the school filter runs in SQL: a one-school dashboard no longer loads the whole tenant's day
+        List<TkPunch> dayPunches = schools.isEmpty() ? List.of()
+                : punches.findByTenantIdAndSchoolIdInAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, schools, day);
         List<TkPunch> counted = dayPunches.stream().filter(p -> p.getStatus() != PunchStatus.REJECTED).toList();
         Map<String, String> presentAt = new TreeMap<>(); // user -> school of the first counted IN
         counted.stream().filter(p -> p.getDirection() == PunchDirection.IN)
                 .forEach(p -> presentAt.putIfAbsent(p.getUserId(), p.getSchoolId()));
-        List<TkDay> late = days.findByTenantIdAndWorkDate(tenantId, day).stream()
-                .filter(d -> schools.contains(d.getSchoolId()) && d.getLateMinutes() > 0).toList();
+        List<TkDay> late = (schools.isEmpty() ? List.<TkDay>of()
+                : days.findByTenantIdAndSchoolIdInAndWorkDate(tenantId, schools, day)).stream()
+                .filter(d -> d.getLateMinutes() > 0).toList();
 
         Map<RequestType, Set<String>> away = requests.findApprovedOn(tenantId, day).stream()
                 .filter(r -> schools.contains(r.getSchoolId()) && r.getType() != RequestType.EXPLANATION)
@@ -173,7 +176,8 @@ public class TodayDashboardService {
         Set<String> wanted = new LinkedHashSet<>(userIds);
         Set<String> known = users.findByTenantIdAndIdIn(tenantId, wanted).stream().map(User::getId)
                 .collect(Collectors.toSet());
-        Set<String> punchedIn = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, day).stream()
+        Set<String> punchedIn = known.isEmpty() ? Set.of() : punches
+                .findByTenantIdAndUserIdInAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId, known, day, day).stream()
                 .filter(p -> p.getDirection() == PunchDirection.IN && p.getStatus() != PunchStatus.REJECTED)
                 .map(TkPunch::getUserId).collect(Collectors.toSet());
         Map<String, String> schoolOf = context.schoolsOf(tenantId, known);
@@ -202,9 +206,13 @@ public class TodayDashboardService {
                 p.getPhotoKey() != null);
     }
 
-    /** Schools of {@code schools} with a shift in effect on {@code day} (one shift query per school). */
+    /** Schools of {@code schools} with a shift in effect on {@code day}, from one read of the tenant's shifts. */
     private Set<String> schoolsWithShift(String tenantId, Set<String> schools, LocalDate day) {
-        return schools.stream().filter(s -> context.shiftFor(tenantId, s, day).isPresent()).collect(Collectors.toSet());
+        if (schools.isEmpty()) return Set.of();
+        Map<String, List<TkShift>> bySchool = shifts.findByTenantId(tenantId).stream()
+                .filter(s -> schools.contains(s.getSchoolId())).collect(Collectors.groupingBy(TkShift::getSchoolId));
+        return bySchool.entrySet().stream().filter(e -> WorkContextResolver.shiftOn(e.getValue(), day).isPresent())
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
     }
 
     private Set<String> configuredSchools(String tenantId) {

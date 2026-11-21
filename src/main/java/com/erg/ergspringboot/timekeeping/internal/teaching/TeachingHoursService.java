@@ -4,6 +4,7 @@ import static com.erg.ergspringboot.timekeeping.internal.teaching.TeachingSheets
 import static com.erg.ergspringboot.timekeeping.internal.teaching.TeachingSheets.MAIN;
 
 import com.erg.ergspringboot.calendar.TeachingPeriodReadPort;
+import com.erg.ergspringboot.calendar.TeachingPeriodReadPort.PeriodSlice;
 import com.erg.ergspringboot.calendar.TeachingPeriodReadPort.TeachingPeriod;
 import com.erg.ergspringboot.lms.LessonLogReportPort;
 import com.erg.ergspringboot.lms.LessonLogReportPort.PeriodState;
@@ -43,6 +44,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -59,6 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TeachingHoursService {
 
     static final int PAGE_SIZE = 100;
+    static final int MAX_EXPORT_PERIODS = 200_000;
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm").withZone(TeachingSheets.ZONE);
     private static final String USER_NAMES = "select id, coalesce(full_name, '') from users where tenant_id = :tenant and id in (:ids)";
     private static final String SCHOOL_NAMES = "select id, name from education_units where tenant_id = :tenant and id in (:ids)";
@@ -118,8 +121,19 @@ public class TeachingHoursService {
     /** Teacher id to {main total, assistant total} of the live timetable; teachers with no period are absent. */
     @Transactional(readOnly = true)
     public Map<String, int[]> liveTotals(String tenantId, YearMonth month) {
+        return totals(monthEvents(tenantId, month));
+    }
+
+    /** Same, for one teacher only (the filter runs in SQL). */
+    @Transactional(readOnly = true)
+    public Map<String, int[]> liveTotals(String tenantId, YearMonth month, String teacherUserId) {
+        return totals(calendar.periods(tenantId, month.atDay(1), month.atEndOfMonth(), TeachingPeriodReadPort.PUBLISHED,
+                null, teacherUserId));
+    }
+
+    public static Map<String, int[]> totals(List<TeachingPeriod> events) {
         Map<String, int[]> totals = new HashMap<>();
-        for (TeachingPeriod e : monthEvents(tenantId, month)) {
+        for (TeachingPeriod e : events) {
             totals.computeIfAbsent(e.teacherUserId(), k -> new int[2])[ASSISTANT.equals(e.role()) ? 1 : 0] += e.periodCount();
         }
         return totals;
@@ -140,16 +154,16 @@ public class TeachingHoursService {
             return new MyTeachingMonth(month.toString(), "CLOSED", deadline, sum(main), sum(assistant), weeks,
                     snapshotRows(main), snapshotRows(assistant), List.of(), List.of(), confirmation, closedAt(tenantId, month));
         }
-        List<TeachingPeriod> all = monthEvents(tenantId, month);
-        List<TeachingPeriod> mine = all.stream().filter(e -> userId.equals(e.teacherUserId())).toList();
+        List<TeachingPeriod> mine = calendar.periods(tenantId, month.atDay(1), month.atEndOfMonth(),
+                TeachingPeriodReadPort.PUBLISHED, null, userId);
         List<TeachingPeriod> main = TeachingSheets.ofRole(mine, MAIN);
         List<TeachingPeriod> assistant = TeachingSheets.ofRole(mine, ASSISTANT);
         // The port already lists only holiday-cancelled or schedule-cancelled periods (not deleted drafts).
         List<CancelledPeriod> cancelled = calendar.periods(tenantId, month.atDay(1), month.atEndOfMonth(),
-                        TeachingPeriodReadPort.CANCELLED).stream()
-                .filter(e -> userId.equals(e.teacherUserId())).map(e -> new CancelledPeriod(e.eventId(),
+                        TeachingPeriodReadPort.CANCELLED, null, userId).stream()
+                .map(e -> new CancelledPeriod(e.eventId(),
                         TeachingSheets.dateOf(e), e.className(), e.periodStart(), e.periodCount())).toList();
-        return new MyTeachingMonth(month.toString(), status(tenantId, month, all), deadline,
+        return new MyTeachingMonth(month.toString(), status(tenantId, month), deadline,
                 main.stream().mapToInt(TeachingPeriod::periodCount).sum(),
                 assistant.stream().mapToInt(TeachingPeriod::periodCount).sum(), weeks, rows(main, weeks),
                 rows(assistant, weeks), missingReports(tenantId, main), cancelled, confirmation, null);
@@ -197,6 +211,18 @@ public class TeachingHoursService {
         return sheet(tenantId, month, TeachingSheets.role(role), null);
     }
 
+    /** As above for a month still open whose published events the caller already read ({@link #openMonthEvents}). */
+    @Transactional(readOnly = true)
+    public TeachingMonthSheet monthSheet(String tenantId, YearMonth month, String role, List<TeachingPeriod> events) {
+        return sheet(tenantId, month, TeachingSheets.role(role), events);
+    }
+
+    /** The published events of the month, or null once HR closed it (the sheet is then read from its snapshot). */
+    @Transactional(readOnly = true)
+    public List<TeachingPeriod> openMonthEvents(String tenantId, YearMonth month) {
+        return isClosed(tenantId, month) ? null : monthEvents(tenantId, month);
+    }
+
     /** {@code preloaded} are the month's published events when the caller already read them (export), else null. */
     private TeachingMonthSheet sheet(String tenantId, YearMonth month, String role, List<TeachingPeriod> preloaded) {
         List<TeachingWeek> weeks = TeachingWeekSplitter.split(month);
@@ -228,12 +254,13 @@ public class TeachingHoursService {
     }
 
     /** CLOSED, else READY once the month is over and every teacher with periods has confirmed, else COLLECTING. */
-    private String status(String tenantId, YearMonth month, List<TeachingPeriod> all) {
+    private String status(String tenantId, YearMonth month) {
         if (!ended(month)) return "COLLECTING";
-        Set<String> teachers = all.stream().map(TeachingPeriod::teacherUserId).collect(Collectors.toSet());
         Set<String> done = confirmations.findByTenantIdAndMonth(tenantId, month.toString()).stream()
                 .filter(c -> "CONFIRMED".equals(c.getStatus())).map(TkTeachingConfirmation::getTeacherUserId)
                 .collect(Collectors.toSet());
+        if (done.isEmpty()) return "COLLECTING"; // nobody confirmed yet: no need to scan the tenant for who teaches
+        Set<String> teachers = calendar.teacherIds(tenantId, month.atDay(1), month.atEndOfMonth());
         return !teachers.isEmpty() && done.containsAll(teachers) ? "READY" : "COLLECTING";
     }
 
@@ -247,19 +274,25 @@ public class TeachingHoursService {
         LocalDate start = from != null ? from : LocalDate.of(today().getYear(), 1, 1);
         LocalDate end = to != null ? to : start.withDayOfYear(start.lengthOfYear());
         if (end.isBefore(start)) throw new TimekeepingException(HttpStatus.BAD_REQUEST, "INVALID_RANGE", "Khoảng ngày không hợp lệ");
-        List<TeachingPeriod> events = TeachingSheets.ofRole(
-                calendar.periods(tenantId, start, end, TeachingPeriodReadPort.PUBLISHED), wanted).stream()
-                .filter(e -> blank(schoolId) || schoolId.equals(e.schoolId()))
-                .filter(e -> blank(teacherId) || teacherId.equals(e.teacherUserId())).toList();
         String needle = blank(q) ? null : q.strip().toLowerCase(Locale.ROOT);
+        if (needle == null) { // paging, counting and ordering run in SQL: a page click no longer expands the whole range
+            int pageNo = Math.max(page, 0);
+            PeriodSlice slice = calendar.periodSlice(tenantId, start, end, wanted, blank(schoolId) ? null : schoolId,
+                    blank(teacherId) ? null : teacherId, pageNo * PAGE_SIZE, PAGE_SIZE);
+            checkExportSize(slice.total());
+            List<Tiet> slicePeriods = slice.rows().stream().map(r -> new Tiet(r.event(), r.periodNo(),
+                    TeachingSheets.dateOf(r.event()), r.from(), r.to())).toList();
+            return new TeachingPeriodPage(periodRows(tenantId, slicePeriods), slice.total(), pageNo, PAGE_SIZE);
+        }
+        // shortcut: the text filter also matches the lesson content, which only the class log knows, so a search still
+        // expands the range; narrow it with schoolId, teacherId or dates (the size cap applies), or index the titles.
+        List<TeachingPeriod> events = TeachingSheets.ofRole(calendar.periods(tenantId, start, end,
+                TeachingPeriodReadPort.PUBLISHED, blank(schoolId) ? null : schoolId, blank(teacherId) ? null : teacherId),
+                wanted);
+        checkExportSize(events);
         List<Tiet> tiets = TeachingSheets.expand(events).stream().sorted(Comparator.comparing(Tiet::from)
                 .thenComparing(t -> t.event().schoolName()).thenComparing(t -> t.event().className())
                 .thenComparingInt(Tiet::periodNo)).toList();
-        if (needle == null) {
-            int skip = Math.min(Math.max(page, 0) * PAGE_SIZE, tiets.size());
-            List<Tiet> slice = tiets.subList(skip, Math.min(tiets.size(), skip + PAGE_SIZE));
-            return new TeachingPeriodPage(periodRows(tenantId, slice), tiets.size(), Math.max(page, 0), PAGE_SIZE);
-        }
         List<TeachingPeriodRow> matching = periodRows(tenantId, tiets).stream().filter(r -> matches(r, needle)).toList();
         int skip = Math.min(Math.max(page, 0) * PAGE_SIZE, matching.size());
         return new TeachingPeriodPage(matching.subList(skip, Math.min(matching.size(), skip + PAGE_SIZE)), matching.size(),
@@ -274,21 +307,48 @@ public class TeachingHoursService {
 
     @Transactional(readOnly = true)
     public TeachingExport export(String tenantId, int year) {
-        LocalDate from = LocalDate.of(year, 1, 1);
-        List<TeachingPeriod> events = calendar.periods(tenantId, from, LocalDate.of(year, 12, 31), TeachingPeriodReadPort.PUBLISHED);
-        // shortcut: the whole year is expanded and its lesson titles read in one go; page it if a tenant outgrows memory.
-        List<TeachingPeriodRow> main = periodRows(tenantId, sorted(TeachingSheets.expand(TeachingSheets.ofRole(events, MAIN))));
-        List<TeachingPeriodRow> assistant = periodRows(tenantId, sorted(TeachingSheets.expand(TeachingSheets.ofRole(events, ASSISTANT))));
+        return export(tenantId, year, null, null);
+    }
+
+    /** The year (or one {@code month} of it) of one {@code schoolId} or of every school; refuses more than {@link #MAX_EXPORT_PERIODS}. */
+    @Transactional(readOnly = true)
+    public TeachingExport export(String tenantId, int year, String schoolId, Integer month) {
+        if (month != null && (month < 1 || month > 12)) {
+            throw new TimekeepingException(HttpStatus.BAD_REQUEST, "INVALID_MONTH", "Tháng phải từ 1 đến 12");
+        }
+        LocalDate from = month == null ? LocalDate.of(year, 1, 1) : LocalDate.of(year, month, 1);
+        LocalDate to = month == null ? LocalDate.of(year, 12, 31) : YearMonth.of(year, month).atEndOfMonth();
+        List<TeachingPeriod> events = calendar.periods(tenantId, from, to, TeachingPeriodReadPort.PUBLISHED,
+                blank(schoolId) ? null : schoolId, null);
+        checkExportSize(events);
+        // shortcut: the filtered range is expanded and its lesson titles read in one go, bounded by MAX_EXPORT_PERIODS.
+        List<Tiet> mainPeriods = sorted(TeachingSheets.expand(TeachingSheets.ofRole(events, MAIN)));
+        List<Tiet> assistantPeriods = sorted(TeachingSheets.expand(TeachingSheets.ofRole(events, ASSISTANT)));
+        Map<String, String> titles = lessonTitles(tenantId, Stream.concat(mainPeriods.stream(), assistantPeriods.stream())
+                .map(Tiet::event).distinct().toList());
+        List<TeachingPeriodRow> main = periodRows(mainPeriods, titles);
+        List<TeachingPeriodRow> assistant = periodRows(assistantPeriods, titles);
         List<TeachingMonthSheet> mainMonths = new ArrayList<>();
         List<TeachingMonthSheet> assistantMonths = new ArrayList<>();
-        for (int m = 1; m <= 12; m++) {
-            YearMonth month = YearMonth.of(year, m);
-            List<TeachingPeriod> inMonth = events.stream().filter(e -> YearMonth.from(TeachingSheets.dateOf(e)).equals(month)).toList();
-            if (inMonth.isEmpty() && !isClosed(tenantId, month)) continue;
-            mainMonths.add(sheet(tenantId, month, MAIN, inMonth));
-            assistantMonths.add(sheet(tenantId, month, ASSISTANT, inMonth));
+        for (int m = month == null ? 1 : month; m <= (month == null ? 12 : month); m++) {
+            YearMonth ym = YearMonth.of(year, m);
+            List<TeachingPeriod> inMonth = events.stream().filter(e -> YearMonth.from(TeachingSheets.dateOf(e)).equals(ym)).toList();
+            if (inMonth.isEmpty() && !isClosed(tenantId, ym)) continue;
+            mainMonths.add(sheet(tenantId, ym, MAIN, inMonth));
+            assistantMonths.add(sheet(tenantId, ym, ASSISTANT, inMonth));
         }
         return new TeachingExport(year, main, assistant, mainMonths, assistantMonths);
+    }
+
+    static void checkExportSize(List<TeachingPeriod> events) {
+        checkExportSize(events.stream().mapToLong(e -> Math.max(1, e.periodCount())).sum());
+    }
+
+    static void checkExportSize(long periods) {
+        if (periods > MAX_EXPORT_PERIODS) {
+            throw new TimekeepingException(HttpStatus.BAD_REQUEST, "TEACHING_RANGE_TOO_LARGE",
+                    "Quá nhiều tiết (" + periods + "), hãy lọc theo schoolId hoặc month");
+        }
     }
 
     private static List<Tiet> sorted(List<Tiet> tiets) {
@@ -297,8 +357,12 @@ public class TeachingHoursService {
 
     private List<TeachingPeriodRow> periodRows(String tenantId, List<Tiet> tiets) {
         if (tiets.isEmpty()) return List.of();
-        Map<String, String> titles = lessonTitles(tenantId, tiets.stream().map(Tiet::event).distinct().toList());
-        return tiets.stream().map(t -> new TeachingPeriodRow(t.date(), t.date().getDayOfWeek().getValue(), t.periodNo(),
+        return periodRows(tiets, lessonTitles(tenantId, tiets.stream().map(Tiet::event).distinct().toList()));
+    }
+
+    private static List<TeachingPeriodRow> periodRows(List<Tiet> tiets, Map<String, String> titles) {
+        return tiets.stream()
+.map(t -> new TeachingPeriodRow(t.date(), t.date().getDayOfWeek().getValue(), t.periodNo(),
                 t.event().schoolName(), HH_MM.format(t.from()), HH_MM.format(t.to()), t.event().className(),
                 t.event().levelName(), t.event().subjectName(), titles.get(t.event().eventId() + '#' + t.periodNo()),
                 t.event().teacherName())).toList();
@@ -340,10 +404,9 @@ public class TeachingHoursService {
                 java.util.Arrays.stream(r.getWeekTotals()).mapToInt(Integer::intValue).toArray()))).toList();
     }
 
-    /** The rows HR's close freezes: both role sheets of the live timetable. */
-    List<TkTeachingMonthLine> snapshot(String tenantId, YearMonth month) {
+    /** The rows HR's close freezes: both role sheets of {@code all}, the month events the close just checked. */
+    List<TkTeachingMonthLine> snapshot(String tenantId, YearMonth month, List<TeachingPeriod> all) {
         List<TeachingWeek> weeks = TeachingWeekSplitter.split(month);
-        List<TeachingPeriod> all = monthEvents(tenantId, month);
         List<TkTeachingMonthLine> result = new ArrayList<>();
         for (String role : List.of(MAIN, ASSISTANT)) {
             for (Line l : TeachingSheets.lines(TeachingSheets.ofRole(all, role), weeks)) {

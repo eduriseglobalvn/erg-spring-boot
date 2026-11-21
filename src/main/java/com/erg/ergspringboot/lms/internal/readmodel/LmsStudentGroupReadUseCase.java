@@ -9,9 +9,11 @@ import java.util.stream.Collectors;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Scoped student-group projection for the LMS homework workspace. */
 @Service
+@Transactional(value = "postgresTransactionManager", readOnly = true)
 public class LmsStudentGroupReadUseCase {
     private final StudentGroupRepository groups;
     private final StudentGroupMemberRepository members;

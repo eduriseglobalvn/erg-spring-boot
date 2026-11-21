@@ -14,6 +14,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Savepoint;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -21,6 +22,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,12 +57,27 @@ public class QuizAttemptGradingService {
 
     private static final int SCALE = 2;
     private static final double DEFAULT_PASS_PERCENT = 50.0;
+    private static final Logger log = LoggerFactory.getLogger(QuizAttemptGradingService.class);
+    // assignment_id is nullable and the unique index treats nulls as distinct: update-then-insert, not ON CONFLICT.
+    private static final String PROGRESS_UPDATE = """
+            update student_progress set student_name = ?, quiz_title = ?, class_id = ?, mode = ?, status = ?,
+                answered_count = ?, total_questions = ?, percent_complete = ?, score = ?, passed = ?,
+                started_at = coalesce(started_at, ?), submitted_at = ?, last_active_at = ?, updated_at = ?
+            where tenant_id = ? and student_user_id = ? and quiz_id = ? and assignment_id is not distinct from ?
+            """;
+    private static final String PROGRESS_INSERT = """
+            insert into student_progress (student_name, quiz_title, class_id, mode, status, answered_count,
+                total_questions, percent_complete, score, passed, started_at, submitted_at, last_active_at, updated_at,
+                tenant_id, student_user_id, quiz_id, assignment_id, id, created_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """;
 
     private final QuizVersionRepository quizVersionRepository;
     private final QuizVersionQuestionRepository questionRepository;
     private final AttemptAnswerRowRepository answerRowRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final GradingEngine gradingEngine;
+    private JdbcTemplate jdbc; // null only in hand-built instances (unit tests), which keep the repository path
     /**
      * A published version never changes (a republish makes a new version id), so every submit of one exam reuses its
      * questions and pass mark instead of reloading the question bodies and the whole version. Keyed by the caller's
@@ -78,6 +100,11 @@ public class QuizAttemptGradingService {
         this.answerRowRepository = answerRowRepository;
         this.studentProgressRepository = studentProgressRepository;
         this.gradingEngine = gradingEngine;
+    }
+
+    @Autowired
+    void setJdbc(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
     }
 
     /**
@@ -147,6 +174,15 @@ public class QuizAttemptGradingService {
         return Optional.of(totals(quizVersionId, awardedTotal, maxTotal, anyManual, gradedCount, questions.size()));
     }
 
+    /** quiz_version_questions.id -> runtime question id of a published (immutable) version, from the published-version cache. */
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public Map<String, String> runtimeIdsByVersionQuestionId(String quizVersionId) {
+        if (quizVersionId == null || quizVersionId.isBlank()) return Map.of();
+        Map<String, String> ids = new java.util.LinkedHashMap<>();
+        published(quizVersionId).questions().forEach(question -> ids.put(question.getId(), question.getRuntimeQuestionId()));
+        return ids;
+    }
+
     /** Runtime question ids of a published version; submitted answers are filtered to this set. */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public java.util.Set<String> runtimeQuestionIds(String quizVersionId) {
@@ -212,13 +248,15 @@ public class QuizAttemptGradingService {
         return totals(quizVersionId, awarded, max, pending, graded, questions.size());
     }
 
-    private GradedAttempt totals(String quizVersionId, BigDecimal awardedTotal, BigDecimal maxTotal,
+    GradedAttempt totals(String quizVersionId, BigDecimal awardedTotal, BigDecimal maxTotal,
             boolean anyManual, int gradedCount, int totalQuestions) {
-        double percent = maxTotal.signum() > 0
-                ? awardedTotal.divide(maxTotal, 6, RoundingMode.HALF_UP).doubleValue() * 100.0
-                : 0.0;
-        percent = Math.min(100.0, Math.max(0.0, percent));
-        boolean passed = !anyManual && percent >= passPercent(quizVersionId);
+        // BigDecimal end to end: 57/100 against a 57 pass mark must pass (a double gives 56.99999999999999).
+        BigDecimal scaled = awardedTotal.multiply(BigDecimal.valueOf(100));
+        BigDecimal percentExact = maxTotal.signum() > 0 ? scaled.divide(maxTotal, 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        double percent = Math.min(100.0, Math.max(0.0, percentExact.doubleValue()));
+        // The pass decision uses the rounded percent the learner sees: 56.996 shows 57.0 and must pass a 57% mark.
+        boolean reached = maxTotal.signum() > 0 && percentExact.compareTo(BigDecimal.valueOf(passPercent(quizVersionId))) >= 0;
+        boolean passed = !anyManual && reached;
         return new GradedAttempt(
                 awardedTotal.setScale(SCALE, RoundingMode.HALF_UP),
                 maxTotal.setScale(SCALE, RoundingMode.HALF_UP),
@@ -307,11 +345,11 @@ public class QuizAttemptGradingService {
     }
 
     /**
-     * Upserts the live progress projection for the teacher dashboard (spec §1.7). Runs in its own
-     * transaction because attempt commands call it after their own transaction committed.
+     * Upserts the live progress projection for the teacher dashboard (spec §1.7) on the caller's connection, inside a
+     * JDBC savepoint: a failure here (constraint, trigger, concurrent insert) is undone and logged, and never rolls
+     * back the graded attempt. It must not go through Hibernate: a failed flush dooms the whole transaction.
      */
-    @Transactional(value = "postgresTransactionManager",
-            propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Transactional("postgresTransactionManager")
     public void projectProgress(
             String tenantId,
             String studentUserId,
@@ -330,6 +368,19 @@ public class QuizAttemptGradingService {
             OffsetDateTime submittedAt
     ) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (jdbc != null) {
+            BigDecimal percent = totalQuestions > 0
+                    ? BigDecimal.valueOf(answeredCount * 100.0 / totalQuestions).setScale(SCALE, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            Object[] update = {studentName, quizTitle, classId, mode, status, answeredCount, totalQuestions, percent,
+                    score, passed, startedAt == null ? now : startedAt, submittedAt, now, now,
+                    tenantId, studentUserId, quizId, assignmentId};
+            Object[] insert = java.util.Arrays.copyOf(update, update.length + 2);
+            insert[update.length] = com.erg.ergspringboot.utils.IdGenerator.newId();
+            insert[update.length + 1] = now;
+            upsertProgressOnSavepoint(update, insert, quizId);
+            return;
+        }
         StudentProgress progress = studentProgressRepository
                 .findByTenantIdAndStudentUserIdAndQuizIdAndAssignmentId(tenantId, studentUserId, quizId, assignmentId)
                 .orElseGet(StudentProgress::new);
@@ -355,5 +406,23 @@ public class QuizAttemptGradingService {
         progress.setSubmittedAt(submittedAt);
         progress.setLastActiveAt(now);
         studentProgressRepository.save(progress);
+    }
+
+    private void upsertProgressOnSavepoint(Object[] update, Object[] insert, String quizId) {
+        jdbc.execute((ConnectionCallback<Void>) connection -> {
+            Savepoint savepoint = connection.setSavepoint();
+            try {
+                try {
+                    if (jdbc.update(PROGRESS_UPDATE, update) == 0) jdbc.update(PROGRESS_INSERT, insert);
+                } catch (DuplicateKeyException raced) {
+                    connection.rollback(savepoint); // a concurrent write created the row between our update and insert
+                    jdbc.update(PROGRESS_UPDATE, update);
+                }
+            } catch (RuntimeException failure) {
+                connection.rollback(savepoint);
+                log.warn("EXAM_PROGRESS_PROJECTION_FAILED quizId={} cause={}", quizId, failure.getClass().getSimpleName());
+            }
+            return null;
+        });
     }
 }

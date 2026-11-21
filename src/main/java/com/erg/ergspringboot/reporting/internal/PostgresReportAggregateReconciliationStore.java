@@ -56,4 +56,20 @@ public class PostgresReportAggregateReconciliationStore implements ReportAggrega
                 .param("tenantId", task.tenantId()).param("aggregateId", task.aggregateId())
                 .param("sourceUpdatedAt", task.sourceUpdatedAt()).update();
     }
+
+    @Override
+    public void recordFailure(Task task, String error, int maxAttempts) {
+        // source_updated_at guards a task the trigger re-queued meanwhile: that fresh event must not inherit this back-off.
+        jdbc.sql("""
+                update report_reconciliation_queue
+                set status = case when attempts >= :maxAttempts then 'failed' else 'pending' end,
+                    available_at = now() + least(interval '1 hour', interval '30 seconds' * power(2, attempts)),
+                    lease_until = null, last_error = :error
+                where tenant_id = :tenantId and aggregate_type = 'assignment_progress'
+                  and aggregate_id = :aggregateId and source_updated_at = :sourceUpdatedAt
+                """)
+                .param("maxAttempts", maxAttempts).param("error", error)
+                .param("tenantId", task.tenantId()).param("aggregateId", task.aggregateId())
+                .param("sourceUpdatedAt", task.sourceUpdatedAt()).update();
+    }
 }

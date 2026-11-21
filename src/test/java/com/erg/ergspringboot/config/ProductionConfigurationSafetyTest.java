@@ -19,8 +19,7 @@ class ProductionConfigurationSafetyTest {
                 .contains("include-stacktrace: never")
                 .contains("include-binding-errors: never")
                 .contains("enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}")
-                .contains("enabled: ${SCALAR_ENABLED:false}")
-                .contains("enabled: ${ERG_PROCESS_LOCAL_ENABLED:false}");
+                .contains("enabled: ${SCALAR_ENABLED:false}");
     }
 
     @Test
@@ -69,8 +68,7 @@ class ProductionConfigurationSafetyTest {
         assertThat(local)
                 .contains("generate_statistics: true")
                 .contains("include-message: always")
-                .contains("api-docs:")
-                .contains("process-local:");
+                .contains("api-docs:");
     }
 
     @Test

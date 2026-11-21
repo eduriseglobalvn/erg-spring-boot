@@ -3,6 +3,7 @@ package com.erg.ergspringboot.controller.elearning.graphql;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.ClassLeaderboardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.LeaderboardClassResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentPageResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
@@ -17,6 +18,7 @@ import com.erg.ergspringboot.elearning.ElearningOperations;
 import com.erg.ergspringboot.elearning.StudentQuestionThreadOperations;
 import com.erg.ergspringboot.elearning.StudentTierOperations;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.CreateDiscussionCommand;
+import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionCommentsQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionModerator;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.LeaderboardManager;
@@ -64,6 +66,17 @@ public class StudentEngagementGraphQlController {
         ));
     }
 
+    /** Pages the comments of a post of the viewer's class; {@code parentId} pages the replies of one top-level comment. */
+    @SchemaMapping(typeName = "ElearningQuery", field = "discussionComments")
+    @ElearningDashboardRead
+    public StudentDiscussionCommentPageResponse discussionComments(@Argument String postId, @Argument String parentId,
+                                                                  @Argument Integer page, @Argument Integer size,
+                                                                  @Argument String tenantId) {
+        ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
+        return service.discussionComments(new DiscussionCommentsQuery(accessSupport.verifiedTenantId(principal, tenantId),
+                principal.userId(), postId, parentId, page == null ? 0 : page, size == null ? 20 : size));
+    }
+
     @MutationMapping
     @ElearningDiscussionWriteSelf
     public StudentDiscussionPostResponse createStudentDiscussion(@Argument CreateStudentDiscussionInput input) {
@@ -107,9 +120,11 @@ public class StudentEngagementGraphQlController {
 
     @SchemaMapping(typeName = "ElearningQuery", field = "myQuestionThreads")
     @ElearningDashboardRead
-    public List<QuestionThreadResponse> myQuestionThreads(@Argument String status, @Argument String tenantId) {
+    public List<QuestionThreadResponse> myQuestionThreads(@Argument String status, @Argument String tenantId,
+                                                        @Argument Boolean includeCorrectAnswer) {
         ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
-        return questionThreads.list(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), false, false, status);
+        return questionThreads.list(accessSupport.verifiedTenantId(principal, tenantId), principal.userId(), false, false, status,
+                !Boolean.FALSE.equals(includeCorrectAnswer));
     }
 
     @SchemaMapping(typeName = "ElearningQuery", field = "questionThread")
@@ -121,9 +136,11 @@ public class StudentEngagementGraphQlController {
 
     @SchemaMapping(typeName = "ElearningQuery", field = "teacherQuestionThreads")
     @ElearningDiscussionModerate
-    public List<QuestionThreadResponse> teacherQuestionThreads(@Argument String status, @Argument String tenantId) {
+    public List<QuestionThreadResponse> teacherQuestionThreads(@Argument String status, @Argument String tenantId,
+                                                             @Argument Boolean includeCorrectAnswer) {
         DiscussionModerator teacher = moderator(tenantId);
-        return questionThreads.list(teacher.tenantId(), teacher.userId(), teacher.tenantWide(), true, status);
+        return questionThreads.list(teacher.tenantId(), teacher.userId(), teacher.tenantWide(), true, status,
+                !Boolean.FALSE.equals(includeCorrectAnswer));
     }
 
     @SchemaMapping(typeName = "ElearningQuery", field = "teacherQuestionThread")
@@ -213,12 +230,13 @@ public class StudentEngagementGraphQlController {
     /** "Thi đua" board of the student's own class or grade, by XP; no entries once the teacher switched it off. */
     @SchemaMapping(typeName = "ElearningQuery", field = "studentClassLeaderboard")
     @ElearningDashboardRead
-    public ClassLeaderboardResponse studentClassLeaderboard(@Argument StudentClassLeaderboardInput input) {
+    public ClassLeaderboardResponse studentClassLeaderboard(@Argument StudentClassLeaderboardInput input,
+                                                            @Argument Boolean viewerOnly) {
         ErgPrincipal principal = requirePrincipal("elearning.dashboard.read");
         StudentClassLeaderboardInput safe = input == null ? new StudentClassLeaderboardInput(null, null, null, null) : input;
         return service.studentClassLeaderboard(
                 accessSupport.verifiedTenantId(principal, safe.tenantId()), principal.userId(), safe.classId(),
-                safe.period(), safe.scope());
+                safe.period(), safe.scope(), Boolean.TRUE.equals(viewerOnly));
     }
 
     /** The student hides themselves from classmates on the board; they still see their own rank. */

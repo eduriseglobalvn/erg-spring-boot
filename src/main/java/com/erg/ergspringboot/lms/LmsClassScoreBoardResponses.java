@@ -9,7 +9,7 @@ public final class LmsClassScoreBoardResponses {
     }
 
     public record ClassScoreBoardResponse(String classId, String className, List<ScoreBoardStudent> students,
-            List<ScoreBoardAttempt> attempts, boolean truncated) {
+            List<ScoreBoardAttempt> attempts, boolean truncated, boolean rosterTruncated) {
     }
 
     public record ScoreBoardStudent(String id, String studentCode, String fullName) {

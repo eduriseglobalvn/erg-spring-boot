@@ -1,6 +1,8 @@
 package com.erg.ergspringboot.elearning.internal.engagement;
 
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
+import com.erg.ergspringboot.common.response.elearning.DiscussionFeedSnapshot;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentPageResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionPostResponse;
@@ -8,8 +10,8 @@ import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponse
 import com.erg.ergspringboot.elearning.ElearningNotice;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -29,41 +31,54 @@ public class StudentEngagementService {
     private static final Set<String> REACTIONS = Set.of("like", "love", "care", "haha", "wow", "sad", "angry");
     private static final Set<String> TARGET_TYPES = Set.of("POST", "COMMENT");
 
-    private final StudentRepository students;
+    private final LmsStudentIdentityLookup identities;
     private final JdbcTemplate jdbc;
-    private final NamedParameterJdbcTemplate namedJdbc;
     private final StudentDiscussionReader reader;
+    private final StudentDiscussionFeedCache feeds;
     private final ApplicationEventPublisher events;
 
-    public StudentEngagementService(StudentRepository students, JdbcTemplate jdbc) {
-        this(students, jdbc, event -> { });
-    }
-
     @Autowired
-    public StudentEngagementService(StudentRepository students, JdbcTemplate jdbc, ApplicationEventPublisher events) {
-        this.students = students;
+    public StudentEngagementService(LmsStudentIdentityLookup identities, JdbcTemplate jdbc, ApplicationEventPublisher events,
+                                    StudentDiscussionFeedCache feeds) {
+        this.identities = identities;
         this.jdbc = jdbc;
         this.events = events;
-        this.namedJdbc = new NamedParameterJdbcTemplate(jdbc);
-        this.reader = new StudentDiscussionReader(jdbc, namedJdbc);
+        this.feeds = feeds;
+        this.reader = new StudentDiscussionReader(jdbc, new NamedParameterJdbcTemplate(jdbc));
     }
 
     @Transactional(readOnly = true)
     public StudentDiscussionFeedResponse feed(FeedScope scope) {
-        Student student = requireStudent(scope.tenantId(), scope.actorUserId());
+        StudentIdentity student = requireStudent(scope.tenantId(), scope.actorUserId());
         int page = Math.max(0, scope.page());
         int size = Math.max(1, Math.min(50, scope.size()));
         StudentDiscussionReader.PostFilter filter = StudentDiscussionReader.PostFilter.of(scope.filter(), scope.subject());
-        long total = reader.countPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), false, filter);
-        return new StudentDiscussionFeedResponse(
-                reader.classPosts(scope.tenantId(), scope.actorUserId(), student.getAcademicClassId(), size, page * size, false, filter),
-                page, size, total, (long) (page + 1) * size < total
-        );
+        // The class-shared part comes from a 20 s cache; the viewer's own reactions and follows are read per call.
+        DiscussionFeedSnapshot snapshot = feeds.snapshot(scope.tenantId(), student.academicClassId(), page, size, filter.kind(),
+                filter.subject(), StudentDiscussionFeedCache.authorKey(filter, scope.actorUserId()), false);
+        return reader.feedResponse(snapshot, scope.tenantId(), scope.actorUserId(), page, size);
+    }
+
+    /**
+     * Pages the comments of a post of the student's class ({@code parentId}: the replies of one top-level comment). Same class
+     * membership and visibility as the feed; a post or parent outside them is "not found".
+     */
+    @Transactional(readOnly = true)
+    public StudentDiscussionCommentPageResponse comments(CommentsScope scope) {
+        StudentIdentity student = requireStudent(scope.tenantId(), scope.actorUserId());
+        requireText(scope.postId(), "postId", 36);
+        String postId = scope.postId().trim();
+        requirePostInClass(scope.tenantId(), postId, student.academicClassId());
+        String parentId = blank(scope.parentId());
+        if (parentId != null) reader.requireRootComment(scope.tenantId(), postId, parentId, false);
+        int page = Math.max(0, scope.page());
+        int size = Math.max(1, Math.min(50, scope.size()));
+        return reader.commentPage(scope.tenantId(), scope.actorUserId(), postId, parentId, page, size, false);
     }
 
     @Transactional
     public StudentDiscussionPostResponse createDiscussion(CreateDiscussionCommand command) {
-        Student student = requireStudent(command.tenantId(), command.actorUserId());
+        StudentIdentity student = requireStudent(command.tenantId(), command.actorUserId());
         requireText(command.idempotencyKey(), "idempotencyKey", 192);
         requireText(command.title(), "title", 250);
         requireText(command.content(), "content", 4000);
@@ -78,7 +93,7 @@ public class StudentEngagementService {
                       (id, tenant_id, academic_class_id, title, content, assignment_id, attachment_ids,
                        author_id, idempotency_key, latest_activity_at, created_at, updated_at, subject)
                     values (?, ?, ?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?)
-                    """, id, command.tenantId(), student.getAcademicClassId(), command.title().trim(),
+                    """, id, command.tenantId(), student.academicClassId(), command.title().trim(),
                     command.content().trim(), blank(command.assignmentId()), json(command.attachmentIds()),
                     command.actorUserId(), command.idempotencyKey().trim(), now, now, now, blank(command.subject()));
         } catch (DataIntegrityViolationException race) {
@@ -86,16 +101,17 @@ public class StudentEngagementService {
             if (raced != null) return reader.postById(command.tenantId(), command.actorUserId(), raced);
             throw race;
         }
+        feeds.evictClass(command.tenantId(), student.academicClassId());
         return reader.postById(command.tenantId(), command.actorUserId(), id);
     }
 
     @Transactional
     public StudentDiscussionCommentResponse reply(ReplyCommand command) {
-        Student student = requireStudent(command.tenantId(), command.actorUserId());
+        StudentIdentity student = requireStudent(command.tenantId(), command.actorUserId());
         requireText(command.idempotencyKey(), "idempotencyKey", 192);
         requireText(command.postId(), "postId", 36);
         requireText(command.content(), "content", 4000);
-        requirePostInClass(command.tenantId(), command.postId(), student.getAcademicClassId());
+        requirePostInClass(command.tenantId(), command.postId(), student.academicClassId());
         String existing = existingId("student_discussion_comments", command.tenantId(), command.actorUserId(), command.idempotencyKey());
         if (existing != null) return reader.commentById(command.tenantId(), command.actorUserId(), existing);
         String parentId = blank(command.parentCommentId());
@@ -117,6 +133,7 @@ public class StudentEngagementService {
         }
         jdbc.update("update student_discussion_threads set latest_activity_at = ?, updated_at = ? where tenant_id = ? and id = ?",
                 now, now, command.tenantId(), command.postId());
+        feeds.evictClass(command.tenantId(), student.academicClassId());
         notifyFollowers(command, id);
         return reader.commentById(command.tenantId(), command.actorUserId(), id);
     }
@@ -124,9 +141,9 @@ public class StudentEngagementService {
     /** Follow (or stop following) a thread of the student's class; followers are notified of new replies. */
     @Transactional
     public boolean follow(String tenantId, String actorUserId, String postId, boolean follow) {
-        Student student = requireStudent(tenantId, actorUserId);
+        StudentIdentity student = requireStudent(tenantId, actorUserId);
         requireText(postId, "postId", 36);
-        requirePostInClass(tenantId, postId, student.getAcademicClassId());
+        requirePostInClass(tenantId, postId, student.academicClassId());
         if (follow) {
             jdbc.update("""
                     insert into student_discussion_follows (tenant_id, post_id, user_id, created_at) values (?, ?, ?, ?)
@@ -141,12 +158,12 @@ public class StudentEngagementService {
 
     @Transactional
     public StudentDiscussionReactionResponse setReaction(SetReactionCommand command) {
-        Student student = requireStudent(command.tenantId(), command.actorUserId());
+        StudentIdentity student = requireStudent(command.tenantId(), command.actorUserId());
         String type = upper(command.targetType());
         String reaction = lower(command.reaction());
         if (!TARGET_TYPES.contains(type)) throw new BadRequestException("targetType must be POST or COMMENT.");
         if (!REACTIONS.contains(reaction)) throw new BadRequestException("Unsupported discussion reaction.");
-        requireTargetInClass(command.tenantId(), type, command.targetId(), student.getAcademicClassId());
+        requireTargetInClass(command.tenantId(), type, command.targetId(), student.academicClassId());
         String current = jdbc.query("""
                 select reaction from student_discussion_reactions
                 where tenant_id = ? and target_type = ? and target_id = ? and user_id = ?
@@ -167,13 +184,14 @@ public class StudentEngagementService {
                     """, IdGenerator.newId(), command.tenantId(), type, command.targetId(), command.actorUserId(), reaction, now, now);
             current = reaction;
         }
+        feeds.evictClass(command.tenantId(), student.academicClassId());
         return new StudentDiscussionReactionResponse(type, command.targetId(), current,
                 reader.reactionCounts(command.tenantId(), type, command.targetId()));
     }
 
     @Transactional
     public AnnouncementReadResponse markAnnouncementRead(MarkAnnouncementReadCommand command) {
-        Student student = requireStudent(command.tenantId(), command.actorUserId());
+        StudentIdentity student = requireStudent(command.tenantId(), command.actorUserId());
         Integer allowed = jdbc.queryForObject("""
                 select count(*) from lms_announcements a
                 where a.tenant_id = ? and a.id = ? and a.status = 'PUBLISHED'
@@ -181,7 +199,7 @@ public class StudentEngagementService {
                     or jsonb_exists(a.academic_class_ids, ?)
                     or jsonb_exists(a.student_ids, ?))
                 """, Integer.class, command.tenantId(), command.announcementId(),
-                student.getAcademicClassId(), student.getId());
+                student.academicClassId(), student.studentId());
         if (allowed == null || allowed == 0) throw new ResourceNotFoundException("Announcement was not found in the student scope.");
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update("""
@@ -190,7 +208,7 @@ public class StudentEngagementService {
                 values (?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (tenant_id, announcement_id, user_id)
                 do update set read_at = excluded.read_at, updated_at = excluded.updated_at
-                """, IdGenerator.newId(), command.tenantId(), command.announcementId(), student.getId(),
+                """, IdGenerator.newId(), command.tenantId(), command.announcementId(), student.studentId(),
                 command.actorUserId(), now, now, now);
         return new AnnouncementReadResponse(command.announcementId(), true, now);
     }
@@ -208,10 +226,12 @@ public class StudentEngagementService {
                 content.length() > 140 ? content.substring(0, 140) : content, command.actorUserId(), followers));
     }
 
-    private Student requireStudent(String tenantId, String actorUserId) {
-        return students.findFirstByTenantIdAndAuthUserId(tenantId, actorUserId)
-                .filter(student -> student.getAcademicClassId() != null && !student.getAcademicClassId().isBlank())
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated student enrollment was not found."));
+    private StudentIdentity requireStudent(String tenantId, String actorUserId) {
+        StudentIdentity student = identities.byAuthUser(tenantId, actorUserId);
+        if (!student.exists() || student.academicClassId() == null || student.academicClassId().isBlank()) {
+            throw new ResourceNotFoundException("Authenticated student enrollment was not found.");
+        }
+        return student;
     }
 
     private String existingId(String table, String tenantId, String actorUserId, String idempotencyKey) {
@@ -274,6 +294,8 @@ public class StudentEngagementService {
             this(tenantId, actorUserId, page, size, null, null);
         }
     }
+    /** {@code parentId} null: top-level comments; else the replies of that top-level comment. */
+    public record CommentsScope(String tenantId, String actorUserId, String postId, String parentId, int page, int size) { }
     public record CreateDiscussionCommand(String tenantId, String actorUserId, String idempotencyKey, String title,
                                           String content, String assignmentId, List<String> attachmentIds, String subject) {
         public CreateDiscussionCommand(String tenantId, String actorUserId, String idempotencyKey, String title,

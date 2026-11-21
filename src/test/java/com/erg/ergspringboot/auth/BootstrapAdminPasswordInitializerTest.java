@@ -50,4 +50,17 @@ class BootstrapAdminPasswordInitializerTest {
 
         verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
+
+    @Test
+    void aBlankPasswordLeavesTheAdminAloneAndThePropertyHasNoBuiltInDefault() throws Exception {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH)))
+                .thenReturn(1);
+
+        assertThat(new BootstrapAdminPasswordInitializer(jdbc, passwords, "").apply()).isFalse();
+
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        var value = BootstrapAdminPasswordInitializer.class.getConstructors()[0].getParameters()[2]
+                .getAnnotation(org.springframework.beans.factory.annotation.Value.class).value();
+        assertThat(value).isEqualTo("${erg.bootstrap.admin-password:}");
+    }
 }

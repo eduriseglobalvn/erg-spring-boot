@@ -99,7 +99,8 @@ class LmsAssignmentProgressWorkspaceQueryCountIntegrationTest {
         assertThat(response.summary().needsReviewCount()).isEqualTo(13);
         assertThat(response.attempts().items()).hasSize(20);
         assertThat(response.attempts().totalItems()).isEqualTo(80);
-        assertThat(response.recipients().items()).hasSize(45);
+        // recipients follow the request page size (20 of 45), the total still counts everyone
+        assertThat(response.recipients().items()).hasSize(20);
         assertThat(response.recipients().totalItems()).isEqualTo(45);
         assertThat(response.recipients().items().getFirst().studentId()).isEqualTo("student-apwq-1");
         assertThat(response.recipients().items().getFirst().latestAttempt().id()).isEqualTo("attempt-apwq-latest-1");
@@ -110,7 +111,7 @@ class LmsAssignmentProgressWorkspaceQueryCountIntegrationTest {
 
         assertThat(statistics.getPrepareStatementCount())
                 .as("assignmentProgressWorkspace should use bounded projection queries for detail, resources, summary, attempts, recipients, latest/best attempts and missing-late students")
-                .isLessThanOrEqualTo(11);
+                .isLessThanOrEqualTo(13); // +1 recipient-rows exists check, +1 missing/late flags of the page
         assertThat(statistics.getEntityLoadCount())
                 .as("projection read should not materialize assignment/student/attempt entities or raw answers")
                 .isZero();

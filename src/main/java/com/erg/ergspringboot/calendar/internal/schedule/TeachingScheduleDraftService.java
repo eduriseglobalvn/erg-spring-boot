@@ -122,15 +122,14 @@ public class TeachingScheduleDraftService {
         CalendarBatch batch = batches.findByTenantIdAndId(tenantId, batchId)
                 .orElseThrow(() -> TeachingScheduleException.notFound("Batch not found: " + batchId));
         Map<String, String> firstEventOfRow = new LinkedHashMap<>();
-        loader.loadBatchCandidates(tenantId, batchId, "DRAFT").stream()
-                .sorted(java.util.Comparator.comparing(Occurrence::start))
+        List<Occurrence> drafted = loader.loadBatchCandidates(tenantId, batchId, "DRAFT");
+        drafted.stream().sorted(java.util.Comparator.comparing(Occurrence::start))
                 .forEach(o -> firstEventOfRow.putIfAbsent(o.rowKey(), o.eventId()));
         List<RowIdPairResponse> rowIdMap = firstEventOfRow.values().stream()
                 .map(id -> new RowIdPairResponse(id, id)).toList();
         OffsetDateTime now = now();
         return new DraftResultResponse(toResponse(batch, 0), batch.getRecordVersion().intValue(), now.toString(), rowIdMap,
-                conflictService.checkStoredDraft(tenantId, batchId), access.accessChanges(tenantId, batch.getSchoolId(),
-                loader.loadBatchCandidates(tenantId, batchId, "DRAFT"), now));
+                engine.detect(tenantId, drafted, Set.of(), true), access.accessChanges(tenantId, batch.getSchoolId(), drafted, now));
     }
 
     public static BatchResponse toResponse(CalendarBatch batch, int affected) {

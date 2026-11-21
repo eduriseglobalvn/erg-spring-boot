@@ -166,15 +166,11 @@ public class LessonReportService {
     private List<Taught> taught(String tenantId, LocalDate from, LocalDate to, String schoolId, String subjectId,
                                 Collection<String> allowedSchools) {
         if (to.isBefore(from)) return List.of();
-        List<LessonSlot> slots = schedule.publishedWeekSlots(tenantId, from, to).stream()
-                .filter(s -> schoolId == null || schoolId.equals(s.schoolId()))
-                .filter(s -> subjectId == null || subjectId.equals(s.subjectId()))
-                .filter(s -> allowedSchools == null || allowedSchools.contains(s.schoolId()))
-                .toList();
+        List<LessonSlot> slots = schedule.publishedWeekSlots(tenantId, from, to, schools(schoolId, allowedSchools), subjectId);
         if (slots.isEmpty()) return List.of();
         Map<String, LessonLogEntry> saved = new HashMap<>();
-        entries.findByTenantIdAndEventIdIn(tenantId, slots.stream().map(LessonSlot::eventId).distinct().toList())
-                .forEach(e -> saved.putIfAbsent(LessonLogReader.key(e.getEventId(), e.getPeriodNo()), e));
+        eventIdChunks(slots).forEach(chunk -> entries.findByTenantIdAndEventIdIn(tenantId, chunk)
+                .forEach(e -> saved.putIfAbsent(LessonLogReader.key(e.getEventId(), e.getPeriodNo()), e)));
         var now = clock.instant();
         List<Taught> result = new ArrayList<>();
         for (LessonSlot slot : slots) {
@@ -189,6 +185,20 @@ public class LessonReportService {
             }
         }
         return result;
+    }
+
+    /** The school filter pushed into SQL: the requested school within the allowed ones; null when unrestricted. */
+    static Collection<String> schools(String schoolId, Collection<String> allowedSchools) {
+        if (schoolId == null) return allowedSchools;
+        return allowedSchools == null || allowedSchools.contains(schoolId) ? List.of(schoolId) : List.of();
+    }
+
+    /** Event ids in lists of at most 1,000: a 30-day reminder spans more events than PostgreSQL's 32,767 bind parameters. */
+    static List<List<String>> eventIdChunks(List<LessonSlot> slots) {
+        List<String> ids = slots.stream().map(LessonSlot::eventId).distinct().toList();
+        List<List<String>> chunks = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i += 1_000) chunks.add(ids.subList(i, Math.min(ids.size(), i + 1_000)));
+        return chunks;
     }
 
     private Map<String, String> schoolNames(String tenantId, Set<String> schoolIds) {

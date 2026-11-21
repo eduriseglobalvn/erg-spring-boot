@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapResponse;
@@ -14,7 +16,9 @@ import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.Permission;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
 import com.erg.ergspringboot.lms.persistence.Classroom;
-import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionIdentityResponse;
+import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionScopeResponse;
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
@@ -214,11 +218,117 @@ class SessionServiceTest {
                 any(Pageable.class)))
                 .thenReturn(classes);
 
-        assertThatThrownBy(() -> service.currentBootstrap(
-                "s-large", "erg", new UserAccessContext("u-admin", "erg", List.of(), List.of(), null, null)))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("500")
-                .hasMessageContaining("classes");
+        SessionBootstrapResponse response = service.currentBootstrap(
+                "s-large", "erg", new UserAccessContext("u-admin", "erg", List.of(), List.of(), null, null));
+
+        assertThat(response.manageableClasses()).hasSize(500);
+    }
+
+    @Test
+    void currentBootstrapForStudentSkipsUnitAndClassQueries() {
+        SessionService service = newService();
+        User user = assignedOnlyUser("u-stu");
+        stubSession(user, "s-stu");
+        when(userRoleAssignmentRepository.findActiveForUser(eq("u-stu"), eq("erg"), any(OffsetDateTime.class)))
+                .thenReturn(List.of(assignment("u-stu", "lms.learner", "lms.quiz.play", "student.workspace.access")));
+
+        SessionBootstrapResponse response = service.currentBootstrap("s-stu", "erg",
+                new UserAccessContext("u-stu", "erg", List.of(), List.of(), null, null));
+
+        assertThat(response.manageableUnits()).isEmpty();
+        assertThat(response.manageableClasses()).isEmpty();
+        verifyNoInteractions(educationUnitRepository, classroomRepository);
+        verify(userRoleAssignmentRepository, times(1)).findActiveForUser(eq("u-stu"), eq("erg"), any(OffsetDateTime.class));
+    }
+
+    @Test
+    void wildcardWithoutSystemSuperAdminRoleListsOnlyItsOwnTenant() {
+        SessionService service = newService();
+        User user = userWithRole("u-wild", "tenant_owner", "*");
+        stubSession(user, "s-wild");
+        when(educationUnitRepository.findByTenantIdOrderByNameAsc(eq("erg"), any(Pageable.class)))
+                .thenReturn(List.of(educationUnit("school-1", "School", "school", null)));
+
+        SessionBootstrapResponse response = service.currentBootstrap("s-wild", "erg",
+                new UserAccessContext("u-wild", "erg", List.of(), List.of(), null, null));
+
+        assertThat(response.manageableUnits()).extracting(unit -> unit.id()).containsExactly("school-1");
+        verify(educationUnitRepository, never()).findTop500ByOrderByNameAsc();
+    }
+
+    @Test
+    void currentIdentityRunsNoUnitOrClassQueries() {
+        SessionService service = newService();
+        User user = userWithRole("u-me", "teacher", "teacher.workspace.access");
+        stubSession(user, "s-me");
+
+        SessionIdentityResponse response = service.currentIdentity("s-me", "erg");
+
+        assertThat(response.user().id()).isEqualTo("u-me");
+        assertThat(response.tenantId()).isEqualTo("erg");
+        assertThat(response.workspaces()).containsExactly("TEACHER");
+        verifyNoInteractions(educationUnitRepository, classroomRepository);
+    }
+
+    @Test
+    void currentIdentityTakesGrantsFromTheCallersPrincipalButStillReadsLifecycleFromTheUserRow() {
+        SessionService service = newService();
+        User user = userWithRole("u-me", "teacher", "teacher.workspace.access");
+        user.setMustChangePassword(true);
+        stubSession(user, "s-me");
+        var principal = com.erg.ergspringboot.platform.security.ErgPrincipal.authenticated("u-me", "s-me", "erg",
+                List.of("teacher"), List.of("teacher.workspace.access"), List.of(), List.of("lms"), "erg", "user", null);
+
+        SessionIdentityResponse response = service.currentIdentity("s-me", "erg", principal);
+
+        assertThat(response.workspaces()).containsExactly("TEACHER");
+        assertThat(response.permissions().roles()).containsExactly("teacher");
+        assertThat(response.lifecycle().mustChangePassword()).isTrue();
+        verifyNoInteractions(userRoleAssignmentRepository, userPermissionOverrideRepository);
+    }
+
+    @Test
+    void currentIdentityIgnoresAPrincipalOfAnotherSession() {
+        SessionService service = newService();
+        User user = userWithRole("u-me", "teacher", "teacher.workspace.access");
+        stubSession(user, "s-me");
+        var other = com.erg.ergspringboot.platform.security.ErgPrincipal.authenticated("u-me", "s-other", "erg",
+                List.of("admin"), List.of("*"), List.of(), List.of("*"), "erg", "admin", null);
+
+        SessionIdentityResponse response = service.currentIdentity("s-me", "erg", other);
+
+        assertThat(response.permissions().roles()).containsExactly("teacher");
+        verify(userRoleAssignmentRepository).findActiveForUser(eq("u-me"), eq("erg"), any());
+    }
+
+    @Test
+    void currentScopePagesUnitsInSqlAndRejectsAUnitTheCallerCannotManage() {
+        SessionService service = newService();
+        User user = userWithRole("u-dir", "director");
+        stubSession(user, "s-dir");
+        when(educationUnitRepository.findDirectory(eq("erg"), eq("binh"), org.mockito.ArgumentMatchers.isNull(), any(Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(educationUnit("school-1", "THCS Binh An", "school", null))));
+        when(educationUnitRepository.findDirectory(eq("erg"), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(), any(Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.<EducationUnit>of()));
+        when(educationUnitRepository.findByIdAndTenantId("other-tenant-school", "erg")).thenReturn(Optional.empty());
+        UserAccessContext access = new UserAccessContext("u-dir", "erg", List.of(), List.of(), null, null);
+
+        SessionScopeResponse response = service.currentScope("s-dir", "erg", access,
+                new SessionService.ScopeRequest("Binh", 0, 500, null, 100));
+
+        assertThat(response.units().items()).extracting(unit -> unit.id()).containsExactly("school-1");
+        assertThat(response.units().size()).isEqualTo(100);
+        assertThat(response.classes().items()).isEmpty();
+        assertThatThrownBy(() -> service.currentScope("s-dir", "erg", access,
+                new SessionService.ScopeRequest(null, 0, 50, "other-tenant-school", 100)))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    private SessionService newService() {
+        return new SessionService(sessionRepository, educationUnitRepository, classroomRepository,
+                userPermissionOverrideRepository, userRoleAssignmentRepository);
     }
 
     private User userWithRole(String userId, String roleName, String... permissions) {

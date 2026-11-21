@@ -111,6 +111,7 @@ public class CurriculumController {
             @RequestParam(required = false) String status,
             HttpServletRequest request
     ) {
+        curriculumService.requireReadableTreeStatus(status);
         return ok("Curriculum tree loaded", curriculumService.listTree(status, access(request)), request);
     }
 

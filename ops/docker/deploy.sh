@@ -72,10 +72,12 @@ trap 'on_error $LINENO' ERR
 SAMPLE_SECRET_SHA256="99be40432fc38c1333a4ea4fbf3ea2975250ff1ff2283d9c476e73f852d5a859
 c4444892486cacdd43119d3dde018ffcede47c132abe6546833b3c3c8c5e2369
 28943b3628c7826d337002105b6e761008612e1381aaf26ee45fa742ffbb5648
-39dc3b58ddbb2aecd1183adc61f93db338d59e3f759d6015cc798ed43f35c390"
+39dc3b58ddbb2aecd1183adc61f93db338d59e3f759d6015cc798ed43f35c390
+3b612c75a7b5048a435fb6ec81e52ff92d6d795a8b5a9c17070f6a63c97a53b2
+e4a24e57bbcd91378ccd19bf08ba96e29d8bf5f1acfc55f61c5c2697c1ad1e0b"
 check_secrets() {
   local name value bad=0
-  for name in POSTGRES_PASSWORD POSTGRES_RUNTIME_PASSWORD REDIS_STATE_PASSWORD REDIS_CACHE_PASSWORD; do
+  for name in POSTGRES_PASSWORD POSTGRES_RUNTIME_PASSWORD REDIS_STATE_PASSWORD REDIS_CACHE_PASSWORD GRAFANA_PASSWORD ERG_BOOTSTRAP_ADMIN_PASSWORD; do
     value=$(envval "$name")
     if [ -z "$value" ]; then
       echo "$name is empty in $ENV_FILE" >&2; bad=1
@@ -86,7 +88,7 @@ check_secrets() {
   return $bad
 }
 if ! check_secrets; then
-  notify "⛔ Deploy ${SHA:0:7} bị từ chối: mật khẩu Postgres/Redis trong .env.production trống hoặc còn giá trị mẫu. Production chưa bị đụng."
+  notify "⛔ Deploy ${SHA:0:7} bị từ chối: mật khẩu Postgres/Redis/Grafana/admin trong .env.production trống hoặc còn giá trị mẫu. Production chưa bị đụng."
   echo "Deploy stopped before touching anything." >&2; exit 1
 fi
 

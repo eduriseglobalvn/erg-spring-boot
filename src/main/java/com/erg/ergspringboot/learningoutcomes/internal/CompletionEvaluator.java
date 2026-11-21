@@ -137,10 +137,13 @@ public class CompletionEvaluator {
         String tenant = visibility.tenant(access);
         String learner = required(learnerId, "learnerId", 96);
         visibility.ensureLearnerAccess(access, learner);
-        return completions.findTop100ByTenantIdAndLearnerIdOrderByEvaluatedAtDesc(tenant, learner).stream()
-                .filter(value -> lookup.find(tenant, value.getLearningPathId())
-                        .map(path -> visibility.canSee(access, path))
-                        .orElse(false))
+        List<LearningPathCompletion> rows = completions.findTop100ByTenantIdAndLearnerIdOrderByEvaluatedAtDesc(tenant, learner);
+        Map<String, LearningPath> pathById = lookup.byIds(tenant, rows.stream().map(LearningPathCompletion::getLearningPathId).toList());
+        return rows.stream()
+                .filter(value -> {
+                    LearningPath path = pathById.get(OutcomeValues.trimToNull(value.getLearningPathId()));
+                    return path != null && visibility.canSee(access, path);
+                })
                 .map(OutcomeResponseMapper::completionResponse)
                 .toList();
     }

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,12 +85,9 @@ public class CompetencyCatalog {
         String tenant = visibility.tenant(access);
         String requestedEducationUnitId = trimToNull(educationUnitId);
         visibility.ensureScope(access, requestedEducationUnitId, null);
-        List<Competency> candidates = requestedEducationUnitId == null
-                ? competencies.findTop100ByTenantIdOrderByUpdatedAtDesc(tenant)
-                : competencies.findTop100ByTenantIdAndEducationUnitIdOrderByUpdatedAtDesc(
-                        tenant, requestedEducationUnitId);
-        return candidates.stream()
-                .filter(value -> access.canAccessEducationUnit(trimToNull(value.getEducationUnitId())))
+        List<String> units = access.managedEducationUnitIds();
+        return competencies.findScoped(tenant, requestedEducationUnitId == null ? "" : requestedEducationUnitId,
+                        units.contains("*"), units.isEmpty() ? List.of("-") : units, PageRequest.of(0, 100)).stream()
                 .map(OutcomeResponseMapper::competencyResponse)
                 .toList();
     }

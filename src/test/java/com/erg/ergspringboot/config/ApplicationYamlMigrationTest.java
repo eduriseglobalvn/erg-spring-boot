@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class ApplicationYamlMigrationTest {
 
     @Test
-    void applicationYamlUsesSinglePostgresDatabaseAndKeepsMongoConfiguration() throws IOException {
+    void applicationYamlUsesSinglePostgresDatabase() throws IOException {
         String applicationYaml = Files.readString(Path.of("src/main/resources/application.yml"));
 
         assertThat(applicationYaml)
@@ -20,8 +20,7 @@ class ApplicationYamlMigrationTest {
                 .doesNotContain("LEARNING_DATASOURCE_URL")
                 .doesNotContain("learning:")
                 .contains("ddl-auto: validate")
-                .contains("${SPRING_DATA_MONGODB_URI:${MONGODB__URI}}")
-                .contains("${SPRING_DATA_MONGODB_DATABASE:${MONGODB__DATABASE}}");
+                .doesNotContain("mongodb");
     }
 
     @Test

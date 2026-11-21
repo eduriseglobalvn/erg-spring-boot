@@ -105,8 +105,8 @@ public class ErgModuleEventsProperties {
         @Min(1)
         private int maxSize = 16;
         @Min(0)
-        @Max(128)
-        private int queueCapacity;
+        @Max(1024)
+        private int queueCapacity = 256;
 
         public int getCoreSize() { return coreSize; }
         public void setCoreSize(int coreSize) { this.coreSize = coreSize; }
@@ -119,7 +119,7 @@ public class ErgModuleEventsProperties {
         public boolean isPoolBoundsValid() { return maxSize >= coreSize; }
 
         void validate() {
-            if (coreSize < 1 || maxSize < coreSize || queueCapacity < 0 || queueCapacity > 128) {
+            if (coreSize < 1 || maxSize < coreSize || queueCapacity < 0 || queueCapacity > 1024) {
                 throw new IllegalArgumentException("Invalid module-event-io executor bounds");
             }
         }

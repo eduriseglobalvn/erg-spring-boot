@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.elearning.internal.readmodel;
 
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository;
 import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,7 +18,7 @@ import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
-import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
@@ -52,7 +53,7 @@ class StudentDashboardReadServiceTest {
     private StudentRepository studentRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private DashboardUserFallbackRepository userRepository;
 
     @Mock
     private ErgPolicyService policyService;
@@ -117,7 +118,7 @@ class StudentDashboardReadServiceTest {
     void studentDashboardReturnsSafeFirstSliceWithoutRawAttempts() {
         when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
                 .thenReturn(true);
-        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
+        when(userRepository.findFallback("tenant-a", "student-1")).thenReturn(Optional.empty());
         when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.empty());
 
         StudentDashboardResponse response = service.studentDashboard(scope("tenant-a", "student-1", null, null));
@@ -180,7 +181,6 @@ class StudentDashboardReadServiceTest {
         );
         when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
                 .thenReturn(true);
-        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
         when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.of(student));
         when(assignmentRepository.findStudentDashboardAssignments(
                 "tenant-a",
@@ -259,7 +259,7 @@ class StudentDashboardReadServiceTest {
                 .extracting("pinned")
                 .containsExactly(true, false);
 
-        verify(userRepository).findWithDetailsByIdAndTenantId("student-1", "tenant-a");
+        // The student row supplies name, email and status, so the login is not read at all.
         verify(studentRepository).findFirstByTenantIdAndAuthUserId("tenant-a", "student-1");
         verify(assignmentRepository).findStudentDashboardAssignments(
                 "tenant-a",
@@ -298,7 +298,7 @@ class StudentDashboardReadServiceTest {
         );
         when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
                 .thenReturn(true);
-        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
+        when(userRepository.findFallback("tenant-a", "student-1")).thenReturn(Optional.empty());
         when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.of(student));
         when(assignmentRepository.findStudentDashboardAssignments(
                 "tenant-a",
@@ -348,7 +348,7 @@ class StudentDashboardReadServiceTest {
         );
         when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
                 .thenReturn(true);
-        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
+        when(userRepository.findFallback("tenant-a", "student-1")).thenReturn(Optional.empty());
         when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.of(student));
         when(studentEnrollmentRepository.findByTenantIdAndStudentIdAndStatusIgnoreCaseOrderByCreatedAtAsc(
                 "tenant-a", "student-row-1", "ENROLLED"))
@@ -391,7 +391,7 @@ class StudentDashboardReadServiceTest {
                 .toList();
         when(policyService.isAllowed(any(ErgPrincipal.class), eq("elearning.assignment.read_self"), eq("elearning"), eq("tenant-a")))
                 .thenReturn(true);
-        when(userRepository.findWithDetailsByIdAndTenantId("student-1", "tenant-a")).thenReturn(Optional.empty());
+        when(userRepository.findFallback("tenant-a", "student-1")).thenReturn(Optional.empty());
         when(studentRepository.findFirstByTenantIdAndAuthUserId("tenant-a", "student-1")).thenReturn(Optional.of(student));
         when(assignmentRepository.findStudentDashboardAssignments("tenant-a", null, "student-row-1", PageRequest.of(0, 51)))
                 .thenReturn(sixty.subList(0, 51));

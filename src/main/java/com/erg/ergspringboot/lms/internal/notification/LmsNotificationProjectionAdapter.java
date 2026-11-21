@@ -45,6 +45,13 @@ class LmsNotificationProjectionAdapter implements LmsNotificationProjection {
 
     @Override
     @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public Optional<AssignmentSummary> assignmentSummary(String tenantId, String assignmentId) {
+        return assignments.findByTenantIdAndId(tenantId, assignmentId).map(assignment -> new AssignmentSummary(
+                assignment.getId(), assignment.getTitle(), assignment.getAcademicClassId(), assignment.getAssignedBy()));
+    }
+
+    @Override
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
     public Optional<Submitter> submitter(String tenantId, String studentId) {
         return students.findByTenantIdAndId(tenantId, studentId)
                 .map(student -> new Submitter(student.getFullName(), student.getAuthUserId()));

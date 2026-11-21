@@ -7,6 +7,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyConfig;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyVersions;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleConfig;
+import com.erg.ergspringboot.timekeeping.internal.schedule.SchoolSetupCache;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicyRepository;
@@ -42,9 +43,12 @@ public class TimekeepingConfigService {
     private final UserRepository users;
     private final WorkContextResolver context;
     private final AdminSupport support;
+    private final SchoolSetupCache setups;
 
     TimekeepingConfigService(TkShiftRepository shifts, TkPolicyRepository policies,
-            TkRemoteRuleRepository remoteRules, UserRepository users, WorkContextResolver context, AdminSupport support) {
+            TkRemoteRuleRepository remoteRules, UserRepository users, WorkContextResolver context, AdminSupport support,
+            SchoolSetupCache setups) {
+        this.setups = setups;
         this.shifts = shifts;
         this.policies = policies;
         this.remoteRules = remoteRules;
@@ -95,6 +99,7 @@ public class TimekeepingConfigService {
         row.setLockDayOfMonth(range(c.lockDayOfMonth(), now.getLockDayOfMonth(), 1, 28, "Ngày chốt công"));
         row.setApprovalChains(c.approvalChains() == null ? now.getApprovalChains() : chains(c.approvalChains()));
         PolicyConfig saved = policy(policies.save(row));
+        setups.evict(tenantId, schoolId);
         support.auditChange(tenantId, actorId, "UPDATE_POLICY", "POLICY", saved.id(), before,
                 AdminSupport.summary(saved));
         return saved;

@@ -23,7 +23,6 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -38,8 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class CrmSchoolService {
 
     static final String ANALYTICS_PERMISSION = "crm.analytics.read";
-    private static final String SIGNED = "signed";
-    private static final String LOST = "lost";
 
     private final EducationUnitRepository educationUnitRepository;
     private final CrmSchoolProfileRepository profileRepository;
@@ -70,12 +67,14 @@ public class CrmSchoolService {
     public List<CrmSchoolSummaryResponse> schoolsBySeo(UserAccessContext access, String seoUserId, boolean signedOnly) {
         requireSeoAccess(access, seoUserId);
         String tenantId = access.tenantId();
-        List<CrmSchoolDeal> deals = (signedOnly
-                ? dealRepository.findByTenantIdAndOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc(tenantId, seoUserId, SIGNED)
-                : dealRepository.findByTenantIdAndOwnerUserIdOrderByCreatedAtDesc(tenantId, seoUserId))
-                .stream()
-                .filter(deal -> access.canAccessEducationUnit(deal.getSchoolId()))
-                .toList();
+        boolean tenantWide = access.managedEducationUnitIds().contains("*");
+        List<CrmSchoolDeal> deals = signedOnly
+                ? (tenantWide
+                        ? dealRepository.findByTenantIdAndOwnerUserIdAndSignedAtIsNotNullOrderBySignedAtDesc(tenantId, seoUserId)
+                        : dealRepository.findSignedInScopeByOwner(tenantId, seoUserId, scopeIds(access)))
+                : (tenantWide
+                        ? dealRepository.findByTenantIdAndOwnerUserIdOrderByCreatedAtDesc(tenantId, seoUserId)
+                        : dealRepository.findInScopeByOwner(tenantId, seoUserId, scopeIds(access)));
         List<String> schoolIds = deals.stream().map(CrmSchoolDeal::getSchoolId).distinct().toList();
         if (schoolIds.isEmpty()) {
             return List.of();
@@ -102,42 +101,25 @@ public class CrmSchoolService {
         boolean tenantWideScope = access.managedEducationUnitIds().contains("*");
         DealPerformanceAggregate aggregate = tenantWideScope
                 ? dealRepository.aggregatePerformance(tenantId, seoUserId, from, to)
-                : null;
-        if (aggregate != null) {
-            long total = value(aggregate.getTotalCount());
-            long signed = value(aggregate.getSignedCount());
-            long lost = value(aggregate.getLostCount());
-            long inProgress = Math.max(0, total - signed - lost);
-            BigDecimal revenue = aggregate.getSignedRevenue() == null ? BigDecimal.ZERO : aggregate.getSignedRevenue();
-            BigDecimal conversion = total == 0
-                    ? BigDecimal.ZERO.setScale(2)
-                    : BigDecimal.valueOf(signed).divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
-            BigDecimal average = signed == 0
-                    ? BigDecimal.ZERO
-                    : revenue.divide(BigDecimal.valueOf(signed), 2, RoundingMode.HALF_UP).stripTrailingZeros();
-            return new CrmSchoolPerformanceResponse(total, signed, lost, inProgress, conversion, revenue, average);
-        }
-        List<CrmSchoolDeal> deals = dealRepository.findByTenantIdAndOwnerUserIdAndCreatedAtBetween(tenantId, seoUserId, from, to)
-                .stream()
-                .filter(deal -> access.canAccessEducationUnit(deal.getSchoolId()))
-                .toList();
-        long total = deals.size();
-        long signed = deals.stream().filter(deal -> stageIs(deal, SIGNED)).count();
-        long lost = deals.stream().filter(deal -> stageIs(deal, LOST)).count();
+                : dealRepository.aggregatePerformanceInScope(tenantId, seoUserId, from, to, scopeIds(access));
+        long total = value(aggregate.getTotalCount());
+        long signed = value(aggregate.getSignedCount());
+        long lost = value(aggregate.getLostCount());
         long inProgress = Math.max(0, total - signed - lost);
-        BigDecimal revenue = deals.stream()
-                .filter(deal -> stageIs(deal, SIGNED))
-                .map(CrmSchoolDeal::getSignedRevenue)
-                .map(value -> value == null ? BigDecimal.ZERO : value)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal revenue = aggregate.getSignedRevenue() == null ? BigDecimal.ZERO : aggregate.getSignedRevenue();
         BigDecimal conversion = total == 0
                 ? BigDecimal.ZERO.setScale(2)
                 : BigDecimal.valueOf(signed).divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
         BigDecimal average = signed == 0
                 ? BigDecimal.ZERO
                 : revenue.divide(BigDecimal.valueOf(signed), 2, RoundingMode.HALF_UP).stripTrailingZeros();
-
         return new CrmSchoolPerformanceResponse(total, signed, lost, inProgress, conversion, revenue, average);
+    }
+
+    /** The caller's school ids for an {@code in} predicate; a sentinel stands in for an empty scope (empty IN lists are not portable). */
+    private static List<String> scopeIds(UserAccessContext access) {
+        List<String> ids = access.managedEducationUnitIds();
+        return ids == null || ids.isEmpty() ? List.of("\u0001") : ids;
     }
 
     private void requireSeoAccess(UserAccessContext access, String seoUserId) {
@@ -199,7 +181,7 @@ public class CrmSchoolService {
     private Map<String, CrmSchoolContact> primaryContacts(String tenantId, Collection<String> schoolIds) {
         Map<String, CrmSchoolContact> contacts = new LinkedHashMap<>();
         for (CrmSchoolContact contact : contactRepository
-                .findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc(tenantId, schoolIds)) {
+                .findPrimaryContacts(tenantId, schoolIds)) {
             contacts.putIfAbsent(contact.getSchoolId(), contact);
         }
         return contacts;
@@ -207,10 +189,6 @@ public class CrmSchoolService {
 
     private <T> Map<String, T> byId(Collection<T> items, Function<T, String> id) {
         return items.stream().collect(Collectors.toMap(id, Function.identity(), (left, right) -> left, LinkedHashMap::new));
-    }
-
-    private boolean stageIs(CrmSchoolDeal deal, String stage) {
-        return deal.getStage() != null && deal.getStage().trim().toLowerCase(Locale.ROOT).equals(stage);
     }
 
     private String firstNonBlank(String first, String second) {

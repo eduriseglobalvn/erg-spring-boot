@@ -5,6 +5,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.ShiftConfig;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteConfig;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
+import com.erg.ergspringboot.timekeeping.internal.schedule.SchoolSetupCache;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRemoteRuleRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkShift;
@@ -40,9 +41,11 @@ public class SiteShiftConfigService {
     private final TkPunchRepository punches;
     private final TkDayRepository days;
     private final AdminSupport support;
+    private final SchoolSetupCache setups;
 
     SiteShiftConfigService(TkSiteRepository sites, TkShiftRepository shifts, TkRemoteRuleRepository remoteRules,
-            TkPunchRepository punches, TkDayRepository days, AdminSupport support) {
+            TkPunchRepository punches, TkDayRepository days, AdminSupport support, SchoolSetupCache setups) {
+        this.setups = setups;
         this.sites = sites;
         this.shifts = shifts;
         this.remoteRules = remoteRules;
@@ -65,6 +68,7 @@ public class SiteShiftConfigService {
         if (c == null) throw AdminSupport.bad("BODY_REQUIRED", "Thiếu dữ liệu");
         TkSite row = id == null ? new TkSite() : sites.findByIdAndTenantId(id, tenantId).orElseThrow(siteNotFound());
         Map<String, Object> before = id == null ? null : AdminSupport.summary(site(row));
+        String movedFrom = id == null ? null : row.getSchoolId();
         support.requireSchool(tenantId, c.schoolId());
         String name = AdminSupport.text(c.name(), 255, "NAME_REQUIRED", "Nhập tên vị trí");
         if (c.lat() == null || c.lng() == null || c.lat().abs().compareTo(BigDecimal.valueOf(90)) > 0
@@ -85,6 +89,8 @@ public class SiteShiftConfigService {
         row.setRadiusM(radius);
         row.setActive(c.active() == null || c.active());
         SiteConfig saved = site(sites.save(row));
+        setups.evict(tenantId, c.schoolId());
+        setups.evict(tenantId, movedFrom);
         support.auditChange(tenantId, actorId, id == null ? "CREATE_SITE" : "UPDATE_SITE", "SITE", saved.id(), before,
                 AdminSupport.summary(saved));
         return saved;
@@ -99,6 +105,7 @@ public class SiteShiftConfigService {
         } else {
             sites.delete(row);
         }
+        setups.evict(tenantId, row.getSchoolId());
         support.auditChange(tenantId, actorId, used ? "DEACTIVATE_SITE" : "DELETE_SITE", "SITE", id,
                 AdminSupport.summary(site(row)), null);
     }
@@ -135,6 +142,7 @@ public class SiteShiftConfigService {
         Integer[] weekdays = c.weekdays().stream().distinct().sorted().toArray(Integer[]::new);
         boolean active = c.active() == null || c.active();
         TkShift row = existing == null ? new TkShift() : existing;
+        String movedFrom = existing == null ? null : existing.getSchoolId();
         boolean revives = existing != null && active && existing.getDeactivatedAt() != null;
         if (revives || (existing != null && rewritesHistory(existing, c, units, weekdays)
                 && days.existsByTenantIdAndShiftId(tenantId, existing.getId()))) {
@@ -163,6 +171,8 @@ public class SiteShiftConfigService {
         if (row != existing) row.setCreatedAt(support.clock().instant().atOffset(ZoneOffset.UTC));
         retire(row, !active);
         ShiftConfig saved = shift(shifts.save(row));
+        setups.evict(tenantId, c.schoolId());
+        setups.evict(tenantId, movedFrom);
         if (existing != null && row != existing) remoteRules.repointShift(tenantId, existing.getId(), saved.id());
         String action = existing == null ? "CREATE_SHIFT" : row == existing ? "UPDATE_SHIFT" : "REPLACE_SHIFT";
         support.auditChange(tenantId, actorId, action, "SHIFT", saved.id(), before, AdminSupport.summary(saved));
@@ -179,6 +189,7 @@ public class SiteShiftConfigService {
         } else {
             shifts.delete(row);
         }
+        setups.evict(tenantId, row.getSchoolId());
         support.auditChange(tenantId, actorId, used ? "DEACTIVATE_SHIFT" : "DELETE_SHIFT", "SHIFT", id,
                 AdminSupport.summary(shift(row)), null);
     }

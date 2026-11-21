@@ -10,7 +10,6 @@ import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWor
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraft;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumTopicRepository;
@@ -44,6 +43,7 @@ public class LcmsQuizWorkspaceReadService {
     public static final int HARD_MAX_PAGE_SIZE = 50;
     public static final int MAX_VERSION_HISTORY = 100;
     private static final String ACTIVE = "active";
+    private static final PageRequest OPTION_LIMIT = PageRequest.of(0, 500);
 
     private final QuizRepository quizRepository;
     private final QuizDraftRepository quizDraftRepository;
@@ -72,8 +72,9 @@ public class LcmsQuizWorkspaceReadService {
     }
 
     public QuizVersionHistoryResponse quizVersions(String tenantId, String quizId) {
-        List<QuizVersion> versions = quizVersionRepository.findByQuizIdAndTenantIdOrderByVersionNumberDesc(
-                quizId, tenantId, PageRequest.of(0, MAX_VERSION_HISTORY + 1));
+        List<QuizVersionRepository.Summary> versions = quizVersionRepository
+                .findSummariesByQuizIdAndTenantIdOrderByVersionNumberDesc(
+                        quizId, tenantId, PageRequest.of(0, MAX_VERSION_HISTORY + 1));
         if (versions.size() > MAX_VERSION_HISTORY) {
             throw new BadRequestException("quiz versions exceeds " + MAX_VERSION_HISTORY
                     + " rows; use the paged version-history API");
@@ -84,7 +85,7 @@ public class LcmsQuizWorkspaceReadService {
         return new QuizVersionHistoryResponse(quizId, items);
     }
 
-    private QuizVersionSummaryResponse toVersionSummary(QuizVersion version) {
+    private QuizVersionSummaryResponse toVersionSummary(QuizVersionRepository.Summary version) {
         return new QuizVersionSummaryResponse(
                 version.getId(),
                 version.getVersionLabel(),
@@ -97,9 +98,10 @@ public class LcmsQuizWorkspaceReadService {
         );
     }
 
+    /** {@code viewerUserId} is set for a teacher: other teachers' quizzes are filtered in SQL, before paging and counting. */
     @Cacheable(
             cacheNames = "lcmsQuizWorkspace",
-            key = "{#tenantId, #search, #subjectId, #levelId, #categoryId, #status, #kind, #page, #size}"
+            key = "{#tenantId, #search, #subjectId, #levelId, #categoryId, #status, #kind, #page, #size, #viewerUserId}"
     )
     public QuizWorkspaceResponse quizWorkspace(
             String tenantId,
@@ -110,7 +112,8 @@ public class LcmsQuizWorkspaceReadService {
             String status,
             String kind,
             Integer page,
-            Integer size
+            Integer size,
+            String viewerUserId
     ) {
         Page<QuizSummaryProjection> quizPage = quizSummaries(
                 tenantId,
@@ -120,6 +123,7 @@ public class LcmsQuizWorkspaceReadService {
                 blankToNull(categoryId),
                 normalized(status),
                 normalized(kind),
+                viewerUserId,
                 PageRequest.of(safePage(page), safeSize(size))
         );
 
@@ -127,9 +131,9 @@ public class LcmsQuizWorkspaceReadService {
                 .map(this::toSummary)
                 .toList();
 
-        List<QuestionBankOptionProjection> subjectOptions = subjectRepository.findAssessmentOptions(tenantId, ACTIVE);
-        List<QuestionBankOptionProjection> levelOptions = levelRepository.findAssessmentOptions(tenantId, blankToNull(subjectId), ACTIVE);
-        List<QuestionBankOptionProjection> topicOptions = topicRepository.findAssessmentOptions(tenantId, blankToNull(levelId), ACTIVE);
+        List<QuestionBankOptionProjection> subjectOptions = subjectRepository.findAssessmentOptions(tenantId, ACTIVE, OPTION_LIMIT);
+        List<QuestionBankOptionProjection> levelOptions = levelRepository.findAssessmentOptions(tenantId, blankToNull(subjectId), ACTIVE, OPTION_LIMIT);
+        List<QuestionBankOptionProjection> topicOptions = topicRepository.findAssessmentOptions(tenantId, blankToNull(levelId), ACTIVE, OPTION_LIMIT);
         Map<String, List<String>> topicIdsByLevelId = topicOptions.stream()
                 .filter(topic -> blankToNull(topic.levelId()) != null)
                 .collect(Collectors.groupingBy(
@@ -177,6 +181,7 @@ public class LcmsQuizWorkspaceReadService {
             String categoryId,
             String status,
             String kind,
+            String viewerUserId,
             PageRequest pageRequest
     ) {
         if (search == null) {
@@ -187,6 +192,7 @@ public class LcmsQuizWorkspaceReadService {
                     categoryId,
                     status,
                     kind,
+                    viewerUserId,
                     pageRequest
             );
         }
@@ -198,6 +204,7 @@ public class LcmsQuizWorkspaceReadService {
                 categoryId,
                 status,
                 kind,
+                viewerUserId,
                 pageRequest
         );
     }

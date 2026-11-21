@@ -32,7 +32,7 @@ public class UserSessionUseCase {
 
     @Transactional(readOnly = true)
     public SessionListResponse list(String userId, String tenantId, String currentSessionId) {
-        List<SessionResponse> items = sessions.findByUserIdAndTenantIdOrderByLastActiveAtDesc(userId, tenant(tenantId))
+        List<SessionResponse> items = sessions.findTop50ByUserIdAndTenantIdOrderByLastActiveAtDesc(userId, tenant(tenantId))
                 .stream().map(session -> toResponse(session, currentSessionId)).toList();
         return new SessionListResponse(items);
     }

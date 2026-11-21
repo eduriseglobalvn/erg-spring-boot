@@ -33,6 +33,15 @@ final class LcmsWorkspaceResponseMapper {
             Page<QuestionBankQuestionProjection> questions,
             Map<String, Long> usageCounts
     ) {
+        return toQuestionPage(questions, usageCounts, true);
+    }
+
+    /** {@code includeRuntimeQuestion} false leaves runtimeQuestion null: nobody selected it, so it is not serialised. */
+    static PageResponse<QuestionBankQuestionRowResponse> toQuestionPage(
+            Page<QuestionBankQuestionProjection> questions,
+            Map<String, Long> usageCounts,
+            boolean includeRuntimeQuestion
+    ) {
         List<QuestionBankQuestionRowResponse> items = questions.getContent().stream()
                 .map(question -> new QuestionBankQuestionRowResponse(
                         question.id(),
@@ -67,7 +76,7 @@ final class LcmsWorkspaceResponseMapper {
                         recommendedCluster(question),
                         null,
                         question.updatedAt() == null ? null : question.updatedAt().toString(),
-                        runtimeQuestionJson(question.content())
+                        includeRuntimeQuestion ? runtimeQuestionJson(question.content()) : null
                 ))
                 .toList();
         return new PageResponse<>(

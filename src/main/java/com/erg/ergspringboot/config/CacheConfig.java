@@ -12,7 +12,6 @@ import com.erg.ergspringboot.platform.cache.JacksonCacheValueCodec;
 import com.erg.ergspringboot.platform.cache.LocalCacheGenerationService;
 import com.erg.ergspringboot.platform.cache.CacheGenerationService;
 import com.erg.ergspringboot.platform.cache.CacheInvalidationService;
-import com.erg.ergspringboot.platform.cache.BusinessCacheRuntimeHints;
 import com.erg.ergspringboot.platform.cache.CacheMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import com.erg.ergspringboot.platform.cache.NoOpRedisCacheStore;
@@ -28,16 +27,17 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.ImportRuntimeHints;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
-@EnableCaching
+@EnableCaching(order = CacheConfig.CACHE_ADVISOR_ORDER)
 @EnableConfigurationProperties(ErgCacheProperties.class)
-@ImportRuntimeHints({CaffeineNativeRuntimeHints.class, BusinessCacheRuntimeHints.class})
 public class CacheConfig {
+
+    /** Lower than the transaction advisor (default LOWEST_PRECEDENCE) so a cache hit returns before a transaction opens. */
+    public static final int CACHE_ADVISOR_ORDER = org.springframework.core.Ordered.LOWEST_PRECEDENCE - 100;
 
     @Bean
     ErgTieredCacheManager cacheManager(
@@ -63,7 +63,11 @@ public class CacheConfig {
         return build(JsonMapper.builder().findAndAddModules().build(),
                 new ErgCacheProperties(), NoOpRedisCacheStore.INSTANCE,
                 new LocalCacheGenerationService(), null, null, List.of(
-                        new LmsCacheDescriptorContributor(), new PlatformCacheDescriptorContributor()));
+                        new LmsCacheDescriptorContributor(), new PlatformCacheDescriptorContributor(),
+                        new ElearningCacheDescriptorContributor(),
+                        new com.erg.ergspringboot.calendar.CalendarCacheDescriptorContributor(),
+                        new com.erg.ergspringboot.lms.LmsReadCacheDescriptorContributor(),
+                        new com.erg.ergspringboot.notifications.internal.campaign.NotificationCacheDescriptorContributor()));
     }
 
     private ErgTieredCacheManager build(ObjectMapper mapper, ErgCacheProperties properties,

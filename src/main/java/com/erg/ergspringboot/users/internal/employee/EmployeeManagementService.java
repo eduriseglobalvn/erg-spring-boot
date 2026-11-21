@@ -14,7 +14,6 @@ import com.erg.ergspringboot.users.persistence.EmployeeProfile;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
-import com.erg.ergspringboot.users.persistence.auth.SecurityEvent;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserItemResponse;
 import com.erg.ergspringboot.common.response.users.UserResponses.UserListResponse;
@@ -98,11 +97,9 @@ public class EmployeeManagementService {
         Map<String, List<AuthSession>> activeSessions = sessionRepository
                 .findByUserIdInAndTenantIdAndRevokedAtIsNull(userIds, normalizedTenant)
                 .stream().collect(Collectors.groupingBy(AuthSession::getUserId));
-        Map<String, SecurityEvent> latestRisk = new LinkedHashMap<>();
-        securityEventRepository.findByTenantIdAndUserIdInOrderByOccurredAtDesc(normalizedTenant, userIds)
-                .stream()
-                .filter(event -> event.getRiskCode() != null && !event.getRiskCode().isBlank())
-                .forEach(event -> latestRisk.putIfAbsent(event.getUserId(), event));
+        Map<String, SecurityEventRepository.LatestRisk> latestRisk = securityEventRepository
+                .findLatestRiskByUserIds(normalizedTenant, userIds).stream()
+                .collect(Collectors.toMap(SecurityEventRepository.LatestRisk::getUserId, Function.identity(), (a, b) -> a));
         Map<String, List<UserRoleAssignment>> assignments = roleAssignmentRepository
                 .findActiveForUsers(normalizedTenant, userIds, OffsetDateTime.now())
                 .stream().collect(Collectors.groupingBy(UserRoleAssignment::getUserId));
@@ -297,7 +294,7 @@ public class EmployeeManagementService {
             EmployeeProfile profile,
             List<AuthSession> sessions,
             List<UserRoleAssignment> assignments,
-            SecurityEvent risk
+            SecurityEventRepository.LatestRisk risk
     ) {
         List<String> platforms = sessions.stream()
                 .map(AuthSession::getPlatform)

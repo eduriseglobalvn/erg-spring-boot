@@ -41,7 +41,7 @@ public class LmsStudentReadModelUseCase {
     )
     public StudentAssignmentListResponse listAssignments(String studentId, UserAccessContext access, int page, int size) {
         int safePage = Math.max(0, page); int safeSize = Math.max(1, Math.min(size, 100)); String tenant = tenant(access.tenantId());
-        Student student = students.findFirstByTenantIdAndAuthUserId(tenant, studentId).orElse(null);
+        Student student = policy.learner(tenant, studentId).orElse(null); // cached 60 s, see LmsStudentIdentityLookup
         Page<Assignment> source = assignments.findStudentAssignments(tenant, student == null ? studentId : student.getId(),
                 student == null ? null : student.getAcademicClassId(), PageRequest.of(safePage, safeSize));
         Map<String, Classroom> classes = classrooms(tenant, source.getContent());
@@ -52,12 +52,14 @@ public class LmsStudentReadModelUseCase {
     public StudentScoreListResponse listScores(String studentId, UserAccessContext access, int page, int size) {
         int safePage = Math.max(0, page); int safeSize = Math.max(1, Math.min(size, 100)); String tenant = tenant(access.tenantId());
         // Assignments and attempts store Student.id; resolve the caller's Student before every lookup.
-        Student student = students.findFirstByTenantIdAndAuthUserId(tenant, studentId).orElse(null);
+        Student student = policy.learner(tenant, studentId).orElse(null);
         String learnerKey = student == null ? studentId : student.getId();
         String classId = student == null ? null : student.getAcademicClassId();
         Page<Assignment> source = assignments.findStudentAssignments(tenant, learnerKey, classId, PageRequest.of(safePage, safeSize));
         Map<String, Classroom> classes = classrooms(tenant, source.getContent()); List<Assignment> filtered = source.getContent().stream().filter(a -> allowed(a.getAcademicClassId(), access, classes)).toList();
-        Map<String, List<AttemptResponse>> recent = attempts.findTop3ByAssignmentsAndStudent(tenant, filtered.stream().map(Assignment::getId).toList(), learnerKey).stream().map(this::attempt).collect(java.util.stream.Collectors.groupingBy(AttemptResponse::assignmentId));
+        List<String> assignmentIds = filtered.stream().map(Assignment::getId).toList();
+        Map<String, List<AttemptResponse>> recent = attempts.findTop3ByAssignmentsAndStudent(tenant, assignmentIds, learnerKey).stream()
+                .map(this::attemptSummary).collect(java.util.stream.Collectors.groupingBy(AttemptResponse::assignmentId));
         List<StudentScoreItem> result = filtered.stream().map(a -> { List<AttemptResponse> items = recent.getOrDefault(a.getId(), List.of()); double best = items.stream().mapToDouble(AttemptResponse::score).max().orElse(0); return new StudentScoreItem(assignment(a), best, items); }).toList();
         return new StudentScoreListResponse(result, source.getNumber(), source.getSize(), source.getTotalElements(), source.getTotalPages(), source.hasNext());
     }
@@ -67,7 +69,7 @@ public class LmsStudentReadModelUseCase {
         var progress = attempts.summarizeAssignmentProgress(tenant(access.tenantId()), assignmentId);
         int submitted = progress.submittedCount();
         int inProgress = progress.inProgressCount();
-        int recipients = assignment.getStudentIds() == null ? 0 : assignment.getStudentIds().size();
+        int recipients = policy.recipientCount(assignment);
         return new AssignmentProgressResponse(submitted, inProgress,
                 Math.max(0, recipients - submitted - inProgress), progress.needsReviewCount());
     }
@@ -76,6 +78,15 @@ public class LmsStudentReadModelUseCase {
         quizzes.findByTenantIdAndId(tenant(access.tenantId()), quizId)
                 .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
         String tenant = tenant(access.tenantId());
+        List<String> unitIds = list(access.managedEducationUnitIds());
+        if (!unitIds.isEmpty()) {
+            // Scope in SQL (same query as /students/page), so the newest-500 cut applies to the caller's own rows only.
+            List<String> classIds = list(access.managedClassIds());
+            return attempts.findScopedQuizAttemptSummaries(tenant, quizId, classIds.contains("*"),
+                    classIds.isEmpty() ? NO_SCOPE : classIds, unitIds.contains("*"), unitIds,
+                    org.springframework.data.domain.PageRequest.of(0, 500)).getContent().stream().map(this::attemptSummary).toList();
+        }
+        // shortcut: a caller with only class scope (no education unit) keeps the old newest-500 in-memory filter, see R3
         var source = attempts.findQuizAttemptSummaries(tenant, quizId);
         Map<String, Assignment> byId = assignments.findByTenantIdAndIdIn(tenant,
                         source.stream().map(com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection::assignmentId)
@@ -115,7 +126,6 @@ public class LmsStudentReadModelUseCase {
     private boolean allowed(String classId, UserAccessContext access, Map<String, Classroom> classes) { if (classId == null || classId.isBlank()) return true; Classroom c = classes.get(classId); return c != null && tenant(access.tenantId()).equals(tenant(c.getTenantId())) && (access.managedClassIds().contains(classId) || (access.canAccessClass(classId) && access.canAccessEducationUnit(c.getSchoolId()))); }
     private Map<String, Classroom> classrooms(String tenant, List<Assignment> source) { List<String> ids = source.stream().map(Assignment::getAcademicClassId).filter(id -> id != null && !id.isBlank()).distinct().toList(); return classrooms.findByTenantIdAndIdIn(tenant, ids).stream().collect(java.util.stream.Collectors.toMap(Classroom::getId, x -> x, (a,b) -> a)); }
     private AssignmentResponse assignment(Assignment a) { return new AssignmentResponse(a.getId(), a.getAcademicClassId(), a.getQuizId(), a.getSubjectId(), List.of(), a.getDueAt(), a.getTeacherNote(), a.getStatus(), a.getRecipientMode(), a.getCreatedAt(), a.getUpdatedAt(), a.isOfflineAllowed()); }
-    private AttemptResponse attempt(Attempt a) { Map<String, com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptAnswer> answers = new LinkedHashMap<>(); map(a.getAnswers()).forEach((id, value) -> answers.put(id, new com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptAnswer(value == null ? null : value.getAnswer(), value == null ? Map.of() : map(value.getClientResult()), value == null ? null : value.getAnsweredAt()))); return new AttemptResponse(a.getId(), a.getAssignmentId(), a.getQuizId(), a.getStudentId(), a.getPackageId(), a.getPackageHash(), a.getStatus(), answers, value(a.getScore()), value(a.getMaxScore()), value(a.getPercent()), Boolean.TRUE.equals(a.getPassed()), a.getStartedAt(), a.getSubmittedAt(), a.getUpdatedAt(), com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptPolicySnapshotResponse.from(a.getPolicySnapshot())); }
     private String tenant(String value) { return AuthenticatedTenant.require(value); }
     private double value(Double value) { return value == null ? 0 : value; }
     private <T> List<T> list(List<T> value) { return value == null ? List.of() : value; }

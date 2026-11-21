@@ -236,9 +236,11 @@ type ElearningQuery {
   status: String!
   studentDashboard(input: StudentDashboardInput): StudentDashboard!
   discussionFeed(input: StudentDiscussionFeedInput): StudentDiscussionFeed!
+  "Pages the comments of a post of the student's class (parentId: the replies of one top-level comment). Page 0 is the newest window the feed embeds; size is capped at 50; items of a page run oldest to newest, like the feed."
+  discussionComments(postId: String!, parentId: String, page: Int = 0, size: Int = 20, tenantId: String): StudentDiscussionCommentPage!
   discussionModerationClasses(tenantId: String): [StudentDiscussionModerationClass!]!
   discussionModerationFeed(input: StudentDiscussionModerationFeedInput!): StudentDiscussionFeed!
-  studentClassLeaderboard(input: StudentClassLeaderboardInput): ClassLeaderboard!
+  studentClassLeaderboard(input: StudentClassLeaderboardInput, viewerOnly: Boolean = false): ClassLeaderboard!
   leaderboardClasses(tenantId: String): [LeaderboardClass!]!
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
   "Tier of the authenticated student; dates are yyyy-MM-dd strings"
@@ -246,11 +248,11 @@ type ElearningQuery {
   "Cutoffs of the student's own grade for weekStart (default: the latest update)"
   tierTable(weekStart: String, tenantId: String): [TierTableRow!]!
   myFrames(tenantId: String): MyFrames!
-  "Hộp thư: the student's own threads about a question, newest first. status: OPEN or ANSWERED"
-  myQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  "Hộp thư: the student's own threads about a question, newest first. status: OPEN or ANSWERED. includeCorrectAnswer: false skips the correct-answer lookup (correctAnswerText is then null)"
+  myQuestionThreads(status: String, tenantId: String, includeCorrectAnswer: Boolean = true): [QuestionThread!]!
   questionThread(id: String!, tenantId: String): QuestionThread!
   "Threads addressed to the teacher (a tenant-wide admin sees every thread of the tenant)"
-  teacherQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  teacherQuestionThreads(status: String, tenantId: String, includeCorrectAnswer: Boolean = true): [QuestionThread!]!
   teacherQuestionThread(id: String!, tenantId: String): QuestionThread!
 }
 
@@ -464,6 +466,7 @@ input QuestionBankWorkspaceInput {
   includeQuestions: Boolean
   page: Int
   size: Int
+  quizLimit: Int
 }
 
 input AccessManagementWorkspaceInput {
@@ -818,6 +821,7 @@ type QuestionBankWorkspace {
   levels: [QuestionBankOption!]!
   topics: [QuestionBankOption!]!
   quizzes: [QuestionBankQuizOption!]!
+  quizzesTruncated: Boolean!
 }
 
 type QuestionBankQuestionPage {
@@ -1017,6 +1021,7 @@ type ClassScoreBoard {
   students: [ClassScoreBoardStudent!]!
   attempts: [ClassScoreBoardAttempt!]!
   truncated: Boolean!
+  rosterTruncated: Boolean!
 }
 
 type ClassScoreBoardStudent {
@@ -1167,8 +1172,10 @@ input AskTeacherAboutQuestionInput { tenantId: String, idempotencyKey: String!, 
 input SendQuestionThreadMessageInput { tenantId: String, threadId: String!, message: String!, attachmentIds: [String!] }
 
 type StudentDiscussionFeed { items: [StudentDiscussionPost!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }
-type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]!, hidden: Boolean!, subject: String, pinned: Boolean!, "The reply the teacher chose as the answer" acceptedReplyId: String, "The viewer follows this thread" following: Boolean! }
-type StudentDiscussionComment { id: String!, parentId: String, authorId: String, authorName: String, authorInitials: String, content: String, createdAt: String, attachmentIds: [String!]!, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, replies: [StudentDiscussionComment!]!, hidden: Boolean! }
+"""One page of a post's comments (or of the replies of one top-level comment)."""
+type StudentDiscussionCommentPage { items: [StudentDiscussionComment!]!, page: Int!, size: Int!, totalItems: Int!, hasNext: Boolean! }
+type StudentDiscussionPost { id: String!, authorId: String, authorName: String, authorInitials: String, academicClassId: String, className: String, title: String, content: String, createdAt: String, attachmentIds: [String!]!, assignmentId: String, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, comments: [StudentDiscussionComment!]!, hidden: Boolean!, subject: String, pinned: Boolean!, "The reply the teacher chose as the answer" acceptedReplyId: String, "The viewer follows this thread" following: Boolean!, "Visible comments and replies of the post (hidden ones only count for moderators)" commentCount: Int!, "More top-level comments exist than the comments list holds; page them with discussionComments" hasMoreComments: Boolean! }
+type StudentDiscussionComment { id: String!, parentId: String, authorId: String, authorName: String, authorInitials: String, content: String, createdAt: String, attachmentIds: [String!]!, reactions: [StudentDiscussionReactionCount!]!, viewerReaction: String, replies: [StudentDiscussionComment!]!, hidden: Boolean!, "Visible replies of this comment" replyCount: Int!, "More replies exist than the replies list holds; page them with discussionComments(parentId)" hasMoreReplies: Boolean! }
 type StudentDiscussionReactionCount { reaction: String!, count: Int! }
 type StudentDiscussionReactionPayload { targetType: String!, targetId: String!, viewerReaction: String, reactions: [StudentDiscussionReactionCount!]! }
 type StudentDiscussionModerationClass { id: String!, name: String }

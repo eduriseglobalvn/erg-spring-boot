@@ -81,15 +81,29 @@ public class ReportJobUseCase implements ReportJobPort {
 
     @Override
     @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public ReportJobResponse getStatus(String tenantId, String id) {
+        return repository.findStatusByIdAndTenantId(id, tenantId)
+                .map(s -> new ReportJobResponse(s.getId(), s.getReportType(), s.getAggregateId(), s.getStatus(),
+                        s.getProgress(), s.getCreatedAt(), s.getCompletedAt(), null, s.getLastError(), s.getFormat(),
+                        s.getExpiresAt(), downloadPath(s.getId())))
+                .orElseThrow(() -> new ResourceNotFoundException("report job not found"));
+    }
+
+    @Override
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
     public java.util.Optional<String> requestedBy(String tenantId, String id) {
-        return repository.findByIdAndTenantId(id, tenantId).map(ReportJob::getRequestedBy);
+        return repository.findStatusByIdAndTenantId(id, tenantId).map(ReportJobRepository.Status::getRequestedBy);
+    }
+
+    private static String downloadPath(String id) {
+        return "/api/v1/reports/jobs/" + id + "/download";
     }
 
     public ReportJobResponse toResponse(ReportJob job) {
         return new ReportJobResponse(
                 job.getId(), job.getReportType(), job.getAggregateId(), job.getStatus(), job.getProgress(),
                 job.getCreatedAt(), job.getCompletedAt(), job.getResultJson(), job.getLastError(),
-                job.getFormat(), job.getExpiresAt(), "/api/v1/reports/jobs/" + job.getId() + "/download");
+                job.getFormat(), job.getExpiresAt(), downloadPath(job.getId()));
     }
 
     private Map<String, Object> requestJson(String assignmentId, String format, ReportExportOptions options) {

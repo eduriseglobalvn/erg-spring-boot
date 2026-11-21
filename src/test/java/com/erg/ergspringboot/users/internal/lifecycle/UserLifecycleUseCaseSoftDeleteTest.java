@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.request.users.UserRequests.BulkDeleteRequest;
+import com.erg.ergspringboot.common.request.users.UserRequests.BulkStatusRequest;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
@@ -36,7 +37,7 @@ class UserLifecycleUseCaseSoftDeleteTest {
         User user = user("usr_1");
         AuthSession session = new AuthSession();
         when(users.findByIdAndTenantId("usr_1", "erg")).thenReturn(Optional.of(user));
-        when(sessions.findByUserIdAndTenantIdAndRevokedAtIsNull("usr_1", "erg")).thenReturn(List.of(session));
+        when(sessions.findByUserIdInAndTenantIdAndRevokedAtIsNull(List.of("usr_1"), "erg")).thenReturn(List.of(session));
 
         assertThat(useCase.delete("usr_1", "erg").modifiedCount()).isEqualTo(1);
 
@@ -83,8 +84,7 @@ class UserLifecycleUseCaseSoftDeleteTest {
     void bulkDeleteSoftDeletesEveryUser() {
         User first = user("usr_1");
         User second = user("usr_2");
-        when(users.findByIdAndTenantId("usr_1", "erg")).thenReturn(Optional.of(first));
-        when(users.findByIdAndTenantId("usr_2", "erg")).thenReturn(Optional.of(second));
+        when(users.findByTenantIdAndIdInAnyStatus(eq("erg"), any())).thenReturn(List.of(first, second));
 
         useCase.bulkDelete("erg", new BulkDeleteRequest(List.of("usr_1", "usr_2")));
 
@@ -133,5 +133,42 @@ class UserLifecycleUseCaseSoftDeleteTest {
         user.setDateOfBirth("2000-01-01");
         user.setRecoveryEmail("recovery@example.test");
         return user;
+    }
+
+    @Test
+    void bulkStatusWritesOneAuditRowPerUser() {
+        UserActivityRepository activities = mock(UserActivityRepository.class);
+        UserLifecycleUseCase audited = new UserLifecycleUseCase(users, sessions, activities, store);
+        when(users.findByTenantIdAndIdInAnyStatus(eq("erg"), any())).thenReturn(List.of(user("usr_1"), user("usr_2")));
+
+        audited.bulkStatus("erg", new BulkStatusRequest(List.of("usr_1", "usr_2"), "BLOCKED"));
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<Iterable<com.erg.ergspringboot.users.persistence.UserActivity>> saved =
+                org.mockito.ArgumentCaptor.forClass(Iterable.class);
+        verify(activities).saveAll(saved.capture());
+        assertThat(saved.getValue()).hasSize(2).allMatch(a -> "EMPLOYEE_STATUS_CHANGED".equals(a.getAction()));
+        verify(activities, never()).save(any());
+        // one sessions query for the batch, not one per user
+        verify(sessions).findByUserIdInAndTenantIdAndRevokedAtIsNull(List.of("usr_1", "usr_2"), "erg");
+        verify(users, never()).findByIdAndTenantId(any(), any());
+    }
+
+    @Test
+    void oneFailingAccountDoesNotStopTheRestOfThePurge() {
+        User ok = user("usr_2");
+        ok.setStatus("DELETED");
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        when(store.dueForPurge(now)).thenReturn(List.of("usr_1", "usr_2"));
+        when(users.findById("usr_1")).thenThrow(new IllegalStateException("boom"));
+        when(users.findById("usr_2")).thenReturn(Optional.of(ok));
+        var tx = new org.springframework.transaction.support.TransactionTemplate(
+                mock(org.springframework.transaction.PlatformTransactionManager.class));
+
+        assertThat(new UserPurgeJob(users, store, null, tx).purgeDue(now)).isEqualTo(1);
+
+        assertThat(ok.getEmail()).isEqualTo("deleted-usr_2@deleted.invalid");
+        verify(store, never()).finishPurge("usr_1");
+        verify(store).finishPurge("usr_2");
     }
 }

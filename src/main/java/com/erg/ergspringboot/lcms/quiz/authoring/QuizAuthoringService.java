@@ -135,7 +135,7 @@ public class QuizAuthoringService {
         return snapshot == null ? Map.of() : snapshot;
     }
 
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage", "quizStartInfo"}, allEntries = true)
     public DeleteQuizResponse delete(String tenantId, String quizId) {
         Quiz quiz = quizRepository.findByIdAndTenantId(quizId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("quiz not found"));
@@ -147,7 +147,7 @@ public class QuizAuthoringService {
         return new DeleteQuizResponse(quiz.getId(), true);
     }
 
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage", "quizStartInfo"}, allEntries = true)
     public UpdateQuizResponse update(String tenantId, String quizId, UpdateQuizRequest request) {
         String title = request == null || request.title() == null ? null : request.title().trim();
         String kind = request == null ? null : request.kind();

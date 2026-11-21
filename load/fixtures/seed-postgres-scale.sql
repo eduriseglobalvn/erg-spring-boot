@@ -5,6 +5,8 @@
 \set ON_ERROR_STOP on
 BEGIN;
 SET LOCAL synchronous_commit = off;
+-- The benchmark Postgres caps statements at 30 s; the bulk inserts below take longer on a 4-core host.
+SET LOCAL statement_timeout = 0;
 
 -- 450 teachers, 50 admins, and 4,500 students.
 INSERT INTO users (id, created_at, updated_at, email, password_hash, full_name, status,
@@ -118,25 +120,7 @@ FROM generate_series(1, 10) AS tenant(t)
 CROSS JOIN generate_series(1, 12) AS grades(grade)
 ON CONFLICT (id) DO NOTHING;
 
--- Twenty legacy calendar subjects/levels: two per tenant.
-INSERT INTO lms_subjects (id, created_at, updated_at, tenant_id, scope, name, code, status)
-SELECT format('seed-lsub-%s-%s', lpad(t::text, 2, '0'), s), now(), now(),
-       format('seed-tenant-%s', lpad(t::text, 2, '0')),
-       jsonb_build_object('schoolId', format('seed-school-%s', lpad(t::text, 2, '0'))),
-       format('Seed Subject %s.%s', t, s), format('SEED-%s-%s', t, s), 'ACTIVE'
-FROM generate_series(1, 10) AS tenant(t)
-CROSS JOIN generate_series(1, 2) AS subject(s)
-ON CONFLICT (id) DO UPDATE SET scope = EXCLUDED.scope, updated_at = EXCLUDED.updated_at;
-
-INSERT INTO lms_levels (id, created_at, updated_at, tenant_id, subject_id, name, code, sort_order, status)
-SELECT format('seed-llevel-%s-%s', lpad(t::text, 2, '0'), s), now(), now(),
-       format('seed-tenant-%s', lpad(t::text, 2, '0')),
-       format('seed-lsub-%s-%s', lpad(t::text, 2, '0'), s),
-       format('Seed Level %s.%s', t, s), format('SEED-L-%s-%s', t, s), s, 'ACTIVE'
-FROM generate_series(1, 10) AS tenant(t)
-CROSS JOIN generate_series(1, 2) AS subject(s)
-ON CONFLICT (id) DO NOTHING;
-
+-- V163 made the curriculum tables the only subject/level store, so the calendar rows below use them too.
 -- Canonical taxonomy for question-bank and learning-resource workloads.
 INSERT INTO curriculum_subjects
     (id, tenant_id, code, name, status, sort_order, created_by, updated_by, created_at, updated_at)
@@ -230,7 +214,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO user_role_assignments
     (id, user_id, role_id, tenant_id, scope_type, scope_id, assigned_by, created_at, updated_at)
 SELECT 'load-tclass-' || substr(md5(class.id), 1, 24), class.homeroom_teacher_id,
-       'role_lms_homeroom_teacher', class.tenant_id, 'CLASS', class.id, class.homeroom_teacher_id, now(), now()
+       'role_lms_teacher', class.tenant_id, 'CLASS', class.id, class.homeroom_teacher_id, now(), now()
 FROM academic_classes class
 JOIN users teacher ON teacher.id = class.homeroom_teacher_id AND teacher.tenant_id = class.tenant_id
 WHERE class.id LIKE 'seed-class-%'
@@ -525,8 +509,8 @@ SELECT 'seed-cal-' || substr(md5(n::text), 1, 27),
        format('seed-cal-batch-%s', lpad(t::text, 2, '0')),
        format('seed-school-%s', lpad(t::text, 2, '0')),
        format('seed-class-%s', lpad((((t - 1) * 25) + (((n - 1) / 10) % 25) + 1)::text, 4, '0')),
-       format('seed-lsub-%s-%s', lpad(t::text, 2, '0'), ((n - 1) % 2) + 1),
-       format('seed-llevel-%s-%s', lpad(t::text, 2, '0'), ((n - 1) % 2) + 1),
+       format('seed-csub-%s-%s', lpad(t::text, 2, '0'), ((n - 1) % 2) + 1),
+       format('seed-clevel-%s-%s', lpad(t::text, 2, '0'), ((n - 1) % 2) + 1),
        format('Seed Room %s', ((n - 1) % 50) + 1), format('Seed Calendar Lesson %s', n),
        event_start, event_start + interval '45 minutes', extract(isodow from event_start)::smallint,
        CASE WHEN extract(hour from event_start) < 12 THEN 'MORNING' ELSE 'AFTERNOON' END,
@@ -571,7 +555,7 @@ INSERT INTO teaching_schedule_events
      status, created_by, updated_by, created_at, updated_at)
 SELECT format('load-batch-event-%s', lpad(n::text, 6, '0')), 'seed-tenant-01',
        format('load-batch-%s', lpad(n::text, 6, '0')), 'seed-school-01',
-       'seed-class-0001', 'seed-lsub-01-1', 'load event',
+       'seed-class-0001', 'seed-csub-01-1', 'load event',
        timestamptz '2026-08-17 08:00:00+07', timestamptz '2026-08-17 09:00:00+07',
        1, 'MORNING', 1, 1, 'DRAFT', 'seed-admin-00001', 'seed-admin-00001', now(), now()
 FROM generate_series(1, 20000) AS g(n)

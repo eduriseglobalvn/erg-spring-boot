@@ -77,6 +77,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                     and (:categoryId is null or q.categoryId = :categoryId)
                     and (:status is null or lower(q.status) = :status)
                     and (:kind is null or lower(q.kind) = :kind)
+                    and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
                     order by q.updatedAt desc, q.id asc
                     """,
             countQuery = """
@@ -90,6 +91,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                     and (:categoryId is null or q.categoryId = :categoryId)
                     and (:status is null or lower(q.status) = :status)
                     and (:kind is null or lower(q.kind) = :kind)
+                    and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
                     """
     )
     Page<QuizSummaryProjection> findQuizSummaries(
@@ -100,6 +102,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("categoryId") String categoryId,
             @Param("status") String status,
             @Param("kind") String kind,
+            @Param("viewerUserId") String viewerUserId,
             Pageable pageable
     );
 
@@ -125,6 +128,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                     and (:categoryId is null or q.categoryId = :categoryId)
                     and (:status is null or lower(q.status) = :status)
                     and (:kind is null or lower(q.kind) = :kind)
+                    and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
                     order by q.updatedAt desc, q.id asc
                     """,
             countQuery = """
@@ -137,6 +141,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
                     and (:categoryId is null or q.categoryId = :categoryId)
                     and (:status is null or lower(q.status) = :status)
                     and (:kind is null or lower(q.kind) = :kind)
+                    and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
                     """
     )
     Page<QuizSummaryProjection> findQuizSummariesWithoutSearch(
@@ -146,6 +151,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("categoryId") String categoryId,
             @Param("status") String status,
             @Param("kind") String kind,
+            @Param("viewerUserId") String viewerUserId,
             Pageable pageable
     );
 
@@ -175,6 +181,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             and (:categoryId is null or q.categoryId = :categoryId)
             and lower(q.status) = :status
             and (:kind is null or lower(q.kind) = :kind)
+            and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
             order by q.updatedAt desc, q.id asc
             """)
     List<QuestionBankQuizOptionProjection> findQuestionBankQuizOptions(
@@ -184,7 +191,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("levelId") String levelId,
             @Param("categoryId") String categoryId,
             @Param("status") String status,
-            @Param("kind") String kind
+            @Param("kind") String kind,
+            @Param("viewerUserId") String viewerUserId,
+            Pageable pageable
     );
 
     @Query("""
@@ -212,6 +221,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             and (:categoryId is null or q.categoryId = :categoryId)
             and lower(q.status) = :status
             and (:kind is null or lower(q.kind) = :kind)
+            and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
             order by q.updatedAt desc, q.id asc
             """)
     List<QuestionBankQuizOptionProjection> findQuestionBankQuizOptionsWithoutSearch(
@@ -220,7 +230,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("levelId") String levelId,
             @Param("categoryId") String categoryId,
             @Param("status") String status,
-            @Param("kind") String kind
+            @Param("kind") String kind,
+            @Param("viewerUserId") String viewerUserId,
+            Pageable pageable
     );
 
     @Query("""
@@ -248,6 +260,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             and (:levelId is null or q.levelId = :levelId)
             and (:categoryId is null or q.categoryId = :categoryId)
             and (:kind is null or lower(q.kind) = :kind)
+            and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
             order by q.updatedAt desc, q.id asc
             """)
     List<QuestionBankQuizOptionProjection> findQuestionBankQuizOptionsWithoutStatus(
@@ -256,7 +269,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("subjectId") String subjectId,
             @Param("levelId") String levelId,
             @Param("categoryId") String categoryId,
-            @Param("kind") String kind
+            @Param("kind") String kind,
+            @Param("viewerUserId") String viewerUserId,
+            Pageable pageable
     );
 
     @Query("""
@@ -283,6 +298,7 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             and (:levelId is null or q.levelId = :levelId)
             and (:categoryId is null or q.categoryId = :categoryId)
             and (:kind is null or lower(q.kind) = :kind)
+            and (:viewerUserId is null or q.portal is null or q.portal <> 'teacher' or q.ownerUserId = :viewerUserId)
             order by q.updatedAt desc, q.id asc
             """)
     List<QuestionBankQuizOptionProjection> findQuestionBankQuizOptionsWithoutStatusAndSearch(
@@ -290,7 +306,9 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("subjectId") String subjectId,
             @Param("levelId") String levelId,
             @Param("categoryId") String categoryId,
-            @Param("kind") String kind
+            @Param("kind") String kind,
+            @Param("viewerUserId") String viewerUserId,
+            Pageable pageable
     );
 
     @Query(
@@ -309,14 +327,6 @@ public interface QuizRepository extends JpaRepository<Quiz, String> {
             @Param("tenantId") String tenantId,
             @Param("questionIds") List<String> questionIds
     );
-
-    /** Quizzes a teacher built that belong to someone other than `userId`. */
-    @Query("""
-            select q.id from Quiz q
-            where q.tenantId = :tenantId and q.portal = 'teacher' and q.deletedAt is null
-            and (q.ownerUserId is null or q.ownerUserId <> :userId)
-            """)
-    java.util.Set<String> findTeacherQuizIdsNotOwnedBy(@Param("tenantId") String tenantId, @Param("userId") String userId);
 
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true)
     @Query("""

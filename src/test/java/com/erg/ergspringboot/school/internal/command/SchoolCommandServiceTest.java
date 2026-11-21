@@ -85,6 +85,19 @@ class SchoolCommandServiceTest {
         verify(unitRepository, never()).save(any());
     }
 
+    @Test
+    void everyAcademicYearAndGradeWriteEvictsTheSchoolDirectoryAndOperationsCaches() {
+        for (String name : List.of("createAcademicYear", "activateAcademicYear", "closeAcademicYear", "syncDefaultGrades",
+                "createGrade", "updateGrade")) {
+            var method = java.util.Arrays.stream(SchoolCommandService.class.getDeclaredMethods())
+                    .filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow();
+            var evict = method.getAnnotation(org.springframework.cache.annotation.CacheEvict.class);
+            assertThat(evict).as(name).isNotNull();
+            assertThat(evict.cacheNames()).containsExactlyInAnyOrder("lcmsSchoolDirectory", "lcmsSchoolOperations");
+            assertThat(evict.allEntries()).isTrue();
+        }
+    }
+
     private CreateSchoolRequest request(String type, int startYear) {
         return new CreateSchoolRequest("Trường kiểm thử", type, startYear, "1 Đường A", "Quận 1",
                 "Hiệu trưởng", "0900000000", "school@example.com", "ONBOARDING");

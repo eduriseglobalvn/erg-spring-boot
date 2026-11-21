@@ -2,6 +2,7 @@ package com.erg.ergspringboot.auth.internal.login;
 
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttempt;
+import com.erg.ergspringboot.users.persistence.auth.LoginAttemptSignal;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.auth.SecurityEvent;
 import com.erg.ergspringboot.users.persistence.User;
@@ -78,14 +79,14 @@ public class LoginFailureEnforcementService {
         }
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<OffsetDateTime> failures = new java.util.ArrayList<>();
-        for (AuthLoginAttempt attempt : attemptRepository.findByUserIdOrderByCreatedAtDesc(
+        for (LoginAttemptSignal attempt : attemptRepository.findSignalsByUserId(
                 user.getId(), PageRequest.of(0, LOCKOUT_SCAN_LIMIT))) {
-            if ("SUCCESS".equalsIgnoreCase(attempt.getResult())
-                    || AuthLoginAttemptRepository.RESULT_RESET.equalsIgnoreCase(attempt.getResult())) {
+            if ("SUCCESS".equalsIgnoreCase(attempt.result())
+                    || AuthLoginAttemptRepository.RESULT_RESET.equalsIgnoreCase(attempt.result())) {
                 break;
             }
-            if (attempt.getCreatedAt() != null && INVALID_CREDENTIALS.equals(attempt.getReason())) {
-                failures.add(attempt.getCreatedAt());
+            if (attempt.createdAt() != null && INVALID_CREDENTIALS.equals(attempt.reason())) {
+                failures.add(attempt.createdAt());
                 if (failures.size() >= maxFailedLogin) {
                     break;
                 }

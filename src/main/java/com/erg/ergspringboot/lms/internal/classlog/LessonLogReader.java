@@ -120,6 +120,24 @@ class LessonLogReader {
         return List.copyOf(curriculum.scope(tenantId).framework(schoolId, classId, subjectId, levelId, date).values());
     }
 
+    /**
+     * The period as it reads after a save: the row's timetable data with the entry's values, the lesson title of its actual
+     * period and the current absentees. Replaces re-running the whole week pipeline for the one period that was edited.
+     */
+    @Transactional(readOnly = true)
+    public LessonLogPeriod refreshed(String tenantId, Row row, LessonLogEntry entry) {
+        LessonLogPeriod p = row.period();
+        LessonSlot slot = row.slot();
+        CurriculumProgramRow lesson = curriculum.scope(tenantId)
+                .framework(slot.schoolId(), slot.classId(), slot.subjectId(), slot.levelId(), slot.date()).get(entry.getActualPeriod());
+        List<LessonLogAbsentee> absent = absentees(tenantId, List.of(slot))
+                .getOrDefault(absentKey(slot.classId(), slot.subjectId(), slot.date(), p.periodNo()), List.of());
+        return new LessonLogPeriod(p.eventId(), p.date(), p.periodNo(), p.classId(), p.className(), p.subjectId(), p.subjectName(),
+                p.teacherName(), p.ppctPeriod(), entry.getActualPeriod(), lesson == null ? null : lesson.getTitle(), absent,
+                entry.getComment(), entry.getStatus(), entry.isLate(), p.happened(),
+                entry.getVersion() == null ? 0 : entry.getVersion().intValue(), p.curriculumPeriodCount());
+    }
+
     LessonLogWeek week(LocalDate weekStart, List<Row> rows, String session, String status) {
         List<LessonLogPeriod> all = rows.stream().map(Row::period).toList();
         Map<LocalDate, String> sessions = new HashMap<>();

@@ -20,8 +20,10 @@ import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -60,10 +62,15 @@ public class UserLifecycleUseCase {
         users.save(user); softDeletes.restore(userId);
         record(user,audit,"USER_RESTORED","Employee account restored",Map.of("status",STATUS_DELETED,"restorableUntil",until.toString()),Map.of("status","INACTIVE"));
         return response(user);}
-    @Transactional public BulkOperationResponse bulkStatus(String tenantId,BulkStatusRequest request){
+    @Transactional public BulkOperationResponse bulkStatus(String tenantId,BulkStatusRequest request){return bulkStatus(tenantId,request,null);}
+    @Transactional public BulkOperationResponse bulkStatus(String tenantId,BulkStatusRequest request,UserAuditContext audit){
         String status=status(request.status()); List<User> found=findAll(request.userIds(),tenantId);
+        Map<String,String> previous=found.stream().collect(Collectors.toMap(User::getId,u->safe(u.getStatus()),(a,b)->a));
         found.forEach(user->user.setStatus(status)); users.saveAll(found); String t=tenant(tenantId);
-        found.forEach(user->revokeIfLocked(user,t,status)); return new BulkOperationResponse(found.size()); }
+        revokeAll(found,t,status);
+        activities.saveAll(found.stream().map(user->activity(user,audit,"EMPLOYEE_STATUS_CHANGED","Employee account status changed",
+                Map.of("status",previous.get(user.getId())),Map.of("status",status))).toList());
+        return new BulkOperationResponse(found.size()); }
     @Transactional public BulkOperationResponse bulkDelete(String tenantId,BulkDeleteRequest request){return bulkDelete(tenantId,request,null);}
     @Transactional public BulkOperationResponse bulkDelete(String tenantId,BulkDeleteRequest request,UserAuditContext audit){
         List<User> found=findAll(request.userIds(),tenantId); softDelete(found,tenant(tenantId),audit); return new BulkOperationResponse(found.size()); }
@@ -73,9 +80,9 @@ public class UserLifecycleUseCase {
         found.forEach(user->{user.setStatus(STATUS_DELETED); user.setPasswordHash(null);
             user.setAuthzVersion((user.getAuthzVersion()==null?1L:user.getAuthzVersion())+1);});
         users.saveAll(found); softDeletes.mark(found.stream().map(User::getId).toList(),now,purgeAfter);
-        found.forEach(user->{revokeIfLocked(user,tenant,STATUS_DELETED);
-            record(user,audit,"USER_DELETED","Employee account deleted",Map.of("status",previous.get(user.getId())),
-                    Map.of("status",STATUS_DELETED,"restorableUntil",purgeAfter.toString()));}); }
+        revokeAll(found,tenant,STATUS_DELETED);
+        activities.saveAll(found.stream().map(user->activity(user,audit,"USER_DELETED","Employee account deleted",
+                Map.of("status",previous.get(user.getId())),Map.of("status",STATUS_DELETED,"restorableUntil",purgeAfter.toString()))).toList()); }
     static void anonymise(User u){
         u.setStatus(STATUS_DELETED); u.setEmail("deleted-"+u.getId()+"@deleted.invalid"); u.setUsername(null);
         u.setPasswordHash(null); u.setFullName("Deleted user"); u.setAvatarUrl(null); u.setPhone(null); u.setBio(null);
@@ -88,19 +95,33 @@ public class UserLifecycleUseCase {
         List<AuthSession> active=sessions.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(),tenant); if(active.isEmpty())return;
         OffsetDateTime at=OffsetDateTime.now(ZoneOffset.UTC); String reason="status_changed_"+status.toLowerCase();
         active.forEach(s->{s.setRevokedAt(at);s.setRevokedReason(reason);});sessions.saveAll(active);}
+    /** One sessions query and one save for the whole batch; same revocation as {@link #revokeIfLocked} per user. */
+    private void revokeAll(List<User> found,String tenant,String status){
+        if(found.isEmpty()||!List.of("BLOCKED","BANNED","INACTIVE",STATUS_DELETED).contains(status))return;
+        List<AuthSession> active=sessions.findByUserIdInAndTenantIdAndRevokedAtIsNull(found.stream().map(User::getId).distinct().toList(),tenant);
+        if(active.isEmpty())return;
+        OffsetDateTime at=OffsetDateTime.now(ZoneOffset.UTC); String reason="status_changed_"+status.toLowerCase();
+        active.forEach(s->{s.setRevokedAt(at);s.setRevokedReason(reason);});sessions.saveAll(active);}
     private void record(User target,UserAuditContext audit,Map<String,Object> before,Map<String,Object> after){
         record(target,audit,"EMPLOYEE_STATUS_CHANGED","Employee account status changed",before,after);}
     private void record(User target,UserAuditContext audit,String action,String description,Map<String,Object> before,Map<String,Object> after){
+        activities.save(activity(target,audit,action,description,before,after));}
+    private UserActivity activity(User target,UserAuditContext audit,String action,String description,Map<String,Object> before,Map<String,Object> after){
         UserAuditContext c=audit==null?new UserAuditContext(target.getId(),null,null,null):audit;
         UserActivity a=new UserActivity();a.setId(IdGenerator.newId());a.setUserId(blank(c.actorUserId())?target.getId():c.actorUserId());
         a.setTenantId(tenant(target.getTenantId()));a.setAction(action);a.setTargetUserId(target.getId());
         a.setIpAddress(trim(c.ipAddress()));a.setUserAgent(trim(c.userAgent()));a.setRequestId(trim(c.requestId()));
         a.setDescription(description);a.setMetadata(Map.of("before",before,"after",after));
-        a.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));activities.save(a);}
+        a.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));return a;}
     private User find(String id,String tenant){return users.findByIdAndTenantId(id,tenant(tenant))
             .filter(u->!STATUS_DELETED.equalsIgnoreCase(u.getStatus()))
             .orElseThrow(()->new ResourceNotFoundException("user not found"));}
-    private List<User> findAll(List<String> ids,String tenant){return ids.stream().map(id->find(id,tenant)).toList();}
+    private List<User> findAll(List<String> ids,String tenant){
+        if(ids.isEmpty())return List.of();
+        Map<String,User> byId=users.findByTenantIdAndIdInAnyStatus(tenant(tenant),new LinkedHashSet<>(ids)).stream()
+                .collect(Collectors.toMap(User::getId,u->u,(a,b)->a));
+        return ids.stream().map(id->Optional.ofNullable(byId.get(id)).filter(u->!STATUS_DELETED.equalsIgnoreCase(u.getStatus()))
+                .orElseThrow(()->new ResourceNotFoundException("user not found"))).toList();}
     private String status(String value){String s=value.trim().toUpperCase();
         if(!List.of("ACTIVE","PENDING","BLOCKED","BANNED","INACTIVE").contains(s))throw new BadRequestException("invalid user status");return s;}
     private UserResponse response(User u){return new UserResponse(u.getId(),u.getEmail(),u.getFullName(),u.getPhone(),u.getAvatarUrl(),

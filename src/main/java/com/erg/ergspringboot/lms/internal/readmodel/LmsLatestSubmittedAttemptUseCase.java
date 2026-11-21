@@ -4,13 +4,11 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.LatestSubmittedAttemp
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuestionOutcome;
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRow;
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRowRepository;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestion;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
 import com.erg.ergspringboot.lms.internal.core.LmsAttemptService;
-import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.Attempt;
-import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import java.util.LinkedHashMap;
@@ -23,15 +21,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(value = "postgresTransactionManager", readOnly = true)
 public class LmsLatestSubmittedAttemptUseCase {
     private final LmsAttemptService attempts;
-    private final LmsStudentService students;
+    private final LmsStudentIdentityLookup identities;
     private final AttemptAnswerRowRepository answerRows;
-    private final QuizVersionQuestionRepository versionQuestions;
+    private final QuizAttemptGradingService grading;
     private final AssignmentRepository assignments;
 
-    public LmsLatestSubmittedAttemptUseCase(LmsAttemptService attempts, LmsStudentService students,
-            AttemptAnswerRowRepository answerRows, QuizVersionQuestionRepository versionQuestions,
+    public LmsLatestSubmittedAttemptUseCase(LmsAttemptService attempts, LmsStudentIdentityLookup identities,
+            AttemptAnswerRowRepository answerRows, QuizAttemptGradingService grading,
             AssignmentRepository assignments) {
-        this.attempts = attempts; this.students = students; this.answerRows = answerRows; this.versionQuestions = versionQuestions;
+        this.attempts = attempts; this.identities = identities; this.answerRows = answerRows; this.grading = grading;
         this.assignments = assignments;
     }
 
@@ -39,7 +37,8 @@ public class LmsLatestSubmittedAttemptUseCase {
     public LatestSubmittedAttemptResponse latestSubmitted(String assignmentId, String authUserId, UserAccessContext access) {
         String tenant = AuthenticatedTenant.require(access.tenantId());
         // Attempts store Student.id; resolve the caller's Student exactly like listScores does.
-        String learnerKey = students.findFirstByTenantIdAndAuthUserId(tenant, authUserId).map(Student::getId).orElse(authUserId);
+        var identity = identities.byAuthUser(tenant, authUserId);
+        String learnerKey = identity.exists() ? identity.studentId() : authUserId;
         Attempt attempt = attempts.findLatestSubmitted(tenant, assignmentId, learnerKey).orElse(null);
         if (attempt == null) return null;
 
@@ -49,10 +48,8 @@ public class LmsLatestSubmittedAttemptUseCase {
         // attempt_answers is keyed by quiz_version_question_id; the player/answers use the runtime question id.
         Map<String, QuestionOutcome> results = new LinkedHashMap<>();
         if (attempt.getQuizVersionId() != null && !attempt.getQuizVersionId().isBlank()) {
-            Map<String, String> runtimeIds = new LinkedHashMap<>();
-            for (QuizVersionQuestion q : versionQuestions.findByQuizVersionIdOrderByOrderIndexAsc(attempt.getQuizVersionId())) {
-                runtimeIds.put(q.getId(), q.getRuntimeQuestionId());
-            }
+            // A published version is immutable: its question ids come from the grading service's version cache.
+            Map<String, String> runtimeIds = grading.runtimeIdsByVersionQuestionId(attempt.getQuizVersionId());
             for (AttemptAnswerRow row : answerRows.findByAttemptId(attempt.getId())) {
                 String runtimeId = runtimeIds.get(row.getQuizVersionQuestionId());
                 if (runtimeId == null) continue;

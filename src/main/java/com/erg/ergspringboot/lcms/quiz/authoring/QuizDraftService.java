@@ -36,6 +36,8 @@ public class QuizDraftService {
     private final QuizRepository quizRepository;
     private final QuizQuestionLinkService quizQuestionLinkService;
     private final LmsSyncOperationService sync;
+    // quizStartInfo carries the question count (Quiz.questionIds): dropped only when a draft write changes that list.
+    private QuizStartInfoCacheEvictor startInfoEvictor;
 
     public QuizDraftService(
             QuizDraftRepository quizDraftRepository,
@@ -68,8 +70,13 @@ public class QuizDraftService {
         this.sync = sync;
     }
 
+    @Autowired(required = false)
+    void setStartInfoEvictor(QuizStartInfoCacheEvictor startInfoEvictor) {
+        this.startInfoEvictor = startInfoEvictor;
+    }
+
     /** Full-document autosave (PUT). Replaces settings/playerTemplate/tree wholesale. */
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace"}, allEntries = true)
     public SaveDraftResponse saveDraft(String tenantId, String quizId, SaveDraftRequest request) {
         QuizDraft draft = latestDraft(tenantId, quizId);
         LmsSyncOperationService.Receipt receipt = reserve(tenantId, quizId, request, "quiz.draft");
@@ -96,7 +103,7 @@ public class QuizDraftService {
     }
 
     /** Upserts a single slide into a group tree (§4.2). Server assigns the slide id when absent. */
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace"}, allEntries = true)
     @SuppressWarnings("unchecked")
     public SaveDraftResponse upsertSlide(String tenantId, String quizId, SlideUpsertRequest request) {
         QuizDraft draft = latestDraft(tenantId, quizId);
@@ -130,7 +137,7 @@ public class QuizDraftService {
     }
 
     /** Reorders groups/slides (§4.2). */
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace"}, allEntries = true)
     public SaveDraftResponse reorder(String tenantId, String quizId, ReorderRequest request) {
         QuizDraft draft = latestDraft(tenantId, quizId);
         LmsSyncOperationService.Receipt receipt = reserve(tenantId, quizId, request, "quiz.draft.reorder");
@@ -187,8 +194,11 @@ public class QuizDraftService {
     private void syncQuizQuestionIds(String tenantId, String quizId, Object tree) {
         List<String> questionIds = quizQuestionLinkService.syncManualQuestionLinks(tenantId, quizId, extractQuestionLinks(tree));
         quizRepository.findByIdAndTenantId(quizId, tenantId).ifPresent(quiz -> {
+            List<String> current = quiz.getQuestionIds() == null ? List.of() : quiz.getQuestionIds();
+            if (current.equals(questionIds)) return;
             quiz.setQuestionIds(questionIds);
             quizRepository.save(quiz);
+            if (startInfoEvictor != null) startInfoEvictor.evictAll();
         });
     }
 

@@ -13,7 +13,8 @@ class CurriculumImpactQueryUseCaseFailClosedTest {
     @Test
     void refusesToStartWithoutUsageCountersSoNodesNeverLookUnused() {
         assertThatThrownBy(() -> new CurriculumImpactQueryUseCase(mock(CurriculumSubjectRepository.class),
-                mock(CurriculumLevelRepository.class), mock(CurriculumTopicRepository.class), List.of()))
+                mock(CurriculumLevelRepository.class), mock(CurriculumTopicRepository.class), List.of(),
+                mock(CurriculumAttemptImpactCounter.class)))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

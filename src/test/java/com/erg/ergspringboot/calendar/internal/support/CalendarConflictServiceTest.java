@@ -471,6 +471,21 @@ class CalendarConflictServiceTest {
             assertEquals(1, conflicts.size());
             assertEquals("ROOM_TIME_CONFLICT", conflicts.get(0).code());
         }
+
+        @Test
+        void sameRoomNameAtAnotherSchoolIsNotAConflict() {
+            OffsetDateTime start = OffsetDateTime.parse("2026-06-15T08:00:00+07:00");
+            OffsetDateTime end = OffsetDateTime.parse("2026-06-15T10:00:00+07:00");
+            CalendarEvent event = createEvent("evt-new", TENANT_A, SCHOOL_ID, CLASS_ID, ROOM_NAME, start, end);
+            CalendarEvent elsewhere = createEvent("evt-other", TENANT_A, "other-school", "other-class", ROOM_NAME, start, end);
+
+            when(eventRepository.countByTenantIdAndAcademicClassIdAndStartAtLessThanAndEndAtGreaterThanAndStatusNot(
+                    anyString(), anyString(), any(), any(), anyString())).thenReturn(0L);
+            when(eventRepository.findRoomTimeConflictsInWindow(eq(TENANT_A), any(), eq(start), eq(end), eq("CANCELLED")))
+                    .thenReturn(List.of(elsewhere));
+
+            assertEquals(0, service.detectConflicts(TENANT_A, List.of(event), List.of()).size());
+        }
     }
 
     // -------------------------------------------------------------------------

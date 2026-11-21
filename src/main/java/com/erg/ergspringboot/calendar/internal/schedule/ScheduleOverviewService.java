@@ -64,14 +64,17 @@ public class ScheduleOverviewService {
                 (int) rows.stream().filter(r -> r.periodCount() == 0).count());
 
         String needle = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
-        Map<String, String> haystack = new HashMap<>();
+        Map<String, StringBuilder> haystack = new HashMap<>();
         if (!needle.isEmpty()) {
-            week.events().forEach(e -> haystack.merge(e.schoolId(), (ScheduleConflictEngine.nz(e.className()) + " " + e.teachers().stream()
-                    .map(t -> ScheduleConflictEngine.nz(t.name())).collect(Collectors.joining(" "))).toLowerCase(Locale.ROOT), (a, b) -> a + " " + b));
+            for (Occurrence e : week.events()) {
+                StringBuilder text = haystack.computeIfAbsent(e.schoolId(), k -> new StringBuilder());
+                text.append(' ').append(ScheduleConflictEngine.nz(e.className()));
+                e.teachers().forEach(t -> text.append(' ').append(ScheduleConflictEngine.nz(t.name())));
+            }
         }
         List<SchoolRowResponse> filtered = rows.stream()
                 .filter(r -> needle.isEmpty() || r.schoolName().toLowerCase(Locale.ROOT).contains(needle)
-                        || haystack.getOrDefault(r.schoolId(), "").contains(needle))
+                        || haystack.getOrDefault(r.schoolId(), new StringBuilder()).toString().toLowerCase(Locale.ROOT).contains(needle))
                 .filter(r -> matchesQuick(r, quick, travel))
                 .sorted(Comparator.comparing((SchoolRowResponse r) -> r.conflictCount() == 0).thenComparing(r -> !r.hasDraft())
                         .thenComparing(SchoolRowResponse::schoolName)).toList();

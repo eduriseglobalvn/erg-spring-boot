@@ -13,5 +13,8 @@ public interface StudentGroupMemberRepository extends JpaRepository<StudentGroup
 
     List<StudentGroupMember> findByTenantIdAndGroupIdIn(String tenantId, Collection<String> groupIds, Pageable pageable);
 
-    void deleteByGroupIdAndTenantId(String groupId, String tenantId);
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("delete from StudentGroupMember m where m.groupId = :groupId and m.tenantId = :tenantId")
+    void deleteByGroupIdAndTenantId(@org.springframework.data.repository.query.Param("groupId") String groupId,
+            @org.springframework.data.repository.query.Param("tenantId") String tenantId);
 }

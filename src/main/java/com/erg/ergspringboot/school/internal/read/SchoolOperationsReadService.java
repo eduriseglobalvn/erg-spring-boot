@@ -86,6 +86,7 @@ public class SchoolOperationsReadService {
     @Transactional(readOnly = true)
     @Cacheable(
             cacheNames = "lcmsSchoolOperations",
+            sync = true,
             key = "{#tenantId, #schoolId, #canCreate, #canUpdate, #canArchive, #canManageClasses, #selectedFields}"
     )
     public SchoolOperationsWorkspace operations(String tenantId, String schoolId,

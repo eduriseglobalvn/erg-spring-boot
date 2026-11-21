@@ -255,6 +255,45 @@ class GlobalExceptionHandlerTest {
         assertThat(errorCode(response)).isEqualTo("PAYLOAD_TOO_LARGE");
     }
 
+    @Test
+    void illegalArgumentIsABadRequestNotA500() {
+        ServletWebRequest request = new ServletWebRequest(new MockHttpServletRequest("POST", "/api/v1/x"));
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleIllegalArgument(new IllegalArgumentException("secret"), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(errorCode(response)).isEqualTo("INVALID_REQUEST");
+        assertThat(response.getBody().message()).doesNotContain("secret");
+    }
+
+    @Test
+    void capacityAndLockFailuresAre503WithRetryAfterAndNoInfrastructureMessage() {
+        ServletWebRequest request = new ServletWebRequest(new MockHttpServletRequest("GET", "/api/v1/x"));
+        for (Exception failure : java.util.List.<Exception>of(
+                new org.springframework.core.task.TaskRejectedException("queue full: jdbc:postgresql://db"),
+                new org.springframework.transaction.CannotCreateTransactionException("pool timeout: jdbc:postgresql://db"),
+                new org.springframework.dao.QueryTimeoutException("jdbc:postgresql://db"),
+                new org.springframework.dao.CannotAcquireLockException("jdbc:postgresql://db"))) {
+            ResponseEntity<ApiResponse<Void>> response = handler.handleOverload(failure, request);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+            assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("5");
+            assertThat(errorCode(response)).isEqualTo("SERVICE_UNAVAILABLE");
+            assertThat(response.getBody().message()).doesNotContain("jdbc");
+        }
+    }
+
+    @Test
+    void serverSideErrorResponseKeepsItsOwnStatus() {
+        ServletWebRequest request = new ServletWebRequest(new MockHttpServletRequest("GET", "/api/v1/x"));
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleMvcProtocolException(
+                new org.springframework.web.context.request.async.AsyncRequestTimeoutException(), request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(errorCode(response)).isEqualTo("SERVICE_UNAVAILABLE");
+    }
+
     private String errorCode(ResponseEntity<ApiResponse<Void>> response) {
         return ((TransportError.Code) response.getBody().errors()).value();
     }

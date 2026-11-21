@@ -4,9 +4,13 @@ import com.erg.ergspringboot.model.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.text.Normalizer;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -47,6 +51,10 @@ public class Student extends BaseEntity {
 
     @Column(name = "full_name")
     private String fullName;
+
+    /** NFC, whitespace collapsed, lower-cased copy of fullName, kept in sync below; the import matches on it. */
+    @Column(name = "full_name_normalized")
+    private String fullNameNormalized;
 
     private String username;
 
@@ -89,4 +97,16 @@ public class Student extends BaseEntity {
     @Version
     @Column(name = "record_version", nullable = false)
     private Long recordVersion;
+
+    /** NFC, inner whitespace (incl. NBSP) collapsed to one space, trimmed, lower-cased. Mirrors the V187 backfill. */
+    public static String normalizeName(String value) {
+        return value == null ? "" : Normalizer.normalize(value, Normalizer.Form.NFC)
+                .replaceAll("[\\s\\u00A0]+", " ").trim().toLowerCase(Locale.ROOT);
+    }
+
+    @PrePersist
+    @PreUpdate
+    void syncNormalizedName() {
+        fullNameNormalized = fullName == null ? null : normalizeName(fullName);
+    }
 }

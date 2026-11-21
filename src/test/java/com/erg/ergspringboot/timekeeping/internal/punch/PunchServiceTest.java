@@ -40,13 +40,10 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class PunchServiceTest {
 
@@ -94,13 +91,6 @@ class PunchServiceTest {
                 Instant.parse("2026-11-12T01:00:00Z"), Instant.parse("2026-11-12T01:45:00Z"), "7A", "Toán", "P201")));
     }
 
-    @AfterEach
-    void clearSynchronization() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.clearSynchronization();
-        }
-    }
-
     @Test
     void validInStoresTheServerClockTimeAndRecomputesTheDay() {
         PunchResult result = service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
@@ -124,7 +114,7 @@ class PunchServiceTest {
         assertThat(saved.getLng()).isEqualByComparingTo("105.8542");
         assertThat(saved.getAccuracyM()).isEqualTo(20);
         assertThat(saved.getSiteId()).isEqualTo("site-1");
-        verify(days).recompute(T, U, DAY);
+        verify(days).recompute(eq(T), eq(U), eq(DAY), any(Optional.class));
     }
 
     @Test
@@ -135,7 +125,7 @@ class PunchServiceTest {
 
         assertThat(result.punch().code()).isEqualTo("CC-121126-0001");
         assertThat(result.nextPeriod()).isNull();
-        verify(days).recompute(T, U, DAY);
+        verify(days).recompute(eq(T), eq(U), eq(DAY), any(Optional.class));
     }
 
     @Test
@@ -188,7 +178,7 @@ class PunchServiceTest {
         assertThat(result.punch().id()).isEqualTo("p-race");
         verify(punches, never()).saveAndFlush(any());
         verify(photos).discardPhoto(PHOTO_KEY);
-        verify(days, never()).recompute(any(), any(), any());
+        verify(days, never()).recompute(any(), any(), any(), any(Optional.class));
     }
 
     @Test
@@ -348,22 +338,31 @@ class PunchServiceTest {
     }
 
     @Test
-    void uploadedPhotoIsDiscardedWhenThePunchTransactionRollsBack() {
-        TransactionSynchronizationManager.initSynchronization();
+    void uploadedPhotoIsDiscardedWhenThePunchTransactionFails() {
+        when(punches.saveAndFlush(any(TkPunch.class))).thenThrow(new IllegalStateException("db down"));
 
-        service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
-        List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
-        syncs.forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
-        verify(photos, never()).discardPhoto(anyString());
-        syncs.forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+        assertThatThrownBy(() -> service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO)))
+                .isInstanceOf(IllegalStateException.class);
 
         verify(photos).discardPhoto(PHOTO_KEY);
     }
 
+    @Test
+    void periodsAreReadOnceBeforeTheWriteTransactionAndSharedWithTheRecompute() {
+        service(NOW).punch(T, U, "key-1", in(21.0285, 105.8542, 20.0, null, PHOTO));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(calendar, codes);
+        order.verify(calendar).teacherPeriods(eq(T), eq(U), any(), any());
+        order.verify(codes).next(T, DAY);
+        verify(calendar, org.mockito.Mockito.times(1)).teacherPeriods(eq(T), eq(U), any(), any());
+    }
+
     private PunchService service(Instant now) {
         return new PunchService(punches, sites, shifts, context, photos, consents, codes, days,
-                new TeacherPeriodReader(calendar, mock(PlatformTransactionManager.class)),
-                Clock.fixed(now, ZoneOffset.UTC));
+                new TeacherPeriodReader(calendar,
+                        mock(com.erg.ergspringboot.calendar.TeachingPeriodReadPort.class),
+                        mock(PlatformTransactionManager.class)),
+                Clock.fixed(now, ZoneOffset.UTC), mock(PlatformTransactionManager.class));
     }
 
     private TkPunch savedPunch() {

@@ -7,6 +7,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarPermissionsResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarWorkspaceResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.exception.TeachingScheduleException;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
@@ -20,11 +21,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 
 /** Owns LCMS, teacher and student Calendar workspace query orchestration. */
 public final class CalendarWorkspaceQueryUseCase {
@@ -35,6 +36,7 @@ public final class CalendarWorkspaceQueryUseCase {
     // Month view fetches the whole 6-week grid (42 days) shown by the frontend.
     private static final int MAX_WORKSPACE_DAYS = 42;
     private static final int MAX_FILTER_VALUES = 100;
+    static final int MAX_WORKSPACE_EVENTS = 5_000;
 
     private final CalendarEventRepository events;
     private final CalendarEventTeacherRepository eventTeachers;
@@ -80,7 +82,7 @@ public final class CalendarWorkspaceQueryUseCase {
                 hasValues(teacherIds), queryValues(teacherIds),
                 hasValues(classIds), queryValues(classIds),
                 hasValues(subjectIds), queryValues(subjectIds),
-                hasValues(levelIds), queryValues(levelIds));
+                hasValues(levelIds), queryValues(levelIds), PageRequest.of(0, MAX_WORKSPACE_EVENTS + 1));
         return response(
                 tenantId, from, to, viewMode, schoolIds,
                 fromDateTime, toDateTime, filteredEvents, principal);
@@ -99,9 +101,8 @@ public final class CalendarWorkspaceQueryUseCase {
                 hasValues(classIds), queryValues(classIds),
                 hasValues(subjectIds), queryValues(subjectIds),
                 hasValues(levelIds), queryValues(levelIds));
-        Set<String> effectiveSchoolIds = hasValues(schoolIds)
-                ? new HashSet<>(schoolIds)
-                : filteredEvents.stream().map(CalendarEvent::getSchoolId).collect(Collectors.toSet());
+        // the catalog covers only schools the caller actually teaches in: a supplied schoolIds only narrows the events
+        Set<String> effectiveSchoolIds = filteredEvents.stream().map(CalendarEvent::getSchoolId).collect(Collectors.toSet());
         return response(
                 tenantId, from, to, viewMode, new ArrayList<>(effectiveSchoolIds),
                 fromDateTime, toDateTime, filteredEvents, principal, teacherUserId);
@@ -111,6 +112,13 @@ public final class CalendarWorkspaceQueryUseCase {
             String tenantId, String studentUserId, String from, String to, String viewMode,
             List<String> subjectIds, List<String> levelIds, List<String> statuses,
             ErgPrincipal principal) {
+        String classId = studentClassId(tenantId, studentUserId, from, to, subjectIds, levelIds);
+        return withPermissions(studentClassBody(tenantId, classId, from, to, viewMode, subjectIds, levelIds), principal);
+    }
+
+    /** Validates the request and finds the student's class: the only per-student part of the student calendar. */
+    public String studentClassId(
+            String tenantId, String studentUserId, String from, String to, List<String> subjectIds, List<String> levelIds) {
         validateBounds(from, to, null, null, null, subjectIds, levelIds);
         Student student = students.findFirstByTenantIdAndAuthUserId(tenantId, studentUserId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -120,6 +128,13 @@ public final class CalendarWorkspaceQueryUseCase {
             throw new IllegalArgumentException(
                     "Student " + studentUserId + " has no academic class assignment.");
         }
+        return academicClassId;
+    }
+
+    /** The same body for every student of the class; {@code permissions} are the empty default until {@link #withPermissions}. */
+    public CalendarWorkspaceResponse studentClassBody(
+            String tenantId, String academicClassId, String from, String to, String viewMode,
+            List<String> subjectIds, List<String> levelIds) {
         OffsetDateTime fromDateTime = dayStart(from);
         OffsetDateTime toDateTime = dayAfter(to);
         List<CalendarEvent> filteredEvents = events.findStudentCalendarEventsFiltered(
@@ -130,7 +145,13 @@ public final class CalendarWorkspaceQueryUseCase {
                 .distinct().toList();
         return response(
                 tenantId, from, to, viewMode, schoolIds,
-                fromDateTime, toDateTime, filteredEvents, principal);
+                fromDateTime, toDateTime, filteredEvents, null);
+    }
+
+    /** The cached class body plus this caller's permission block. */
+    public CalendarWorkspaceResponse withPermissions(CalendarWorkspaceResponse body, ErgPrincipal principal) {
+        return new CalendarWorkspaceResponse(body.tenantId(), body.from(), body.to(), body.viewMode(), body.events(),
+                body.filterOptions(), body.laneSummaries(), body.catalog(), permissionMapper.map(principal), body.generatedAt());
     }
 
     private CalendarWorkspaceResponse response(
@@ -145,6 +166,11 @@ public final class CalendarWorkspaceQueryUseCase {
             String tenantId, String from, String to, String viewMode, List<String> schoolIds,
             OffsetDateTime fromDateTime, OffsetDateTime toDateTime,
             List<CalendarEvent> filteredEvents, ErgPrincipal principal, String viewerUserId) {
+        // the read is capped at MAX + 1 rows, so reaching here with more means "over the limit"
+        if (filteredEvents.size() > MAX_WORKSPACE_EVENTS) {
+            throw TeachingScheduleException.badRequest("CALENDAR_RANGE_TOO_LARGE",
+                    "Quá nhiều lịch (hơn " + MAX_WORKSPACE_EVENTS + "); hãy chọn ít trường hơn hoặc rút ngắn khoảng ngày");
+        }
         List<CalendarEventTeacher> assignments = loadAssignments(tenantId, filteredEvents);
         Map<String, List<CalendarEventTeacher>> assignmentsByEvent = assignments.stream()
                 .collect(Collectors.groupingBy(CalendarEventTeacher::getEventId));
@@ -160,7 +186,7 @@ public final class CalendarWorkspaceQueryUseCase {
                 filteredEvents, assignmentsByEvent, referenceMaps, viewMode);
         CalendarCatalogResponse catalog = catalogs.load(
                 tenantId, schoolIds, fromDateTime, toDateTime);
-        CalendarPermissionsResponse permissions = permissionMapper.map(principal);
+        CalendarPermissionsResponse permissions = principal == null ? null : permissionMapper.map(principal);
         return new CalendarWorkspaceResponse(
                 tenantId, from, to, viewMode, responses, filters, lanes, catalog, permissions,
                 OffsetDateTime.now().toString());

@@ -20,7 +20,10 @@ class CiPortalGatesContractTest {
                 .contains("load/k6/erg-5k-submission-burst.js")
                 .contains("load/k6/outbox-dispatch.js")
                 .contains("load/k6/modulith-events.js")
-                .contains("native:compile");
+                .contains("node --test scripts/openapi-contract-lib.test.cjs scripts/graphql-schema-contract-lib.test.cjs")
+                .contains("bash scripts/deploy-secret-check.test.sh")
+                .contains("docker build --target jvm-runtime .")
+                .doesNotContain("native:compile");
     }
 
     @Test

@@ -74,7 +74,9 @@ public final class CalendarFullCatalogQueryUseCase {
         // Keep repository access on the transaction-bound request thread. The facade owns
         // the read-only transaction and invokes this object synchronously.
         List<EducationUnit> schools = schoolIds != null && !schoolIds.isEmpty()
-                ? educationUnitRepository.findByIdInOrderByNameAsc(schoolIds) : List.of();
+                ? educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(
+                        tenantId, schoolIds, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1))
+                : List.of();
         List<Classroom> classes = schoolIds != null && !schoolIds.isEmpty()
                 ? nonNull(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
                         tenantId, schoolIds, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),

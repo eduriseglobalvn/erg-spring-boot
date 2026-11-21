@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.cache.support.NoOpCacheManager;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -137,6 +138,7 @@ public class LmsOperationalCommandService {
         if (request.status() != null) classroom.setStatus(status(request.status(), classroom.getStatus()));
         Classroom saved = classrooms.save(classroom);
         audit(access, "LMS_CLASS_UPDATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictClasses(access.tenantId(), saved.getId());
         evictSchool(access.tenantId(), schoolId);
         return classResponse(saved);
     }
@@ -150,6 +152,7 @@ public class LmsOperationalCommandService {
         classroom.setStatus("ARCHIVED");
         Classroom saved = classrooms.save(classroom);
         audit(access, "LMS_CLASS_ARCHIVED", saved.getId(), Map.of("schoolId", schoolId));
+        evictClasses(access.tenantId(), saved.getId());
         evictSchool(access.tenantId(), schoolId);
         return classResponse(saved);
     }
@@ -158,13 +161,27 @@ public class LmsOperationalCommandService {
     public StudentResponse createStudent(String schoolId, CreateStudentRequest request, UserAccessContext access) {
         guard.assertSchool(access, schoolId);
         guard.school(access, schoolId);
+        Student saved = insertStudent(schoolId, request, access, new java.util.HashMap<>());
+        evictClasses(access.tenantId(), saved.getAcademicClassId());
+        evictIdentity(access.tenantId(), saved.getAuthUserId()); // a cached "no student" for this login must go
+        evictSchool(access.tenantId(), schoolId);
+        return studentResponse(saved);
+    }
+
+    /**
+     * Creates and audits one student without evicting caches: single create evicts at once, the import once per batch.
+     * The caller has already checked the school scope; {@code classes} memoises the class lookups of one request.
+     */
+    private Student insertStudent(String schoolId, CreateStudentRequest request, UserAccessContext access,
+                                  Map<String, Classroom> classes) {
         String code = trim(request.studentCode());
-        if (code == null) code = identity.newCode(access.tenantId(), schoolId);
+        boolean generated = code == null;
+        if (generated) code = identity.newCode(access.tenantId(), schoolId);
         else if (students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, code).isPresent()) {
             throw new ConflictException("Student code already exists in this school.");
         }
         Classroom classroom = request.academicClassId() == null || request.academicClassId().isBlank()
-                ? null : guard.scopedClass(access, request.academicClassId(), schoolId);
+                ? null : classes.computeIfAbsent(request.academicClassId(), id -> guard.scopedClass(access, id, schoolId));
         Student student = new Student();
         student.setId(IdGenerator.newId());
         student.setTenantId(access.tenantId());
@@ -176,11 +193,10 @@ public class LmsOperationalCommandService {
         student.setStudentCode(code);
         student.setFullName(required(request.fullName(), "Student name"));
         student.setStatus(status(request.status(), "ENROLLED"));
-        Student saved = students.save(student);
+        Student saved = saveNew(student, generated);
         if (assignmentBackfill != null) assignmentBackfill.grantOpenClassAssignments(saved);
         audit(access, "LMS_STUDENT_CREATED", saved.getId(), Map.of("schoolId", schoolId));
-        evictSchool(access.tenantId(), schoolId);
-        return studentResponse(saved);
+        return saved;
     }
 
     @Transactional
@@ -190,6 +206,7 @@ public class LmsOperationalCommandService {
         Student student = guard.student(access, studentId);
         if (!schoolId.equals(student.getSchoolId())) throw new ResourceNotFoundException("Student not found.");
         assertVersion(request.version(), student.getRecordVersion(), "Student");
+        String previousLogin = student.getAuthUserId();
         if (request.studentCode() != null && !normalize(request.studentCode()).equals(normalize(student.getStudentCode()))) {
             students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, request.studentCode().trim())
                     .filter(existing -> !existing.getId().equals(studentId))
@@ -205,6 +222,8 @@ public class LmsOperationalCommandService {
         if (request.status() != null) student.setStatus(status(request.status(), student.getStatus()));
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_UPDATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictClasses(access.tenantId(), saved.getAcademicClassId());
+        evictIdentity(access.tenantId(), previousLogin, saved.getAuthUserId());
         evictSchool(access.tenantId(), schoolId);
         return studentResponse(saved);
     }
@@ -218,6 +237,8 @@ public class LmsOperationalCommandService {
         student.setStatus("ARCHIVED");
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_ARCHIVED", saved.getId(), Map.of("schoolId", schoolId));
+        evictClasses(access.tenantId(), saved.getAcademicClassId());
+        evictIdentity(access.tenantId(), saved.getAuthUserId());
         evictSchool(access.tenantId(), schoolId);
         return studentResponse(saved);
     }
@@ -230,22 +251,13 @@ public class LmsOperationalCommandService {
         String key = normalizeKey(idempotencyKey);
         List<StudentResponse> result = new ArrayList<>();
         List<String> replayedIds = new ArrayList<>();
+        java.util.Set<String> createdLogins = new java.util.LinkedHashSet<>();
+        Map<String, Classroom> classes = new java.util.HashMap<>();
         for (CreateStudentRequest item : request.items()) {
-            String code = trim(item.studentCode());
-            var existing = code == null ? java.util.Optional.<Student>empty()
-                    : students.findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(access.tenantId(), schoolId, code);
-            if (existing.isPresent()
-                    && !normalize(existing.get().getFullName()).equals(normalize(item.fullName()))) {
-                throw new ConflictException("Import student code belongs to a different student.");
-            }
-            // A code-less row, or an account row for a student imported earlier under another code, is the student
-            // already on the roster with that name (and birthday or class): reuse it instead of creating a duplicate.
-            if (existing.isEmpty() && (code == null || trim(item.password()) != null)) {
-                existing = identity.existing(access.tenantId(), schoolId, item);
-            }
+            var existing = identity.forImportRow(access.tenantId(), schoolId, item);
             if (existing.isPresent()) {
                 Student student = existing.get();
-                if (trim(item.password()) != null && student.getAuthUserId() == null) {
+                if (StudentIdentity.wantsAccount(item) && student.getAuthUserId() == null) {
                     result.add(studentResponse(attachAccount(access, schoolId, student, item)));
                     continue;
                 }
@@ -253,15 +265,39 @@ public class LmsOperationalCommandService {
                 replayedIds.add(student.getId());
                 continue;
             }
-            result.add(createStudent(schoolId, item, access));
+            Student created = insertStudent(schoolId, item, access, classes);
+            result.add(studentResponse(created));
+            if (created.getAuthUserId() != null) createdLogins.add(created.getAuthUserId());
         }
         audit(access, "LMS_STUDENT_IMPORT", schoolId, Map.of("requested", request.items().size(), "idempotencyKey", key == null ? "none" : key));
+        // One eviction per scope for the whole batch (new students skip the per-row eviction of createStudent).
+        evictClasses(access.tenantId(), result.stream().map(StudentResponse::academicClassId).distinct().toArray(String[]::new));
+        evictIdentity(access.tenantId(), createdLogins.toArray(String[]::new));
         evictSchool(access.tenantId(), schoolId);
         return new BulkStudentImportResponse(key, request.items().size(), request.items().size() - replayedIds.size(), replayedIds.size(), result, replayedIds);
     }
 
     @Transactional
     public EnrollmentResponse enroll(EnrollStudentRequest request, String idempotencyKey, UserAccessContext access) {
+        EnrollmentTouched touched = new EnrollmentTouched();
+        EnrollmentResponse response = enrollOne(request, idempotencyKey, access, touched);
+        evictEnrollment(access.tenantId(), touched);
+        return response;
+    }
+
+    /** What one or more enrolments changed, so the caches are evicted once per scope instead of once per student. */
+    private record EnrollmentTouched(Set<String> classIds, Set<String> logins, Set<String> schoolIds) {
+        EnrollmentTouched() { this(new java.util.LinkedHashSet<>(), new java.util.LinkedHashSet<>(), new java.util.LinkedHashSet<>()); }
+    }
+
+    private void evictEnrollment(String tenantId, EnrollmentTouched touched) {
+        evictClasses(tenantId, touched.classIds().toArray(String[]::new)); // the classes left and joined
+        evictIdentity(tenantId, touched.logins().toArray(String[]::new)); // the learners now see the new class at once
+        touched.schoolIds().forEach(schoolId -> evictSchool(tenantId, schoolId));
+    }
+
+    private EnrollmentResponse enrollOne(EnrollStudentRequest request, String idempotencyKey, UserAccessContext access,
+                                         EnrollmentTouched touched) {
         String key = normalizeKey(idempotencyKey);
         if (key != null) {
             var replay = enrollments.findByTenantIdAndIdempotencyKey(access.tenantId(), key);
@@ -286,12 +322,16 @@ public class LmsOperationalCommandService {
         enrollment.setIdempotencyKey(key);
         enrollment.setCreatedBy(access.userId());
         StudentEnrollment saved = enrollments.save(enrollment);
+        String previousClassId = student.getAcademicClassId();
         student.setAcademicClassId(classroom.getId());
         student.setStatus("ENROLLED");
         students.save(student);
         if (assignmentBackfill != null) assignmentBackfill.grantOpenClassAssignments(student);
         audit(access, "LMS_STUDENT_ENROLLED", student.getId(), Map.of("classId", classroom.getId(), "schoolId", student.getSchoolId()));
-        evictSchool(access.tenantId(), student.getSchoolId());
+        if (previousClassId != null) touched.classIds().add(previousClassId);
+        touched.classIds().add(classroom.getId());
+        if (student.getAuthUserId() != null) touched.logins().add(student.getAuthUserId());
+        if (student.getSchoolId() != null) touched.schoolIds().add(student.getSchoolId());
         return enrollmentResponse(saved, false);
     }
 
@@ -301,12 +341,15 @@ public class LmsOperationalCommandService {
         String root = normalizeKey(idempotencyKey);
         List<EnrollmentResponse> results = new ArrayList<>();
         int replayed = 0;
+        EnrollmentTouched touched = new EnrollmentTouched();
         for (EnrollmentItem item : request.items()) {
             String itemKey = root == null ? null : root + ":" + item.studentId() + ":" + item.classId();
-            EnrollmentResponse response = enroll(new EnrollStudentRequest(item.studentId(), item.classId(), item.academicYear()), itemKey, access);
+            EnrollmentResponse response = enrollOne(
+                    new EnrollStudentRequest(item.studentId(), item.classId(), item.academicYear()), itemKey, access, touched);
             replayed += response.replayed() ? 1 : 0;
             results.add(response);
         }
+        evictEnrollment(access.tenantId(), touched);
         return new BulkEnrollmentResponse(root, request.items().size(), request.items().size() - replayed, replayed, results);
     }
 
@@ -316,6 +359,16 @@ public class LmsOperationalCommandService {
         caches.evictScopesAfterCommit(tenantId, Map.of(
                 "lmsClassesBySchool", List.of(schoolId), "lcmsSchoolOperations", List.of(schoolId)));
         caches.evictAfterCommit(tenantId, List.of("lcmsSchoolDirectory"));
+    }
+
+    /** lmsClassWorkspace shows roster, counts and class info per class: a write drops just those classes (null ids ignored). */
+    private void evictClasses(String tenantId, String... classIds) {
+        caches.evictClassWorkspaces(tenantId, classIds);
+    }
+
+    /** lmsStudentIdentity caches login -> student for 60 s: every write of class, school, status, name or login evicts it. */
+    private void evictIdentity(String tenantId, String... authUserIds) {
+        caches.evictStudentIdentity(tenantId, authUserIds);
     }
 
     private void assertVersion(Long requested, Long actual, String resource) {
@@ -350,11 +403,22 @@ public class LmsOperationalCommandService {
         student.setAuthUserId(account.userId()); student.setUsername(account.login()); // the login actually created
         Student saved = students.save(student);
         audit(access, "LMS_STUDENT_ACCOUNT_CREATED", saved.getId(), Map.of("schoolId", schoolId));
+        evictIdentity(access.tenantId(), saved.getAuthUserId());
         return saved;
     }
 
+    /** Flushes so a unique-code race surfaces here; a Postgres transaction cannot continue after it, so the caller retries. */
+    private Student saveNew(Student student, boolean generatedCode) {
+        try {
+            return students.saveAndFlush(student);
+        } catch (DataIntegrityViolationException raced) {
+            throw new ConflictException(generatedCode ? "Generated student code collided, please retry the import."
+                    : "Student code already exists in this school.");
+        }
+    }
+
     private void provisionAccount(UserAccessContext access, String schoolId, Student student, CreateStudentRequest request) {
-        if (trim(request.password()) == null || student.getAuthUserId() != null) return;
+        if (!StudentIdentity.wantsAccount(request) || student.getAuthUserId() != null) return;
         if (accounts == null) throw new BadRequestException("Student account creation is not available.");
         student.setAuthUserId(accounts.provision(access, schoolId, trim(request.username()), trim(request.email()),
                 trim(request.fullName()), trim(request.phone()), request.password()));
@@ -391,6 +455,6 @@ public class LmsOperationalCommandService {
     }
     private String required(String value, String name) { if (value == null || value.isBlank()) throw new BadRequestException(name + " is required."); return value.trim(); }
     private String trim(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private String normalize(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
+    private String normalize(String value) { return StudentIdentity.normalize(value); }
     private String normalizeKey(String value) { String key = trim(value); return key == null ? null : key.length() > 255 ? key.substring(0, 255) : key; }
 }

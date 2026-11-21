@@ -36,7 +36,12 @@ public class CurriculumOperations {
         this.commands = commands;
     }
 
-    @Cacheable(cacheNames = "curriculumTree",
+    /** Must run before {@link #listTree}: the cached method cannot enforce who may ask for review-state nodes. */
+    public void requireReadableTreeStatus(String status) {
+        treeQueries.requireReadableStatus(status);
+    }
+
+    @Cacheable(cacheNames = "curriculumTree", sync = true,
             key = "{#access.tenantId(), #status == null ? 'active' : #status.toLowerCase()}")
     public CurriculumTreeResponse listTree(String status, UserAccessContext access) {
         return treeQueries.tree(status, access);

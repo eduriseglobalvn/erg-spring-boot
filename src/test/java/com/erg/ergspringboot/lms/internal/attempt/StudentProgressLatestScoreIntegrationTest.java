@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.erg.ergspringboot.config.PostgreSqlTestDatabase;
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.StudentProgressRepository;
-import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService;
 import com.erg.ergspringboot.lms.persistence.Assignment;
@@ -63,7 +62,7 @@ class StudentProgressLatestScoreIntegrationTest {
     @Autowired private EntityManager entityManager;
     @Autowired @Qualifier("postgresTransactionManager") private PlatformTransactionManager transactions;
     @Autowired private LmsStudentService students;
-    @Autowired private LmsQuizService quizzes;
+    @Autowired private com.erg.ergspringboot.lms.internal.quiz.runtime.QuizRuntimePackageService packages;
     @Autowired private QuizAttemptGradingService grading;
     @Autowired private AttemptRepository attempts;
     @Autowired private StudentProgressRepository progress;
@@ -117,12 +116,13 @@ class StudentProgressLatestScoreIntegrationTest {
     @Test
     void progressScoreAndAssignmentReportFollowTheLatestHandIn() {
         OffsetDateTime base = OffsetDateTime.now().minusHours(1);
-        AttemptProgressProjector projector = new AttemptProgressProjector(students, quizzes, grading);
+        AttemptProgressProjector projector = new AttemptProgressProjector(
+                new com.erg.ergspringboot.lms.LmsStudentIdentityLookup(students), students, packages, grading);
         int minute = 0;
         // Ten one-point questions: the raw score (4, 6, 9) differs from the percent the reports show.
         for (double percent : new double[] {40, 60, 90}) {
             Attempt saved = attempts.saveAndFlush(graded("sps-att-" + (int) percent, percent, base.plusMinutes(minute += 10)));
-            projector.projectAfterCommit(saved, assignment, TENANT);
+            projector.project(saved, assignment, TENANT);
         }
 
         var row = progress.findByTenantIdAndStudentUserIdAndQuizIdAndAssignmentId(TENANT, "sps-user", "qz_math_g6_base", "sps-asg")

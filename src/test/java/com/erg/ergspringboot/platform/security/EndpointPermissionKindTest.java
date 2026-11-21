@@ -36,10 +36,9 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * holds exactly one XEM permission; if the URL rule and the method annotation both let it through, a read grant
  * can change data. GraphQL mutations check scope inside the controllers and are covered by their own tests.
  */
-@ActiveProfiles({"test", "prototype"})
+@ActiveProfiles("test")
 @SpringBootTest(properties = {
         "erg.auth.bff-enabled=true",
-        "erg.process-local.enabled=true",
         "spring.security.oauth2.client.registration.erg-api.provider=keycloak",
         "spring.security.oauth2.client.registration.erg-api.client-id=catalog-test",
         "spring.security.oauth2.client.registration.erg-api.client-secret=catalog-test",

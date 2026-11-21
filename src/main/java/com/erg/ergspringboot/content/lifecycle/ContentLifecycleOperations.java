@@ -26,9 +26,12 @@ import com.erg.ergspringboot.lcms.persistence.quiz.authoring.QuizDraftRepository
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +52,7 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
     private final QuizDraftRepository quizDrafts;
     private final QuizVersionRepository quizVersions;
     private final ContentLifecycleAccessPolicy accessPolicy;
+    private final CacheManager caches;
 
     public ContentLifecycleOperations(
             ContentLifecycleTransitionRepository transitions,
@@ -60,7 +64,9 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
             QuizRepository quizzes,
             QuizDraftRepository quizDrafts,
             QuizVersionRepository quizVersions,
-            AuthorizationOperations authorization) {
+            AuthorizationOperations authorization,
+            CacheManager caches) {
+        this.caches = caches;
         this.transitions = transitions;
         this.subjects = subjects;
         this.levels = levels;
@@ -75,7 +81,6 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
 
     @Override
     @Transactional(value = "postgresTransactionManager")
-    @org.springframework.cache.annotation.CacheEvict(cacheNames = {"curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace"}, allEntries = true)
     public LifecycleResponse transition(
             UserAccessContext access,
             LifecycleResourceKind kind,
@@ -130,7 +135,22 @@ public class ContentLifecycleOperations implements ContentLifecyclePort {
         ContentLifecycleTransition event = event(access, kind, resourceId, loaded.state(), targetState,
                 request, resultingVersion, sourceVersionId);
         transitions.save(event);
+        evictReadCaches(kind);
         return response(event, false);
+    }
+
+    /** Clear() is tenant-scoped through the tenant context; only the caches this resource kind feeds are dropped. */
+    private void evictReadCaches(LifecycleResourceKind kind) {
+        List<String> names = switch (kind) {
+            case CURRICULUM_SUBJECT, CURRICULUM_LEVEL, CURRICULUM_TOPIC ->
+                    List.of("curriculumTree", "learningResourceLibrary", "lcmsQuizWorkspace", "lcmsQuestionBankWorkspace");
+            case CONTENT_ITEM -> List.of("learningResourceLibrary");
+            case QUESTION, QUIZ -> List.of("lcmsQuizWorkspace", "lcmsQuestionBankWorkspace");
+        };
+        names.forEach(name -> {
+            Cache cache = caches.getCache(name);
+            if (cache != null) cache.clear();
+        });
     }
 
     /** Called by the immutable quiz publish transaction after validation and snapshot persistence. */

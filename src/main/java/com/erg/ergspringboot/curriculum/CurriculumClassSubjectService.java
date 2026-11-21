@@ -17,12 +17,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Which subjects each class of a school studies in an academic year; a save replaces the whole set. */
 @Service
 public class CurriculumClassSubjectService {
+    static final int MAX_ALL_YEARS_ROWS = 5_000;
+
     private final CurriculumClassSubjectAllocationRepository allocations;
 
     public CurriculumClassSubjectService(CurriculumClassSubjectAllocationRepository allocations) {
@@ -35,9 +38,14 @@ public class CurriculumClassSubjectService {
         // No year: every year's rows. The teacher side asks this way, it knows its classes but not the school's year.
         List<CurriculumClassSubjectAllocation> rows = schoolId == null || schoolId.isBlank() ? List.of()
                 : academicYear == null || academicYear.isBlank()
-                ? allocations.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(access.tenantId(), schoolId)
+                ? allocations.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(
+                        access.tenantId(), schoolId, PageRequest.of(0, MAX_ALL_YEARS_ROWS + 1))
                 : allocations.findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(
                         access.tenantId(), schoolId, academicYear);
+        if (rows.size() > MAX_ALL_YEARS_ROWS) {
+            throw CurriculumException.badRequest("CURRICULUM_ALL_YEARS_TOO_LARGE",
+                    "Too many rows without an academicYear; pass academicYear");
+        }
         if (!allSchoolAccess && !access.canAccessEducationUnit(schoolId)) {
             // A teacher has no school scope, only classes: they read the subjects of those classes (BUG-A-043).
             rows = rows.stream().filter(row -> access.managedClassIds().contains(row.getAcademicClassId())).toList();
@@ -144,14 +152,20 @@ public class CurriculumClassSubjectService {
                                  Map<String, Set<String>> wanted) {
         Set<String> keptSubjects = new LinkedHashSet<>();
         wanted.values().forEach(keptSubjects::addAll);
-        LocalDate last = null;
+        Set<String> removedClasses = new LinkedHashSet<>();
+        Set<String> removedPairs = new LinkedHashSet<>();
+        Set<String> leavingSubjects = new LinkedHashSet<>(); // leave the school: their teaching hours count too
         for (CurriculumClassSubjectAllocation row : current) {
             if (wanted.getOrDefault(row.getAcademicClassId(), Set.of()).contains(row.getSubjectId())) continue;
-            last = later(last, allocations.lastTeachingDate(tenant, row.getAcademicClassId(), row.getSubjectId()));
-            if (!keptSubjects.contains(row.getSubjectId())) { // leaves the school: its teaching hours count too
-                String month = allocations.lastTeachingHoursMonth(tenant, schoolId, row.getSubjectId());
-                if (month != null) last = later(last, YearMonth.parse(month).atEndOfMonth());
-            }
+            removedClasses.add(row.getAcademicClassId());
+            removedPairs.add(row.getAcademicClassId() + '|' + row.getSubjectId());
+            if (!keptSubjects.contains(row.getSubjectId())) leavingSubjects.add(row.getSubjectId());
+        }
+        if (removedPairs.isEmpty()) return;
+        LocalDate last = allocations.lastTeachingDate(tenant, removedClasses, removedPairs);
+        if (!leavingSubjects.isEmpty()) {
+            String month = allocations.lastTeachingHoursMonth(tenant, schoolId, leavingSubjects);
+            if (month != null) last = later(last, YearMonth.parse(month).atEndOfMonth());
         }
         if (last == null) return;
         LocalDate allowedFrom = last.plusMonths(1);

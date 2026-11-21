@@ -19,30 +19,39 @@ public interface CurriculumClassSubjectAllocationRepository extends JpaRepositor
     int deleteScope(@Param("tenantId") String tenantId, @Param("schoolId") String schoolId,
                     @Param("academicYear") String academicYear);
 
-    /** Latest timetable lesson (not cancelled) or class-log entry of the subject in the class; null when there is none. */
+    /**
+     * Latest timetable lesson (not cancelled) or class-log entry over the given (class, subject) pairs; null when there
+     * is none. {@code pairKeys} are "classId|subjectId"; {@code classIds} only narrows the scan to the class index.
+     */
     @Query(value = """
             select max(d) from (
                 select max((start_at at time zone 'Asia/Ho_Chi_Minh')::date) d from teaching_schedule_events
-                where tenant_id = :tenantId and academic_class_id = :classId and subject_id = :subjectId
+                where tenant_id = :tenantId and academic_class_id in (:classIds)
+                  and (academic_class_id || '|' || subject_id) in (:pairKeys)
                   and upper(coalesce(status, '')) not like 'CANCEL%'
                 union all
                 select max(lesson_date) from lms_lesson_log_entries
-                where tenant_id = :tenantId and class_id = :classId and subject_id = :subjectId) x
+                where tenant_id = :tenantId and class_id in (:classIds)
+                  and (class_id || '|' || subject_id) in (:pairKeys)) x
             """, nativeQuery = true)
-    java.time.LocalDate lastTeachingDate(@Param("tenantId") String tenantId, @Param("classId") String classId,
-                                         @Param("subjectId") String subjectId);
+    java.time.LocalDate lastTeachingDate(@Param("tenantId") String tenantId, @Param("classIds") Collection<String> classIds,
+                                         @Param("pairKeys") Collection<String> pairKeys);
 
-    /** Latest month ("yyyy-MM") with teaching-hour lines of the subject at the school; null when there is none. */
-    @Query(value = "select max(month) from tk_teaching_month_lines where tenant_id = :tenantId and school_id = :schoolId and subject_id = :subjectId",
-            nativeQuery = true)
+    /** Latest month ("yyyy-MM") with teaching-hour lines of any of the subjects at the school; null when there is none. */
+    @Query(value = "select max(month) from tk_teaching_month_lines where tenant_id = :tenantId and school_id = :schoolId "
+            + "and subject_id in (:subjectIds)", nativeQuery = true)
     String lastTeachingHoursMonth(@Param("tenantId") String tenantId, @Param("schoolId") String schoolId,
-                                  @Param("subjectId") String subjectId);
+                                  @Param("subjectIds") Collection<String> subjectIds);
 
     /** Class ids of this school and tenant among {@code ids} (native: classes belong to the LMS module). */
     @Query(value = "select id from academic_classes where tenant_id = :tenantId and school_id = :schoolId and id in (:ids)",
             nativeQuery = true)
     List<String> existingClassIds(@Param("tenantId") String tenantId, @Param("schoolId") String schoolId,
                                   @Param("ids") Collection<String> ids);
+
+    /** The all-years read: capped by the caller, who asks for one row more than its limit. */
+    List<CurriculumClassSubjectAllocation> findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(
+            String tenantId, String schoolId, org.springframework.data.domain.Pageable pageable);
 
     List<CurriculumClassSubjectAllocation> findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(
             String tenantId, String schoolId);

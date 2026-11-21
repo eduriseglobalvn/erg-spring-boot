@@ -29,6 +29,7 @@ class ReportAggregateReconciliationWorkerTest {
             public void reconcile(Task task) {
                 observedTenants.add(TenantContext.current().tenantId());
             }
+            public void recordFailure(Task task, String error, int maxAttempts) { }
         };
 
         int processed = new ReportAggregateReconciliationWorker(store, new ImmediateTransactionManager())
@@ -37,6 +38,29 @@ class ReportAggregateReconciliationWorkerTest {
         assertThat(processed).isEqualTo(2);
         assertThat(observedTenants).containsExactly("tenant-a", "tenant-b");
         assertThat(TenantContext.current()).isNull();
+    }
+
+    @Test
+    void poisonTaskIsRecordedAndDoesNotStopTheRestOfTheBatch() {
+        List<String> reconciled = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        ReportAggregateReconciliationStore store = new ReportAggregateReconciliationStore() {
+            public List<Task> claim(int limit) {
+                return List.of(new Task("tenant-a", "poison", OffsetDateTime.now()), new Task("tenant-b", "ok", OffsetDateTime.now()));
+            }
+            public void reconcile(Task task) {
+                if (task.aggregateId().equals("poison")) throw new IllegalStateException("bad row");
+                reconciled.add(task.aggregateId());
+            }
+            public void recordFailure(Task task, String error, int maxAttempts) {
+                failed.add(task.aggregateId() + "|" + error + "|" + maxAttempts);
+            }
+        };
+
+        new ReportAggregateReconciliationWorker(store, new ImmediateTransactionManager()).runDueBatch();
+
+        assertThat(reconciled).containsExactly("ok");
+        assertThat(failed).containsExactly("poison|IllegalStateException: bad row|8");
     }
 
     private static final class ImmediateTransactionManager extends AbstractPlatformTransactionManager {

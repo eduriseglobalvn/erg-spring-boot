@@ -4,6 +4,8 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.ContentScope;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizDetailResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizPackageResponse;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.QuizResponse;
+import com.erg.ergspringboot.lms.QuizStartInfo;
+import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
@@ -67,6 +69,26 @@ public class QuizRuntimePackageService {
         // The package carries the quiz id of its version, so the version row (and its JSON blobs) need not be loaded.
         return packageRepository.findByQuizVersionIdAndTenantId(quizVersionId, tenantId)
                 .filter(pkg -> quizId.equals(pkg.getQuizId()));
+    }
+
+    /**
+     * What an attempt start needs from the quiz and its package (pinned version, or the active one when
+     * {@code quizVersionId} is null). Cached; every eviction of quizRuntimePackage also evicts quizStartInfo.
+     */
+    @Cacheable(
+            cacheNames = "quizStartInfo",
+            key = "{#tenantId, #quizId, #quizVersionId == null ? 'active' : #quizVersionId}",
+            sync = true
+    )
+    public QuizStartInfo startInfo(String tenantId, String quizId, String quizVersionId) {
+        if (quizVersionId != null) {
+            // Pinned version: the quiz and its package in one statement.
+            List<Object[]> rows = packageRepository.findQuizWithVersionPackage(tenantId, quizId, quizVersionId);
+            return rows.isEmpty() ? QuizStartInfo.of(null, null)
+                    : QuizStartInfo.of((Quiz) rows.getFirst()[0], (QuizPackage) rows.getFirst()[1]);
+        }
+        Optional<QuizPackage> pkg = activePackageEntity(tenantId, quizId);
+        return QuizStartInfo.of(quizRepository.findByIdAndTenantId(quizId, tenantId).orElse(null), pkg.orElse(null));
     }
 
     /** A package by its own id (offline result import); empty when it is not in the tenant. */

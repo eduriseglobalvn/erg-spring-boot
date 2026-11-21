@@ -69,6 +69,13 @@ jobs:
               --jq '.workflow_runs[0].head_sha // empty')
           fi
           [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "::error::No deployable commit: need a 40-hex sha or a green CI run on main"; exit 1; }
+          if [ -n "$INPUT_SHA" ]; then
+            # A hand-typed sha must be on main and have a green ci.yml push run: no deploying a side branch or red build.
+            rel=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$sha" --jq .status)
+            case "$rel" in identical|behind) ;; *) echo "::error::$sha is not an ancestor of main (compare status: $rel)"; exit 1;; esac
+            green=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$CI_WORKFLOW_FILE/runs?head_sha=$sha&event=push&status=success&per_page=1" --jq .total_count)
+            [ "$green" -ge 1 ] || { echo "::error::$sha has no successful $CI_WORKFLOW_FILE run"; exit 1; }
+          fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           now=$(TZ=Asia/Ho_Chi_Minh date +%H:%M); minutes=$((10#${now%:*} * 60 + 10#${now#*:}))
           if [ "$INPUT_FORCE" != true ] && [ "$minutes" -ge 390 ] && [ "$minutes" -lt 1290 ]; then

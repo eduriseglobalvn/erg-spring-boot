@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Class workspace read projection with bounded paging and optional score/risk summaries. */
 @Service
@@ -20,11 +21,18 @@ public class LmsClassWorkspaceReadUseCase {
     private final ClassroomRepository classrooms; private final StudentRepository students;
     private final AssignmentRepository assignments; private final AssignmentResourceRepository resources;
     private final AttemptRepository attempts; private final ClassStudentScoreRepository studentScores;
+    private final ClassRiskSummaryRepository risks;
     public LmsClassWorkspaceReadUseCase(ClassroomRepository classrooms, StudentRepository students,
-            AssignmentRepository assignments, AssignmentResourceRepository resources, AttemptRepository attempts, ClassStudentScoreRepository studentScores) {
-        this.classrooms=classrooms; this.students=students; this.assignments=assignments; this.resources=resources; this.attempts=attempts; this.studentScores=studentScores;
+            AssignmentRepository assignments, AssignmentResourceRepository resources, AttemptRepository attempts, ClassStudentScoreRepository studentScores,
+            ClassRiskSummaryRepository risks) {
+        this.classrooms=classrooms; this.students=students; this.assignments=assignments; this.resources=resources; this.attempts=attempts; this.studentScores=studentScores; this.risks=risks;
     }
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
     public Page<ClassWorkspaceProjection> schoolClasses(String tenant,String school,String status,Pageable page){return classrooms.findSchoolClassWorkspaces(tenant,school,normalize(status),page);}
+    // Callers authorize before this call; includeScore/includeRisk are permission-derived, so they are part of the key.
+    @Cacheable(cacheNames = "lmsClassWorkspace", sync = true, key = "{#tenantId, #classId, #schoolId, #studentStatus, #page, #size, "
+            + "#assignmentStatus, #assignmentPage, #assignmentSize, #includeScore, #includeRisk}")
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
     public ClassWorkspaceResponse query(String tenantId,String classId,String schoolId,String studentStatus,Integer page,Integer size,String assignmentStatus,Integer assignmentPage,Integer assignmentSize,boolean includeScore,boolean includeRisk){
         String tenant=require(tenantId,"tenantId"), id=require(classId,"classId"), school=blank(schoolId);
         ClassWorkspaceProjection info=classrooms.findClassWorkspace(tenant,id,school).orElseThrow(()->new NoSuchElementException("Class workspace not found."));
@@ -33,7 +41,7 @@ public class LmsClassWorkspaceReadUseCase {
         Page<StudentRosterProjection> roster=students.findClassRoster(tenant,id,normalize(studentStatus),studentPage);
         Page<AssignmentCardProjection> cards=assignments.findClassAssignmentCards(tenant,id,LmsStatePolicy.assignmentFilter(assignmentStatus),assignmentPageable);
         ClassScoreSummaryResponse scores=includeScore?score(attempts.summarizeClassWorkspaceScores(tenant,id)):null;
-        ClassRiskSummaryResponse risks=includeRisk?risk(students.summarizeClassWorkspaceRisks(tenant,id,50.0D)):null;
+        ClassRiskSummaryResponse risks=includeRisk?risk(this.risks.summarizeClassWorkspaceRisks(tenant,id,50.0D)):null;
         Map<String,ClassStudentScoreProjection> perStudent=includeScore?studentScores(tenant,id,roster.getContent()):Map.of();
         return new ClassWorkspaceResponse(tenant,classInfo(info),scores,risks,studentPage(roster,perStudent),assignmentPage(cards,tenant));
     }

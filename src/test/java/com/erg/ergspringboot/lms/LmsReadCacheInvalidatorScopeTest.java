@@ -33,9 +33,40 @@ class LmsReadCacheInvalidatorScopeTest {
         verify(invalidations).clearTenantCacheScope("t1", "quizQuestionAnalytics", "quiz-1");
         verify(invalidations).clearTenantCacheScope("t1", "quizQuestionAnalytics", "qv-1");
         verify(invalidations).clearTenantCacheScope("t1", "studentDashboard", "user-s1");
-        verify(invalidations).clearTenantCache("t1", "lmsClassWorkspace");
+        verify(invalidations).clearTenantCacheScope("t1", "studentTier", "user-s1");
+        verify(invalidations).clearTenantCacheScope("t1", "lmsClassWorkspace", "class-1");
+        verify(invalidations, never()).clearTenantCache(eq("t1"), eq("lmsClassWorkspace"));
         verify(invalidations, never()).clearTenantCache(eq("t1"), eq("studentDashboard"));
         verify(invalidations, never()).clearTenantCache(eq("t1"), eq("lmsHomeworkWorkspace"));
+    }
+
+    @Test
+    void aClassLessAssignmentClearsEveryClassWorkspaceOfTheTenant() {
+        Assignment classless = assignment();
+        classless.setAcademicClassId(null);
+
+        invalidator.evictAttemptAfterCommit("t1", attempt(), classless, "user-s1");
+
+        verify(invalidations).clearTenantCache("t1", "lmsClassWorkspace");
+    }
+
+    @Test
+    void aRosterWriteClearsOnlyThoseClassWorkspaces() {
+        invalidator.evictClassWorkspaces("t1", "class-1", null, "class-2");
+
+        verify(invalidations).clearTenantCacheScope("t1", "lmsClassWorkspace", "class-1");
+        verify(invalidations).clearTenantCacheScope("t1", "lmsClassWorkspace", "class-2");
+        verify(invalidations, never()).clearTenantCache(eq("t1"), eq("lmsClassWorkspace"));
+    }
+
+    @Test
+    void anAttemptAndARosterWriteAlsoDropTheScoreBoardOfThatClass() {
+        invalidator.evictAttemptAfterCommit("t1", attempt(), assignment(), "user-s1");
+        invalidator.evictClassWorkspaces("t2", "class-9");
+
+        verify(invalidations).clearTenantCacheScope("t1", "lmsClassScoreBoard", "class-1");
+        verify(invalidations).clearTenantCacheScope("t2", "lmsClassScoreBoard", "class-9");
+        verify(invalidations, never()).clearTenantCache(eq("t1"), eq("lmsClassScoreBoard"));
     }
 
     @Test
@@ -44,6 +75,23 @@ class LmsReadCacheInvalidatorScopeTest {
 
         verify(invalidations).clearTenantCache("t1", "studentDashboard");
         verify(invalidations, never()).clearTenantCacheScope(eq("t1"), eq("studentDashboard"), anyString());
+    }
+
+    @Test
+    void aTenantWideEvictionDropsLocalEntriesNowInsideATransactionAndAgainAfterCommit() {
+        ErgTieredCache cache = mock(ErgTieredCache.class);
+        when(manager.getCache("studentDashboard")).thenReturn(cache);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            invalidator.evictAfterCommit("t1", java.util.List.of("studentDashboard"));
+            verify(cache, org.mockito.Mockito.times(1)).clearLocal("t1");
+
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(cache, org.mockito.Mockito.times(2)).clearLocal("t1");
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     private static Attempt attempt() {
@@ -59,6 +107,7 @@ class LmsReadCacheInvalidatorScopeTest {
         Assignment assignment = new Assignment();
         assignment.setId("asg-1");
         assignment.setAssignedBy("teacher-1");
+        assignment.setAcademicClassId("class-1");
         return assignment;
     }
 }

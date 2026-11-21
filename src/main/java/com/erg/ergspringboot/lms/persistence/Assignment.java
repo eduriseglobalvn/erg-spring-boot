@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.lms.persistence;
 
 import com.erg.ergspringboot.model.BaseEntity;
+import jakarta.persistence.Basic;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -50,6 +51,9 @@ public class Assignment extends BaseEntity {
     @Column(name = "subject_id")
     private String subjectId;
 
+    /** Legacy snapshot, lazy through bytecode enhancement: only the no-recipient-rows fallbacks in the access policy read it. */
+    @Basic(fetch = FetchType.LAZY)
+    @ToString.Exclude
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "student_ids", columnDefinition = "jsonb")
     private List<String> studentIds;

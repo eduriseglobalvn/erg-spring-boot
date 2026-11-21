@@ -58,7 +58,7 @@ class LearningStandardsServiceTest {
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         service = new LearningStandardsService(packages, registrations, statements, receipts, storage,
-                ltiVerifier, events, audit);
+                ltiVerifier, events, audit, org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
         access = new UserAccessContext("user-1", "tenant-1", List.of("*"), List.of("*"), null, null);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 ErgPrincipal.authenticated("user-1", "session-1", "tenant-1", List.of("teacher"),
@@ -122,6 +122,22 @@ class LearningStandardsServiceTest {
         assertThat(response.quarantineReason()).contains("artifact");
         assertThatThrownBy(() -> service.launchPackage(access, "package-1"))
                 .isInstanceOf(ConflictException.class);
+    }
+
+    @Test
+    void packageChangedWhileTheStorageCallRanIsRejectedWhenRecording() {
+        LearningPackage claimed = persistedPackage("package-1", "UPLOADING");
+        LearningPackage moved = persistedPackage("package-1", "UPLOADING");
+        moved.setRecordVersion(1L);
+        when(packages.findByTenantIdAndId("tenant-1", "package-1"))
+                .thenReturn(Optional.of(claimed), Optional.of(moved));
+        when(receipts.findByTenantIdAndIdempotencyKeyAndOperation("tenant-1", "validate-1", "VALIDATE_PACKAGE"))
+                .thenReturn(Optional.empty());
+        when(storage.head("tenant-1", claimed.getArtifactKey())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.validatePackage(access, "package-1", new ValidatePackageRequest(0L, MANIFEST),
+                "validate-1", "corr-1")).isInstanceOf(ConflictException.class);
+        verify(packages, org.mockito.Mockito.never()).saveAndFlush(any());
     }
 
     @Test

@@ -152,12 +152,52 @@ class AccountActionGuardTest {
     }
 
     @Test
+    void bulkLoadsTargetsAndAssignmentsOnceAndRejectsAMissingTarget() {
+        User teacher = user("teacher-1");
+        teacher.setRoles(new LinkedHashSet<>(List.of(teacherRole)));
+        when(users.findWithAuthorityByTenantIdAndIdIn(anyString(), any())).thenReturn(List.of(teacher));
+
+        assertThatThrownBy(() -> guard.assertCanActOnAll(pdt, List.of("teacher-1", "ghost"), AccountAction.DELETE))
+                .isInstanceOf(com.erg.ergspringboot.exception.ResourceNotFoundException.class);
+        assertThatCode(() -> guard.assertCanActOnAll(pdt, List.of("teacher-1"), AccountAction.DELETE))
+                .doesNotThrowAnyException();
+
+        verify(users, never()).findByIdAndTenantId(anyString(), anyString());
+        verify(assignments, never()).findActiveForUser(anyString(), anyString(), any());
+    }
+
+    @Test
     void bulkRejectsWholeBatchWhenOneTargetIsAdmin() {
-        target("teacher-1", teacherRole);
-        target("admin-2", superAdminRole);
+        User teacher = target("teacher-1", teacherRole);
+        User admin = target("admin-2", superAdminRole);
+        when(users.findWithAuthorityByTenantIdAndIdIn(anyString(), any())).thenReturn(List.of(teacher, admin));
 
         assertThatThrownBy(() -> guard.assertCanActOnAll(pdt, List.of("teacher-1", "admin-2"), AccountAction.DELETE))
                 .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void bulkAssignDecidesLikeAssignPerTargetFromOneLoad() {
+        User teacher = user("teacher-1");
+        teacher.setRoles(new LinkedHashSet<>(List.of(teacherRole)));
+        when(users.findWithAuthorityByTenantIdAndIdIn(anyString(), any())).thenReturn(List.of(teacher));
+        when(roles.findAllById(any())).thenReturn(List.of(teacherRole));
+
+        assertThatCode(() -> guard.assertCanAssignAll(pdt, List.of("teacher-1"), "role_lms_teacher"))
+                .doesNotThrowAnyException();
+        // a role beyond the actor's own authority rejects the batch, as assertCanAssign does per target
+        when(roles.findAllById(any())).thenReturn(List.of(teacherRole, admissionsRole));
+        assertThatThrownBy(() -> guard.assertCanAssignAll(pdt, List.of("teacher-1"), "role_admissions"))
+                .isInstanceOf(ForbiddenException.class);
+        // an unknown role id is a bad request; a missing target is not found
+        when(roles.findAllById(any())).thenReturn(List.of(teacherRole));
+        assertThatThrownBy(() -> guard.assertCanAssignAll(pdt, List.of("teacher-1"), "role_ghost"))
+                .isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> guard.assertCanAssignAll(pdt, List.of("teacher-1", "ghost"), "role_operations"))
+                .isInstanceOf(com.erg.ergspringboot.exception.ResourceNotFoundException.class);
+
+        verify(users, never()).findByIdAndTenantId(anyString(), anyString());
+        verify(assignments, never()).findActiveForUser(anyString(), anyString(), any());
     }
 
     @Test

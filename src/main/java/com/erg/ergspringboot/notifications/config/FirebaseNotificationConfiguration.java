@@ -12,11 +12,9 @@ import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.ImportRuntimeHints;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
-@ImportRuntimeHints(FirebaseNotificationRuntimeHints.class)
 public class FirebaseNotificationConfiguration {
 
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(FirebaseNotificationConfiguration.class);

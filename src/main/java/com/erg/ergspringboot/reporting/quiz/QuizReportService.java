@@ -84,15 +84,31 @@ public class QuizReportService {
     /** Filtered assignment progress for REST reporting and bounded exports. */
     public AssignmentReportResponse assignmentReport(
             String tenantId, String assignmentId, AssignmentProgressFilter filter) {
-        AssignmentProgressFilter safe = filter == null
-                ? new AssignmentProgressFilter(null, null, null, null, java.time.ZoneId.of("UTC"), 0, 100)
-                : filter;
+        AssignmentProgressFilter safe = safe(filter);
+        return assignmentReport(tenantId, assignmentId, safe, summary(tenantId, assignmentId, safe));
+    }
+
+    /** The filter's SQL summary, independent of the page: an export computes it once for all its pages. */
+    public StudentProgressSummaryProjection summary(String tenantId, String assignmentId, AssignmentProgressFilter filter) {
+        AssignmentProgressFilter safe = safe(filter);
+        return studentProgressRepository.summarizeAssignment(
+                tenantId, assignmentId, safe.classId(), safe.status(), safe.submittedFrom(), safe.submittedTo());
+    }
+
+    /** One page of the filtered report with a summary from {@link #summary}. */
+    public AssignmentReportResponse assignmentReport(String tenantId, String assignmentId, AssignmentProgressFilter filter,
+            StudentProgressSummaryProjection summary) {
+        AssignmentProgressFilter safe = safe(filter);
         Page<StudentProgress> pageResult = studentProgressRepository.findAssignmentReport(
                 tenantId, assignmentId, safe.classId(), safe.status(), safe.submittedFrom(), safe.submittedTo(),
                 PageRequest.of(safe.page(), safe.size()));
-        StudentProgressSummaryProjection summary = studentProgressRepository.summarizeAssignment(
-                tenantId, assignmentId, safe.classId(), safe.status(), safe.submittedFrom(), safe.submittedTo());
         return report(assignmentId, pageResult, summary, safe.page(), safe.size());
+    }
+
+    private static AssignmentProgressFilter safe(AssignmentProgressFilter filter) {
+        return filter == null
+                ? new AssignmentProgressFilter(null, null, null, null, java.time.ZoneId.of("UTC"), 0, 100)
+                : filter;
     }
 
     /** Counts and average always come from one SQL summary, never re-derived from the visible page. */

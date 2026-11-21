@@ -35,6 +35,32 @@ public final class SessionResponses {
     ) {
     }
 
+    /** Identity only: GET /api/v1/sessions/me, no unit or class lists. */
+    public record SessionIdentityResponse(
+            SessionBootstrapUser user,
+            String tenantId,
+            SessionBootstrapPermissions permissions,
+            List<String> portals,
+            List<String> workspaces,
+            AccountLifecycleResponse lifecycle
+    ) {
+    }
+
+    /** GET /api/v1/sessions/scope: current scope plus one page of units and a bounded list of classes. */
+    public record SessionScopeResponse(
+            SessionBootstrapScope currentScope,
+            SessionScopeUnits units,
+            SessionScopeClasses classes,
+            boolean truncated
+    ) {
+    }
+
+    public record SessionScopeUnits(List<SessionBootstrapUnit> items, int page, int size, long totalItems, boolean hasNext) {
+    }
+
+    public record SessionScopeClasses(List<SessionBootstrapClass> items, boolean hasNext) {
+    }
+
     public record SessionBootstrapUser(
             String id,
             String name,

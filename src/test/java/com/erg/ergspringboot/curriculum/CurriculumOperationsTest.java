@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.curriculum.internal.CurriculumReviewAccess;
 import com.erg.ergspringboot.curriculum.internal.command.CurriculumCommandUseCase;
+import com.erg.ergspringboot.curriculum.internal.impact.CurriculumAttemptImpactCounter;
 import com.erg.ergspringboot.curriculum.internal.impact.CurriculumImpactQueryUseCase;
 import com.erg.ergspringboot.lcms.internal.curriculum.LcmsCurriculumUsageCounter;
 import com.erg.ergspringboot.learningcontent.internal.LearningContentCurriculumUsageCounter;
@@ -66,6 +67,9 @@ class CurriculumOperationsTest {
     @Mock
     private AttemptRepository attemptRepository;
 
+    @Mock
+    private CurriculumAttemptImpactCounter attemptCounter;
+
     private CurriculumOperations service;
 
     @BeforeEach
@@ -74,8 +78,9 @@ class CurriculumOperationsTest {
         CurriculumImpactQueryUseCase impacts = new CurriculumImpactQueryUseCase(
                 subjectRepository, levelRepository, topicRepository, List.of(
                         new LcmsCurriculumUsageCounter(questionRepository, quizRepository, quizVersionRepository),
-                        new LmsCurriculumUsageCounter(assignmentRepository, attemptRepository),
-                        new LearningContentCurriculumUsageCounter(topicContentItemRepository)));
+                        new LmsCurriculumUsageCounter(assignmentRepository),
+                        new LearningContentCurriculumUsageCounter(topicContentItemRepository)),
+                attemptCounter);
         service = new CurriculumOperations(
                 new CurriculumTreeQueryUseCase(subjectRepository, levelRepository, topicRepository, review),
                 impacts,
@@ -150,7 +155,7 @@ class CurriculumOperationsTest {
         when(quizRepository.countImpactByTenantAndTopic("tenant-a", "topic-1")).thenReturn(4L);
         when(quizVersionRepository.countPublishedImpactByTenantAndTopic("tenant-a", "topic-1")).thenReturn(5L);
         when(assignmentRepository.countImpactByTenantAndTopic("tenant-a", "topic-1")).thenReturn(6L);
-        when(attemptRepository.countImpactByTenantAndTopic("tenant-a", "topic-1")).thenReturn(7L);
+        when(attemptCounter.count("tenant-a", CurriculumUsageCounter.Node.TOPIC, "topic-1")).thenReturn(7L);
 
         var impact = service.topicImpact("topic-1", access());
 
@@ -162,6 +167,28 @@ class CurriculumOperationsTest {
         assertThat(impact.impact().assignments()).isEqualTo(6L);
         assertThat(impact.impact().studentAttempts()).isEqualTo(7L);
         assertThat(impact.todo()).doesNotContain("TODO");
+    }
+
+    @Test
+    void hardDeleteTopicIsRejectedWhenAnAttemptExistsAndUsesTheExistenceProbe() {
+        CurriculumTopic topic = topic("topic-1", "level-1", "draft");
+        when(topicRepository.findByTenantIdAndId("tenant-a", "topic-1")).thenReturn(Optional.of(topic));
+        when(attemptCounter.exists("tenant-a", CurriculumUsageCounter.Node.TOPIC, "topic-1")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.hardDeleteTopic("topic-1", access()))
+                .isInstanceOf(CurriculumException.class)
+                .hasMessageContaining("impact report has no dependencies");
+        verify(attemptCounter, never()).count(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+        verify(topicRepository, never()).delete(topic);
+    }
+
+    @Test
+    void reviewStateTreeStatusIsRejectedForACallerWithoutCurriculumManage() {
+        assertThatThrownBy(() -> service.requireReadableTreeStatus("in_review"))
+                .isInstanceOf(CurriculumException.class);
+        service.requireReadableTreeStatus("active");
+        service.requireReadableTreeStatus(null);
     }
 
     @Test

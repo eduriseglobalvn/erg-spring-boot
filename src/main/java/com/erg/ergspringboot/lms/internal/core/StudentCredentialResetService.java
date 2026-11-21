@@ -7,6 +7,7 @@ import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.platform.security.ErgAuthProperties;
 import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.users.CredentialHasher;
@@ -18,7 +19,7 @@ import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
-import java.security.SecureRandom;
+
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -27,15 +28,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reissues a student's password for the staff who manage the student's class (BUG-A-008 / BUG-C-011). The new
- * password is returned once and never logged or audited; a student is never forced to change it (STU-01).
+ * Reissues a student's password for the staff who manage the student's class (BUG-A-008 / BUG-C-011). The default
+ * password is returned and never logged or audited; a student is never forced to change it (STU-01).
  */
 @Service
 public class StudentCredentialResetService {
-
-    private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-    private static final int PASSWORD_LENGTH = 10;
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final ClassroomRepository classrooms;
     private final StudentRepository students;
@@ -46,12 +43,14 @@ public class StudentCredentialResetService {
     private final CredentialHasher passwords;
     private final com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository loginAttempts;
     private final com.erg.ergspringboot.lms.LmsCallerPermissions permissions;
+    private final ErgAuthProperties authProperties;
 
     public StudentCredentialResetService(ClassroomRepository classrooms, StudentRepository students, UserRepository users,
             UserRoleAssignmentRepository assignments, AuthSessionRepository sessions,
             UserActivityRepository activities, CredentialHasher passwords,
             com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository loginAttempts,
-            com.erg.ergspringboot.lms.LmsCallerPermissions permissions) {
+            com.erg.ergspringboot.lms.LmsCallerPermissions permissions, ErgAuthProperties authProperties) {
+        this.authProperties = authProperties;
         this.loginAttempts = loginAttempts;
         this.permissions = permissions;
         this.classrooms = classrooms;
@@ -86,10 +85,8 @@ public class StudentCredentialResetService {
         if (!StudentAccountPolicy.isStudentOnly(user, assignments.findActiveForUser(user.getId(), tenantId, now), now)) {
             throw new ForbiddenException("Only student accounts can be reset here.");
         }
-        // Owner rule 17/11/2026: a student's password is the username itself. Usernames under 6 characters
-        // (older accounts) are too short for a password, so those still get a random one.
-        String username = user.getUsername() == null ? "" : user.getUsername().trim().toLowerCase();
-        String password = username.length() >= 6 ? username : generate();
+        // Owner rule 21/11/2026: a reset always returns the student to the default password (erg.auth.student-default-password).
+        String password = authProperties.getStudentDefaultPassword();
         user.setPasswordHash(passwords.hash(password));
         user.setMustChangePassword(false);
         users.save(user);
@@ -111,11 +108,5 @@ public class StudentCredentialResetService {
         activity.setCreatedAt(now);
         activities.save(activity);
         return new StudentCredentialResetResponse(student.getId(), user.getUsername(), password);
-    }
-
-    private static String generate() {
-        StringBuilder out = new StringBuilder(PASSWORD_LENGTH);
-        for (int i = 0; i < PASSWORD_LENGTH; i++) out.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
-        return out.toString();
     }
 }

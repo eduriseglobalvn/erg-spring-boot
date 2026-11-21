@@ -86,7 +86,7 @@ public class CurriculumCommandUseCase {
 
     public CurriculumHardDeleteResponse hardDeleteSubject(String id, UserAccessContext access) {
         CurriculumSubject subject = requireSubject(id, tenantId(access));
-        requireHardDeleteAllowed(impacts.subjectImpact(id, access));
+        requireHardDeleteAllowed(impacts.subjectImpact(id, access, true));
         subjects.delete(subject);
         return new CurriculumHardDeleteResponse(id, "subject", true);
     }
@@ -131,7 +131,7 @@ public class CurriculumCommandUseCase {
 
     public CurriculumHardDeleteResponse hardDeleteLevel(String id, UserAccessContext access) {
         CurriculumLevel level = requireLevel(id, tenantId(access));
-        requireHardDeleteAllowed(impacts.levelImpact(id, access));
+        requireHardDeleteAllowed(impacts.levelImpact(id, access, true));
         levels.delete(level);
         return new CurriculumHardDeleteResponse(id, "level", true);
     }
@@ -182,7 +182,7 @@ public class CurriculumCommandUseCase {
 
     public CurriculumHardDeleteResponse hardDeleteTopic(String id, UserAccessContext access) {
         CurriculumTopic topic = requireTopic(id, tenantId(access));
-        requireHardDeleteAllowed(impacts.topicImpact(id, access));
+        requireHardDeleteAllowed(impacts.topicImpact(id, access, true));
         topics.delete(topic);
         return new CurriculumHardDeleteResponse(id, "topic", true);
     }

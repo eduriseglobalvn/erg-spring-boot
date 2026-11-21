@@ -72,12 +72,15 @@ public class LcmsCommandUseCase implements LcmsCommandPort {
     @Override public boolean storeSignedMediaUpload(String uploadUrl, String tenantId, String mimeType, byte[] bytes) { return media.storeSignedUpload(uploadUrl, tenantId, mimeType, bytes); }
     @Override public MediaCommitResponse commitMedia(String tenantId, MediaCommitRequest request) { return media.commit(tenantId, request); }
     @Override public LcmsQuizBundleResponse exportActiveBundle(String tenantId, String quizId) {
+        ownership.requireVisible(tenantId, quizId);
         return LcmsQuizBundleResponse.fromLegacy(bundles.exportActive(tenantId, quizId));
     }
     @Override public LcmsQuizBundleResponse exportVersionBundle(String tenantId, String quizVersionId) {
+        if (ownership.callerIsTeacher()) ownership.requireVisible(tenantId, bundles.quizIdOfVersion(tenantId, quizVersionId));
         return LcmsQuizBundleResponse.fromLegacy(bundles.exportVersion(tenantId, quizVersionId));
     }
     @Override public LcmsQuizPackageManifest exportPackageManifest(String tenantId, String packageId) {
+        if (ownership.callerIsTeacher()) ownership.requireVisible(tenantId, bundles.quizIdOfPackage(tenantId, packageId));
         return bundles.manifest(tenantId, packageId);
     }
     @Override public LcmsQuizPackageUpdateFeedResponse packageUpdates(
@@ -86,9 +89,11 @@ public class LcmsCommandUseCase implements LcmsCommandPort {
             String releaseChannel,
             Integer currentVersionNumber,
             String runtimeVersion) {
+        ownership.requireVisible(tenantId, quizId);
         return bundles.updates(tenantId, quizId, releaseChannel, currentVersionNumber, runtimeVersion);
     }
     @Override public LcmsQuizBundleResponse.RevokeResponse revokeBundle(String tenantId, String packageId, String reason) {
+        if (ownership.callerIsTeacher()) ownership.requireOwn(tenantId, bundles.quizIdOfPackage(tenantId, packageId));
         var revoked = bundles.revoke(tenantId, packageId, reason);
         String etag = revoked.getContentHash() == null || revoked.getContentHash().isBlank()
                 ? revoked.getId()

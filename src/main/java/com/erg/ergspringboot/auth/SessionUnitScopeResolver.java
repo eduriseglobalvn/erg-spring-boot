@@ -3,7 +3,10 @@ package com.erg.ergspringboot.auth;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapClass;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapScope;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapUnit;
+import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionScopeClasses;
+import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionScopeUnits;
 import com.erg.ergspringboot.exception.BadRequestException;
+import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.users.persistence.authorization.Permission;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
@@ -16,7 +19,6 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
-import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -24,7 +26,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 /**
@@ -33,6 +39,7 @@ import org.springframework.data.domain.PageRequest;
  */
 final class SessionUnitScopeResolver {
 
+    private static final Logger log = LoggerFactory.getLogger(SessionUnitScopeResolver.class);
     private static final int MAX_BOOTSTRAP_UNITS = 500;
     private static final int MAX_BOOTSTRAP_CLASSES = 500;
 
@@ -50,23 +57,105 @@ final class SessionUnitScopeResolver {
         this.userRoleAssignmentRepository = userRoleAssignmentRepository;
     }
 
-    List<ManagedUnit> resolveManageableUnits(
-            User user,
-            List<String> roles,
-            boolean canAccessGlobalErg,
-            boolean allTenantUnits,
-            String tenantId
-    ) {
-        List<EducationUnit> educationUnits = canAccessGlobalErg
+    List<ManagedUnit> resolveManageableUnits(ScopeCaller caller) {
+        List<EducationUnit> educationUnits = caller.platformWide()
                 ? educationUnitRepository.findTop500ByOrderByNameAsc()
-                : allTenantUnits
-                        ? educationUnitRepository.findByTenantIdOrderByNameAsc(tenantId, PageRequest.of(0, MAX_BOOTSTRAP_UNITS))
-                        : scopedEducationUnits(user, roles, tenantId);
+                : caller.allUnits()
+                        ? educationUnitRepository.findByTenantIdOrderByNameAsc(
+                                caller.tenantId(), PageRequest.of(0, MAX_BOOTSTRAP_UNITS))
+                        : scopedEducationUnits(caller);
+        return sortedUnits(educationUnits);
+    }
+
+    private List<ManagedUnit> sortedUnits(List<EducationUnit> educationUnits) {
         return educationUnits.stream()
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(this::unitSortKey).thenComparing(unit -> safe(unit.getName())))
-                .map(unit -> new ManagedUnit(unit.getId(), normalizedUnitType(unit), unit.getName(), unit.getLogoUrl()))
+                .map(this::toManagedUnit)
                 .toList();
+    }
+
+    private ManagedUnit toManagedUnit(EducationUnit unit) {
+        return new ManagedUnit(unit.getId(), normalizedUnitType(unit), unit.getName(), unit.getLogoUrl());
+    }
+
+    /** One page of manageable units for /sessions/scope; tenant-wide callers are paged in SQL. */
+    SessionScopeUnits pageUnits(ScopeCaller caller, String query, int page, int size) {
+        String needle = safe(query).toLowerCase(Locale.ROOT);
+        if (caller.tenantWide()) {
+            Page<EducationUnit> found = educationUnitRepository.findDirectory(
+                    caller.tenantId(), needle.isEmpty() ? null : needle, null, PageRequest.of(page, size));
+            return new SessionScopeUnits(toBootstrapUnits(found.getContent().stream().map(this::toManagedUnit).toList()),
+                    page, size, found.getTotalElements(), found.hasNext());
+        }
+        // shortcut: scoped and platform-wide callers are filtered and paged in memory over the 500-unit cap; add a repository query to lift it.
+        List<ManagedUnit> matching = resolveManageableUnits(caller).stream()
+                .filter(unit -> needle.isEmpty() || safe(unit.name()).toLowerCase(Locale.ROOT).contains(needle))
+                .toList();
+        int from = (int) Math.min((long) page * size, matching.size());
+        int to = Math.min(from + size, matching.size());
+        return new SessionScopeUnits(toBootstrapUnits(matching.subList(from, to)), page, size, matching.size(), to < matching.size());
+    }
+
+    /** Targeted check: a tenant-wide caller needs one lookup, never the full list. */
+    Optional<ManagedUnit> findManageableUnit(ScopeCaller caller, String unitId) {
+        if (caller.tenantWide()) {
+            return educationUnitRepository.findByIdAndTenantId(unitId, caller.tenantId()).map(this::toManagedUnit);
+        }
+        return resolveManageableUnits(caller).stream().filter(unit -> unitId.equals(unit.id())).findFirst();
+    }
+
+    /** Classes of one manageable unit, or (plain teachers only) the teacher's own classes; admins must pick a unit first. */
+    SessionScopeClasses scopeClasses(ScopeCaller caller, String unitId, int size) {
+        List<ManagedUnit> units;
+        if (!safe(unitId).isEmpty()) {
+            units = List.of(findManageableUnit(caller, unitId.trim())
+                    .orElseThrow(() -> new ForbiddenException("education unit is not manageable by this session")));
+        } else if (caller.teacherId() != null) {
+            units = resolveManageableUnits(caller);
+        } else {
+            return new SessionScopeClasses(List.of(), false);
+        }
+        List<SessionBootstrapClass> rows = classRows(caller.tenantId(), units, caller.teacherId(), size);
+        boolean more = rows.size() > size;
+        return new SessionScopeClasses(more ? rows.subList(0, size) : rows, more);
+    }
+
+    /** Same validation as {@link #resolveCurrentScope} without loading every class of the tenant. */
+    SessionBootstrapScope resolveCurrentScopeTargeted(UserAccessContext requestedAccess, ScopeCaller caller) {
+        String classId = safe(requestedAccess.currentClassId());
+        String unitId = safe(requestedAccess.currentEducationUnitId());
+        if (!classId.isEmpty()) {
+            return classroomRepository.findByTenantIdAndId(caller.tenantId(), classId)
+                    .filter(classroom -> classroom.getSchoolId() != null && findManageableUnit(caller, classroom.getSchoolId()).isPresent())
+                    .filter(classroom -> caller.teacherId() == null || classroomRepository
+                            .findTeacherClassOptions(caller.tenantId(), caller.teacherId()).stream()
+                            .anyMatch(option -> classId.equals(option.id())))
+                    .map(classroom -> new SessionBootstrapScope("class", classroom.getSchoolId(), classroom.getId()))
+                    .orElseGet(() -> fallbackFor(caller));
+        }
+        if (!unitId.isEmpty()) {
+            return findManageableUnit(caller, unitId)
+                    .map(unit -> new SessionBootstrapScope(levelFromUnitType(unit.type()), unit.id(), null))
+                    .orElseGet(() -> fallbackFor(caller));
+        }
+        return fallbackFor(caller);
+    }
+
+    private SessionBootstrapScope fallbackFor(ScopeCaller caller) {
+        return fallbackScope(caller.tenantWide() ? tenantWideFallbackUnits(caller.tenantId()) : resolveManageableUnits(caller),
+                caller.canAccessGlobalErg());
+    }
+
+    /**
+     * The fallback is the first unit by type (system, centre, school) then name. Names alone order the first page, so a
+     * tenant with more units than that page loads the full bootstrap window instead of risking a school ahead of the system unit.
+     */
+    private List<ManagedUnit> tenantWideFallbackUnits(String tenantId) {
+        Page<EducationUnit> first = educationUnitRepository.findDirectory(tenantId, null, null, PageRequest.of(0, 50));
+        return first.hasNext()
+                ? sortedUnits(educationUnitRepository.findByTenantIdOrderByNameAsc(tenantId, PageRequest.of(0, MAX_BOOTSTRAP_UNITS)))
+                : sortedUnits(first.getContent());
     }
 
     List<SessionBootstrapUnit> toBootstrapUnits(List<ManagedUnit> managedUnits) {
@@ -86,6 +175,16 @@ final class SessionUnitScopeResolver {
      * teacher of, have assigned work to, or teach in the published timetable; never every class of the school.
      */
     List<SessionBootstrapClass> resolveManageableClasses(String tenantId, List<ManagedUnit> managedUnits, String teacherId) {
+        List<SessionBootstrapClass> rows = classRows(tenantId, managedUnits, teacherId, MAX_BOOTSTRAP_CLASSES);
+        if (rows.size() <= MAX_BOOTSTRAP_CLASSES) {
+            return rows;
+        }
+        log.warn("session bootstrap classes capped at {} for tenant {}; the caller manages more", MAX_BOOTSTRAP_CLASSES, tenantId);
+        return rows.subList(0, MAX_BOOTSTRAP_CLASSES);
+    }
+
+    /** At most {@code limit + 1} rows: the extra row tells the caller the list was cut. */
+    private List<SessionBootstrapClass> classRows(String tenantId, List<ManagedUnit> managedUnits, String teacherId, int limit) {
         List<String> schoolIds = managedUnits.stream()
                 .map(ManagedUnit::id)
                 .filter(id -> id != null && !id.isBlank())
@@ -97,15 +196,14 @@ final class SessionUnitScopeResolver {
         if (teacherId != null) {
             return classroomRepository.findTeacherClassOptions(tenantId, teacherId).stream()
                     .filter(option -> schoolIds.contains(option.schoolId()))
-                    .limit(MAX_BOOTSTRAP_CLASSES)
+                    .limit(limit + 1L)
                     .map(option -> new SessionBootstrapClass(option.id(), option.name(), option.schoolId(),
                             option.grade(), option.academicYear(), option.status()))
                     .toList();
         }
 
         List<Classroom> classes = classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
-                tenantId, schoolIds, PageRequest.of(0, MAX_BOOTSTRAP_CLASSES + 1));
-        requireWithinLimit(classes.size(), MAX_BOOTSTRAP_CLASSES, "classes");
+                tenantId, schoolIds, PageRequest.of(0, limit + 1));
         return classes.stream()
                 .map(this::toBootstrapClass)
                 .toList();
@@ -135,7 +233,9 @@ final class SessionUnitScopeResolver {
         return fallbackScope(manageableUnits, canAccessGlobalErg);
     }
 
-    private List<EducationUnit> scopedEducationUnits(User user, List<String> roles, String tenantId) {
+    private List<EducationUnit> scopedEducationUnits(ScopeCaller caller) {
+        User user = caller.user();
+        String tenantId = caller.tenantId();
         List<UserAccessScope> scopes = accessScopes(user).stream()
                 .filter(AccessScopeAssembler::appliesToLms)
                 .toList();
@@ -155,9 +255,7 @@ final class SessionUnitScopeResolver {
         }
 
         if (user != null && user.getId() != null) {
-            List<UserRoleAssignment> assignments = userRoleAssignmentRepository.findActiveForUser(
-                    user.getId(), tenantId, OffsetDateTime.now());
-            for (UserRoleAssignment assignment : assignments) {
+            for (UserRoleAssignment assignment : caller.assignments()) {
                 String scopeId = safe(assignment.getScopeId());
                 String scopeType = safe(assignment.getScopeType()).toUpperCase(Locale.ROOT);
                 if (scopeId.isBlank()) {

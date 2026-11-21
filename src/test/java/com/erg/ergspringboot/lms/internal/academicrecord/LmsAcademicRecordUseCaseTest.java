@@ -26,6 +26,19 @@ class LmsAcademicRecordUseCaseTest {
     }
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void refusesAnAttendanceRangeOverTheRowCap() {
+        org.mockito.Mockito.doReturn(java.util.Collections.nCopies(LmsAcademicRecordUseCase.MAX_ATTENDANCE_ROWS + 1, null))
+                .when(jdbc).query(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(org.springframework.jdbc.core.RowMapper.class),
+                        org.mockito.ArgumentMatchers.any(Object[].class));
+
+        assertThatThrownBy(() -> service().attendanceWorkspace("tenant-a", "class-1", "subject-1", "2026-07-01", "2026-07-30"))
+                .isInstanceOf(com.erg.ergspringboot.exception.TeachingScheduleException.class)
+                .hasFieldOrPropertyWithValue("code", "ATTENDANCE_RANGE_TOO_LARGE");
+    }
+
+    @Test
     void rejectsUnknownAttendanceStatusBeforeSql() {
         assertThatThrownBy(() -> service().upsertAttendance(new AttendanceCommand(
                 "tenant-a", "teacher-1", "class-1", "student-1", "subject-1", "2026-07-30", 1, "UNKNOWN", 0)))

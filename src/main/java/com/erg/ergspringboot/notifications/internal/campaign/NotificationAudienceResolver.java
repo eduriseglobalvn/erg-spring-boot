@@ -4,6 +4,7 @@ import com.erg.ergspringboot.lms.LmsAudienceReadPort;
 import com.erg.ergspringboot.notifications.CampaignAudience;
 import com.erg.ergspringboot.users.UserAccountProjection;
 import com.erg.ergspringboot.users.UserDirectoryPort;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,10 +26,12 @@ public class NotificationAudienceResolver {
 
     private final LmsAudienceReadPort lms;
     private final UserDirectoryPort users;
+    private final AudienceAccountQueries accounts;
 
-    public NotificationAudienceResolver(LmsAudienceReadPort lms, UserDirectoryPort users) {
+    public NotificationAudienceResolver(LmsAudienceReadPort lms, UserDirectoryPort users, AudienceAccountQueries accounts) {
         this.lms = lms;
         this.users = users;
+        this.accounts = accounts;
     }
 
     public ResolvedAudience resolve(String tenantId, CampaignAudience audience) {
@@ -55,6 +58,7 @@ public class NotificationAudienceResolver {
             classIds.addAll(lms.classIdsOf(tenantId, audience.schoolIds(), audience.gradeIds()));
         }
         if (!classIds.isEmpty()) {
+            requireStudentsWithinLimit(tenantId, classIds);
             add(reached, Kind.STUDENT,
                     withActiveLogin(tenantId, lms.studentUserIdsInClasses(tenantId, List.copyOf(classIds), FETCH_LIMIT)));
         }
@@ -63,7 +67,8 @@ public class NotificationAudienceResolver {
                     withActiveLogin(tenantId, lms.studentUserIdsInGroups(tenantId, audience.groupIds(), FETCH_LIMIT)));
         }
         if (audience.wholeTenant() || audience.roles().contains("STUDENT")) {
-            add(reached, Kind.STUDENT, withActiveLogin(tenantId, lms.allStudentUserIds(tenantId, FETCH_LIMIT)));
+            requireStudentsWithinLimit(tenantId, null);
+            add(reached, Kind.STUDENT, accounts.activeStudentUserIds(tenantId, FETCH_LIMIT));
         }
     }
 
@@ -75,6 +80,13 @@ public class NotificationAudienceResolver {
             teachers = users.findCalendarTeachersByTenantAndSchoolIds(tenantId, audience.schoolIds(), FETCH_PAGE);
         }
         add(reached, Kind.TEACHER, teachers.stream().map(UserAccountProjection::id).toList());
+    }
+
+    /** Counts in SQL first, so an audience that can only end in "too large" fails before any id is loaded. */
+    private void requireStudentsWithinLimit(String tenantId, Collection<String> classIds) {
+        if (accounts.countActiveStudents(tenantId, classIds) > MAX_RECIPIENTS) {
+            throw new AudienceTooLargeException();
+        }
     }
 
     /** Picked users keep request order; unknown or inactive ids are dropped. Returns how many were already reached. */
@@ -102,13 +114,7 @@ public class NotificationAudienceResolver {
 
     /** A missing status counts as active, like the teacher directory query. */
     private Set<String> activeAmong(String tenantId, List<String> userIds) {
-        Set<String> active = new LinkedHashSet<>();
-        if (!userIds.isEmpty()) {
-            users.findByTenantIdAndIds(tenantId, userIds).stream()
-                    .filter(user -> user.status() == null || "ACTIVE".equalsIgnoreCase(user.status()))
-                    .forEach(user -> active.add(user.id()));
-        }
-        return active;
+        return userIds.isEmpty() ? new LinkedHashSet<>() : accounts.activeUserIds(tenantId, userIds);
     }
 
     private static void add(Map<String, Kind> reached, Kind kind, List<String> ids) {

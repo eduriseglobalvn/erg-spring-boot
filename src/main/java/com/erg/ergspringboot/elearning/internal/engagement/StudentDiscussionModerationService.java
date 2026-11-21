@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.elearning.internal.engagement;
 
+import com.erg.ergspringboot.common.response.elearning.DiscussionFeedSnapshot;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationResponse;
@@ -25,9 +26,11 @@ public class StudentDiscussionModerationService {
     private final ClassroomRepository classrooms;
     private final JdbcTemplate jdbc;
     private final StudentDiscussionReader reader;
+    private final StudentDiscussionFeedCache feeds;
 
-    public StudentDiscussionModerationService(ClassroomRepository classrooms, JdbcTemplate jdbc) {
+    public StudentDiscussionModerationService(ClassroomRepository classrooms, JdbcTemplate jdbc, StudentDiscussionFeedCache feeds) {
         this.classrooms = classrooms;
+        this.feeds = feeds;
         this.jdbc = jdbc;
         this.reader = new StudentDiscussionReader(jdbc, new NamedParameterJdbcTemplate(jdbc));
     }
@@ -48,13 +51,9 @@ public class StudentDiscussionModerationService {
         String safeClassId = requireClass(moderator, classId);
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(50, size));
-        Long total = jdbc.queryForObject(
-                "select count(*) from student_discussion_threads where tenant_id = ? and academic_class_id = ?",
-                Long.class, moderator.tenantId(), safeClassId);
-        long count = total == null ? 0 : total;
-        return new StudentDiscussionFeedResponse(
-                reader.classPosts(moderator.tenantId(), moderator.userId(), safeClassId, safeSize, safePage * safeSize, true),
-                safePage, safeSize, count, (long) (safePage + 1) * safeSize < count);
+        // Includes hidden items (flagged); the class-shared page is cached 20 s and evicted by every writer below.
+        DiscussionFeedSnapshot snapshot = feeds.snapshot(moderator.tenantId(), safeClassId, safePage, safeSize, "ALL", null, "-", true);
+        return reader.feedResponse(snapshot, moderator.tenantId(), moderator.userId(), safePage, safeSize);
     }
 
     /** The teacher pins a thread to the top of the class list; unpinning clears it. */
@@ -64,6 +63,7 @@ public class StudentDiscussionModerationService {
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update("update student_discussion_threads set pinned_at = ?, pinned_by = ?, updated_at = ? where tenant_id = ? and id = ?",
                 pinned ? now : null, pinned ? moderator.userId() : null, now, moderator.tenantId(), target.id());
+        feeds.evictClass(moderator.tenantId(), target.classId());
         return reader.postById(moderator.tenantId(), moderator.userId(), target.id());
     }
 
@@ -82,6 +82,7 @@ public class StudentDiscussionModerationService {
         }
         jdbc.update("update student_discussion_threads set accepted_comment_id = ?, updated_at = ? where tenant_id = ? and id = ?",
                 accepted, OffsetDateTime.now(), moderator.tenantId(), target.id());
+        feeds.evictClass(moderator.tenantId(), target.classId());
         return reader.postById(moderator.tenantId(), moderator.userId(), target.id());
     }
 
@@ -92,6 +93,7 @@ public class StudentDiscussionModerationService {
         if (hidden && "COMMENT".equals(target.type())) clearAcceptedUnder(moderator.tenantId(), target.id());
         jdbc.update("update " + target.table() + " set hidden_at = ?, hidden_by = ?, updated_at = ? where tenant_id = ? and id = ?",
                 hidden ? now : null, hidden ? moderator.userId() : null, now, moderator.tenantId(), target.id());
+        feeds.evictClass(moderator.tenantId(), target.classId()); // a hidden post or comment must vanish from student feeds at once
         return new StudentDiscussionModerationResponse(target.type(), target.id(), hidden, false);
     }
 
@@ -115,6 +117,7 @@ public class StudentDiscussionModerationService {
         }
         if ("COMMENT".equals(target.type())) clearAcceptedUnder(moderator.tenantId(), target.id());
         jdbc.update("delete from " + target.table() + " where tenant_id = ? and id = ?", moderator.tenantId(), target.id());
+        feeds.evictClass(moderator.tenantId(), target.classId());
         return new StudentDiscussionModerationResponse(target.type(), target.id(), false, true);
     }
 
@@ -142,7 +145,7 @@ public class StudentDiscussionModerationService {
                 rs -> rs.next() ? rs.getString(1) : null, moderator.tenantId(), id);
         if (classId == null) throw new ResourceNotFoundException("Discussion item was not found.");
         requireClass(moderator, classId);
-        return new Target(type, id, type.equals("POST") ? "student_discussion_threads" : "student_discussion_comments");
+        return new Target(type, id, type.equals("POST") ? "student_discussion_threads" : "student_discussion_comments", classId);
     }
 
     private String requireClass(Moderator moderator, String classId) {
@@ -163,5 +166,5 @@ public class StudentDiscussionModerationService {
 
     public record Moderator(String tenantId, String userId, boolean tenantWide) { }
 
-    private record Target(String type, String id, String table) { }
+    private record Target(String type, String id, String table, String classId) { }
 }

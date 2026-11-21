@@ -99,6 +99,60 @@ class LmsOperationalCacheScopeTest {
         assertSchoolAGoneAndSchoolBKept();
     }
 
+    /** A transferred student must not see the old class for up to 60 s: the write evicts that login's cached identity only. */
+    @Test
+    void enrollingEvictsTheStudentsCachedIdentityAndNoOtherLearners() {
+        Student student = new Student();
+        student.setId("student-1");
+        student.setTenantId(TENANT);
+        student.setSchoolId("school-a");
+        student.setAuthUserId("usr-1");
+        Classroom classroom = new Classroom();
+        classroom.setId("class-2");
+        classroom.setTenantId(TENANT);
+        classroom.setSchoolId("school-a");
+        when(students.findByTenantIdAndId(TENANT, "student-1")).thenReturn(Optional.of(student));
+        when(classrooms.findByTenantIdAndId(TENANT, "class-2")).thenReturn(Optional.of(classroom));
+        when(enrollments.save(any(StudentEnrollment.class))).thenAnswer(call -> call.getArgument(0));
+        var oldClass = new com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity(
+                "student-1", "usr-1", "class-1", "school-a", "An", "ENROLLED");
+        var other = new com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity(
+                "student-2", "usr-2", "class-1", "school-a", "Binh", "ENROLLED");
+        cache("lmsStudentIdentity").put(List.of(TENANT, "usr-1"), oldClass);
+        cache("lmsStudentIdentity").put(List.of(TENANT, "usr-2"), other);
+
+        service.enroll(new EnrollStudentRequest("student-1", "class-2", "2026"), null, access);
+
+        assertThat(cache("lmsStudentIdentity").get(List.of(TENANT, "usr-1"))).as("moved student re-reads the class").isNull();
+        assertThat(cache("lmsStudentIdentity").get(List.of(TENANT, "usr-2")).get()).isEqualTo(other);
+        assertThat(generations.current(TENANT, ErgTieredCache.scopeGenerationName("lmsStudentIdentity", "usr-1"))).isPositive();
+        assertThat(generations.current(TENANT, "lmsStudentIdentity")).isZero();
+    }
+
+    /** A 3-student bulk enrolment bumps each scope generation once, not once per student. */
+    @Test
+    void bulkEnrollingEvictsEachScopeOnce() {
+        Classroom classroom = new Classroom();
+        classroom.setId("class-2");
+        classroom.setTenantId(TENANT);
+        classroom.setSchoolId("school-a");
+        when(classrooms.findByTenantIdAndId(TENANT, "class-2")).thenReturn(Optional.of(classroom));
+        when(enrollments.save(any(StudentEnrollment.class))).thenAnswer(call -> call.getArgument(0));
+        var items = new ArrayList<com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.EnrollmentItem>();
+        for (String id : List.of("student-1", "student-2", "student-3")) {
+            Student student = new Student();
+            student.setId(id);
+            student.setTenantId(TENANT);
+            student.setSchoolId("school-a");
+            when(students.findByTenantIdAndId(TENANT, id)).thenReturn(Optional.of(student));
+            items.add(new com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.EnrollmentItem(id, "class-2", "2026"));
+        }
+
+        service.bulkEnroll(new com.erg.ergspringboot.common.request.lms.LmsOperationalRequests.BulkEnrollRequest(items), null, access);
+
+        assertThat(generations.current(TENANT, ErgTieredCache.scopeGenerationName("lmsClassesBySchool", "school-a"))).isBetween(1L, 2L);
+    }
+
     @Test
     void aClassListRequestedWithoutSchoolIsKeyedByTheCallersCurrentSchool() throws Exception {
         String key = com.erg.ergspringboot.lms.internal.classroom.LmsClassroomQueryUseCase.class

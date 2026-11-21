@@ -3,9 +3,11 @@ type ElearningQuery {
   status: String!
   studentDashboard(input: StudentDashboardInput): StudentDashboard!
   discussionFeed(input: StudentDiscussionFeedInput): StudentDiscussionFeed!
+  "Pages the comments of a post of the student's class (parentId: the replies of one top-level comment). Page 0 is the newest window the feed embeds; size is capped at 50; items of a page run oldest to newest, like the feed."
+  discussionComments(postId: String!, parentId: String, page: Int = 0, size: Int = 20, tenantId: String): StudentDiscussionCommentPage!
   discussionModerationClasses(tenantId: String): [StudentDiscussionModerationClass!]!
   discussionModerationFeed(input: StudentDiscussionModerationFeedInput!): StudentDiscussionFeed!
-  studentClassLeaderboard(input: StudentClassLeaderboardInput): ClassLeaderboard!
+  studentClassLeaderboard(input: StudentClassLeaderboardInput, viewerOnly: Boolean = false): ClassLeaderboard!
   leaderboardClasses(tenantId: String): [LeaderboardClass!]!
   classLeaderboard(input: ClassLeaderboardInput!): ClassLeaderboard!
   "Tier of the authenticated student; dates are yyyy-MM-dd strings"
@@ -13,11 +15,11 @@ type ElearningQuery {
   "Cutoffs of the student's own grade for weekStart (default: the latest update)"
   tierTable(weekStart: String, tenantId: String): [TierTableRow!]!
   myFrames(tenantId: String): MyFrames!
-  "Hộp thư: the student's own threads about a question, newest first. status: OPEN or ANSWERED"
-  myQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  "Hộp thư: the student's own threads about a question, newest first. status: OPEN or ANSWERED. includeCorrectAnswer: false skips the correct-answer lookup (correctAnswerText is then null)"
+  myQuestionThreads(status: String, tenantId: String, includeCorrectAnswer: Boolean = true): [QuestionThread!]!
   questionThread(id: String!, tenantId: String): QuestionThread!
   "Threads addressed to the teacher (a tenant-wide admin sees every thread of the tenant)"
-  teacherQuestionThreads(status: String, tenantId: String): [QuestionThread!]!
+  teacherQuestionThreads(status: String, tenantId: String, includeCorrectAnswer: Boolean = true): [QuestionThread!]!
   teacherQuestionThread(id: String!, tenantId: String): QuestionThread!
 }
 

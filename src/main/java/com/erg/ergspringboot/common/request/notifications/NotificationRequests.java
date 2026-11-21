@@ -82,7 +82,7 @@ public final class NotificationRequests {
             String actionUrl,
             String priority,
             String portal,
-            List<String> userIds,
+            @Size(max = 5000) List<String> userIds,
             String topicName,
             Map<String, String> data
     ) {

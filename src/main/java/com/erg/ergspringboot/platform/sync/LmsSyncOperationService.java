@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.Optional;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,32 +63,24 @@ public class LmsSyncOperationService {
         String type = required(entityType, "entityType", MAX_ENTITY);
         String id = required(entityId, "entityId", MAX_ENTITY);
         String hash = payloadHash(payload);
-        Optional<Receipt> existing = find(tenant, account, key);
-        if (existing.isPresent()) {
-            Receipt receipt = existing.get();
-            if (!operation.equals(receipt.operationId()) || !hash.equals(receipt.payloadHash())) {
-                throw conflict("IDEMPOTENCY_CONFLICT", receipt, expectedVersion, receipt.serverVersion(), false);
-            }
-            if ("SUCCEEDED".equals(receipt.status())) return Optional.of(receipt.asReplayed());
-            throw conflict("SYNC_PENDING", receipt, expectedVersion, receipt.serverVersion(), true);
-        }
         OffsetDateTime now = serverTime();
-        try {
-            jdbc.update("""
-                    insert into lms_sync_operations
-                      (tenant_id, account_id, operation_id, idempotency_key, entity_type, entity_id,
-                       payload_hash, status, server_version, result_json, created_at, updated_at)
-                    values (?, ?, ?, ?, ?, ?, ?, 'PENDING', null, null, ?, ?)
-                    """, tenant, account, operation, key, type, id, hash, now, now);
-        } catch (DataIntegrityViolationException race) {
-            Receipt raced = find(tenant, account, key)
+        // on conflict do nothing: a unique violation would abort the caller's PostgreSQL transaction.
+        int inserted = jdbc.update("""
+                insert into lms_sync_operations
+                  (tenant_id, account_id, operation_id, idempotency_key, entity_type, entity_id,
+                   payload_hash, status, server_version, result_json, created_at, updated_at)
+                values (?, ?, ?, ?, ?, ?, ?, 'PENDING', null, null, ?, ?)
+                on conflict do nothing
+                """, tenant, account, operation, key, type, id, hash, now, now);
+        if (inserted == 0) {
+            Receipt existing = find(tenant, account, key)
                     .or(() -> findByOperation(tenant, account, operation))
-                    .orElseThrow(() -> race);
-            if (!operation.equals(raced.operationId()) || !hash.equals(raced.payloadHash())) {
-                throw conflict("IDEMPOTENCY_CONFLICT", raced, expectedVersion, raced.serverVersion(), false);
+                    .orElseThrow(() -> new IllegalStateException("sync receipt vanished after conflict"));
+            if (!operation.equals(existing.operationId()) || !hash.equals(existing.payloadHash())) {
+                throw conflict("IDEMPOTENCY_CONFLICT", existing, expectedVersion, existing.serverVersion(), false);
             }
-            if ("SUCCEEDED".equals(raced.status())) return Optional.of(raced.asReplayed());
-            throw conflict("SYNC_PENDING", raced, expectedVersion, raced.serverVersion(), true);
+            if ("SUCCEEDED".equals(existing.status())) return Optional.of(existing.asReplayed());
+            throw conflict("SYNC_PENDING", existing, expectedVersion, existing.serverVersion(), true);
         }
         return Optional.of(new Receipt(tenant, account, operation, key, type, id, hash,
                 "PENDING", null, null, now, now, false));

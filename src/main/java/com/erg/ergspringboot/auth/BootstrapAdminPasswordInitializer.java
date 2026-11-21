@@ -28,7 +28,7 @@ public class BootstrapAdminPasswordInitializer {
     private final String bootstrapPassword;
 
     public BootstrapAdminPasswordInitializer(JdbcTemplate jdbc, PasswordService passwords,
-            @Value("${erg.bootstrap.admin-password:Admin123}") String bootstrapPassword) {
+            @Value("${erg.bootstrap.admin-password:}") String bootstrapPassword) {
         this.jdbc = jdbc;
         this.passwords = passwords;
         this.bootstrapPassword = bootstrapPassword;

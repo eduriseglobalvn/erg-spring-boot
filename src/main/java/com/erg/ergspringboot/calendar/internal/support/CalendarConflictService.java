@@ -5,6 +5,7 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.calendar.internal.schedule.ScheduleDataLoader;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -97,38 +98,37 @@ public class CalendarConflictService {
                     .map(CalendarEvent::getAcademicClassId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
-            Map<String, List<CalendarEvent>> existingClassEvents = classIds.isEmpty()
-                    ? Map.of()
-                    : eventRepository.findClassTimeConflictsInWindow(tenantId, classIds, windowFrom, windowTo, "CANCELLED")
-                            .stream()
-                            .collect(Collectors.groupingBy(CalendarEvent::getAcademicClassId));
+            // every IN list is chunked: a large grid would pass the 32,767 bind-parameter limit of one statement
+            Map<String, List<CalendarEvent>> existingClassEvents = ScheduleDataLoader.chunks(classIds).stream()
+                    .flatMap(chunk -> eventRepository.findClassTimeConflictsInWindow(
+                            tenantId, chunk, windowFrom, windowTo, "CANCELLED").stream())
+                    .collect(Collectors.groupingBy(CalendarEvent::getAcademicClassId));
 
             Set<String> schoolIds = datedEvents.stream()
                     .filter(CalendarConflictService::hasRoom)
                     .map(CalendarEvent::getSchoolId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
-            List<CalendarEvent> existingRoomEvents = schoolIds.isEmpty()
-                    ? List.of()
-                    : eventRepository.findRoomTimeConflictsInWindow(tenantId, schoolIds, windowFrom, windowTo, "CANCELLED");
+            List<CalendarEvent> existingRoomEvents = ScheduleDataLoader.chunks(schoolIds).stream()
+                    .flatMap(chunk -> eventRepository.findRoomTimeConflictsInWindow(
+                            tenantId, chunk, windowFrom, windowTo, "CANCELLED").stream())
+                    .toList();
 
             Set<String> teacherIds = teacherEventIds.keySet();
-            List<CalendarEventTeacher> teacherAssignmentsInWindow = teacherIds.isEmpty()
-                    ? List.of()
-                    : eventTeacherRepository.findTeacherAssignmentsInWindow(
-                            tenantId, teacherIds, windowFrom, windowTo, "CANCELLED");
-            Map<String, CalendarEvent> existingTeacherEventMap = teacherAssignmentsInWindow.isEmpty()
-                    ? Map.of()
-                    : eventRepository.findByTenantIdAndIdInAndStatusNot(tenantId, teacherAssignmentsInWindow.stream()
-                                    .map(CalendarEventTeacher::getEventId)
-                                    .filter(Objects::nonNull)
-                                    .distinct()
-                                    .toList(), "CANCELLED")
-                            .stream()
-                            .collect(Collectors.toMap(CalendarEvent::getId, event -> event, (left, right) -> left));
+            List<CalendarEventTeacher> teacherAssignmentsInWindow = ScheduleDataLoader.chunks(teacherIds).stream()
+                    .flatMap(chunk -> eventTeacherRepository.findTeacherAssignmentsInWindow(
+                            tenantId, chunk, windowFrom, windowTo, "CANCELLED").stream())
+                    .toList();
+            List<String> assignedEventIds = teacherAssignmentsInWindow.stream().map(CalendarEventTeacher::getEventId)
+                    .filter(Objects::nonNull).distinct().toList();
+            Map<String, CalendarEvent> existingTeacherEventMap = ScheduleDataLoader.chunks(assignedEventIds).stream()
+                    .flatMap(chunk -> eventRepository.findByTenantIdAndIdInAndStatusNot(tenantId, chunk, "CANCELLED").stream())
+                    .collect(Collectors.toMap(CalendarEvent::getId, event -> event, (left, right) -> left));
             Map<String, List<CalendarEventTeacher>> existingAssignmentsByTeacher = teacherAssignmentsInWindow.stream()
                     .collect(Collectors.groupingBy(CalendarEventTeacher::getTeacherUserId));
 
+            Map<String, List<CalendarEvent>> existingRoomsByKey = existingRoomEvents.stream()
+                    .filter(CalendarConflictService::hasRoom).collect(Collectors.groupingBy(CalendarConflictService::roomKey));
             for (CalendarEvent event : datedEvents) {
                 String eventId = event.getId();
                 String clientRowId = clientRowIdByEventId.getOrDefault(eventId, eventId);
@@ -154,12 +154,8 @@ public class CalendarConflictService {
                 }
 
                 if (hasRoom(event)) {
-                    for (CalendarEvent existing : existingRoomEvents) {
-                        if (!Objects.equals(existing.getId(), eventId)
-                                && Objects.equals(existing.getSchoolId(), event.getSchoolId())
-                                && existing.getRoomName() != null
-                                && existing.getRoomName().equalsIgnoreCase(event.getRoomName())
-                                && isOverlapping(event, existing)) {
+                    for (CalendarEvent existing : existingRoomsByKey.getOrDefault(roomKey(event), List.of())) {
+                        if (!Objects.equals(existing.getId(), eventId) && isOverlapping(event, existing)) {
                             conflicts.add(new CalendarConflictResponse(
                                     "ROOM_TIME_CONFLICT", "WARNING", clientRowId, existing.getId(),
                                     "Phòng học đã có lịch sử dụng: " + event.getRoomName()));

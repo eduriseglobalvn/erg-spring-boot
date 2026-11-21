@@ -64,4 +64,36 @@ class TenantGucDataSourceTest {
         assertThatThrownBy(() -> new TenantGucDataSource(target).getConnection()).isInstanceOf(SQLException.class);
         verify(connection).close();
     }
+
+    @Test
+    void checkoutInsideDoBeginSkipsTheSessionApplyBecauseTheTransactionAppliesBoth() throws SQLException {
+        when(target.getConnection()).thenReturn(connection);
+        TenantContext.set(TenantContext.of("erg", "usr-1", "lms"));
+
+        TenantGucDataSource.beginTransactionCheckout(true);
+        try {
+            new TenantGucDataSource(target).getConnection();
+        } finally {
+            TenantGucDataSource.beginTransactionCheckout(false);
+        }
+
+        verify(connection, never()).prepareStatement(anyString());
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        new TenantGucDataSource(target).getConnection();
+        verify(connection).prepareStatement(anyString());
+    }
+
+    @Test
+    void transactionStartSetsSessionAndLocalValuesInOneRoundTripAndClearsWithoutContext() throws SQLException {
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+
+        com.erg.ergspringboot.platform.security.TenantGucApplier.applyTransaction(connection, null);
+
+        verify(connection, org.mockito.Mockito.times(1)).prepareStatement(anyString());
+        verify(statement, org.mockito.Mockito.times(1)).execute();
+        verify(statement).setString(2, "");
+        verify(statement).setString(10, "");
+        verify(statement).setString(16, "");
+        verify(connection, never()).commit();
+    }
 }

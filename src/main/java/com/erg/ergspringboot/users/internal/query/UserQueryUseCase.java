@@ -14,6 +14,7 @@ import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.platform.security.StudentAccountPolicy;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
+import com.erg.ergspringboot.users.persistence.authorization.RolePermissionIndex;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserActivity;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
@@ -43,6 +44,7 @@ public class UserQueryUseCase {
     private final AuthSessionRepository sessionRepository;
     private final UserActivityRepository userActivityRepository;
     private final RoleRepository roleRepository;
+    private RolePermissionIndex rolePermissions;
 
     public UserQueryUseCase(
             UserRepository userRepository,
@@ -51,9 +53,16 @@ public class UserQueryUseCase {
             RoleRepository roleRepository
     ) {
         this.roleRepository = roleRepository;
+        this.rolePermissions = new RolePermissionIndex(roleRepository);
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
         this.userActivityRepository = userActivityRepository;
+    }
+
+    /** The cached index; the constructor default reads uncached (unit tests without a Spring context). */
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRolePermissionIndex(RolePermissionIndex rolePermissions) {
+        this.rolePermissions = rolePermissions;
     }
 
     @Transactional(readOnly = true)
@@ -70,11 +79,9 @@ public class UserQueryUseCase {
         // The employee list leaves out student-only accounts (StudentAccountPolicy), filtered in the query so paging and totals stay right.
         List<String> studentRoleIds = new ArrayList<>(List.of(NO_ROLE));
         List<String> staffRoleIds = new ArrayList<>(List.of(NO_ROLE));
-        for (Role r : roleRepository.findAllWithPermissionsAndUsers()) {
-            List<String> permissions = r.getPermissions() == null ? List.of()
-                    : r.getPermissions().stream().map(p -> p.getName()).filter(java.util.Objects::nonNull).toList();
-            (StudentAccountPolicy.isStudentOnly(List.of(String.valueOf(r.getName())), permissions, List.of())
-                    ? studentRoleIds : staffRoleIds).add(r.getId());
+        for (RolePermissionIndex.Entry r : rolePermissions.entries()) {
+            (StudentAccountPolicy.isStudentOnly(List.of(String.valueOf(r.name())), r.permissionNames(), List.of())
+                    ? studentRoleIds : staffRoleIds).add(r.id());
         }
         Page<UserListItemProjection> pageItems = userRepository.findAdminListItems(
                 normalizeTenant(tenantId),
@@ -108,7 +115,7 @@ public class UserQueryUseCase {
     public UserDetailResponse detail(String userId, String tenantId) {
         User user = findUser(userId, tenantId);
         List<SessionResponse> sessions = sessionRepository
-                .findByUserIdAndTenantIdOrderByLastActiveAtDesc(userId, normalizeTenant(tenantId))
+                .findTop50ByUserIdAndTenantIdOrderByLastActiveAtDesc(userId, normalizeTenant(tenantId))
                 .stream()
                 .map(session -> toSessionResponse(session, null))
                 .toList();

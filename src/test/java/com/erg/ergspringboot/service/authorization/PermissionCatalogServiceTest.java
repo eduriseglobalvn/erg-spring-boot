@@ -81,9 +81,8 @@ class PermissionCatalogServiceTest {
         Role role = new Role();
         role.setId("role-teacher");
         role.setPermissions(new LinkedHashSet<>(List.of(permission)));
-        User teacher = new User();
-        teacher.setId("user-teacher");
-        role.setUsers(new LinkedHashSet<>(List.of(teacher)));
+        when(roleRepository.countUsersByPermission(List.of(permission.getId())))
+                .thenReturn(java.util.Collections.singletonList(new Object[] {permission.getId(), 1L}));
 
         PermissionBinding binding = new PermissionBinding();
         binding.setId("binding-rest");
@@ -130,18 +129,38 @@ class PermissionCatalogServiceTest {
         role.setPermissions(new LinkedHashSet<>());
         role.setUsers(new LinkedHashSet<>());
         when(roleRepository.findAllWithPermissionsAndUsers()).thenReturn(List.of(role));
-        when(userRoleAssignmentRepository.findActiveForRoleIds(
+        when(userRoleAssignmentRepository.findActiveScopeTypes(
                 org.mockito.ArgumentMatchers.eq(List.of("role-teacher")), org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
         assertThat(roles.list()).singleElement().extracting(response -> response.id())
                 .isEqualTo("role-teacher");
 
         verify(roleRepository).findAllWithPermissionsAndUsers();
-        verify(userRoleAssignmentRepository).findActiveForRoleIds(
+        verify(userRoleAssignmentRepository).findActiveScopeTypes(
                 org.mockito.ArgumentMatchers.eq(List.of("role-teacher")), org.mockito.ArgumentMatchers.any());
         verify(roleRepository, never()).findAll();
         verify(userRoleAssignmentRepository, never()).findActiveForRole(
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void roleUserCountsComeFromOneGroupedQueryAndNeverLoadTheUsersCollection() {
+        Role role = new Role();
+        role.setId("role-teacher");
+        role.setName("teacher");
+        role.setPermissions(new LinkedHashSet<>());
+        role.setUsers(new LinkedHashSet<>() {
+            @Override public int size() { throw new AssertionError("Role.users must not be loaded"); }
+            @Override public java.util.Iterator<User> iterator() { throw new AssertionError("Role.users must not be loaded"); }
+            @Override public java.util.Spliterator<User> spliterator() { throw new AssertionError("Role.users must not be loaded"); }
+        });
+        when(roleRepository.findAllWithPermissionsAndUsers()).thenReturn(List.of(role));
+        when(roleRepository.countUsersByRole(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.<Object[]>of(new Object[] {"role-teacher", 3L}));
+
+        assertThat(roles.list()).singleElement().extracting(response -> response.userCount()).isEqualTo(3);
+        verify(roleRepository).countUsersByRole(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

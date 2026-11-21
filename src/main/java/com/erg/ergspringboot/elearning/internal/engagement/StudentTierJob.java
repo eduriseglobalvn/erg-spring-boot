@@ -53,9 +53,19 @@ public class StudentTierJob {
 
     /**
      * Manual run for one tenant (admin mutation), in the caller's own tenant context, for the current week. Safe to repeat:
-     * {@link StudentTierService#refreshCohort} replaces the week and derives its state from earlier weeks only.
+     * {@link StudentTierService#refreshCohort} replaces the week and derives its state from earlier weeks only. Runs under the
+     * same cluster lock as the weekly job, so a double click (or a click during the cron run) returns 0 instead of a second pass.
      */
     public int runForTenant(String tenantId) {
+        Integer students = jobLock == null ? tenantRun(tenantId) : jobLock.callExclusively(JOB_NAME, () -> tenantRun(tenantId));
+        if (students == null) {
+            log.info("Manual tier update for tenant {} skipped: another run holds the lock", tenantId);
+            return 0;
+        }
+        return students;
+    }
+
+    private int tenantRun(String tenantId) {
         LocalDate weekStart = mondayOf(LocalDate.now(LeaderboardXp.ZONE));
         int students = 0;
         for (StudentTierService.Cohort cohort : tiers.cohorts()) {

@@ -43,6 +43,21 @@ public interface TkRequestRepository extends JpaRepository<TkRequest, String> {
             """)
     List<TkRequest> findApprovedOn(@Param("tenantId") String tenantId, @Param("date") LocalDate date);
 
+    /** {@link #findApprovedOn} for some people over a whole range (month close); the caller picks the day. */
+    @Query("""
+            select r from TkRequest r
+            where r.tenantId = :tenantId and r.userId in :userIds
+              and r.status = com.erg.ergspringboot.timekeeping.RequestStatus.APPROVED
+              and ((r.type in (com.erg.ergspringboot.timekeeping.RequestType.LEAVE,
+                               com.erg.ergspringboot.timekeeping.RequestType.BUSINESS)
+                    and r.fromDate <= :to and r.toDate >= :from)
+                or (r.type = com.erg.ergspringboot.timekeeping.RequestType.EXPLANATION
+                    and r.workDate between :from and :to))
+            order by r.userId, r.submittedAt, r.id
+            """)
+    List<TkRequest> findApprovedBetween(@Param("tenantId") String tenantId, @Param("userIds") Collection<String> userIds,
+            @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     @Query("""
             select r from TkRequest r
             where r.tenantId = :tenantId and r.userId = :userId

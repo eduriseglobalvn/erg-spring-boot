@@ -43,7 +43,7 @@ public class QuestionBankDemoBootstrapSeedService {
     }
 
     @Transactional("postgresTransactionManager")
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage"}, allEntries = true)
+    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace", "quizRuntimePackage", "quizStartInfo"}, allEntries = true)
     public void seedQuestionBankDemo() {
         seedQuestions();
         seedQuizBankItems();

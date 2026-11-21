@@ -34,6 +34,8 @@ class LmsLearnerPackageAccessTest {
         quiz.setId("quiz-1");
         quiz.setTenantId("erg");
         when(fixture.quizzes.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz));
+        // The recipient rule is one SQL exists query now; asg-1 distributes quiz-1 to usr-1, nothing else does.
+        when(fixture.assignments.existsVisibleQuizForLearner("erg", "quiz-1", "asg-1", null, null, "usr-1")).thenReturn(true);
     }
 
     @Test

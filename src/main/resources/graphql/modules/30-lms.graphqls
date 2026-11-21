@@ -55,6 +55,7 @@ input QuestionBankWorkspaceInput {
   includeQuestions: Boolean
   page: Int
   size: Int
+  quizLimit: Int
 }
 
 input AccessManagementWorkspaceInput {
@@ -409,6 +410,7 @@ type QuestionBankWorkspace {
   levels: [QuestionBankOption!]!
   topics: [QuestionBankOption!]!
   quizzes: [QuestionBankQuizOption!]!
+  quizzesTruncated: Boolean!
 }
 
 type QuestionBankQuestionPage {
@@ -608,6 +610,7 @@ type ClassScoreBoard {
   students: [ClassScoreBoardStudent!]!
   attempts: [ClassScoreBoardAttempt!]!
   truncated: Boolean!
+  rosterTruncated: Boolean!
 }
 
 type ClassScoreBoardStudent {

@@ -10,13 +10,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /** Composes the LMS read-model use cases behind a stable module port. */
 @Service
 @Primary
-// Without a tenant-aware transaction the tenant GUC is never set and RLS hides every row from the runtime role.
-@Transactional(value = "postgresTransactionManager", readOnly = true)
+// No transaction here: the delegates open their own tenant-aware one, so a cache hit never checks out a connection.
 public class LmsReadModelUseCase implements LmsReadModelPort {
     private final LmsStudentGroupReadUseCase studentGroups;
     private final LmsAssignmentProgressQueryUseCase assignmentProgress;

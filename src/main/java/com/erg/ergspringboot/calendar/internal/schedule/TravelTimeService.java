@@ -3,7 +3,9 @@ package com.erg.ergspringboot.calendar.internal.schedule;
 import com.erg.ergspringboot.calendar.SchoolShortName;
 import com.erg.ergspringboot.exception.TeachingScheduleException;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +19,15 @@ public class TravelTimeService {
     public record School(String id, String name, String shortName) {}
 
     public record TravelTime(School schoolA, School schoolB, int minutes, OffsetDateTime updatedAt) {}
+
+    /** The tenant's travel table read once, for callers that ask about many pairs in one request. */
+    public record TravelMatrix(Map<String, Integer> byPair, int defaultMinutes) {
+        public int requiredMinutes(String schoolX, String schoolY) {
+            if (schoolX.equals(schoolY)) return 0;
+            String a = lower(schoolX, schoolY);
+            return byPair.getOrDefault(a + '|' + (a.equals(schoolX) ? schoolY : schoolX), defaultMinutes);
+        }
+    }
 
     private final JdbcTemplate jdbc;
     private final int defaultMinutes;
@@ -39,6 +50,17 @@ public class TravelTimeService {
         } catch (EmptyResultDataAccessException none) {
             return defaultMinutes;
         }
+    }
+
+    /** One select for the whole (small) per-tenant table; same answers as {@link #requiredMinutes}. */
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public TravelMatrix matrix(String tenantId) {
+        Map<String, Integer> pairs = new HashMap<>();
+        jdbc.query("select school_a_id, school_b_id, minutes from school_travel_times where tenant_id = ?",
+                rs -> {
+                    pairs.put(rs.getString("school_a_id") + '|' + rs.getString("school_b_id"), rs.getInt("minutes"));
+                }, tenantId);
+        return new TravelMatrix(pairs, defaultMinutes);
     }
 
     @Transactional(value = "postgresTransactionManager", readOnly = true)

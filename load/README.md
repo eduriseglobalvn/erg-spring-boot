@@ -21,8 +21,6 @@ powershell -NoProfile -File load/scripts/benchmark.ps1 -DryRun
 # Build comparable images from the current working-tree snapshot.
 docker compose --project-name erg-benchmark --env-file ops/docker/.env.benchmark.example `
   -f ops/docker/compose.benchmark.yml --profile jvm build backend-jvm
-docker compose --project-name erg-benchmark --env-file ops/docker/.env.benchmark.example `
-  -f ops/docker/compose.benchmark.yml --profile native build backend-native
 
 # Correctness smoke (default) or the complete measured load profile.
 powershell -NoProfile -File load/scripts/benchmark.ps1 -Runtime All

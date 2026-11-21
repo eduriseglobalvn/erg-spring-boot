@@ -32,8 +32,7 @@ public class CalendarBatchPublishedConsumer {
             log.info("Skip schedule-published notification {}: batch missing, not published or empty", event.eventId());
             return;
         }
-        ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.PUBLISHED, event.tenantId(),
-                        event.actorId(), event.eventId(), event.aggregateVersion(), "SCHEDULE_PUBLISHED", batch)
-                .forEach(notifications::enqueue);
+        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.PUBLISHED, event.tenantId(),
+                        event.actorId(), event.eventId(), event.aggregateVersion(), "SCHEDULE_PUBLISHED", batch));
     }
 }

@@ -8,16 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankQuizOptionResponse;
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.MethodAuthorizationEvaluator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -47,6 +45,20 @@ class TeacherQuizOwnershipTest {
         quiz.setOwnerUserId(owner);
         when(quizzes.findByIdAndTenantId("quiz-1", "tenant-1")).thenReturn(Optional.of(quiz));
         return quiz;
+    }
+
+    @Test
+    void retiringQuizzesClearsTheCachesOnlyWhenSomethingChanged() {
+        var cacheManager = mock(org.springframework.cache.CacheManager.class);
+        var cache = mock(org.springframework.cache.Cache.class);
+        when(cacheManager.getCache(any())).thenReturn(cache);
+        var job = new TeacherQuizOwnership(authorization, quizzes, (com.erg.ergspringboot.platform.events.ClusterJobLock) null, null, cacheManager);
+        when(quizzes.softDeleteTeacherQuizzesOfLockedOwners(any())).thenReturn(0, 2);
+
+        assertThat(job.retireQuizzesOfLockedOwners()).isZero();
+        verify(cache, never()).clear();
+        assertThat(job.retireQuizzesOfLockedOwners()).isEqualTo(2);
+        verify(cache, org.mockito.Mockito.times(2)).clear();
     }
 
     @Test
@@ -81,6 +93,17 @@ class TeacherQuizOwnershipTest {
     }
 
     @Test
+    void aTeacherMayReadASystemQuizOrTheirOwnButNotAnotherTeachersQuiz() {
+        signIn("teacher-1", false);
+        quiz("teacher", "teacher-2");
+        assertThatThrownBy(() -> ownership.requireVisible("tenant-1", "quiz-1")).isInstanceOf(ResourceNotFoundException.class);
+        quiz("lcms", "teacher-2");
+        ownership.requireVisible("tenant-1", "quiz-1");
+        quiz("teacher", "teacher-1");
+        ownership.requireVisible("tenant-1", "quiz-1");
+    }
+
+    @Test
     void theTrainingOfficeMayChangeAnyQuiz() {
         signIn("pdt-1", true);
 
@@ -90,20 +113,10 @@ class TeacherQuizOwnershipTest {
     }
 
     @Test
-    void aTeacherDoesNotSeeOtherTeachersQuizzesButTheTrainingOfficeSeesAll() {
-        var response = new QuestionBankWorkspaceResponse("tenant-1", null, List.of(), List.of(), List.of(),
-                List.of(option("system"), option("mine"), option("theirs")));
-        when(quizzes.findTeacherQuizIdsNotOwnedBy("tenant-1", "teacher-1")).thenReturn(Set.of("theirs"));
-
+    void onlyATeacherGetsAViewerIdSoTheirQuizListsAreFilteredInSql() {
         signIn("teacher-1", false);
-        assertThat(ownership.visibleToCaller("tenant-1", response).quizzes())
-                .extracting(QuestionBankQuizOptionResponse::id).containsExactly("system", "mine");
+        assertThat(ownership.teacherViewerId()).isEqualTo("teacher-1");
         signIn("pdt-1", true);
-        assertThat(ownership.visibleToCaller("tenant-1", response)).isSameAs(response);
-    }
-
-    private static QuestionBankQuizOptionResponse option(String id) {
-        return new QuestionBankQuizOptionResponse(id, id, "published", "train", null, null, null, List.of(), 0,
-                null, null, null, null, null);
+        assertThat(ownership.teacherViewerId()).isNull();
     }
 }

@@ -217,7 +217,8 @@ public class CalendarRestController {
             @RequestParam(required = false) String schoolId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
         String tenantId = verifiedTenantId(principal, null);
-
+        // same school-scope rule as creating a room; no schoolId lists nothing
+        if (blankToNull(schoolId) != null) requireManagedSchool(principal, schoolId);
         return ok("Rooms loaded", calendar.rooms(tenantId, schoolId), request);
     }
 

@@ -63,6 +63,7 @@ public class LearningResourceLibraryReadService {
 
     @Cacheable(
             cacheNames = "learningResourceLibrary",
+            sync = true,
             key = "{#tenantId, #educationUnitId, #userId, #contentManager, #academicYear, #subjectId, #gradeId, #categoryId, #sectionId, #topicId, #status, #visibility, #page, #size}"
     )
     public LearningResourceLibraryResponse learningResourceLibrary(

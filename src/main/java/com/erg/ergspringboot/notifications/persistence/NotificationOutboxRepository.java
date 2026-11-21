@@ -14,8 +14,8 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
      * Batch-bounded retention purge: delete terminal rows ('sent'/'dead') older than the cutoff, at most
      * {@code batchSize} per call so the delete never long-locks the busiest table. Each invocation runs in
      * its own transaction (see {@link Transactional}) and returns the affected row count so the caller can
-     * loop until a partial batch signals the tail is reached. Non-terminal rows (pending/retry/processing/
-     * failed) are never touched.
+     * loop until a partial batch signals the tail is reached. Non-terminal rows (pending/retry/processing)
+     * are never touched.
      */
     @Modifying
     @Transactional
@@ -33,6 +33,24 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
             nativeQuery = true
     )
     int deleteTerminalOlderThan(OffsetDateTime cutoff, int batchSize);
+
+    /** Same bounded purge for terminal 'failed' rows (served by the status prefix of idx_notification_outbox_pickup). */
+    @Modifying
+    @Transactional
+    @Query(
+            value = """
+                    delete from notification_outbox
+                    where id in (
+                        select id
+                        from notification_outbox
+                        where status = 'failed'
+                          and created_at < :cutoff
+                        limit :batchSize
+                    )
+                    """,
+            nativeQuery = true
+    )
+    int deleteFailedOlderThan(OffsetDateTime cutoff, int batchSize);
 
     @Query(
             value = """
@@ -127,6 +145,38 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
             nativeQuery = true
     )
     java.util.Optional<NotificationOutboxEntity> findLeasedForUpdate(String id, String workerId);
+
+    /** Returns rows this worker claimed but never started to the queue now, instead of after the lease expires. */
+    @Modifying
+    @Transactional
+    @Query(
+            value = """
+                    update notification_outbox
+                    set status = case when coalesce(attempt_count, 0) > 0 then 'retry' else 'pending' end,
+                        locked_at = null,
+                        locked_by = null
+                    where id in (:ids)
+                      and locked_by = :workerId
+                      and status = 'processing'
+                    """,
+            nativeQuery = true
+    )
+    int releaseLease(java.util.Collection<String> ids, String workerId);
+
+    interface StatusCount {
+        String getStatus();
+
+        long getTotal();
+    }
+
+    /** One scan for the dashboard counters instead of one count per status. */
+    @Query("""
+            select o.status as status, count(o) as total
+            from NotificationOutboxEntity o
+            where o.tenantId = :tenantId and o.status in ('pending', 'retry', 'sent', 'dead')
+            group by o.status
+            """)
+    List<StatusCount> countByTenantGroupedByStatus(@org.springframework.data.repository.query.Param("tenantId") String tenantId);
 
     long countByStatus(String status);
 
