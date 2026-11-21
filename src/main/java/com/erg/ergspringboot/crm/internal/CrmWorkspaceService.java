@@ -61,6 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class CrmWorkspaceService {
 
     static final int MAX_WORKSPACE_SCHOOLS = 500;
+    /** Completed follow-ups older than this (by due date) stay out of the workspace; open ones always show. */
+    static final int COMPLETED_FOLLOW_UP_DAYS = 90;
 
     private static final Set<String> LEAD_STATUSES = Set.of(
             "new_lead", "consulted", "waiting_decision", "negotiating", "won_pending_setup", "active", "paused", "lost");
@@ -105,6 +107,12 @@ public class CrmWorkspaceService {
     /** Pages over the schools in scope; the scope filter runs in the query, before the page is cut. */
     @Transactional(readOnly = true)
     public WorkspaceResponse workspace(UserAccessContext access, int page, int size) {
+        return workspace(access, page, size, false);
+    }
+
+    /** {@code openFollowUpsOnly} leaves every completed follow-up out; otherwise only those due in the last 90 days are kept. */
+    @Transactional(readOnly = true)
+    public WorkspaceResponse workspace(UserAccessContext access, int page, int size, boolean openFollowUpsOnly) {
         PageRequest request = PageRequest.of(Math.max(0, page), Math.clamp(size, 1, MAX_WORKSPACE_SCHOOLS));
         List<String> scope = safe(access.managedEducationUnitIds());
         Page<EducationUnit> unitPage = scope.contains("*")
@@ -133,8 +141,10 @@ public class CrmWorkspaceService {
                 .findByTenantIdAndSchoolIdInOrderByCreatedAtDesc(tenantId, schoolIds).stream()
                 .map(deal -> opportunityResponse(deal, profilesBySchool.get(deal.getSchoolId())))
                 .toList();
-        List<FollowUpResponse> followUps = activityRepository
-                .findByTenantIdAndSchoolIdInOrderByDueAtAsc(tenantId, schoolIds).stream()
+        List<FollowUpResponse> followUps = (openFollowUpsOnly
+                ? activityRepository.findOpenFollowUps(tenantId, schoolIds)
+                : activityRepository.findFollowUpsWithRecentCompleted(tenantId, schoolIds,
+                        java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(COMPLETED_FOLLOW_UP_DAYS))).stream()
                 .map(activity -> followUpResponse(activity, profilesBySchool.get(activity.getSchoolId())))
                 .toList();
         List<HandoverResponse> handovers = handoverRepository
@@ -315,6 +325,9 @@ public class CrmWorkspaceService {
         CrmSchoolDeal deal = dealRepository.findByIdAndTenantId(handover.getOpportunityId(), access.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("CRM opportunity not found"));
         deal.setStage("active");
+        // the contract is signed when the handover is approved: this is what the SEO signed-schools KPI counts
+        deal.setSignedAt(OffsetDateTime.now());
+        deal.setSignedRevenue(deal.getExpectedRevenue());
         dealRepository.save(deal);
         return handoverResponse(handoverRepository.save(handover));
     }
@@ -349,7 +362,7 @@ public class CrmWorkspaceService {
     private Map<String, CrmSchoolContact> primaryContacts(String tenantId, Collection<String> schoolIds) {
         Map<String, CrmSchoolContact> contacts = new LinkedHashMap<>();
         for (CrmSchoolContact contact : contactRepository
-                .findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc(tenantId, schoolIds)) {
+                .findPrimaryContacts(tenantId, schoolIds)) {
             contacts.putIfAbsent(contact.getSchoolId(), contact);
         }
         return contacts;

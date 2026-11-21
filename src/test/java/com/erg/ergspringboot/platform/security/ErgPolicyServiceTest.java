@@ -40,6 +40,32 @@ class ErgPolicyServiceTest {
         assertThat(policy.isAllowed(teacher, "audit.read", null, "erg")).isFalse();
     }
 
+    @Test
+    void decisionTableCoversDenyOverrideWildcardsAndAliases() {
+        ErgPrincipal teacher = principal(List.of("teacher"), List.of("lms.*", "*.read", "roles.read", "content.manage"),
+                List.of("lms.class.delete", "cms.posts.*"));
+        Object[][] cases = {
+                {"lms.class.read", true}, {"lms.class.delete", false}, {"audit.read", true}, {"audit.write", false},
+                {"rbac.role.read", true}, {"rbac.permission.read", true}, {"rbac.role.create", false},
+                {"cms.posts.update", false}, {"media.upload", true}, {"profile.self", true}, {"*", false}};
+        for (Object[] c : cases) {
+            assertThat(policy.isAllowed(teacher, (String) c[0], null, "erg")).as((String) c[0]).isEqualTo(c[1]);
+        }
+        assertThat(policy.isAllowedAny(teacher, null, "erg", List.of("lms.class.read", "lms.class.delete"))).isFalse();
+        assertThat(policy.isAllowedAny(teacher, null, "erg", List.of("audit.write", "lms.class.read"))).isTrue();
+        assertThat(policy.isAllowed(teacher, "lms.class.read", null, "other")).isFalse();
+        assertThat(policy.isAllowed(null, "lms.class.read", null, "erg")).isFalse();
+    }
+
+    @Test
+    void derivedGrantsAndAuthoritiesAreComputedOncePerPrincipalInstance() {
+        ErgPrincipal teacher = principal(List.of("teacher"), List.of("lms.*"), List.of());
+
+        assertThat(PrincipalDerived.of(teacher)).isSameAs(PrincipalDerived.of(teacher));
+        assertThat(PrincipalDerived.of(teacher).authorities()).extracting(Object::toString)
+                .containsExactly("role:teacher", "perm:lms.*");
+    }
+
     private ErgPrincipal principal(List<String> roles, List<String> permissions, List<String> denied) {
         return new ErgPrincipal("u-1", "s-1", "erg", roles, permissions, denied, List.of(),
                 "staff", "admin", Map.of());

@@ -37,4 +37,7 @@ public interface LessonScheduleReadPort {
 
     /** Published slots of every class of the tenant (with their MAIN teachers), days {@code from}..{@code to} inclusive. */
     List<LessonSlot> publishedWeekSlots(String tenantId, LocalDate from, LocalDate to);
+
+    /** As above, narrowed in SQL to the given schools (null = all, empty = none) and subject (null = all). */
+    List<LessonSlot> publishedWeekSlots(String tenantId, LocalDate from, LocalDate to, Collection<String> schoolIds, String subjectId);
 }

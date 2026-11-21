@@ -2,6 +2,7 @@ package com.erg.ergspringboot.controller.curriculum;
 
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
+import com.erg.ergspringboot.curriculum.authorization.CurriculumManage;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumHardDeleteResponse;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumImpactResponse;
 import com.erg.ergspringboot.curriculum.CurriculumDtos.CurriculumLevelResponse;
@@ -111,6 +112,7 @@ public class CurriculumController {
             @RequestParam(required = false) String status,
             HttpServletRequest request
     ) {
+        curriculumService.requireReadableTreeStatus(status);
         return ok("Curriculum tree loaded", curriculumService.listTree(status, access(request)), request);
     }
 
@@ -147,6 +149,7 @@ public class CurriculumController {
         return ok("Curriculum subject hard deleted", curriculumService.hardDeleteSubject(id, access(request)), request);
     }
 
+    @CurriculumManage
     @GetMapping("/subjects/{id}/impact")
     public ApiResponse<CurriculumImpactResponse> subjectImpact(
             @PathVariable String id,
@@ -189,6 +192,7 @@ public class CurriculumController {
         return ok("Curriculum level hard deleted", curriculumService.hardDeleteLevel(id, access(request)), request);
     }
 
+    @CurriculumManage
     @GetMapping("/levels/{id}/impact")
     public ApiResponse<CurriculumImpactResponse> levelImpact(
             @PathVariable String id,
@@ -231,6 +235,7 @@ public class CurriculumController {
         return ok("Curriculum topic hard deleted", curriculumService.hardDeleteTopic(id, access(request)), request);
     }
 
+    @CurriculumManage
     @GetMapping("/topics/{id}/impact")
     public ApiResponse<CurriculumImpactResponse> topicImpact(
             @PathVariable String id,

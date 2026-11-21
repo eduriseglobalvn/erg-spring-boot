@@ -4,7 +4,6 @@ import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.*;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsCallerPermissions;
-import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.Assignment;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lms.persistence.Student;
@@ -12,8 +11,10 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.lms.internal.core.LmsQuizService;
 import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizRuntimePackageService;
 import com.erg.ergspringboot.platform.security.AuthenticatedTenant;
+import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -31,9 +32,18 @@ public class LmsResourceQueryUseCase {
     private final LmsAssignmentAccessPolicy policy;
     private final LmsCallerPermissions permissions;
 
+    private final QuizVersionRepository quizVersions;
+
     public LmsResourceQueryUseCase(LmsQuizService quizzes, QuizRuntimePackageService packages,
             LmsAssignmentAccessPolicy policy, LmsCallerPermissions permissions) {
+        this(quizzes, packages, policy, permissions, null);
+    }
+
+    @Autowired
+    public LmsResourceQueryUseCase(LmsQuizService quizzes, QuizRuntimePackageService packages,
+            LmsAssignmentAccessPolicy policy, LmsCallerPermissions permissions, QuizVersionRepository quizVersions) {
         this.quizzes = quizzes; this.packages = packages; this.policy = policy; this.permissions = permissions;
+        this.quizVersions = quizVersions;
     }
 
     public QuizPackageResponse getQuizPackage(String quizId, UserAccessContext access) {
@@ -42,38 +52,55 @@ public class LmsResourceQueryUseCase {
 
     public QuizPackageResponse getQuizPackage(String quizId, String assignmentId, UserAccessContext access) {
         String tenant = tenant(access.tenantId());
-        Quiz quiz = quizzes.findByTenantIdAndId(tenant, quizId)
-                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
         if (permissions.hasAny(AUTHORING_READ)) {
+            requireVisibleToAuthor(tenant, quizId, access.userId());
             QuizPackageResponse published = packages.activePackage(tenant, quizId).orElse(null);
-            return published != null ? published : legacy(quiz);
+            return published != null ? published : legacy(requireQuiz(tenant, quizId));
         }
-        return learnerPackage(tenant, quiz, blank(assignmentId), access);
+        return learnerPackage(tenant, quizId, blank(assignmentId), access);
     }
 
     public QuizDetailResponse getQuiz(String quizId, UserAccessContext access) { return getQuizPackage(quizId, access).quiz(); }
 
-    private QuizPackageResponse learnerPackage(String tenant, Quiz quiz, String assignmentId, UserAccessContext access) {
+    /**
+     * Same rule as assignment creation: a teacher (no publish right) never reads another teacher's own quiz; system quizzes
+     * and the training office (publish right) are unrestricted. Reported as missing so the id's existence is not confirmed.
+     */
+    private void requireVisibleToAuthor(String tenant, String quizId, String userId) {
+        if (quizVersions == null || permissions.hasAny("lms.quiz.publish", "*")) return;
+        if (quizVersions.countTeacherQuizzesNotOwnedBy(tenant, List.of(quizId), userId) > 0) {
+            throw new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found");
+        }
+    }
+
+    /** Authorization runs on the small queries; the Quiz row is loaded only for the legacy fallback or to tell 404 from 403. */
+    private QuizPackageResponse learnerPackage(String tenant, String quizId, String assignmentId, UserAccessContext access) {
         Student learner = policy.learner(tenant, access.userId()).orElse(null);
         if (assignmentId == null) {
-            if (!policy.isAssignedQuiz(tenant, quiz.getId(), learner, access.userId())) {
-                throw new ForbiddenException("quiz is not assigned to the authenticated learner");
-            }
-            QuizPackageResponse published = packages.activePackage(tenant, quiz.getId()).orElse(null);
-            return published != null ? learnerView(published, false) : legacy(quiz);
+            if (!policy.isAssignedQuiz(tenant, quizId, learner, access.userId())) throw notAssigned(tenant, quizId);
+            QuizPackageResponse published = packages.activePackage(tenant, quizId).orElse(null);
+            return published != null ? learnerView(published, false) : legacy(requireQuiz(tenant, quizId));
         }
         Assignment assignment = policy.assignment(tenant, assignmentId);
-        var assigned = policy.assignedQuiz(assignment, quiz.getId())
-                .orElseThrow(() -> new ForbiddenException("quiz is not assigned to the authenticated learner"));
-        if (!LmsStatePolicy.assignmentIsVisible(assignment.getStatus())
-                || !policy.isRecipient(assignment, learner, access.userId())) {
-            throw new ForbiddenException("quiz is not assigned to the authenticated learner");
-        }
+        var assigned = policy.assignedQuiz(assignment, quizId).orElseThrow(() -> notAssigned(tenant, quizId));
+        // Same visibility + recipient rule as before (one exists query instead of find + exists + per-assignment lookups).
+        if (!policy.isAssignedQuiz(tenant, quizId, assignment.getId(), learner, access.userId())) throw notAssigned(tenant, quizId);
         QuizPackageResponse published = (assigned.quizVersionId() == null
-                ? packages.activePackage(tenant, quiz.getId())
-                : packages.packageForVersion(tenant, quiz.getId(), assigned.quizVersionId())).orElse(null);
-        if (published == null) return legacy(quiz);
+                ? packages.activePackage(tenant, quizId)
+                : packages.packageForVersion(tenant, quizId, assigned.quizVersionId())).orElse(null);
+        if (published == null) return legacy(requireQuiz(tenant, quizId));
         return learnerView(published, assignment.isOfflineAllowed());
+    }
+
+    private Quiz requireQuiz(String tenant, String quizId) {
+        return quizzes.findByTenantIdAndId(tenant, quizId)
+                .orElseThrow(() -> new com.erg.ergspringboot.exception.ResourceNotFoundException("quiz not found"));
+    }
+
+    /** A missing quiz stays 404 for every caller; the lookup only runs on the denial path. */
+    private RuntimeException notAssigned(String tenant, String quizId) {
+        requireQuiz(tenant, quizId);
+        return new ForbiddenException("quiz is not assigned to the authenticated learner");
     }
 
     /**

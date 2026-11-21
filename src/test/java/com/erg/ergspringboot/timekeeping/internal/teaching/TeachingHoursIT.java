@@ -210,4 +210,36 @@ class TeachingHoursIT extends TeachingScheduleITBase {
         assertThat((String) audit.get("detail")).contains("\"teachers\": 2", "\"mainPeriods\": 3", "\"assistantPeriods\": 1");
         assertThat(hours.export(tenant, 2026).mainMonths()).extracting(m -> m.month()).contains("2026-10");
     }
+
+    /** Two admins closing the same month together: one freezes it, the other finds it closed; one snapshot, one audit row. */
+    @Test
+    void twoAdminsClosingTheSameMonthTogetherFreezeItOnce() throws Exception {
+        tenant = id();
+        school = school(tenant, "THCS Nguyen Du");
+        classId = classroom(tenant, school, "6A6");
+        subject = subject(tenant, "Tin hoc");
+        main = user(tenant, "Nguyen Quoc Vuong");
+        batch = batch(tenant, school, "PUBLISHED", "HK1");
+        publishedEvent("2026-10-06", main, null);
+        months.confirm(tenant, main, OCT, new ConfirmTeachingCommand(1, 0, 0));
+
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var calls = java.util.stream.IntStream.range(0, 2).mapToObj(i -> pool.submit(() -> {
+                start.await();
+                months.close(tenant, "hr" + i, OCT);
+                return null;
+            })).toList();
+            start.countDown();
+            for (var call : calls) call.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject("select count(*) from tk_teaching_month_lines where tenant_id = ? and month = '2026-10'",
+                Integer.class, tenant)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from tk_audit_log where tenant_id = ? and action = 'CLOSE_TEACHING_MONTH'",
+                Integer.class, tenant)).isEqualTo(1);
+    }
 }

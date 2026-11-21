@@ -21,7 +21,6 @@ class BenchmarkPlatformContractTest {
         assertThat(compose)
                 .contains("name: erg-benchmark")
                 .contains("backend-jvm:")
-                .contains("backend-native:")
                 .contains("postgres:")
                 .contains("redis-state:")
                 .contains("redis-cache:")
@@ -42,7 +41,6 @@ class BenchmarkPlatformContractTest {
 
         assertThat(dockerfile)
                 .contains("AS jvm-runtime")
-                .contains("AS native-runtime")
                 .contains("USER erg")
                 .contains("HEALTHCHECK");
     }
@@ -91,16 +89,11 @@ class BenchmarkPlatformContractTest {
     }
 
     @Test
-    void nativeRuntimeLoadsFlywayMigrationsFromTheCopiedFilesystem() throws Exception {
+    void benchmarkRuntimeLoadsFlywayMigrationsFromTheJarClasspath() throws Exception {
         String compose = Files.readString(BENCHMARK_COMPOSE);
-        String dockerfile = Files.readString(DOCKERFILE);
 
         assertThat(compose)
-                .contains("FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres");
-        assertThat(dockerfile)
-                .contains("MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,prometheus")
-                .contains("MANAGEMENT_ENDPOINT_PROMETHEUS_ACCESS=read-only")
-                .contains("MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED=true");
+                .contains("FLYWAY_LOCATIONS: classpath:db/migration/postgres");
     }
 
     @Test

@@ -28,7 +28,8 @@ public final class NotificationCampaignResponses {
             OffsetDateTime updatedAt,
             long recipientCount,
             @Schema(description = "Recipients who opened the message") long viewedCount,
-            @Schema(description = "Recipients who acknowledged reading") long ackedCount) {
+            @Schema(description = "Recipients who acknowledged reading") long ackedCount,
+            @Schema(description = "Size of audience.userIds, so a list can show it without reading the ids") int userIdCount) {
     }
 
     public record CampaignRecipientResponse(

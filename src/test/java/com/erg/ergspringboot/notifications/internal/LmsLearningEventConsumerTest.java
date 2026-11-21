@@ -13,6 +13,7 @@ import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentAudience;
+import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentSummary;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.Submitter;
 import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher;
 import java.time.OffsetDateTime;
@@ -27,6 +28,8 @@ class LmsLearningEventConsumerTest {
     private final LmsLearningEventConsumer consumer = new LmsLearningEventConsumer(lms, publisher);
     private final AssignmentAudience audience =
             new AssignmentAudience("asg-1", "Bai 1", "class-1", "teacher-1", List.of("user-1", "user-2"));
+
+    private final AssignmentSummary summary = new AssignmentSummary("asg-1", "Bai 1", "class-1", "teacher-1");
 
     @Test
     void assignmentCreatedNotifiesLinkedStudentsWithTheEventIdAsKey() {
@@ -49,7 +52,7 @@ class LmsLearningEventConsumerTest {
 
     @Test
     void failedGradedAttemptAlsoRaisesLowScoreSupportForTheAssigningTeacher() {
-        when(lms.assignmentAudience("erg", "asg-1")).thenReturn(Optional.of(audience));
+        when(lms.assignmentSummary("erg", "asg-1")).thenReturn(Optional.of(summary));
         when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", "user-9")));
 
         consumer.on(submitted("submitted", false));
@@ -62,7 +65,7 @@ class LmsLearningEventConsumerTest {
 
     @Test
     void provisionalNeedsReviewScoreIsNotReportedAsLowScore() {
-        when(lms.assignmentAudience("erg", "asg-1")).thenReturn(Optional.of(audience));
+        when(lms.assignmentSummary("erg", "asg-1")).thenReturn(Optional.of(summary));
         when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", "user-9")));
 
         consumer.on(submitted("needs_review", false));
@@ -75,13 +78,23 @@ class LmsLearningEventConsumerTest {
 
     @Test
     void studentWithoutLoginAccountIsSentWithNoCreator() {
-        when(lms.assignmentAudience("erg", "asg-1")).thenReturn(Optional.of(audience));
+        when(lms.assignmentSummary("erg", "asg-1")).thenReturn(Optional.of(summary));
         when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", null)));
 
         consumer.on(submitted("submitted", true));
 
         verify(publisher).attemptSubmitted("attempt-submitted:att-1", "erg", "asg-1", "Bai 1", "att-1", "stu-1",
                 null, "An", List.of("teacher-1"));
+    }
+
+    @Test
+    void submitNeverLoadsTheFullAudience() {
+        when(lms.assignmentSummary("erg", "asg-1")).thenReturn(Optional.of(summary));
+        when(lms.submitter("erg", "stu-1")).thenReturn(Optional.of(new Submitter("An", "user-9")));
+
+        consumer.on(submitted("submitted", true));
+
+        verify(lms, never()).assignmentAudience(anyString(), anyString());
     }
 
     private LmsAttemptSubmitted submitted(String status, boolean passed) {

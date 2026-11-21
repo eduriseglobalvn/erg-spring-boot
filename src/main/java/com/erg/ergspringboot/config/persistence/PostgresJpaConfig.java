@@ -14,6 +14,8 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.persistenceunit.PersistenceManagedTypes;
 import org.springframework.orm.jpa.persistenceunit.PersistenceManagedTypesScanner;
@@ -94,6 +96,22 @@ public class PostgresJpaConfig {
                 jpaProperties,
                 managedTypes
         );
+    }
+
+    /**
+     * JDBC beans go through the same checkout apply/clear as JPA (and join the JPA transaction's connection), so a
+     * non-transactional JdbcTemplate call cannot inherit the previous borrower's tenant or maintenance GUCs.
+     */
+    @Bean
+    @Primary
+    public JdbcTemplate jdbcTemplate(@Qualifier("postgresDataSource") DataSource dataSource) {
+        return new JdbcTemplate(new TenantGucDataSource(dataSource));
+    }
+
+    @Bean
+    @Primary
+    public NamedParameterJdbcTemplate namedParameterJdbcTemplate(JdbcTemplate jdbcTemplate) {
+        return new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
     @Bean

@@ -15,6 +15,13 @@ public interface TkDayRepository extends JpaRepository<TkDay, String> {
 
     List<TkDay> findByTenantIdAndWorkDate(String tenantId, LocalDate workDate);
 
+    /** The day's rows of some schools (today dashboard). */
+    List<TkDay> findByTenantIdAndSchoolIdInAndWorkDate(String tenantId, Collection<String> schoolIds, LocalDate workDate);
+
+    /** Month close: the stored rows of some people over a range. */
+    List<TkDay> findByTenantIdAndUserIdInAndWorkDateBetween(String tenantId, Collection<String> userIds, LocalDate from,
+            LocalDate to);
+
     List<TkDay> findByTenantIdAndUserIdAndWorkDateBetweenOrderByWorkDateAsc(
             String tenantId, String userId, LocalDate from, LocalDate to);
 

@@ -126,7 +126,7 @@ public class ScheduleSlotChangeService {
     private SlotChangeResponse run(String tenantId, String eventId, Integer expectedVersion, Scope scope, boolean dry, boolean swap,
             Patch patch, String kind, String reason, String note, String actorId) {
         // the conflict check reads PUBLISHED periods: it must not interleave with a publish or another edit of the tenant
-        if (!dry) batches.advisoryXactLock("teaching-schedule-publish:" + tenantId);
+        if (!dry) batches.lockTenantPublish(tenantId);
         Target target = resolve(tenantId, eventId, expectedVersion, scope, dry, swap);
         List<String> ids = target.events().stream().map(CalendarEvent::getId).toList();
         List<Occurrence> before = loader.loadEvents(tenantId, ids);
@@ -145,11 +145,13 @@ public class ScheduleSlotChangeService {
         require(patch.subjectId() == null || subjectNames.containsKey(patch.subjectId()), "SUBJECT_INVALID", "Môn học không tồn tại.");
         require(userIds.stream().allMatch(userNames::containsKey), "TEACHER_INVALID", "Giáo viên không tồn tại");
         OffsetDateTime now = now();
+        Map<String, Integer> counts = target.events().stream().collect(Collectors.toMap(CalendarEvent::getId, e -> e.getPeriodCount().intValue()));
         for (Occurrence base : before) {
-            after.add(moved(tenantId, target.batch(), base, patch, template, roomNames, subjectNames, userNames, now));
+            after.add(moved(tenantId, target.batch(), base, patch, template, roomNames, subjectNames, userNames, now,
+                    counts.getOrDefault(base.eventId(), 1)));
         }
 
-        List<ConflictDetailResponse> conflicts = engine.detect(tenantId, after, new HashSet<>(ids), true);
+        List<ConflictDetailResponse> conflicts = engine.detect(tenantId, after, new HashSet<>(ids), dry);
         boolean blocking = conflicts.stream().anyMatch(c -> "ERROR".equals(c.severity()));
         if (dry) return response(false, blocking, after, null, conflicts);
         if (blocking) {
@@ -192,8 +194,11 @@ public class ScheduleSlotChangeService {
                 picked = siblings(tenantId, anchor, anchor.getStartAt());
                 if (swap) {
                     // a teacher who already covered another day keeps it: only the anchor's own teacher is replaced
-                    String main = mainOf(tenantId, anchor);
-                    picked = picked.stream().filter(e -> Objects.equals(main, mainOf(tenantId, e))).toList();
+                    List<String> pickedIds = new ArrayList<>(picked.stream().map(CalendarEvent::getId).toList());
+                    pickedIds.add(anchor.getId());
+                    Map<String, String> mains = mainsOf(tenantId, pickedIds);
+                    String main = mains.get(anchor.getId());
+                    picked = picked.stream().filter(e -> Objects.equals(main, mains.get(e.getId()))).toList();
                 }
             }
             case "SELECTED_DATES" -> picked = selected(tenantId, anchor, scope.dates());
@@ -232,14 +237,17 @@ public class ScheduleSlotChangeService {
         return picked;
     }
 
-    private String mainOf(String tenantId, CalendarEvent event) {
-        return eventTeachers.findByTenantIdAndEventIdIn(tenantId, List.of(event.getId())).stream()
-                .filter(t -> "MAIN".equals(t.getRole())).map(CalendarEventTeacher::getTeacherUserId).findFirst().orElse(null);
+    /** The MAIN teacher of each event (events without one are absent), in one query. */
+    private Map<String, String> mainsOf(String tenantId, List<String> eventIds) {
+        Map<String, String> mains = new java.util.HashMap<>();
+        eventTeachers.findByTenantIdAndEventIdIn(tenantId, eventIds).stream().filter(t -> "MAIN".equals(t.getRole()))
+                .forEach(t -> mains.putIfAbsent(t.getEventId(), t.getTeacherUserId()));
+        return mains;
     }
 
     /** The period as it will be after the change: new time, room, subject and people. */
     private Occurrence moved(String tenantId, CalendarBatch batch, Occurrence o, Patch p, PeriodTemplate fixed, Map<String, String> rooms,
-            Map<String, String> subjects, Map<String, String> users, OffsetDateTime now) {
+            Map<String, String> subjects, Map<String, String> users, OffsetDateTime now, int periodCount) {
         LocalDate date = p.newDate() == null ? o.date() : p.newDate();
         int periodNo = p.periodNo() == null ? o.periodNo() : p.periodNo();
         OffsetDateTime start = o.start();
@@ -254,7 +262,9 @@ public class ScheduleSlotChangeService {
             PeriodTemplate template = fixed != null ? fixed : templates.templateForSchool(tenantId, batch.getSchoolId(), date);
             PeriodSlot slot = templates.slot(template, periodNo);
             start = date.atTime(slot.start()).atZone(ScheduleDataLoader.VN).toOffsetDateTime();
-            end = date.atTime(slot.end()).atZone(ScheduleDataLoader.VN).toOffsetDateTime();
+            // a multi-period event ends with its last period, not with the first slot
+            PeriodSlot last = periodCount > 1 ? templates.slot(template, periodNo + periodCount - 1) : slot;
+            end = date.atTime(last.end()).atZone(ScheduleDataLoader.VN).toOffsetDateTime();
             if (!start.isAfter(now)) {
                 throw TeachingScheduleException.conflict("EVENT_IN_THE_PAST", "Thời điểm mới đã qua.");
             }

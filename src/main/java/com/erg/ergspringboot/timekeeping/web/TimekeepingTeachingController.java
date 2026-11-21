@@ -94,7 +94,8 @@ public class TimekeepingTeachingController {
 
     @GetMapping(TimekeepingPaths.ADMIN_TEACHING + "/export")
     @TimekeepingApprove
-    public ApiResponse<TeachingExport> teachingExport(@RequestParam int year, HttpServletRequest request) {
-        return ok("Teaching export loaded", teaching.export(principal(), year), request);
+    public ApiResponse<TeachingExport> teachingExport(@RequestParam int year, @RequestParam(required = false) String schoolId,
+            @RequestParam(required = false) Integer month, HttpServletRequest request) {
+        return ok("Teaching export loaded", teaching.export(principal(), year, schoolId, month), request);
     }
 }

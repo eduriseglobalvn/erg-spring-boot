@@ -16,8 +16,8 @@ import com.erg.ergspringboot.elearning.internal.engagement.TierMath.State;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -32,6 +32,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -43,28 +45,37 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StudentTierReader {
 
-    private final StudentRepository students;
+    private final LmsStudentIdentityLookup identities;
     private final StudentTierService service;
     private final NamedParameterJdbcTemplate jdbc;
+    private final TierCutoffReader cutoffs;
+    private final LmsReadCacheInvalidator caches;
+    private final ClassLeaderboardService leaderboard;
 
-    public StudentTierReader(StudentRepository students, StudentTierService service, JdbcTemplate jdbc) {
-        this.students = students;
+    public StudentTierReader(LmsStudentIdentityLookup identities, StudentTierService service, JdbcTemplate jdbc,
+            TierCutoffReader cutoffs, LmsReadCacheInvalidator caches, ClassLeaderboardService leaderboard) {
+        this.identities = identities;
         this.service = service;
         this.jdbc = new NamedParameterJdbcTemplate(jdbc);
+        this.cutoffs = cutoffs;
+        this.caches = caches;
+        this.leaderboard = leaderboard;
     }
 
     // ---- student reads ------------------------------------------------------------------------------------------
 
+    /** Per student for 60 s; a hand-in (XP), a frame pick and an acknowledged promotion evict it. */
+    @Cacheable(cacheNames = "studentTier", sync = true, key = "{#tenantId, #userId}")
     @Transactional(readOnly = true)
     public MyTierResponse myTier(String tenantId, String userId) {
-        Student student = requireStudent(tenantId, userId);
+        StudentIdentity student = requireStudent(tenantId, userId);
         LocalDate today = LocalDate.now(LeaderboardXp.ZONE);
         String year = schoolYear(today);
-        Candidate live = service.readXp(tenantId, List.of(student.getId()), yearStart(today), ZonedDateTime.now(LeaderboardXp.ZONE), today).get(student.getId());
-        Row row = latestRow(tenantId, student.getId(), year);
+        Candidate live = service.readXp(tenantId, List.of(student.studentId()), yearStart(today), ZonedDateTime.now(LeaderboardXp.ZONE), today).get(student.studentId());
+        Row row = latestRow(tenantId, student.studentId(), year);
         if (row == null || row.tierKey() == null) {
             return new MyTierResponse(null, null, row == null ? null : row.gradeRank(), row == null ? null : row.gradeSize(),
-                    live.xp(), live.submitted() >= TierMath.MIN_SUBMITTED, live.submitted(), false, null, null, promotion(tenantId, student.getId(), year));
+                    live.xp(), live.submitted() >= TierMath.MIN_SUBMITTED, live.submitted(), false, null, null, promotion(tenantId, student.studentId(), year));
         }
         List<Cell> cells = cells(tenantId, row.schoolId(), row.grade(), row.weekStart());
         int myPosition = TierMath.position(row.tierKey(), row.division());
@@ -82,13 +93,13 @@ public class StudentTierReader {
         }
         return new MyTierResponse(row.tierKey(), row.division(), row.gradeRank(), row.gradeSize(), live.xp(),
                 live.submitted() >= TierMath.MIN_SUBMITTED, live.submitted(), row.protect(), nextDivision, nextTier,
-                promotion(tenantId, student.getId(), year));
+                promotion(tenantId, student.studentId(), year));
     }
 
     @Transactional(readOnly = true)
     public List<TierTableRowResponse> tierTable(String tenantId, String userId, String weekStart) {
-        Student student = requireStudent(tenantId, userId);
-        StudentTierService.Cohort cohort = cohortOf(tenantId, student.getId());
+        StudentIdentity student = requireStudent(tenantId, userId);
+        StudentTierService.Cohort cohort = cohortOf(tenantId, student.studentId());
         LocalDate week;
         try {
             week = weekStart == null || weekStart.isBlank() ? null : LocalDate.parse(weekStart.trim());
@@ -106,46 +117,55 @@ public class StudentTierReader {
         return table;
     }
 
+    @Cacheable(cacheNames = "studentFrames", sync = true, key = "{#tenantId, #userId}")
     @Transactional(readOnly = true)
     public MyFramesResponse myFrames(String tenantId, String userId) {
-        Student student = requireStudent(tenantId, userId);
-        return frames(tenantId, student.getId());
+        StudentIdentity student = requireStudent(tenantId, userId);
+        return frames(tenantId, student.studentId());
     }
 
     /** {@code tierKey} null = "Không dùng". A frame that is not unlocked is refused. */
     @Transactional
     public MyFramesResponse selectFrame(String tenantId, String userId, String tierKey) {
-        Student student = requireStudent(tenantId, userId);
+        StudentIdentity student = requireStudent(tenantId, userId);
         String key = tierKey == null || tierKey.isBlank() ? null : tierKey.trim();
         if (key != null) {
             if (TierMath.TIERS.stream().noneMatch(def -> def.key().equals(key))) throw new BadRequestException("Unknown frame.");
             Integer unlocked = jdbc.queryForObject("select count(*) from student_frame where tenant_id = :t and student_id = :s and tier_key = :k",
-                    Map.of("t", tenantId, "s", student.getId(), "k", key), Integer.class);
+                    Map.of("t", tenantId, "s", student.studentId(), "k", key), Integer.class);
             if (unlocked == null || unlocked == 0) throw new BadRequestException("This frame is not unlocked yet.");
         }
         jdbc.update("""
                 insert into student_frame_choice (tenant_id, student_id, tier_key, updated_at) values (:t, :s, :k, now())
                 on conflict (tenant_id, student_id) do update set tier_key = excluded.tier_key, updated_at = now()
-                """, new MapSqlParameterSource("t", tenantId).addValue("s", student.getId()).addValue("k", key));
-        return frames(tenantId, student.getId());
+                """, new MapSqlParameterSource("t", tenantId).addValue("s", student.studentId()).addValue("k", key));
+        evictStudent(tenantId, userId, true);
+        return frames(tenantId, student.studentId());
+    }
+
+    /** The class boards embed each member's frame (45 s, per instance): drop only the boards this student is on, now and after commit. */
+    private void evictStudent(String tenantId, String userId, boolean frameChanged) {
+        caches.evictScopesAfterCommit(tenantId, Map.of("studentTier", List.of(userId), "studentFrames", List.of(userId)));
+        if (frameChanged) leaderboard.evictStudentBoards(tenantId, userId);
     }
 
     /** Marks the promotion of {@code weekStart} (and every earlier one) as seen; unknown weeks change nothing. */
     @Transactional
     public boolean acknowledgePromotion(String tenantId, String userId, String weekStart) {
-        Student student = requireStudent(tenantId, userId);
+        StudentIdentity student = requireStudent(tenantId, userId);
         LocalDate week;
         try {
             week = LocalDate.parse(weekStart == null ? "" : weekStart.trim());
         } catch (DateTimeParseException invalid) {
             throw new BadRequestException("weekStart must be a date (yyyy-MM-dd).");
         }
-        List<SqlParameterSource> seen = promotions(tenantId, student.getId(), schoolYear(week)).stream()
+        List<SqlParameterSource> seen = promotions(tenantId, student.studentId(), schoolYear(week)).stream()
                 .filter(p -> !p.weekStart().isAfter(week))
-                .map(p -> (SqlParameterSource) new MapSqlParameterSource("t", tenantId).addValue("s", student.getId()).addValue("w", p.weekStart()))
+                .map(p -> (SqlParameterSource) new MapSqlParameterSource("t", tenantId).addValue("s", student.studentId()).addValue("w", p.weekStart()))
                 .toList();
         jdbc.batchUpdate("insert into student_tier_seen (tenant_id, student_id, week_start) values (:t, :s, :w) on conflict do nothing",
                 seen.toArray(SqlParameterSource[]::new));
+        evictStudent(tenantId, userId, false);
         return true;
     }
 
@@ -223,15 +243,8 @@ public class StudentTierReader {
 
     /** Cutoff cells of a cohort for {@code week}, or its latest stored week when null. */
     private List<Cell> cells(String tenantId, String schoolId, String grade, LocalDate week) {
-        return jdbc.query("""
-                select tier_key, division, rank_from, rank_to, min_xp from student_tier_cutoff
-                where tenant_id = :t and school_id = :school and grade = :grade
-                  and week_start = coalesce(cast(:week as date), (select max(week_start) from student_tier_cutoff
-                                                    where tenant_id = :t and school_id = :school and grade = :grade))
-                order by rank_from
-                """, new MapSqlParameterSource("t", tenantId).addValue("school", schoolId).addValue("grade", grade).addValue("week", week),
-                (rs, n) -> new Cell(rs.getString("tier_key"), rs.getInt("division") == 0 ? null : rs.getInt("division"),
-                        rs.getInt("rank_from"), rs.getInt("rank_to"), rs.getInt("min_xp")));
+        return cutoffs.cutoffs(tenantId, schoolId, grade, week).cells().stream()
+                .map(c -> new Cell(c.tierKey(), c.division(), c.rankFrom(), c.rankTo(), c.minXp())).toList();
     }
 
     private StudentTierService.Cohort cohortOf(String tenantId, String studentId) {
@@ -242,9 +255,10 @@ public class StudentTierReader {
                 """, Map.of("t", tenantId, "s", studentId), rs -> rs.next() ? new StudentTierService.Cohort(tenantId, rs.getString(1), rs.getString(2)) : null);
     }
 
-    private Student requireStudent(String tenantId, String userId) {
-        return students.findFirstByTenantIdAndAuthUserId(tenantId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated student was not found."));
+    private StudentIdentity requireStudent(String tenantId, String userId) {
+        StudentIdentity student = identities.byAuthUser(tenantId, userId);
+        if (!student.exists()) throw new ResourceNotFoundException("Authenticated student was not found.");
+        return student;
     }
 
     private static String schoolYear(LocalDate day) {

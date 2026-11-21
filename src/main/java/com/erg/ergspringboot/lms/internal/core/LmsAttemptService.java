@@ -3,12 +3,11 @@ package com.erg.ergspringboot.lms.internal.core;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
+import com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,8 +29,7 @@ public class LmsAttemptService {
     }
 
     public Optional<Attempt> findInProgress(String tenantId, String assignmentId, String quizId, String studentId) {
-        return repository.findFirstByTenantIdAndAssignmentIdAndQuizIdAndStudentIdAndStatusIgnoreCase(
-                tenantId, assignmentId, quizId, studentId, "in_progress");
+        return repository.findInProgress(tenantId, assignmentId, quizId, studentId);
     }
 
     public Optional<Attempt> findByStartIdempotencyKey(
@@ -48,10 +46,6 @@ public class LmsAttemptService {
                 tenantId, assignmentId, quizId, studentId, startIdempotencyKey.trim());
     }
 
-    public List<Attempt> findTop3ByAssignmentAndStudent(String tenantId, String assignmentId, String studentId) {
-        return repository.findTop3ByTenantIdAndAssignmentIdAndStudentIdOrderByUpdatedAtDesc(tenantId, assignmentId, studentId);
-    }
-
     /** Latest handed-in attempt (submitted/graded/needs_review); never an in-progress one. */
     public Optional<Attempt> findLatestSubmitted(String tenantId, String assignmentId, String studentId) {
         return repository.findLatestByStatuses(tenantId, assignmentId, studentId,
@@ -59,7 +53,8 @@ public class LmsAttemptService {
                 .stream().findFirst();
     }
 
-    public List<Attempt> findTop3ByAssignmentsAndStudent(
+    /** Newest three attempts per assignment, answers not loaded (score list view). */
+    public List<AttemptSummaryProjection> findTop3ByAssignmentsAndStudent(
             String tenantId,
             Collection<String> assignmentIds,
             String studentId
@@ -67,12 +62,7 @@ public class LmsAttemptService {
         if (assignmentIds == null || assignmentIds.isEmpty()) {
             return List.of();
         }
-        Map<String, Integer> retainedByAssignment = new HashMap<>();
-        return repository.findByTenantIdAndAssignmentIdInAndStudentIdOrderByAssignmentIdAscUpdatedAtDesc(
-                        tenantId, assignmentIds, studentId)
-                .stream()
-                .filter(attempt -> retainedByAssignment.merge(attempt.getAssignmentId(), 1, Integer::sum) <= 3)
-                .toList();
+        return repository.findTop3SummariesByAssignmentsAndStudent(tenantId, assignmentIds, studentId);
     }
 
     public long countCompletedForLimit(String tenantId, String assignmentId, String quizId, String studentId) {
@@ -84,17 +74,9 @@ public class LmsAttemptService {
                 LmsStatePolicy.completedAttemptStates());
     }
 
-    public List<Attempt> findByAssignment(String tenantId, String assignmentId) {
-        return repository.findByTenantIdAndAssignmentIdOrderByUpdatedAtDesc(tenantId, assignmentId);
-    }
-
     public com.erg.ergspringboot.lms.persistence.projection.AssignmentProgressProjection summarizeAssignmentProgress(
             String tenantId, String assignmentId) {
         return repository.summarizeAssignmentProgress(tenantId, assignmentId);
-    }
-
-    public List<Attempt> findByQuiz(String tenantId, String quizId) {
-        return repository.findByTenantIdAndQuizIdOrderByUpdatedAtDesc(tenantId, quizId);
     }
 
     // Summary projection (no jsonb blobs) capped for the quiz-students list view; the full answers
@@ -111,6 +93,15 @@ public class LmsAttemptService {
                     org.springframework.data.domain.Pageable pageable) {
         return repository.findScopedQuizAttemptSummaries(
                 tenantId, quizId, allClasses, classIds, allUnits, unitIds, pageable);
+    }
+
+    /** As above; with {@code classScopeWithoutSchool} a class named in {@code classIds} needs no matching education unit. */
+    public org.springframework.data.domain.Page<com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection>
+            findScopedQuizAttemptSummaries(String tenantId, String quizId, boolean allClasses,
+                    java.util.Collection<String> classIds, boolean allUnits, java.util.Collection<String> unitIds,
+                    boolean classScopeWithoutSchool, org.springframework.data.domain.Pageable pageable) {
+        return repository.findScopedQuizAttemptSummaries(
+                tenantId, quizId, allClasses, classIds, allUnits, unitIds, classScopeWithoutSchool, pageable);
     }
 
     /**

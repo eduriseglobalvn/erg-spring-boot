@@ -72,6 +72,15 @@ public abstract class AdminITBase {
         }
     }
 
+    @Autowired org.springframework.cache.CacheManager cacheManager;
+
+    /** Tests seed shifts/sites with JDBC inside rolled-back transactions, which no eviction sees. */
+    @org.junit.jupiter.api.BeforeEach
+    void forgetCachedSchoolSetup() {
+        var cache = cacheManager.getCache("timekeepingSchoolSetup");
+        if (cache != null) cache.clear();
+    }
+
     @MockitoBean protected CalendarReadPort calendar;
     @MockitoBean protected NotificationAdminOperations notifications;
     @Autowired protected JdbcTemplate jdbc;

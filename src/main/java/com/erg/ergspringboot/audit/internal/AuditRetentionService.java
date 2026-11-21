@@ -2,6 +2,7 @@ package com.erg.ergspringboot.audit.internal;
 
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "erg.audit.retention.enabled", havingValue = "true", matchIfMissing = true)
 public class AuditRetentionService {
     static final String JOB_NAME = "audit-retention";
+    private static final Duration RUN_BUDGET = Duration.ofSeconds(20);
 
     private final AuditEventRepository repository;
     private final EntityManager entityManager;
@@ -83,7 +85,17 @@ public class AuditRetentionService {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             // Never purge rows whose absolute deadline is still in the future.
             OffsetDateTime effective = cutoff == null || cutoff.isAfter(now) ? now : cutoff;
-            return repository.deleteExpired(effective, batchSize);
+            // Batch after batch until a partial batch signals the tail or the budget is spent (the next run resumes).
+            // shortcut: one transaction for the whole run (the GUCs are transaction-local); split per batch if its
+            // delete locks ever hurt writers.
+            long deadline = System.nanoTime() + RUN_BUDGET.toNanos();
+            int total = 0;
+            int deleted;
+            do {
+                deleted = repository.deleteExpired(effective, batchSize);
+                total += deleted;
+            } while (deleted >= batchSize && System.nanoTime() - deadline < 0);
+            return total;
         } finally {
             running.set(false);
         }

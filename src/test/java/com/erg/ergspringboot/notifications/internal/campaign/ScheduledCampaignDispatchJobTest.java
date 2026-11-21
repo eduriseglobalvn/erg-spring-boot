@@ -31,6 +31,7 @@ class ScheduledCampaignDispatchJobTest {
     @Mock private NotificationCampaignRepository campaigns;
     @Mock private NotificationCampaignService service;
     @Mock private ClusterJobLock lock;
+    @Mock private CampaignFanOut fanOut;
 
     @Test
     void dispatchesOnlyTheDueCampaignsInTheirOwnTenant() {
@@ -75,8 +76,21 @@ class ScheduledCampaignDispatchJobTest {
         verify(campaigns, never()).findTop100ByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(any(), any());
     }
 
+    @Test
+    void eachPassClaimsDueCampaignsThenFansOutWhatIsStillSending() {
+        when(campaigns.findTop100ByStatusAndScheduledAtLessThanEqualOrderByScheduledAtAsc(eq(CampaignStatus.SCHEDULED), any()))
+                .thenReturn(List.of(campaign("due", "t1")));
+        when(service.dispatchDue("t1", "due")).thenReturn(true);
+
+        job(null).run();
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(service, fanOut);
+        order.verify(service).dispatchDue("t1", "due");
+        order.verify(fanOut).drainSending();
+    }
+
     private ScheduledCampaignDispatchJob job(ClusterJobLock jobLock) {
-        return new ScheduledCampaignDispatchJob(campaigns, service, jobLock, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new ScheduledCampaignDispatchJob(campaigns, service, fanOut, jobLock, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static NotificationCampaignEntity campaign(String id, String tenant) {

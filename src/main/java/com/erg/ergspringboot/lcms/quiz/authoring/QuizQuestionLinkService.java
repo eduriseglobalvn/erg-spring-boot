@@ -36,12 +36,14 @@ public class QuizQuestionLinkService {
 
     public List<String> syncManualQuestionLinks(String tenantId, String quizId, List<QuestionLinkInput> questionLinks) {
         List<QuestionLinkInput> cleanLinks = cleanQuestionLinks(tenantId, questionLinks);
+        List<String> cleanIds = cleanLinks.stream().map(QuestionLinkInput::questionId).toList();
+        if (unchanged(tenantId, quizId, cleanLinks)) {
+            return cleanIds;
+        }
         deleteExistingLinks(tenantId, quizId);
-        List<String> cleanIds = new ArrayList<>();
         List<QuizQuestion> links = new ArrayList<>(cleanLinks.size());
         for (int index = 0; index < cleanLinks.size(); index += 1) {
             QuestionLinkInput input = cleanLinks.get(index);
-            cleanIds.add(input.questionId());
             QuizQuestion link = new QuizQuestion();
             link.setTenantId(tenantId);
             link.setQuizId(quizId);
@@ -57,6 +59,28 @@ public class QuizQuestionLinkService {
             quizQuestionRepository.saveAll(links);
         }
         return cleanIds;
+    }
+
+    // An autosave that did not touch the question list must not delete and re-insert every link row.
+    private boolean unchanged(String tenantId, String quizId, List<QuestionLinkInput> wanted) {
+        List<QuizQuestion> current = quizQuestionRepository.findByTenantIdAndQuizIdOrderByOrderIndexAsc(tenantId, quizId);
+        if (current.size() != wanted.size()) {
+            return false;
+        }
+        for (int index = 0; index < current.size(); index += 1) {
+            QuizQuestion link = current.get(index);
+            QuestionLinkInput input = wanted.get(index);
+            if (!input.questionId().equals(link.getQuestionId()) || !"manual".equals(link.getSource())
+                    || link.getOrderIndex() == null || link.getOrderIndex() != index
+                    || (link.getMetadata() != null && !link.getMetadata().isEmpty())
+                    || (input.points() == null ? link.getPoints() != null
+                            : link.getPoints() == null || input.points().compareTo(link.getPoints()) != 0)
+                    || !java.util.Objects.equals(link.getSettings() == null ? Map.of() : link.getSettings(),
+                            input.settings() == null ? Map.of() : input.settings())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void deleteExistingLinks(String tenantId, String quizId) {
@@ -87,9 +111,8 @@ public class QuizQuestionLinkService {
             }
         }
         if (ids.isEmpty()) return result;
-        java.util.Set<String> existingIds = questionRepository.findByTenantIdAndIdIn(tenantId, new ArrayList<>(ids))
-                .stream().map(com.erg.ergspringboot.lcms.persistence.quiz.bank.Question::getId)
-                .collect(java.util.stream.Collectors.toSet());
+        java.util.Set<String> existingIds = new java.util.HashSet<>(
+                questionRepository.findIdsByTenantIdAndIdIn(tenantId, new ArrayList<>(ids)));
         candidates.stream()
                 .filter(candidate -> existingIds.contains(candidate.questionId()))
                 .forEach(result::add);

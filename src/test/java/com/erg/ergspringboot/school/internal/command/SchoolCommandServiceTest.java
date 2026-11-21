@@ -87,6 +87,19 @@ class SchoolCommandServiceTest {
     }
 
     @Test
+    void everyAcademicYearAndGradeWriteEvictsTheSchoolDirectoryAndOperationsCaches() {
+        for (String name : List.of("createAcademicYear", "activateAcademicYear", "closeAcademicYear", "syncDefaultGrades",
+                "createGrade", "updateGrade")) {
+            var method = java.util.Arrays.stream(SchoolCommandService.class.getDeclaredMethods())
+                    .filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow();
+            var evict = method.getAnnotation(org.springframework.cache.annotation.CacheEvict.class);
+            assertThat(evict).as(name).isNotNull();
+            assertThat(evict.cacheNames()).containsExactlyInAnyOrder("lcmsSchoolDirectory", "lcmsSchoolOperations");
+            assertThat(evict.allEntries()).isTrue();
+        }
+    }
+
+    @Test
     void archiveLocksTheSchoolsClassesAndStudentsInsteadOfRefusingWhileClassesAreOpen() {
         stubSchool("ACTIVE");
         org.mockito.Mockito.lenient().when(classroomRepository.countByTenantIdAndSchoolIdAndStatusIgnoreCase(any(), any(), any())).thenReturn(3L);

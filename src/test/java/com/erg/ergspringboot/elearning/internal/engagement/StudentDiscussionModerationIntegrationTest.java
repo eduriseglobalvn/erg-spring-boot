@@ -13,13 +13,14 @@ import com.erg.ergspringboot.elearning.internal.engagement.StudentDiscussionMode
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.FeedScope;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.ReplyCommand;
 import com.erg.ergspringboot.exception.ForbiddenException;
+import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity;
 import com.erg.ergspringboot.lms.persistence.projection.ClassOptionProjection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
@@ -48,7 +49,7 @@ class StudentDiscussionModerationIntegrationTest {
     private static String tenantId;
     private static String classId;
 
-    private final StudentRepository students = mock(StudentRepository.class);
+    private final LmsStudentIdentityLookup identities = mock(LmsStudentIdentityLookup.class);
     private final ClassroomRepository classrooms = mock(ClassroomRepository.class);
 
     @BeforeAll
@@ -120,6 +121,88 @@ class StudentDiscussionModerationIntegrationTest {
     }
 
     @Test
+    void feedLoadsOnlyTheNewestTwentyCommentsAndTwentyRepliesPerPost() {
+        insertPost("post-many");
+        for (int i = 0; i < 25; i++) insertComment("m-root-" + i, "post-many", null);
+        for (int i = 0; i < 25; i++) insertComment("m-reply-" + i, "post-many", "m-root-24");
+
+        StudentDiscussionPostResponse many = post(studentFeed(), "post-many");
+
+        assertThat(many.comments()).hasSize(20);
+        assertThat(many.comments().getLast().id()).isEqualTo("m-root-24");
+        assertThat(many.comments().getLast().replies()).hasSize(20);
+    }
+
+    @Test
+    void feedReportsCommentTotalsAndWhetherMoreCommentsExist() {
+        insertPost("post-counts");
+        for (int i = 0; i < 25; i++) insertComment("k-root-" + i, "post-counts", null);
+        for (int i = 0; i < 25; i++) insertComment("k-reply-" + i, "post-counts", "k-root-24");
+        for (int i = 0; i < 3; i++) insertComment("k-old-reply-" + i, "post-counts", "k-root-0"); // outside the embedded window
+
+        StudentDiscussionPostResponse post = post(studentFeed(), "post-counts");
+
+        assertThat(post.commentCount()).isEqualTo(53);
+        assertThat(post.hasMoreComments()).isTrue();
+        StudentDiscussionCommentResponse newest = post.comments().getLast();
+        assertThat(newest.replyCount()).isEqualTo(25);
+        assertThat(newest.hasMoreReplies()).isTrue();
+        assertThat(post.comments().getFirst().replyCount()).isZero();
+        assertThat(post.comments().getFirst().hasMoreReplies()).isFalse();
+
+        // A hidden comment and the replies under it stop counting for students, but not for moderators.
+        StudentDiscussionModerationService moderation = moderationService();
+        Moderator admin = new Moderator(tenantId, "usr_admin", true);
+        moderation.setHidden(admin, "COMMENT", "k-root-24", true);
+        assertThat(post(studentFeed(), "post-counts").commentCount()).isEqualTo(24 + 3);
+        assertThat(post(moderation.feed(admin, classId, 0, 50).items(), "post-counts").commentCount()).isEqualTo(53);
+    }
+
+    @Test
+    void discussionCommentsPagesTopLevelCommentsAndRepliesNewestWindowFirst() {
+        insertPost("post-paging");
+        for (int i = 0; i < 25; i++) insertComment("p-root-" + i, "post-paging", null);
+        for (int i = 0; i < 25; i++) insertComment("p-reply-" + i, "post-paging", "p-root-24");
+        StudentEngagementService student = studentService();
+
+        var first = student.comments(new StudentEngagementService.CommentsScope(tenantId, STUDENT_USER, "post-paging", null, 0, 20));
+        var second = student.comments(new StudentEngagementService.CommentsScope(tenantId, STUDENT_USER, "post-paging", null, 1, 20));
+
+        assertThat(first.totalItems()).isEqualTo(25);
+        assertThat(first.hasNext()).isTrue();
+        assertThat(first.items()).hasSize(20);
+        assertThat(first.items().getLast().id()).isEqualTo("p-root-24"); // page 0 is the window the feed embeds
+        assertThat(first.items().getLast().replies()).hasSize(20);
+        assertThat(first.items().getLast().hasMoreReplies()).isTrue();
+        assertThat(second.items()).extracting(StudentDiscussionCommentResponse::id)
+                .containsExactly("p-root-0", "p-root-1", "p-root-2", "p-root-3", "p-root-4");
+        assertThat(second.hasNext()).isFalse();
+
+        var replies = student.comments(new StudentEngagementService.CommentsScope(tenantId, STUDENT_USER, "post-paging", "p-root-24", 1, 20));
+        assertThat(replies.items()).hasSize(5);
+        assertThat(replies.totalItems()).isEqualTo(25);
+        assertThat(student.comments(new StudentEngagementService.CommentsScope(tenantId, STUDENT_USER, "post-paging", null, 0, 500)).size())
+                .isEqualTo(50);
+    }
+
+    @Test
+    void discussionCommentsRefusesUnknownHiddenPostsAndNonRootParents() {
+        insertPost("post-auth");
+        insertComment("a-root", "post-auth", null);
+        insertComment("a-reply", "post-auth", "a-root");
+        StudentEngagementService student = studentService();
+
+        assertThatThrownBy(() -> student.comments(new StudentEngagementService.CommentsScope(
+                tenantId, STUDENT_USER, "post-missing", null, 0, 20))).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> student.comments(new StudentEngagementService.CommentsScope(
+                tenantId, STUDENT_USER, "post-auth", "a-reply", 0, 20))).isInstanceOf(ResourceNotFoundException.class);
+
+        moderationService().setHidden(new Moderator(tenantId, "usr_admin", true), "POST", "post-auth", true);
+        assertThatThrownBy(() -> student.comments(new StudentEngagementService.CommentsScope(
+                tenantId, STUDENT_USER, "post-auth", null, 0, 20))).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
     void teacherModeratesOnlyClassesTheyTeach() {
         insertPost("post-scope");
         insertComment("s-root", "post-scope", null);
@@ -139,22 +222,55 @@ class StudentDiscussionModerationIntegrationTest {
                 "select count(*) from student_discussion_comments where post_id = 'post-scope'", Integer.class)).isZero();
     }
 
+    @Test
+    void moderationCommentsIncludeHiddenItemsAndFollowTheModeratorClassScope() {
+        insertPost("post-modpage");
+        for (int i = 0; i < 25; i++) insertComment("g-root-" + i, "post-modpage", null);
+        for (int i = 0; i < 3; i++) insertComment("g-reply-" + i, "post-modpage", "g-root-0");
+        StudentDiscussionModerationService moderation = moderationService();
+        Moderator admin = new Moderator(tenantId, "usr_admin", true);
+        moderation.setHidden(admin, "COMMENT", "g-root-0", true);
+
+        var first = moderation.comments(admin, "post-modpage", null, 0, 500);
+        var second = moderation.comments(admin, "post-modpage", null, 1, 20);
+        assertThat(first.size()).isEqualTo(50);
+        assertThat(first.totalItems()).isEqualTo(25); // the hidden comment still counts for moderators
+        assertThat(second.items()).extracting(StudentDiscussionCommentResponse::id).contains("g-root-0");
+        assertThat(second.items().getFirst().hidden()).isTrue();
+        assertThat(second.items().getFirst().replyCount()).isEqualTo(3);
+        assertThat(moderation.comments(admin, "post-modpage", "g-root-0", 0, 2).hasNext()).isTrue();
+        assertThat(moderation.comments(admin, "post-modpage", "g-root-0", 0, 0).size()).isEqualTo(1);
+        assertThat(studentService().comments(new StudentEngagementService.CommentsScope(
+                tenantId, STUDENT_USER, "post-modpage", null, 0, 50)).totalItems()).isEqualTo(24);
+
+        Moderator teacher = new Moderator(tenantId, TEACHER_USER, false);
+        when(classrooms.findTeacherClassOptions(tenantId, TEACHER_USER))
+                .thenReturn(List.of(new ClassOptionProjection("other-class", null, "Lớp khác", null, null, "ACTIVE")));
+        assertThatThrownBy(() -> moderation.comments(teacher, "post-modpage", null, 0, 20))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> moderation.comments(admin, "post-missing", null, 0, 20))
+                .isInstanceOf(ResourceNotFoundException.class);
+        when(classrooms.findTeacherClassOptions(tenantId, TEACHER_USER))
+                .thenReturn(List.of(new ClassOptionProjection(classId, null, "Lớp", null, null, "ACTIVE")));
+        assertThat(moderation.comments(teacher, "post-modpage", null, 0, 20).totalItems()).isEqualTo(25);
+    }
+
     private List<StudentDiscussionPostResponse> studentFeed() {
         return studentService().feed(new FeedScope(tenantId, STUDENT_USER, 0, 50)).items();
     }
 
     private StudentEngagementService studentService() {
-        Student student = new Student();
-        student.setId("student-discussion");
-        student.setTenantId(tenantId);
-        student.setAuthUserId(STUDENT_USER);
-        student.setAcademicClassId(classId);
-        when(students.findFirstByTenantIdAndAuthUserId(tenantId, STUDENT_USER)).thenReturn(Optional.of(student));
-        return new StudentEngagementService(students, jdbc);
+        when(identities.byAuthUser(tenantId, STUDENT_USER)).thenReturn(
+                new StudentIdentity("student-discussion", STUDENT_USER, classId, null, null, "ENROLLED"));
+        return new StudentEngagementService(identities, jdbc, event -> { }, feeds());
+    }
+
+    private StudentDiscussionFeedCache feeds() {
+        return new StudentDiscussionFeedCache(jdbc, mock(LmsReadCacheInvalidator.class));
     }
 
     private StudentDiscussionModerationService moderationService() {
-        return new StudentDiscussionModerationService(classrooms, jdbc);
+        return new StudentDiscussionModerationService(classrooms, jdbc, feeds());
     }
 
     private static StudentDiscussionPostResponse post(List<StudentDiscussionPostResponse> posts, String id) {

@@ -36,9 +36,8 @@ public class CalendarScheduleChangeConsumer {
         }
         // Single-event edits (room/note) never change the people, so current people = old people. Teacher swaps and
         // moved slots publish CalendarSlotsChanged instead (V157), which also tells whoever lost a period.
-        ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(),
-                        event.actorId(), "schedule-event-changed:" + event.calendarEventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch)
-                .forEach(notifications::enqueue);
+        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(),
+                        event.actorId(), "schedule-event-changed:" + event.calendarEventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch));
     }
 
     /**
@@ -49,9 +48,8 @@ public class CalendarScheduleChangeConsumer {
     public void on(CalendarSlotsChanged event) {
         var batch = calendar.findChangedEvents(event.tenantId(), event.batchId(), event.calendarEventIds()).orElse(null);
         if (batch != null && !batch.slots().isEmpty()) {
-            ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(), event.actorId(),
-                            event.eventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch)
-                    .forEach(notifications::enqueue);
+            notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(), event.actorId(),
+                            event.eventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch));
         }
         if (batch == null || event.removed().isEmpty()) return;
         var lost = new CalendarPublishedBatchProjection.PublishedBatch(batch.batchId(), batch.schoolId(), batch.schoolName(),
@@ -60,15 +58,13 @@ public class CalendarScheduleChangeConsumer {
                         slot.roomName(), event.removed().stream().filter(r -> r.calendarEventId().equals(slot.eventId()))
                                 .map(r -> new CalendarPublishedBatchProjection.Person(r.userId(), r.name(), r.role())).toList()))
                 .filter(slot -> !slot.people().isEmpty()).toList());
-        ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.REMOVED, event.tenantId(), event.actorId(),
-                        event.eventId() + ":removed", event.aggregateVersion(), "SCHEDULE_CHANGED", lost)
-                .forEach(notifications::enqueue);
+        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.REMOVED, event.tenantId(), event.actorId(),
+                        event.eventId() + ":removed", event.aggregateVersion(), "SCHEDULE_CHANGED", lost));
     }
 
     @ApplicationModuleListener
     public void on(CalendarHolidayCancelled event) {
-        HolidayCancelNotificationComposer.compose(event, calendar.findCancelledEvents(event.tenantId(), event.calendarEventIds()))
-                .forEach(notifications::enqueue);
+        notifications.enqueueAll(HolidayCancelNotificationComposer.compose(event, calendar.findCancelledEvents(event.tenantId(), event.calendarEventIds())));
     }
 
     @ApplicationModuleListener
@@ -78,8 +74,7 @@ public class CalendarScheduleChangeConsumer {
             log.info("Skip schedule-cancelled notification {}: draft batch or no future period", event.eventId());
             return;
         }
-        ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CANCELLED, event.tenantId(),
-                        event.actorId(), event.eventId(), event.aggregateVersion(), "SCHEDULE_CANCELLED", batch)
-                .forEach(notifications::enqueue);
+        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CANCELLED, event.tenantId(),
+                        event.actorId(), event.eventId(), event.aggregateVersion(), "SCHEDULE_CANCELLED", batch));
     }
 }

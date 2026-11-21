@@ -13,10 +13,11 @@ class ExecutorResourceContractTest {
                 "src/main/java/com/erg/ergspringboot/platform/concurrency/ModuleEventTaskExecutorConfig.java"));
         String yaml = Files.readString(Path.of("src/main/resources/application.yml"));
 
-        assertThat(source).contains("applicationTaskExecutor", "moduleEventIoExecutor", "moduleEventCpuExecutor", "AbortPolicy");
+        assertThat(source).contains("applicationTaskExecutor", "moduleEventIoExecutor", "CallerRunsPolicy");
+        assertThat(source).doesNotContain("AbortPolicy", "moduleEventCpuExecutor");
         assertThat(yaml)
                 .contains("ERG_MODULE_EVENTS_IO_MAX_SIZE:16")
-                .contains("ERG_MODULE_EVENTS_IO_QUEUE_CAPACITY:0")
+                .contains("ERG_MODULE_EVENTS_IO_QUEUE_CAPACITY:256")
                 .contains("ERG_MODULE_EVENTS_CPU_QUEUE_CAPACITY:32");
     }
 }

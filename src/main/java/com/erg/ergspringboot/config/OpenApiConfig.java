@@ -29,21 +29,10 @@ public class OpenApiConfig {
     static final List<AccessRule> ACCESS_RULES = List.of(
             AccessRule.publicFor(null,
                     "/api/v1/health", "/api/v1/ready", "/api/health", "/api/ready", "/healthz", "/ready",
-                    "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**",
-                    "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml"),
+                    "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**"),
             AccessRule.publicFor("POST", "/webhooks/discord", "/webhooks/telegram"),
             AccessRule.publicFor("POST", "/api/v1/auth/login", "/api/v1/auth/refresh"),
             AccessRule.publicFor("GET", "/api/v1/auth/login", "/oauth2/**", "/login/oauth2/**"),
-            AccessRule.protectedFor("GET", "/api/v1/posts/hidden", "/api/v1/posts/trash", "/api/v1/posts/preview/**"),
-            AccessRule.protectedFor("GET", "/api/v1/reviews/admin", "/api/v1/reviews/admin/all"),
-            AccessRule.publicFor("GET",
-                    "/api/v1/pages/**", "/api/v1/menus/structure",
-                    "/api/v1/posts", "/api/v1/posts/**",
-                    "/api/v1/courses", "/api/v1/courses/**",
-                    "/api/v1/elearning/categories/**", "/api/v1/elearning/levels/**",
-                    "/api/v1/recruitment/jobs/**", "/api/v1/reviews", "/api/v1/reviews/stats",
-                    "/api/v1/public-disclosure/**", "/api/v1/trending/**"),
-            AccessRule.publicFor("POST", "/api/v1/recruitment/apply", "/api/v1/reviews", "/api/v1/reviews/*/helpful"),
             AccessRule.publicFor("PUT", "/api/v1/lcms/media/upload/quiz-media/**"),
             AccessRule.publicFor("GET", "/api/v1/timekeeping/photos/file")
     );

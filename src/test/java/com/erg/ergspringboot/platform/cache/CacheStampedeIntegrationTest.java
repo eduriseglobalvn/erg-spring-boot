@@ -57,7 +57,7 @@ class CacheStampedeIntegrationTest {
     }
 
     @Test
-    void rejectsASecondIndependentMissWhenLoadAdmissionIsFull() throws Exception {
+    void loadsUncoordinatedWhenLoadAdmissionIsFull() throws Exception {
         CacheLoadCoordinator coordinator = new CacheLoadCoordinator(1);
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -69,11 +69,33 @@ class CacheStampedeIntegrationTest {
             }));
             assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
 
-            assertThatThrownBy(() -> coordinator.load("key-b", () -> "b"))
-                    .isInstanceOf(java.util.concurrent.RejectedExecutionException.class);
+            assertThat(coordinator.<String>load("key-b", () -> "b")).isEqualTo("b");
 
             release.countDown();
             assertThat(first.get()).isEqualTo("a");
+        }
+    }
+
+    @Test
+    void aWaiterLoadsItselfWhenTheLeaderHangsAndStillPropagatesRealFailures() throws Exception {
+        CacheLoadCoordinator coordinator = new CacheLoadCoordinator(4, Duration.ofMillis(100));
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            Future<String> leader = executor.submit(() -> coordinator.load("key", () -> {
+                entered.countDown();
+                release.await();
+                return "leader";
+            }));
+            assertThat(entered.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+            assertThat(coordinator.<String>load("key", () -> "waiter")).isEqualTo("waiter");
+            assertThatThrownBy(() -> coordinator.load("key", () -> {
+                throw new IllegalStateException("db down");
+            })).isInstanceOf(IllegalStateException.class).hasMessage("db down");
+
+            release.countDown();
+            assertThat(leader.get()).isEqualTo("leader");
         }
     }
 }

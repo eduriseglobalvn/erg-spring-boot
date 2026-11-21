@@ -10,6 +10,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarConflictResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRowResultResponse;
 import com.erg.ergspringboot.exception.ConflictException;
+import com.erg.ergspringboot.exception.TeachingScheduleException;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacher;
@@ -19,7 +20,9 @@ import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatchRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.calendar.internal.schedule.ScheduleDataLoader;
 import com.erg.ergspringboot.calendar.internal.support.CalendarBulkInputNormalizer;
+import com.erg.ergspringboot.calendar.internal.support.CalendarCancelAnnouncer;
 import com.erg.ergspringboot.calendar.internal.support.CalendarConflictService;
 import com.erg.ergspringboot.calendar.internal.support.CalendarConflictService.ResolveResult;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService;
@@ -46,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,6 +73,8 @@ public class CalendarBulkCreateUseCase {
     private final ObjectProvider<GraphQlAccessSupport> accessSupports;
     private final ObjectProvider<CalendarBulkReferenceDataUseCase> references;
     private final ObjectProvider<EntityManager> entityManagers;
+    private final ObjectProvider<ScheduleDataLoader> loaders;
+    private final ObjectProvider<ApplicationEventPublisher> publishers;
 
     @Autowired
     public CalendarBulkCreateUseCase(
@@ -81,7 +87,11 @@ public class CalendarBulkCreateUseCase {
             ObjectProvider<CalendarConflictService> conflictServices,
             ObjectProvider<GraphQlAccessSupport> accessSupports,
             ObjectProvider<CalendarBulkReferenceDataUseCase> references,
-            ObjectProvider<EntityManager> entityManagers) {
+            ObjectProvider<EntityManager> entityManagers,
+            ObjectProvider<ScheduleDataLoader> loaders,
+            ObjectProvider<ApplicationEventPublisher> publishers) {
+        this.loaders = loaders;
+        this.publishers = publishers;
         this.batches = batches;
         this.events = events;
         this.eventTeachers = eventTeachers;
@@ -105,7 +115,11 @@ public class CalendarBulkCreateUseCase {
             CalendarConflictService conflicts,
             GraphQlAccessSupport accessSupport,
             CalendarBulkReferenceDataUseCase references,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            ScheduleDataLoader loader,
+            ApplicationEventPublisher publisher) {
+        this.loaders = provider(loader);
+        this.publishers = provider(publisher);
         this.batches = provider(batches);
         this.events = provider(events);
         this.eventTeachers = provider(eventTeachers);
@@ -139,13 +153,15 @@ public class CalendarBulkCreateUseCase {
                 if (batch.getPayloadHash() != null && !payloadHash.equals(batch.getPayloadHash())) {
                     throw new ConflictException("Idempotency key was already used with a different payload.");
                 }
-                return buildBulkPayload(
-                        teacherRepository, batch.getId(),
-                        eventRepository.findByTenantIdAndBatchId(tenantId, batch.getId()),
-                        List.of(), List.of());
+                // a replay only reports totals: counted in SQL instead of loading every event of the batch
+                return new CalendarBulkPayload(batch.getId(),
+                        (int) eventRepository.countByTenantIdAndBatchId(tenantId, batch.getId()),
+                        (int) teacherRepository.countByBatch(tenantId, batch.getId()),
+                        (int) eventRepository.sumPeriodCountByBatch(tenantId, batch.getId()), List.of(), List.of());
             }
         }
 
+        requireWithinEventCap(input);
         if (!attemptAdvisoryLock(tenantId, input.schoolId())) {
             throw new ConflictException("Another bulk schedule operation is in progress for this school.");
         }
@@ -164,10 +180,12 @@ public class CalendarBulkCreateUseCase {
         List<CalendarEventTeacher> allAssignments = new ArrayList<>();
         Map<String, String> clientRowIdByEventId = new java.util.HashMap<>();
         List<CalendarRowResultResponse> rowResults = new ArrayList<>();
+        Set<LocalDate> holidays = require(loaders, "schedule loader").loadHolidays(tenantId, applyFrom,
+                applyFrom.plusWeeks(input.repeatWeeks()), List.of(input.schoolId())).keySet();
         for (CalendarBulkRowRequest row : input.rows()) {
-            ExpansionResult expansion = expansionService.expand(
+            ExpansionResult expansion = withoutHolidays(expansionService.expand(
                     row, batchId, tenantId, input.schoolId(), userId,
-                    applyFrom, input.repeatWeeks(), refData);
+                    applyFrom, input.repeatWeeks(), refData), holidays);
             allEvents.addAll(expansion.events());
             allAssignments.addAll(expansion.assignments());
             clientRowIdByEventId.putAll(expansion.clientRowIdByEventId());
@@ -184,10 +202,8 @@ public class CalendarBulkCreateUseCase {
                 .distinct()
                 .sorted()
                 .toList();
-        for (String teacherId : teacherIds) {
-            if (!attemptAdvisoryLock(teacherLockId(tenantId, teacherId))) {
-                throw new ConflictException("Another bulk schedule operation is in progress for a teacher in this payload.");
-            }
+        if (!teacherIds.isEmpty() && !attemptTeacherLocks(teacherIds.stream().map(id -> teacherLockId(tenantId, id)).toList())) {
+            throw new ConflictException("Another bulk schedule operation is in progress for a teacher in this payload.");
         }
 
         List<CalendarConflictResponse> conflicts = conflictService.detectConflicts(
@@ -219,7 +235,9 @@ public class CalendarBulkCreateUseCase {
         }
 
         if (!eventIdsToCancel.isEmpty()) {
+            List<CalendarEvent> before = eventRepository.findAllById(eventIdsToCancel);
             eventRepository.cancelByIds(tenantId, eventIdsToCancel, "REPLACED", userId, OffsetDateTime.now());
+            CalendarCancelAnnouncer.announce(require(publishers, "event publisher"), tenantId, before, "REPLACED", userId);
         }
 
         CalendarBatch batch = new CalendarBatch();
@@ -242,6 +260,35 @@ public class CalendarBulkCreateUseCase {
                 .mapToInt(event -> event.getPeriodCount() != null ? event.getPeriodCount() : 0).sum();
         return new CalendarBulkPayload(
                 batchId, savedEvents.size(), allAssignments.size(), totalPeriodCount, rowResults, conflicts);
+    }
+
+    /** A school day off carries no lesson (the v2 grid skips it too); the dropped ones are only logged. */
+    private static ExpansionResult withoutHolidays(ExpansionResult expansion, Set<LocalDate> holidays) {
+        if (holidays.isEmpty()) return expansion;
+        Set<String> off = expansion.events().stream()
+                .filter(e -> holidays.contains(e.getStartAt().atZoneSameInstant(CalendarExpansionService.VIETNAM_ZONE).toLocalDate()))
+                .map(CalendarEvent::getId).collect(Collectors.toSet());
+        if (off.isEmpty()) return expansion;
+        log.info("Bulk create skipped {} lessons that fall on a school holiday", off.size());
+        return new ExpansionResult(expansion.events().stream().filter(e -> !off.contains(e.getId())).toList(),
+                expansion.assignments().stream().filter(a -> !off.contains(a.getEventId())).toList(),
+                expansion.clientRowIdByEventId().entrySet().stream().filter(e -> !off.contains(e.getKey()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a, java.util.LinkedHashMap::new)));
+    }
+
+    static final int MAX_BULK_EVENTS = 20_000;
+
+    /** Upper bound of the expansion (rows x classes x weeks, holidays only lower it), computed before anything is allocated. */
+    static void requireWithinEventCap(CalendarBulkCreateRequest input) {
+        long total = 0;
+        for (CalendarBulkRowRequest row : input.rows() == null ? List.<CalendarBulkRowRequest>of() : input.rows()) {
+            total += (row.classIds() == null ? 0L : row.classIds().size()) * Math.max(input.repeatWeeks(), 0);
+            if (total > MAX_BULK_EVENTS) {
+                throw TeachingScheduleException.badRequest("CALENDAR_BULK_TOO_LARGE",
+                        "Yêu cầu tạo quá nhiều tiết (tối đa " + MAX_BULK_EVENTS
+                                + "); hãy giảm số lớp, số tuần hoặc chia thành nhiều lần.");
+            }
+        }
     }
 
     public String payloadHash(CalendarBulkCreateRequest input) {
@@ -282,21 +329,6 @@ public class CalendarBulkCreateUseCase {
         return rows;
     }
 
-    private CalendarBulkPayload buildBulkPayload(
-            CalendarEventTeacherRepository teachers,
-            String batchId,
-            List<CalendarEvent> existingEvents,
-            List<CalendarRowResultResponse> rowResults,
-            List<CalendarConflictResponse> conflicts) {
-        int periods = existingEvents.stream()
-                .mapToInt(event -> event.getPeriodCount() != null ? event.getPeriodCount() : 0).sum();
-        List<String> eventIds = existingEvents.stream().map(CalendarEvent::getId).toList();
-        List<CalendarEventTeacher> assignments = eventIds.isEmpty() ? List.of()
-                : teachers.findByTenantIdAndEventIdIn(existingEvents.get(0).getTenantId(), eventIds);
-        return new CalendarBulkPayload(
-                batchId, existingEvents.size(), assignments.size(), periods, rowResults, conflicts);
-    }
-
     private boolean attemptAdvisoryLock(String tenantId, String schoolId) {
         return attemptAdvisoryLock((long) (tenantId.hashCode() * 31L + schoolId.hashCode()));
     }
@@ -305,6 +337,19 @@ public class CalendarBulkCreateUseCase {
     static long teacherLockId(String tenantId, String teacherUserId) {
         int hash = ("calendar-teacher|" + tenantId + "|" + teacherUserId).hashCode();
         return (0x43414C54L << 32) | (hash & 0xFFFFFFFFL);
+    }
+
+    /** SQL taking every key in one statement, in the given order; the keys are longs we computed, never user text. */
+    static String tryLocksSql(List<Long> lockIds) {
+        String keys = lockIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        return "select bool_and(got) from (select pg_try_advisory_xact_lock(k) as got from"
+                + " unnest(cast(array[" + keys + "] as bigint[])) with ordinality as t(k, n) order by n) locks";
+    }
+
+    /** All-or-nothing; try-locks never wait, so key order cannot deadlock. A SQL error propagates (it aborts the transaction anyway). */
+    private boolean attemptTeacherLocks(List<Long> lockIds) {
+        Query query = require(entityManagers, "entity manager").createNativeQuery(tryLocksSql(lockIds));
+        return Boolean.TRUE.equals(query.getSingleResult());
     }
 
     private boolean attemptAdvisoryLock(long lockId) {

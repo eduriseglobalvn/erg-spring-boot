@@ -9,6 +9,7 @@ import com.erg.ergspringboot.timekeeping.HolidayPayMode;
 import com.erg.ergspringboot.timekeeping.HolidayTeachingAction;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.HolidayConfig;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.persistence.TkHoliday;
 import com.erg.ergspringboot.timekeeping.persistence.TkHolidayRepository;
 import java.time.LocalDate;
@@ -48,12 +49,19 @@ public class HolidayService {
 
     @Transactional(readOnly = true)
     public List<HolidayConfig> holidays(String tenantId, String schoolId, Integer year) {
-        if (schoolId != null) support.requireSchool(tenantId, schoolId);
+        return holidays(tenantId, SchoolScope.TENANT, schoolId, year);
+    }
+
+    /** Tenant-level days off are visible to everyone; a school's own rows only inside the caller's scope. */
+    @Transactional(readOnly = true)
+    public List<HolidayConfig> holidays(String tenantId, SchoolScope scope, String schoolId, Integer year) {
+        if (schoolId != null) support.requireSchool(tenantId, scope, schoolId);
         int y = year == null ? support.today().getYear() : year;
         if (y < 2000 || y > 2100) throw AdminSupport.bad("INVALID_YEAR", "Năm không hợp lệ");
         List<TkHoliday> rows = holidays.findByTenantIdAndHolidayDateBetweenOrderByHolidayDateAsc(tenantId,
                 LocalDate.of(y, 1, 1), LocalDate.of(y, 12, 31)).stream()
-                .filter(h -> schoolId == null || h.getSchoolId() == null || schoolId.equals(h.getSchoolId())).toList();
+                .filter(h -> h.getSchoolId() == null || (schoolId == null ? scope.allows(h.getSchoolId())
+                        : schoolId.equals(h.getSchoolId()))).toList();
         Map<String, Affected> affected = calendar.affected(tenantId, rows.stream().map(TkHoliday::getId).toList());
         Map<String, String> creators = support.names(tenantId,
                 rows.stream().map(TkHoliday::getCreatedBy).filter(id -> id != null).toList());

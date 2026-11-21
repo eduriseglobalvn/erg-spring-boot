@@ -51,7 +51,7 @@ class LmsManualReviewUseCaseTest {
         List<QuizVersionQuestion> questions = List.of(
                 question("vq-1", "q-choice", "single_choice", "Chọn đáp án"),
                 question("vq-2", "q-essay", "essay", "Nêu hai nguỵ biện"));
-        when(versionQuestions.findByQuizVersionIdOrderByOrderIndexAsc("ver-1")).thenReturn(questions);
+        when(versionQuestions.findAllById(java.util.Set.of("vq-2"))).thenReturn(questions);
         when(answerRows.findByAttemptId("att-1")).thenReturn(List.of(
                 row("vq-1", false, "server", "10"), row("vq-2", true, null, "0")));
 
@@ -70,7 +70,7 @@ class LmsManualReviewUseCaseTest {
     void keepsAnAnswerATeacherAlreadyScored() {
         when(policy.isReviewer()).thenReturn(true);
         List<QuizVersionQuestion> questions = List.of(question("vq-2", "q-essay", "essay", "Nêu hai nguỵ biện"));
-        when(versionQuestions.findByQuizVersionIdOrderByOrderIndexAsc("ver-1")).thenReturn(questions);
+        when(versionQuestions.findAllById(java.util.Set.of("vq-2"))).thenReturn(questions);
         when(answerRows.findByAttemptId("att-1")).thenReturn(List.of(row("vq-2", false, "teacher-1", "7")));
 
         assertThat(useCase.manualAnswers("att-1", access).items()).singleElement().satisfies(item -> {
@@ -88,6 +88,7 @@ class LmsManualReviewUseCaseTest {
     private static QuizVersionQuestion question(String id, String runtimeId, String kind, String title) {
         QuizVersionQuestion question = mock(QuizVersionQuestion.class);
         when(question.getId()).thenReturn(id);
+        when(question.getQuizVersionId()).thenReturn("ver-1");
         when(question.getRuntimeQuestionId()).thenReturn(runtimeId);
         when(question.getKind()).thenReturn(kind);
         when(question.getPoints()).thenReturn(new BigDecimal("10"));

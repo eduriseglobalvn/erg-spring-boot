@@ -26,7 +26,7 @@ class AuthoredQuestionBankSyncTest {
 
     @Test
     void singleChoiceIsMirroredIntoTheBankWithItsCorrectChoice() {
-        when(repository.saveAndFlush(any(Question.class))).thenAnswer(call -> {
+        when(repository.save(any(Question.class))).thenAnswer(call -> {
             Question saved = call.getArgument(0);
             saved.setId("bank-1");
             return saved;
@@ -36,7 +36,7 @@ class AuthoredQuestionBankSyncTest {
 
         assertThat(id).isEqualTo("bank-1");
         ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
-        verify(repository).saveAndFlush(captor.capture());
+        verify(repository).save(captor.capture());
         Question bank = captor.getValue();
         assertThat(bank.getType()).isEqualTo("single_choice");
         assertThat(bank.getStem()).isEqualTo("Máy tính dùng thiết bị nào để nhập chữ?");
@@ -53,7 +53,7 @@ class AuthoredQuestionBankSyncTest {
         Question existing = new Question();
         existing.setId("bank-1");
         when(repository.findByIdAndTenantId("bank-1", "erg")).thenReturn(Optional.of(existing));
-        when(repository.saveAndFlush(any(Question.class))).thenAnswer(call -> call.getArgument(0));
+        when(repository.save(any(Question.class))).thenAnswer(call -> call.getArgument(0));
 
         assertThat(sync.upsert("erg", "usr-1", quiz(), single(), "bank-1")).isEqualTo("bank-1");
         assertThat(existing.getStem()).isEqualTo("Máy tính dùng thiết bị nào để nhập chữ?");
@@ -67,12 +67,12 @@ class AuthoredQuestionBankSyncTest {
         when(repository.findByIdAndTenantId("bank-1", "erg")).thenReturn(Optional.of(archived));
 
         assertThat(sync.upsert("erg", "usr-1", quiz(), single(), "bank-1")).isEqualTo("bank-1");
-        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).save(any());
     }
 
     @Test
     void everyKindIsMirroredWithTheEditorQuestion() {
-        when(repository.saveAndFlush(any(Question.class))).thenAnswer(call -> call.getArgument(0));
+        when(repository.save(any(Question.class))).thenAnswer(call -> call.getArgument(0));
         Map<String, Object> authored = Map.of("title", "Ghép cặp", "matching", List.of(Map.of("prompt", "CPU", "response", "Xử lý")));
         CompiledQuestion matching = new CompiledQuestion("q", "slide-1", "s", null, "matching", "matching", BigDecimal.TEN, true, "auto", 0,
                 Map.of("title", "Ghép cặp"), Map.of(), authored);
@@ -80,7 +80,7 @@ class AuthoredQuestionBankSyncTest {
         sync.upsert("erg", "usr-1", quiz(), matching, null);
 
         ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
-        verify(repository).saveAndFlush(captor.capture());
+        verify(repository).save(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo("matching");
         assertThat(captor.getValue().getChoices()).isEmpty();
         assertThat(captor.getValue().getContent()).containsEntry("runtimeQuestion", authored);
@@ -106,7 +106,7 @@ class AuthoredQuestionBankSyncTest {
     void quizzesWithoutPlacementAreSkipped() {
         Quiz unplaced = new Quiz();
         assertThat(sync.upsert("erg", "usr-1", unplaced, single(), null)).isNull();
-        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).save(any());
     }
 
     private Quiz quiz() {

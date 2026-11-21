@@ -32,6 +32,12 @@ public class LmsAssignmentService {
         return repository.findByTenantIdAndQuizId(tenantId, quizId);
     }
 
+    /** One exists query: a visible assignment (optionally this one) distributes the quiz to the learner. */
+    public boolean existsVisibleQuizForLearner(String tenantId, String quizId, String assignmentId, String studentId,
+            String academicClassId, String authUserId) {
+        return repository.existsVisibleQuizForLearner(tenantId, quizId, assignmentId, studentId, academicClassId, authUserId);
+    }
+
     public Page<Assignment> findStudentAssignments(
             String tenantId, String studentId, String academicClassId, Pageable pageable
     ) {

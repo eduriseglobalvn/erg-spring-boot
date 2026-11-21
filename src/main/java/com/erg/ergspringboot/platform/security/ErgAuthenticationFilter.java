@@ -216,11 +216,7 @@ public class ErgAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(ErgPrincipal principal) {
-        List<SimpleGrantedAuthority> authorities = java.util.stream.Stream.concat(
-                        principal.roles().stream().map(role -> new SimpleGrantedAuthority("role:" + role)),
-                        principal.permissions().stream().map(permission -> new SimpleGrantedAuthority("perm:" + permission))
-                )
-                .toList();
+        List<SimpleGrantedAuthority> authorities = PrincipalDerived.of(principal).authorities();
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(principal, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(authentication);

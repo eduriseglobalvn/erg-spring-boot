@@ -130,11 +130,12 @@ class LmsExamHotPathQueryBudgetIntegrationTest {
 
     // Measured before the fix: home 3, package 7, start 13, draft 4, submit 37 (20 questions).
     private static final int BUDGET_HOME = 3;
-    private static final int BUDGET_PACKAGE = 7;
-    private static final int BUDGET_START = 9;
-    private static final int BUDGET_DRAFT = 4;
-    // First submit of a version in this JVM; later ones also skip the question and version reads (11).
-    private static final int BUDGET_SUBMIT = 13;
+    private static final int BUDGET_PACKAGE = 6;
+    private static final int BUDGET_START = 9; // cold quizStartInfo: quiz + pinned package in one join
+    // Autosave: attempt + update; the learner lookup is a cache hit after the home call and the assignment is not loaded.
+    private static final int BUDGET_DRAFT = 2;
+    // First submit of a version in this JVM (cold question and version reads).
+    private static final int BUDGET_SUBMIT = 10;
 
     private record Seed(String suffix, String userId, String assignmentId, String quizId) {}
     private record Counted<T>(T value, long statements) {}

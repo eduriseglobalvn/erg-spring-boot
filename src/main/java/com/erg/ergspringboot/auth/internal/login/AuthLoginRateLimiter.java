@@ -81,11 +81,12 @@ public class AuthLoginRateLimiter {
      * so counting every login blocked the 31st student of the minute even with the right password.
      */
     public Decision allowRequest(AuthClientContext context) {
+        String device = context == null ? null : first(context.deviceFingerprint(), context.deviceId());
+        // No device id: skip the dimension, a shared "unknown" bucket would throttle every such client together.
+        boolean hasDevice = device != null && !device.isBlank();
         return check(windowStart -> current(key("source", context == null ? null : context.ipAddress(), windowStart))
                         < sourceLimit
-                && increment(key("device", context == null ? null
-                        : first(context.deviceFingerprint(), context.deviceId()), windowStart), deviceLimit,
-                        windowEnd(windowStart)));
+                && (!hasDevice || increment(key("device", device, windowStart), deviceLimit, windowEnd(windowStart))));
     }
 
     /**

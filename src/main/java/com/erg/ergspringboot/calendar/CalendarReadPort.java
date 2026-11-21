@@ -62,6 +62,10 @@ public interface CalendarReadPort {
 
     CalendarBatchDetailResponse teachingScheduleBatch(String tenantId, String batchId);
 
+    /** Paged text search of {@code kind} (classes, teachers, rooms, subjects); {@code schoolIds} must already be scope-checked. */
+    CalendarCatalogSearchResponse catalogSearch(
+            String tenantId, String kind, List<String> schoolIds, String q, Integer page, Integer size);
+
     /**
      * Published periods taught by {@code teacherUserId} on the Asia/Ho_Chi_Minh days {@code from}..{@code to}
      * (inclusive), ordered by start. No principal: the caller has already decided the teacher may be read.

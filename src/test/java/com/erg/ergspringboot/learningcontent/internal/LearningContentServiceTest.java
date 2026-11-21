@@ -63,7 +63,8 @@ class LearningContentServiceTest {
                 contentItemAssetRepository,
                 topicContentItemRepository,
                 curriculumTopicLookupRepository,
-                null
+                null,
+                new ContentOwnership(null)
         );
     }
 

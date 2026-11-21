@@ -132,9 +132,10 @@ class QuizPublishServiceTest {
         );
 
         when(quizRepository.findByIdAndTenantId("quiz-1", "tenant-a")).thenReturn(Optional.of(quiz));
-        when(quizVersionRepository.findByQuizIdAndTenantIdOrderByVersionNumberDesc("quiz-1", "tenant-a")).thenReturn(List.of());
+        when(quizVersionRepository.findSummaryByQuizIdAndTenantIdAndIdempotencyKey(eq("quiz-1"), eq("tenant-a"), anyString()))
+                .thenReturn(Optional.empty());
         when(quizDraftRepository.findFirstByQuizIdAndTenantIdOrderByUpdatedAtDesc("quiz-1", "tenant-a")).thenReturn(Optional.of(draft));
-        when(bankQuestionRepository.findByTenantIdAndIdIn("tenant-a", List.of("bank-question-1"))).thenReturn(List.of());
+        when(bankQuestionRepository.findSettingsByTenantIdAndIdIn("tenant-a", List.of("bank-question-1"))).thenReturn(List.of());
         when(quizQuestionRepository.findByTenantIdAndQuizIdOrderByOrderIndexAsc("tenant-a", "quiz-1")).thenReturn(List.of());
         when(compileService.compile(eq(draft.getSettings()), eq(draft.getTree()), eq(Map.of()), eq(Map.of()), eq(draft.getPlayerTemplate()))).thenReturn(compiled);
         when(validationService.validate(compiled)).thenReturn(List.of());
@@ -161,7 +162,7 @@ class QuizPublishServiceTest {
             section.setId("section-db-1");
             return section;
         });
-        when(questionRepository.save(any(QuizVersionQuestion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        
         when(quizVersionRepository.save(any(QuizVersion.class))).thenAnswer(invocation -> {
             QuizVersion version = invocation.getArgument(0);
             version.setId("version-1");

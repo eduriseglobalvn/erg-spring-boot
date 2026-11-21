@@ -43,11 +43,11 @@ final class LoginAttemptRecorder {
     }
 
     void recordLoginAttempt(
-            String userId, String email, AuthClientContext context,
+            String userId, String tenantId, String email, AuthClientContext context,
             String portal, String result, String reason) {
         AuthLoginAttempt attempt = new AuthLoginAttempt();
         attempt.setId(IdGenerator.newId());
-        attempt.setTenantId(DEFAULT_TENANT);
+        attempt.setTenantId(firstNonBlank(tenantId, DEFAULT_TENANT));
         attempt.setUserId(userId);
         attempt.setAttemptedEmail(email == null ? null : normalizeEmail(email));
         attempt.setIpAddress(context.ipAddress());
@@ -60,12 +60,12 @@ final class LoginAttemptRecorder {
         attempt.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));
         attempts.save(attempt);
         if ("SUCCESS".equalsIgnoreCase(result)) {
-            log.info("AUTH_LOGIN_SUCCESS user={} email={} ip={} portal={} device={} tenant={}",
-                    userId, email, context.ipAddress(), portal, context.deviceName(), DEFAULT_TENANT);
-            failureEnforcement.auditLogin(userId, DEFAULT_TENANT, context, portal, true, null);
+            log.info("AUTH_LOGIN_SUCCESS user={} ip={} portal={} device={} tenant={}",
+                    userId, context.ipAddress(), portal, context.deviceName(), attempt.getTenantId());
+            failureEnforcement.auditLogin(userId, attempt.getTenantId(), context, portal, true, null);
         } else {
-            log.warn("AUTH_LOGIN_FAILED user={} email={} ip={} portal={} reason={}",
-                    userId, email, context.ipAddress(), portal, reason);
+            log.warn("AUTH_LOGIN_FAILED user={} ip={} portal={} reason={}",
+                    userId, context.ipAddress(), portal, reason);
         }
         meterRegistry.ifPresent(registry -> registry
                 .counter("erg.auth.login.count", "result", result == null ? "none" : result)

@@ -26,6 +26,19 @@ public interface CalendarBatchRepository extends JpaRepository<CalendarBatch, St
     @Query(value = "select count(*) from (select pg_advisory_xact_lock(hashtextextended(:key, 0))) t", nativeQuery = true)
     long advisoryXactLock(@Param("key") String key);
 
+    /** Transaction-local cap on every lock wait of this transaction; a timeout surfaces as a PessimisticLockingFailureException. */
+    @Query(value = "select set_config('lock_timeout', :timeout, true)", nativeQuery = true)
+    String setLocalLockTimeout(@Param("timeout") String timeout);
+
+    /**
+     * The tenant-wide lock that serialises publishes and published-period edits. Waits at most 10 s, so a stuck holder
+     * fails the waiting request (503 through the global handler) instead of queueing every writer of the tenant behind it.
+     */
+    default void lockTenantPublish(String tenantId) {
+        setLocalLockTimeout("10s");
+        advisoryXactLock("teaching-schedule-publish:" + tenantId);
+    }
+
     List<CalendarBatch> findByTenantIdAndSchoolId(String tenantId, String schoolId);
 
     @Query(

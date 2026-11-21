@@ -7,6 +7,8 @@ import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.lcms.LcmsQueryOperations;
 import com.erg.ergspringboot.lcms.authorization.LcmsWorkspaceRead;
 import com.erg.ergspringboot.lcms.authorization.LcmsScopeRead;
+import graphql.schema.DataFetchingFieldSelectionSet;
+import com.erg.ergspringboot.lcms.LcmsReadPort;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
@@ -28,7 +30,8 @@ public class LcmsWorkspaceGraphQlController {
 
     @SchemaMapping(typeName = "LcmsQuery", field = "questionBankWorkspace")
     @LcmsWorkspaceRead
-    public QuestionBankWorkspaceResponse questionBankWorkspace(@Argument QuestionBankWorkspaceInput input) {
+    public QuestionBankWorkspaceResponse questionBankWorkspace(
+            @Argument QuestionBankWorkspaceInput input, DataFetchingFieldSelectionSet selectionSet) {
         QuestionBankWorkspaceInput safeInput = input == null ? QuestionBankWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.exercise.read", "lms.quiz.read", "content.manage", "*");
@@ -43,13 +46,16 @@ public class LcmsWorkspaceGraphQlController {
                 safeInput.quizKind(),
                 safeInput.includeQuestions(),
                 safeInput.page(),
-                safeInput.size()
+                safeInput.size(),
+                new LcmsReadPort.QuestionBankReadOptions(selectionSet.contains("quizzes"),
+                        selectionSet.contains("questions/items/runtimeQuestion"), safeInput.quizLimit())
         );
     }
 
     @SchemaMapping(typeName = "LcmsQuery", field = "accessManagementWorkspace")
     @LcmsScopeRead
-    public AccessManagementWorkspaceResponse accessManagementWorkspace(@Argument AccessManagementWorkspaceInput input) {
+    public AccessManagementWorkspaceResponse accessManagementWorkspace(
+            @Argument AccessManagementWorkspaceInput input, DataFetchingFieldSelectionSet selectionSet) {
         AccessManagementWorkspaceInput safeInput = input == null ? AccessManagementWorkspaceInput.empty() : input;
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.scope.read", "*");
@@ -61,7 +67,7 @@ public class LcmsWorkspaceGraphQlController {
                 safeInput.status(),
                 safeInput.page(),
                 safeInput.size(),
-                canReadEffectivePermissions(principal)
+                canReadEffectivePermissions(principal) && selectionSet.contains("users/items/effectivePermissions")
         );
     }
 
@@ -91,11 +97,17 @@ public class LcmsWorkspaceGraphQlController {
             String quizKind,
             Boolean includeQuestions,
             Integer page,
-            Integer size
+            Integer size,
+            Integer quizLimit
     ) {
 
+        QuestionBankWorkspaceInput(String tenantId, String search, String subjectId, String levelId, String topicId,
+                String status, String quizKind, Boolean includeQuestions, Integer page, Integer size) {
+            this(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page, size, null);
+        }
+
         static QuestionBankWorkspaceInput empty() {
-            return new QuestionBankWorkspaceInput(null, null, null, null, null, null, null, null, null, null);
+            return new QuestionBankWorkspaceInput(null, null, null, null, null, null, null, null, null, null, null);
         }
     }
 

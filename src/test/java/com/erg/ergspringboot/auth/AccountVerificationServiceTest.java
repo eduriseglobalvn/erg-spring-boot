@@ -113,6 +113,34 @@ class AccountVerificationServiceTest {
         org.junit.jupiter.api.Assertions.assertNotNull(challenge.challengeId());
     }
 
+    @Test
+    void wrongCodesPersistTheirAttemptsSoTheLimitFiresAndTheMethodDoesNotRollBackFailures() throws Exception {
+        var verify = AccountVerificationService.class.getMethod("verifyRecoveryEmail",
+                String.class, String.class, String.class, String.class, com.erg.ergspringboot.users.UserAuditContext.class);
+        org.junit.jupiter.api.Assertions.assertTrue(java.util.Arrays.asList(
+                verify.getAnnotation(org.springframework.transaction.annotation.Transactional.class).noRollbackFor())
+                .contains(com.erg.ergspringboot.exception.AccountLifecycleException.class));
+        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user()));
+        AccountVerificationCode challenge = new AccountVerificationCode();
+        challenge.setId("c1");
+        challenge.setUserId("user-1");
+        challenge.setTenantId("erg");
+        challenge.setPurpose("RECOVERY_EMAIL");
+        challenge.setCodeHash(passwordService.hash("123456"));
+        challenge.setExpiresAt(java.time.OffsetDateTime.now().plusMinutes(5));
+        when(codeRepository.findById("c1")).thenReturn(Optional.of(challenge));
+
+        for (int i = 0; i < challenge.getMaxAttempts(); i++) {
+            assertThrows(com.erg.ergspringboot.exception.AccountLifecycleException.class,
+                    () -> service.verifyRecoveryEmail("user-1", "erg", "c1", "000000"));
+        }
+
+        org.junit.jupiter.api.Assertions.assertEquals(challenge.getMaxAttempts(), challenge.getAttempts());
+        var exceeded = assertThrows(com.erg.ergspringboot.exception.AccountLifecycleException.class,
+                () -> service.verifyRecoveryEmail("user-1", "erg", "c1", "123456"));
+        assertTrue(exceeded.getMessage().contains("exceeded"));
+    }
+
     private User user() {
         User user = new User();
         user.setId("user-1");

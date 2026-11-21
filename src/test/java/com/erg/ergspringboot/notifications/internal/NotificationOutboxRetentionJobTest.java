@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.erg.ergspringboot.notifications.persistence.NotificationDeliveryAttemptRepository;
 import com.erg.ergspringboot.notifications.persistence.NotificationOutboxRepository;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ class NotificationOutboxRetentionJobTest {
         OffsetDateTime ninetyOneDaysAgo = OffsetDateTime.now().minusDays(91);
         when(repository.deleteTerminalOlderThan(argThat(java.util.Objects::nonNull), eq(1000))).thenReturn(0);
 
-        new NotificationOutboxRetentionJob(repository, true, 90, 1000).purgeExpiredTerminal();
+        new NotificationOutboxRetentionJob(repository, mock(NotificationDeliveryAttemptRepository.class), true, 90, 1000).purgeExpiredTerminal();
 
         verify(repository).deleteTerminalOlderThan(argThat(cutoff ->
                 cutoff.isAfter(ninetyOneDaysAgo) && cutoff.isBefore(OffsetDateTime.now().minusDays(89))), eq(1000));
@@ -34,7 +35,7 @@ class NotificationOutboxRetentionJobTest {
         when(repository.deleteTerminalOlderThan(argThat(java.util.Objects::nonNull), eq(500)))
                 .thenReturn(500, 500, 42);
 
-        new NotificationOutboxRetentionJob(repository, true, 90, 500).purgeExpiredTerminal();
+        new NotificationOutboxRetentionJob(repository, mock(NotificationDeliveryAttemptRepository.class), true, 90, 500).purgeExpiredTerminal();
 
         verify(repository, times(3)).deleteTerminalOlderThan(argThat(java.util.Objects::nonNull), eq(500));
     }
@@ -50,7 +51,7 @@ class NotificationOutboxRetentionJobTest {
             return 0;
         });
 
-        new NotificationOutboxRetentionJob(repository, true, 90, 1000).purgeExpiredTerminal();
+        new NotificationOutboxRetentionJob(repository, mock(NotificationDeliveryAttemptRepository.class), true, 90, 1000).purgeExpiredTerminal();
 
         org.assertj.core.api.Assertions.assertThat(maintenance).isTrue();
         org.assertj.core.api.Assertions.assertThat(com.erg.ergspringboot.platform.security.TenantContext.current()).isNull();
@@ -60,8 +61,21 @@ class NotificationOutboxRetentionJobTest {
     void skipsPurgeWhenDisabled() {
         NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
 
-        new NotificationOutboxRetentionJob(repository, false, 90, 1000).purgeExpiredTerminal();
+        new NotificationOutboxRetentionJob(repository, mock(NotificationDeliveryAttemptRepository.class), false, 90, 1000).purgeExpiredTerminal();
 
         verify(repository, never()).deleteTerminalOlderThan(argThat(java.util.Objects::nonNull), anyInt());
+    }
+
+    @Test
+    void purgesAttemptsAndFailedRowsOlderThanTheWindowInBatches() {
+        NotificationOutboxRepository repository = mock(NotificationOutboxRepository.class);
+        NotificationDeliveryAttemptRepository attempts = mock(NotificationDeliveryAttemptRepository.class);
+        when(attempts.deleteOlderThan(argThat(java.util.Objects::nonNull), eq(500))).thenReturn(500, 7);
+        when(repository.deleteFailedOlderThan(argThat(java.util.Objects::nonNull), eq(500))).thenReturn(3);
+
+        new NotificationOutboxRetentionJob(repository, attempts, true, 90, 500).purgeExpiredTerminal();
+
+        verify(attempts, times(2)).deleteOlderThan(argThat(java.util.Objects::nonNull), eq(500));
+        verify(repository).deleteFailedOlderThan(argThat(cutoff -> cutoff.isBefore(OffsetDateTime.now().minusDays(89))), eq(500));
     }
 }

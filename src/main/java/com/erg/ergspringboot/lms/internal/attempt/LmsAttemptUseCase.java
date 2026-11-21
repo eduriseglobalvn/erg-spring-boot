@@ -9,6 +9,7 @@ import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy;
 import com.erg.ergspringboot.lms.LmsAssignmentAccessPolicy.AssignedQuiz;
 import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
+import com.erg.ergspringboot.lms.QuizStartInfo;
 import com.erg.ergspringboot.lms.persistence.*;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.*;
 import com.erg.ergspringboot.lms.persistence.AttemptAnswer;
@@ -28,7 +29,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +55,7 @@ public class LmsAttemptUseCase {
     private final AttemptFactory factory;
     private final AttemptProgressProjector progress;
     private final AttemptCompletionEffects effects;
+    private TransactionTemplate submitTx; // null in explicit wiring: submit then runs in the caller's transaction
 
     @Autowired
     public LmsAttemptUseCase(LmsAssignmentAccessPolicy policy, LmsQuizService quizzes, LmsAttemptService attempts,
@@ -74,8 +80,14 @@ public class LmsAttemptUseCase {
         this.clock = clock == null ? Clock.systemUTC() : clock;
         this.deadlines = new AttemptDeadlinePolicy(submitGrace);
         this.factory = new AttemptFactory(deadlines);
-        this.progress = new AttemptProgressProjector(students, quizzes, grading);
+        this.progress = new AttemptProgressProjector(policy.identities(), students, packages, grading);
         this.effects = new AttemptCompletionEffects(events, progress, caches, publisher);
+    }
+
+    /** Required: without it submit would silently run with no transaction (only hand-wired test fixtures skip it). */
+    @Autowired
+    public void setTransactionManager(@Qualifier("postgresTransactionManager") PlatformTransactionManager manager) {
+        this.submitTx = new TransactionTemplate(manager);
     }
 
     @Transactional("postgresTransactionManager")
@@ -95,36 +107,41 @@ public class LmsAttemptUseCase {
         attempts.lockStart(tenant, request.assignmentId(), request.quizId(), persistedStudent);
         if (key != null) {
             Optional<Attempt> existing = attempts.findByStartIdempotencyKey(tenant, request.assignmentId(), request.quizId(), persistedStudent, key);
-            if (existing.isPresent()) return response(existing.get());
+            if (existing.isPresent()) return AttemptResponses.of(existing.get());
         }
         Optional<Attempt> inProgress = attempts.findInProgress(tenant, request.assignmentId(), request.quizId(), persistedStudent);
         LmsSyncOperationService.Receipt receipt = reserve(tenant, persistedStudent, key, "quiz.attempt.start",
                 request.assignmentId() + ":" + request.quizId() + ":" + persistedStudent, request, null);
         if (receipt != null && receipt.replayed()) return sync.result(receipt, AttemptResponse.class);
         if (inProgress.isPresent() && deadlines.isExpired(inProgress.get(), assignment, now)) {
-            autoClose(inProgress.get(), assignment, tenant, now);
+            Attempt closed = autoClose(inProgress.get(), assignment, tenant, now);
+            if (deadlines.isPastDue(assignment, now)) {
+                // Return the closed attempt instead of throwing: an exception would roll the auto-close back.
+                effects.evictReads(tenant, closed, assignment, studentId);
+                AttemptResponse result = AttemptResponses.of(closed);
+                complete(receipt, result, version(closed));
+                return result;
+            }
             inProgress = Optional.empty();
         }
         if (inProgress.isPresent()) {
             Attempt attempt = inProgress.get();
-            ensureResumePackageMatches(attempt, request);
+            factory.ensureResumePackageMatches(attempt, request);
             attempt.setLastActiveAt(now);
             Attempt saved = attempts.save(attempt);
             log.info("EXAM_ATTEMPT_RESUME studentId={} attemptId={} quizId={} assignmentId={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId());
             effects.evictReads(tenant, saved, assignment, studentId);
-            AttemptResponse result = response(saved);
+            AttemptResponse result = AttemptResponses.of(saved);
             complete(receipt, result, version(saved));
             return result;
         }
 
         deadlines.ensureOpen(assignment, now);
-        Optional<QuizPackage> runtimePackage = assignedQuiz.quizVersionId() == null
-                ? packages.activePackageEntity(tenant, request.quizId())
-                : packages.packageEntityForVersion(tenant, request.quizId(), assignedQuiz.quizVersionId());
-        Quiz quiz = quizzes.findByTenantIdAndId(tenant, request.quizId()).orElse(null);
-        validatePackageContract(request, runtimePackage);
+        // Cached projection: the package_json and the quiz jsonb columns are not loaded per start.
+        QuizStartInfo info = packages.startInfo(tenant, request.quizId(), assignedQuiz.quizVersionId());
+        factory.validatePackageContract(request, info);
         ensureLimit(assignment, tenant, request.quizId(), persistedStudent);
-        Attempt attempt = factory.newAttempt(tenant, persistedStudent, request, assignment, quiz, runtimePackage, now, key);
+        Attempt attempt = factory.newAttempt(tenant, persistedStudent, request, assignment, info, now, key);
         attempt.setClassId(blank(assignment.getAcademicClassId()) == null && learner != null
                 ? learner.getAcademicClassId() : assignment.getAcademicClassId());
         attempt.setLastActiveAt(now);
@@ -137,7 +154,7 @@ public class LmsAttemptUseCase {
         }
         log.info("EXAM_ATTEMPT_START studentId={} attemptId={} quizId={} assignmentId={} mode={}", persistedStudent, saved.getId(), request.quizId(), request.assignmentId(), saved.getMode());
         effects.evictReads(tenant, saved, assignment, studentId); // studentId is the caller's login user id
-        AttemptResponse result = response(saved);
+        AttemptResponse result = AttemptResponses.of(saved);
         complete(receipt, result, version(saved));
         return result;
     }
@@ -145,9 +162,9 @@ public class LmsAttemptUseCase {
     /** Keeps answers so far on the open attempt for resume (start returns them); submit merges and grades them. */
     @Transactional("postgresTransactionManager")
     public AttemptResponse saveDraft(String id, AttemptDraftRequest request, UserAccessContext access) {
-        Attempt attempt = mutable(id, access).attempt();
+        Attempt attempt = ownAttempt(id, access);
         editable(attempt);
-        if (request == null || request.answers() == null || request.answers().isEmpty()) return response(attempt);
+        if (request == null || request.answers() == null || request.answers().isEmpty()) return AttemptResponses.of(attempt);
         boolean otherPackage = request.packageHash() != null && !Objects.equals(attempt.getPackageHash(), request.packageHash());
         if (otherPackage) throw new BadRequestException("package_hash conflict");
         if (request.answers().size() > MAX_DRAFT_ANSWERS) throw new BadRequestException("too many answers in draft");
@@ -159,14 +176,14 @@ public class LmsAttemptUseCase {
         });
         attempt.setAnswers(answers);
         attempt.setLastActiveAt(now);
-        return response(attempts.save(attempt));
+        return AttemptResponses.of(attempts.save(attempt));
     }
 
     /** Legacy compatibility endpoint. Answers are accepted only in the final submit payload. */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public AnswerResultResponse saveAnswer(String id, String questionId, SaveAnswerRequest request, UserAccessContext access) {
         if (questionId.contains(".") || questionId.contains("$")) throw new BadRequestException("invalid question id");
-        Attempt attempt = mutable(id, access).attempt();
+        Attempt attempt = mutable(id, access, false).attempt();
         editable(attempt);
         return new AnswerResultResponse(id, questionId, false);
     }
@@ -174,18 +191,27 @@ public class LmsAttemptUseCase {
     /** Legacy compatibility endpoint. Offline state remains client-side until final submit. */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public AttemptSyncResponse sync(String id, AttemptSyncRequest request, UserAccessContext access) {
-        Attempt attempt = mutable(id, access).attempt();
+        Attempt attempt = mutable(id, access, false).attempt();
         if (request != null && !Objects.equals(attempt.getPackageHash(), request.packageHash())) {
-            return new AttemptSyncResponse("conflict", response(attempt), List.of("package_hash"));
+            return new AttemptSyncResponse("conflict", AttemptResponses.of(attempt), List.of("package_hash"));
         }
-        return new AttemptSyncResponse(attempt.getStatus(), response(attempt), List.of());
+        return new AttemptSyncResponse(attempt.getStatus(), AttemptResponses.of(attempt), List.of());
     }
 
-    @Transactional("postgresTransactionManager")
+    /** Autosave can win the {@code @Version} race with the hand-in: retry once in a fresh transaction. */
     public AttemptSubmitResponse submit(String id, SubmitAttemptRequest request, UserAccessContext access) {
+        if (submitTx == null) return submitOnce(id, request, access);
+        try {
+            return submitTx.execute(status -> submitOnce(id, request, access));
+        } catch (ObjectOptimisticLockingFailureException raced) {
+            return submitTx.execute(status -> submitOnce(id, request, access));
+        }
+    }
+
+    private AttemptSubmitResponse submitOnce(String id, SubmitAttemptRequest request, UserAccessContext access) {
         Timer.Sample sample = meterRegistry == null ? null : Timer.start(meterRegistry);
         String tenant = tenant(access.tenantId());
-        Owned owned = mutable(id, access);
+        Owned owned = mutable(id, access, true); // submit always reads the assignment fresh: deadlines decide late/closed
         Attempt attempt = owned.attempt();
         if (request != null && request.packageHash() != null && !Objects.equals(attempt.getPackageHash(), request.packageHash())) throw new BadRequestException("package_hash conflict");
         String submitKey = blank(request == null ? null : request.idempotencyKey());
@@ -193,11 +219,11 @@ public class LmsAttemptUseCase {
                 "quiz.attempt.submit", id, request, version(attempt));
         if (receipt != null && receipt.replayed()) return sync.result(receipt, AttemptSubmitResponse.class);
         if (submitKey != null && submitKey.equals(blank(attempt.getSubmitIdempotencyKey()))) {
-            complete(receipt, submitResult(attempt), version(attempt));
-            return submitResult(attempt);
+            complete(receipt, AttemptResponses.submit(attempt), version(attempt));
+            return AttemptResponses.submit(attempt);
         }
         if (!LmsStatePolicy.attemptIsEditable(attempt.getStatus())) {
-            AttemptSubmitResponse result = submitResult(attempt);
+            AttemptSubmitResponse result = AttemptResponses.submit(attempt);
             complete(receipt, result, version(attempt));
             return result;
         }
@@ -208,12 +234,13 @@ public class LmsAttemptUseCase {
         if (request != null && request.answers() != null) request.answers().forEach((qid, answer) -> answers.put(qid, answer(qid, answer, Map.of(), now())));
         // submittedAt is accepted for wire compatibility only; expiry and audit authority are server time.
         OffsetDateTime submitted = now();
-        boolean late = deadlines.ensureSubmitAllowed(attempt, owned.assignment(), submitted);
+        // Past deadline + grace the payload answers are still graded and stored as a late hand-in, never dropped.
+        boolean late = deadlines.isLate(attempt, owned.assignment(), submitted);
         if (submitKey != null) attempt.setSubmitIdempotencyKey(submitKey);
         Score score = finish(attempt, answers, tenant, submitted, late);
         Attempt saved = attempts.save(attempt);
         log.info("EXAM_ATTEMPT_SUBMIT studentId={} attemptId={} quizId={} assignmentId={} score={}/{} percent={}% passed={} late={}", saved.getStudentId(), saved.getId(), saved.getQuizId(), saved.getAssignmentId(), score.score(), score.max(), score.percent(), score.passed(), late);
-        effects.submitted(saved, owned.assignment(), tenant, score, submitted, late);
+        effects.submitted(saved, owned.assignment(), tenant, score, submitted, late, access.userId());
         if (request != null) events.recordClientBatch(saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), request.clientEvents());
         if (sample != null) sample.stop(meterRegistry.timer("erg.lms.attempt.submit", "result", score.passed() ? "passed" : "failed"));
         AttemptSubmitResponse result = new AttemptSubmitResponse(score.score(), score.max(), score.percent(), score.passed());
@@ -226,8 +253,8 @@ public class LmsAttemptUseCase {
             Map<String, Object> clientMeta, Map<String, Object> answers) {
         OffsetDateTime now = now();
         Attempt attempt = factory.newAttempt(tenant, student.getId(), new StartAttemptRequest(assignment.getId(), pkg.getQuizId(),
-                pkg.getId(), pkg.getContentHash()), assignment, quizzes.findByTenantIdAndId(tenant, pkg.getQuizId()).orElse(null),
-                Optional.of(pkg), now, key);
+                pkg.getId(), pkg.getContentHash()), assignment,
+                QuizStartInfo.of(quizzes.findByTenantIdAndId(tenant, pkg.getQuizId()).orElse(null), pkg), now, key);
         attempt.setClassId(blank(assignment.getAcademicClassId()) == null ? student.getAcademicClassId() : assignment.getAcademicClassId());
         attempt.setSubmitIdempotencyKey(key); attempt.setClient(clientMeta);
         Map<String, AttemptAnswer> stored = new LinkedHashMap<>(); answers.forEach((qid, value) -> stored.put(qid, answer(qid, value, Map.of(), now)));
@@ -267,16 +294,31 @@ public class LmsAttemptUseCase {
         Attempt saved = attempts.save(attempt);
         log.info("EXAM_ATTEMPT_GRADED attemptId={} questionId={} graderId={} status={}", saved.getId(), questionId, access.userId(), saved.getStatus());
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_answer_graded", questionId, null, Map.of("score", result.score().doubleValue(), "status", saved.getStatus()), now());
-        progress.projectAfterCommit(saved, assignment, tenant);
+        // An older attempt must not overwrite student_progress written by the learner's newer hand-in.
+        boolean latest = attempts.findLatestSubmitted(tenant, saved.getAssignmentId(), saved.getStudentId())
+                .map(newest -> newest.getId().equals(saved.getId())).orElse(true);
+        if (latest) progress.project(saved, assignment, tenant);
         effects.evictReads(tenant, saved, assignment);
-        return response(saved);
+        return AttemptResponses.of(saved);
     }
 
     private record Owned(Attempt attempt, Assignment assignment) { }
     record Score(double score, double max, double percent, boolean passed) { }
 
-    private Owned mutable(String id, UserAccessContext access) {
+    /**
+     * The caller's own attempt, or a reviewer's. The assignment is loaded only when the caller needs it (submit deadlines,
+     * the reviewer scope): autosave and sync never use it, so the owner path skips that query.
+     */
+    /** Draft autosave belongs to the learner: a reviewer who may read or grade the attempt must not overwrite its answers. */
+    private Attempt ownAttempt(String id, UserAccessContext access) {
         Attempt attempt = attempts.findByTenantIdAndId(tenant(access.tenantId()), id).orElseThrow(() -> new ResourceNotFoundException("attempt not found"));
+        if (!policy.isOwner(attempt, access)) throw new ForbiddenException("You can only save answers on your own attempt");
+        return attempt;
+    }
+
+    private Owned mutable(String id, UserAccessContext access, boolean withAssignment) {
+        Attempt attempt = attempts.findByTenantIdAndId(tenant(access.tenantId()), id).orElseThrow(() -> new ResourceNotFoundException("attempt not found"));
+        if (!withAssignment && policy.isOwner(attempt, access)) return new Owned(attempt, null);
         Assignment assignment = policy.assignment(access.tenantId(), attempt.getAssignmentId());
         policy.ensureAttemptAccess(attempt, assignment, access);
         return new Owned(attempt, assignment);
@@ -334,54 +376,19 @@ public class LmsAttemptUseCase {
     }
 
     /** Closes an in-progress attempt whose deadline plus grace passed, grading whatever the server holds. */
-    private void autoClose(Attempt attempt, Assignment assignment, String tenant, OffsetDateTime now) {
+    private Attempt autoClose(Attempt attempt, Assignment assignment, String tenant, OffsetDateTime now) {
         Score score = finish(attempt, new LinkedHashMap<>(map(attempt.getAnswers())), tenant, now, true);
         Attempt saved = attempts.save(attempt);
         log.info("EXAM_ATTEMPT_AUTO_CLOSED attemptId={} studentId={} score={}", saved.getId(), saved.getStudentId(), score.score());
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_auto_closed", null, null, Map.of("score", score.score(), "late", true), now);
-        progress.projectAfterCommit(saved, assignment, tenant);
-    }
-
-    private void validatePackageContract(StartAttemptRequest request, Optional<QuizPackage> activePackage) {
-        if (activePackage.isEmpty()) {
-            return; // Legacy quizzes without a published lineage use the request fields as a compatibility bridge.
-        }
-        QuizPackage pkg = activePackage.get();
-        String expectedHash = factory.canonicalPackageHash(pkg, null);
-        if (!Objects.equals(pkg.getId(), request.packageId()) || !Objects.equals(expectedHash, request.packageHash())) {
-            throw new BadRequestException("package contract mismatch");
-        }
-    }
-
-    private void ensureResumePackageMatches(Attempt attempt, StartAttemptRequest request) {
-        if (attempt.getPackageId() != null && !Objects.equals(attempt.getPackageId(), request.packageId())) {
-            throw new BadRequestException("attempt package contract mismatch");
-        }
-        if (attempt.getPackageHash() != null && !Objects.equals(attempt.getPackageHash(), request.packageHash())) {
-            throw new BadRequestException("attempt package contract mismatch");
-        }
+        progress.project(saved, assignment, tenant);
+        return saved;
     }
 
     private void ensureLimit(Assignment a, String tenant, String quiz, String student) { Integer limit = a.getAttemptLimit(); if (limit != null && limit > 0 && attempts.countCompletedForLimit(tenant, a.getId(), quiz, student) >= limit) throw new ConflictException("attempt limit reached"); }
     private void editable(Attempt a) { if (!LmsStatePolicy.attemptIsEditable(a.getStatus())) throw new BadRequestException("attempt already submitted"); }
     private Map<String,Object> raw(Map<String,AttemptAnswer> answers) { Map<String,Object> out = new LinkedHashMap<>(); answers.forEach((k,v) -> out.put(k, v == null ? null : v.getAnswer())); return out; }
     private AttemptAnswer answer(String id, Object value, Map<String,Object> client, OffsetDateTime at) { return new AttemptAnswer(id, value, client, at); }
-    private AttemptSubmitResponse submitResult(Attempt attempt) {
-        return new AttemptSubmitResponse(value(attempt.getScore()), value(attempt.getMaxScore()),
-                value(attempt.getPercent()), Boolean.TRUE.equals(attempt.getPassed()));
-    }
-
-    private AttemptResponse response(Attempt a) {
-        Map<String,com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptAnswer> out = new LinkedHashMap<>();
-        map(a.getAnswers()).forEach((k,v) -> out.put(k, new com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptAnswer(
-                v == null ? null : v.getAnswer(), v == null ? Map.of() : map(v.getClientResult()),
-                v == null ? null : v.getAnsweredAt())));
-        return new AttemptResponse(a.getId(), a.getAssignmentId(), a.getQuizId(), a.getStudentId(), a.getPackageId(),
-                a.getPackageHash(), a.getStatus(), out, value(a.getScore()), value(a.getMaxScore()), value(a.getPercent()),
-                Boolean.TRUE.equals(a.getPassed()), a.getStartedAt(), a.getSubmittedAt(), a.getUpdatedAt(),
-                AttemptPolicySnapshotResponse.from(a.getPolicySnapshot()));
-    }
-
     private LmsSyncOperationService.Receipt reserve(String tenant, String account, String key, String type,
                                                      String entityId, Object payload, Long expectedVersion) {
         if (sync == null || key == null || key.isBlank()) return null;
@@ -394,7 +401,6 @@ public class LmsAttemptUseCase {
     private String tenant(String value) { return AuthenticatedTenant.require(value); }
     private OffsetDateTime now() { return OffsetDateTime.now(clock); }
     private String blank(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private double value(Double value) { return value == null ? 0 : value; }
     private <T> List<T> list(List<T> value) { return value == null ? List.of() : value; }
     private <K,V> Map<K,V> map(Map<K,V> value) { return value == null ? Map.of() : value; }
 }

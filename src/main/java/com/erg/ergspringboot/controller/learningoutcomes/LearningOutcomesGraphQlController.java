@@ -24,6 +24,7 @@ import com.erg.ergspringboot.platform.security.AccessScopeSet;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.utils.IdGenerator;
+import graphql.schema.DataFetchingFieldSelectionSet;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -44,19 +45,22 @@ public class LearningOutcomesGraphQlController {
 
     @SchemaMapping(typeName = "LmsQuery", field = "learningOutcomes")
     @LearningOutcomesRead
-    public LearningOutcomesWorkspace learningOutcomes(@Argument LearningOutcomesQueryInput input) {
+    public LearningOutcomesWorkspace learningOutcomes(@Argument LearningOutcomesQueryInput input,
+                                                       DataFetchingFieldSelectionSet selection) {
         LearningOutcomesQueryInput safe = input == null ? new LearningOutcomesQueryInput(null, null, null, null, null) : input;
         ErgPrincipal principal = principal("learning.outcomes.read", "learning.outcomes.manage");
         String tenant = accessSupport.verifiedTenantId(principal, safe.tenantId());
         accessSupport.assertEducationUnitScope(principal, safe.educationUnitId());
         UserAccessContext access = access(principal, tenant);
         String learnerId = safe.learnerId() == null ? principal.userId() : safe.learnerId();
+        // Unselected blocks stay empty: each one costs its own read transaction.
         return new LearningOutcomesWorkspace(
-                operations.paths(access, safe.status(), safe.educationUnitId(), safe.classId()),
-                operations.competencies(access, safe.educationUnitId()),
-                operations.completions(access, learnerId),
-                operations.attainments(access, learnerId),
-                operations.certificates(access, learnerId));
+                selection.contains("paths")
+                        ? operations.paths(access, safe.status(), safe.educationUnitId(), safe.classId()) : List.of(),
+                selection.contains("competencies") ? operations.competencies(access, safe.educationUnitId()) : List.of(),
+                selection.contains("completions") ? operations.completions(access, learnerId) : List.of(),
+                selection.contains("attainments") ? operations.attainments(access, learnerId) : List.of(),
+                selection.contains("certificates") ? operations.certificates(access, learnerId) : List.of());
     }
 
     @SchemaMapping(typeName = "LmsQuery", field = "learningOutcomePath")

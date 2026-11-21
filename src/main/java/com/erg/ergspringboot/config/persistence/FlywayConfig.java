@@ -11,13 +11,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.ImportRuntimeHints;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Configuration
-@ImportRuntimeHints(FlywayRuntimeHints.class)
 public class FlywayConfig {
 
     private static final String CLASSPATH_MIGRATION_LOCATION = "classpath:db/migration/postgres";
@@ -54,7 +52,8 @@ public class FlywayConfig {
      */
     static String migrationInitSql(Environment environment) {
         String demoPurge = demoPurgeInitSql(environment);
-        return "SET statement_timeout = 0" + (demoPurge == null ? "" : "; " + demoPurge)
+        // lock_timeout: a migration queued behind a lock fails the deploy instead of queueing every request behind it.
+        return "SET statement_timeout = 0; SET lock_timeout = '10s'" + (demoPurge == null ? "" : "; " + demoPurge)
                 + (freshInstallPurge(environment) ? "; SET erg.fresh_install_purge = 'true'" : "");
     }
 

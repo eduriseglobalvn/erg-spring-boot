@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.elearning.internal.readmodel;
 
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository;
 import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAnnouncementCardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardAssignmentCardResponse;
@@ -9,7 +10,7 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardProfileResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardScoreSummaryResponse;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository.UserFallback;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
@@ -127,7 +128,7 @@ final class StudentDashboardCards {
 
     static StudentDashboardProfileResponse toProfile(
             StudentDashboardReadScope scope,
-            User user,
+            UserFallback user,
             Student student,
             String selectedClassId,
             boolean leaderboardEnabled

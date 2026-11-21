@@ -42,7 +42,8 @@ class RequestServiceTest {
     private final RequestService service = new RequestService(mock(TkRequestRepository.class),
             mock(TkRequestStepRepository.class), mock(TkRequestEvidenceRepository.class),
             mock(TkCodeCounterRepository.class), rules, chains, mock(RequestNotifier.class),
-            mock(RequestViewAssembler.class), balance, affected, mock(TeacherPeriodReader.class), context, clock);
+            mock(RequestViewAssembler.class), balance, affected, mock(TeacherPeriodReader.class), context, clock,
+            mock(org.springframework.transaction.PlatformTransactionManager.class));
 
     @Test
     void decemberToJanuaryShowsTheYearWithTheLeastBalanceLeft() {

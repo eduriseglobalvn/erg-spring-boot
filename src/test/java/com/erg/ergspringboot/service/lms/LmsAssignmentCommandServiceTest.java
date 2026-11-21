@@ -316,6 +316,24 @@ class LmsAssignmentCommandServiceTest {
     }
 
     @Test
+    void deleteAnswers409WhenStudentsAlreadyStartedTheAssignment() {
+        Assignment assignment = new Assignment();
+        assignment.setId("assignment-9");
+        assignment.setTenantId("tenant-a");
+        assignment.setAcademicClassId("class-1");
+        when(assignmentRepository.findById("assignment-9")).thenReturn(Optional.of(assignment));
+        var attempts = org.mockito.Mockito.mock(com.erg.ergspringboot.lms.persistence.AttemptRepository.class);
+        when(attempts.existsByTenantIdAndAssignmentId("tenant-a", "assignment-9")).thenReturn(true);
+        service.setAttemptRepository(attempts);
+
+        assertThatThrownBy(() -> service.delete(admin, "assignment-9"))
+                .isInstanceOf(com.erg.ergspringboot.lms.internal.core.AssignmentHasAttemptsException.class)
+                .hasFieldOrPropertyWithValue("code", "ASSIGNMENT_HAS_ATTEMPTS");
+        verify(recipientRepository, never()).deleteByAssignmentId(anyString());
+        verify(assignmentRepository, never()).delete(any(Assignment.class));
+    }
+
+    @Test
     void createRejectsRecipientsOutsideTheCallerScope() {
         when(studentRepository.findByTenantIdAndAcademicClassIdOrderByFullNameAsc("tenant-a", "class-9a2"))
                 .thenReturn(List.of(student("s1", "class-9a2")));

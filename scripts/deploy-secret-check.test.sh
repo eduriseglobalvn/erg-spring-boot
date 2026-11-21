@@ -12,13 +12,16 @@ expect() { # $1 0|1 expected status, $2 label, rest: env lines
   check_secrets 2>/dev/null || got=1
   if [ "$got" = "$want" ]; then echo "ok   $label"; else echo "FAIL $label (got $got, want $want)"; fail=1; fi
 }
-good=(POSTGRES_PASSWORD=a1 POSTGRES_RUNTIME_PASSWORD=b2 REDIS_STATE_PASSWORD=c3 REDIS_CACHE_PASSWORD=d4)
-expect 0 "four distinct real passwords pass" "${good[@]}"
-expect 1 "missing variable is refused" POSTGRES_PASSWORD=a1 POSTGRES_RUNTIME_PASSWORD=b2 REDIS_STATE_PASSWORD=c3
+good=(POSTGRES_PASSWORD=a1 POSTGRES_RUNTIME_PASSWORD=b2 REDIS_STATE_PASSWORD=c3 REDIS_CACHE_PASSWORD=d4 GRAFANA_PASSWORD=e5 ERG_BOOTSTRAP_ADMIN_PASSWORD=f6)
+expect 0 "six distinct real passwords pass" "${good[@]}"
+expect 1 "missing variable is refused" POSTGRES_PASSWORD=a1 POSTGRES_RUNTIME_PASSWORD=b2 REDIS_STATE_PASSWORD=c3 REDIS_CACHE_PASSWORD=d4 GRAFANA_PASSWORD=e5
 expect 1 "blank variable is refused" "${good[@]}" REDIS_CACHE_PASSWORD=
 expect 1 "old postgres sample is refused" "${good[@]}" POSTGRES_PASSWORD=replace-with-strong-postgres-password
 expect 1 "old runtime sample is refused" "${good[@]}" POSTGRES_RUNTIME_PASSWORD=replace-with-different-runtime-password
 expect 1 "old state sample is refused" "${good[@]}" REDIS_STATE_PASSWORD=replace-with-strong-state-redis-password
 expect 1 "old cache sample is refused" "${good[@]}" REDIS_CACHE_PASSWORD=replace-with-strong-cache-redis-password
+expect 1 "old grafana sample is refused" "${good[@]}" GRAFANA_PASSWORD=erg-grafana-password
+expect 1 "old bootstrap admin sample is refused" "${good[@]}" ERG_BOOTSTRAP_ADMIN_PASSWORD=Admin123
+expect 1 "blank bootstrap admin password is refused" "${good[@]}" ERG_BOOTSTRAP_ADMIN_PASSWORD=
 expect 0 "a sample value as substring of a real password passes" "${good[@]}" POSTGRES_PASSWORD=xreplace-with-strong-postgres-password
 exit $fail

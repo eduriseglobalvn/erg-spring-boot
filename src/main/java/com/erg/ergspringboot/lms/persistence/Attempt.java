@@ -11,6 +11,7 @@ import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -21,6 +22,7 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
+@DynamicUpdate // autosave changes a few columns: do not rewrite every jsonb column (answers, events, client, policy_snapshot)
 @Table(
         name = "lms_attempts",
         indexes = {

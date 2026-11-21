@@ -18,13 +18,12 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
 
     Optional<Attempt> findByTenantIdAndId(String tenantId, String id);
 
-    Optional<Attempt> findFirstByTenantIdAndAssignmentIdAndQuizIdAndStudentIdAndStatusIgnoreCase(
-            String tenantId,
-            String assignmentId,
-            String quizId,
-            String studentId,
-            String status
-    );
+    boolean existsByTenantIdAndAssignmentId(String tenantId, String assignmentId);
+
+    /** Literal predicate so the planner can use the partial unique index uq_lms_attempts_single_in_progress (lower(status)). */
+    @Query("select a from Attempt a where a.tenantId = :tenantId and a.assignmentId = :assignmentId and a.quizId = :quizId "
+            + "and a.studentId = :studentId and lower(a.status) = 'in_progress'")
+    Optional<Attempt> findInProgress(String tenantId, String assignmentId, String quizId, String studentId);
 
     Optional<Attempt> findFirstByTenantIdAndAssignmentIdAndQuizIdAndStudentIdAndStartIdempotencyKey(
             String tenantId,
@@ -32,16 +31,6 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
             String quizId,
             String studentId,
             String startIdempotencyKey
-    );
-
-    List<Attempt> findByTenantIdAndAssignmentIdOrderByUpdatedAtDesc(String tenantId, String assignmentId);
-
-    List<Attempt> findByTenantIdAndQuizIdOrderByUpdatedAtDesc(String tenantId, String quizId);
-
-    List<Attempt> findTop3ByTenantIdAndAssignmentIdAndStudentIdOrderByUpdatedAtDesc(
-            String tenantId,
-            String assignmentId,
-            String studentId
     );
 
     /** Newest handed-in attempt first; pass {@code PageRequest.of(0, 1)} for the latest one. */
@@ -57,56 +46,18 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
             @Param("studentId") String studentId, @Param("statuses") Collection<String> statuses,
             Pageable pageable);
 
-    List<Attempt> findByTenantIdAndAssignmentIdInAndStudentIdOrderByAssignmentIdAscUpdatedAtDesc(
-            String tenantId,
-            Collection<String> assignmentIds,
-            String studentId
-    );
-
+    /** Newest three attempts per assignment as summaries (no answers jsonb); ties on updated_at break by id. */
     @Query("""
-            select count(distinct attempt.id)
-            from Attempt attempt
-            left join Quiz quiz
-                on quiz.tenantId = attempt.tenantId
-                and quiz.id = attempt.quizId
-            left join Assignment assignment
-                on assignment.tenantId = attempt.tenantId
-                and assignment.id = attempt.assignmentId
-            where attempt.tenantId = :tenantId
-              and (
-                  quiz.subjectId = :subjectId
-                  or assignment.subjectId = :subjectId
-              )
+            select new com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection(a.id, a.assignmentId, a.quizId,
+                a.studentId, a.status, a.score, a.maxScore, a.percent, a.passed, a.startedAt, a.submittedAt, a.updatedAt)
+            from Attempt a
+            where a.tenantId = :tenantId and a.assignmentId in :assignmentIds and a.studentId = :studentId
+              and (select count(n.id) from Attempt n where n.tenantId = a.tenantId and n.assignmentId = a.assignmentId
+                   and n.studentId = a.studentId and (n.updatedAt > a.updatedAt or (n.updatedAt = a.updatedAt and n.id > a.id))) < 3
+            order by a.assignmentId, a.updatedAt desc, a.id desc
             """)
-    long countImpactByTenantAndSubject(@Param("tenantId") String tenantId, @Param("subjectId") String subjectId);
-
-    @Query("""
-            select count(distinct attempt.id)
-            from Attempt attempt
-            join Quiz quiz
-                on quiz.tenantId = attempt.tenantId
-                and quiz.id = attempt.quizId
-            where attempt.tenantId = :tenantId
-              and quiz.levelId = :levelId
-            """)
-    long countImpactByTenantAndLevel(@Param("tenantId") String tenantId, @Param("levelId") String levelId);
-
-    @Query(
-            value = """
-                    select count(distinct attempt.id)
-                    from lms_attempts attempt
-                    join lms_quizzes quiz
-                      on quiz.tenant_id = attempt.tenant_id
-                     and quiz.id = attempt.quiz_id
-                    where attempt.tenant_id = :tenantId
-                      and (
-                          quiz.category_id = :topicId
-                          or jsonb_exists(coalesce(quiz.topic_ids, '[]'::jsonb), :topicId)
-                      )
-                    """,
-            nativeQuery = true
-    )
-    long countImpactByTenantAndTopic(@Param("tenantId") String tenantId, @Param("topicId") String topicId);
+    List<AttemptSummaryProjection> findTop3SummariesByAssignmentsAndStudent(
+            String tenantId, Collection<String> assignmentIds, String studentId);
 
     @Query("""
             select count(attempt.id)
@@ -193,6 +144,7 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
     /**
      * Paged roster with the caller's class/education-unit scope applied in SQL, so a page is never cut
      * before filtering. Mirrors the in-memory rule: an assignment without a class is visible to every reviewer.
+     * With {@code classScopeWithoutSchool} a class named in {@code classIds} is enough, as in the in-memory rule.
      */
     @Query(value = """
             select new com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection(
@@ -218,9 +170,10 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
               and attempt.quizId = :quizId
               and (coalesce(assignment.academicClassId, '') = ''
                    or (classroom.id is not null
-                       and (:allClasses = true or assignment.academicClassId in :classIds)
-                       and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
-                            or classroom.schoolId in :unitIds)))
+                       and ((:classScopeWithoutSchool = true and assignment.academicClassId in :classIds)
+                            or ((:allClasses = true or assignment.academicClassId in :classIds)
+                                and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
+                                     or classroom.schoolId in :unitIds)))))
             order by attempt.updatedAt desc, attempt.id desc
             """, countQuery = """
             select count(attempt.id)
@@ -233,9 +186,10 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
               and attempt.quizId = :quizId
               and (coalesce(assignment.academicClassId, '') = ''
                    or (classroom.id is not null
-                       and (:allClasses = true or assignment.academicClassId in :classIds)
-                       and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
-                            or classroom.schoolId in :unitIds)))
+                       and ((:classScopeWithoutSchool = true and assignment.academicClassId in :classIds)
+                            or ((:allClasses = true or assignment.academicClassId in :classIds)
+                                and (:allUnits = true or coalesce(classroom.schoolId, '') = ''
+                                     or classroom.schoolId in :unitIds)))))
             """)
     Page<AttemptSummaryProjection> findScopedQuizAttemptSummaries(
             @Param("tenantId") String tenantId,
@@ -244,8 +198,15 @@ public interface AttemptRepository extends JpaRepository<Attempt, String>, Attem
             @Param("classIds") Collection<String> classIds,
             @Param("allUnits") boolean allUnits,
             @Param("unitIds") Collection<String> unitIds,
+            @Param("classScopeWithoutSchool") boolean classScopeWithoutSchool,
             Pageable pageable
     );
+
+    /** School rule only: a class named in {@code classIds} must also match the education unit. */
+    default Page<AttemptSummaryProjection> findScopedQuizAttemptSummaries(String tenantId, String quizId, boolean allClasses,
+            Collection<String> classIds, boolean allUnits, Collection<String> unitIds, Pageable pageable) {
+        return findScopedQuizAttemptSummaries(tenantId, quizId, allClasses, classIds, allUnits, unitIds, false, pageable);
+    }
 
     @Query("""
             select new com.erg.ergspringboot.lms.persistence.projection.AttemptScoreProjection(

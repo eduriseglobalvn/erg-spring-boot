@@ -32,7 +32,8 @@ class NotificationAudienceResolverTest {
 
     private final LmsAudienceReadPort lms = mock(LmsAudienceReadPort.class);
     private final UserDirectoryPort users = mock(UserDirectoryPort.class);
-    private final NotificationAudienceResolver resolver = new NotificationAudienceResolver(lms, users);
+    private final AudienceAccountQueries accounts = mock(AudienceAccountQueries.class);
+    private final NotificationAudienceResolver resolver = new NotificationAudienceResolver(lms, users, accounts, 5_000);
 
     /** User ids the directory does not know at all / knows as suspended. */
     private final Set<String> unknownUsers = new HashSet<>();
@@ -45,11 +46,10 @@ class NotificationAudienceResolverTest {
     void roster() {
         class7a = IntStream.rangeClosed(1, 31).mapToObj(i -> "s" + i).toList();
         when(lms.studentUserIdsInClasses(eq(TENANT), eq(List.of("7A")), anyInt())).thenReturn(class7a);
-        when(users.findByTenantIdAndIds(eq(TENANT), anyCollection())).thenAnswer(call ->
+        when(accounts.activeUserIds(eq(TENANT), anyCollection())).thenAnswer(call ->
                 ((Collection<String>) call.getArgument(1)).stream()
-                        .filter(id -> !unknownUsers.contains(id))
-                        .map(id -> account(id, suspendedUsers.contains(id) ? "SUSPENDED" : "ACTIVE"))
-                        .toList());
+                        .filter(id -> !unknownUsers.contains(id) && !suspendedUsers.contains(id))
+                        .collect(java.util.stream.Collectors.toSet()));
     }
 
     private static CampaignAudience audience(List<String> classIds, List<String> userIds) {
@@ -113,18 +113,52 @@ class NotificationAudienceResolverTest {
     }
 
     @Test
+    void theCapIsConfigurableSoATwentyThousandStudentTenantCanBeReached() {
+        List<String> everyone = IntStream.rangeClosed(1, 20_000).mapToObj(i -> "u" + i).toList();
+        when(accounts.countActiveStudents(TENANT, null)).thenReturn(20_000L);
+        when(accounts.activeStudentUserIds(eq(TENANT), anyInt())).thenReturn(everyone);
+        CampaignAudience students = new CampaignAudience(false, null, null, null, null, List.of("STUDENT"), null);
+
+        NotificationAudienceResolver wide = new NotificationAudienceResolver(lms, users, accounts, 50_000);
+        assertThat(wide.resolve(TENANT, students).breakdown().total()).isEqualTo(20_000);
+
+        NotificationAudienceResolver narrow = new NotificationAudienceResolver(lms, users, accounts, 10_000);
+        assertThatThrownBy(() -> narrow.resolve(TENANT, students))
+                .isInstanceOf(AudienceTooLargeException.class)
+                .hasMessage("Tối đa 10.000 người nhận mỗi lần gửi");
+    }
+
+    @Test
+    void wholeStudentBodyOverTheCapFailsOnTheSqlCountBeforeAnyIdIsLoaded() {
+        when(accounts.countActiveStudents(TENANT, null)).thenReturn(20_000L);
+
+        assertThatThrownBy(() -> resolver.resolve(TENANT, new CampaignAudience(false, null, null, null, null, List.of("STUDENT"), null)))
+                .isInstanceOf(AudienceTooLargeException.class);
+        verify(accounts, never()).activeStudentUserIds(any(), anyInt());
+        verifyNoInteractions(lms);
+    }
+
+    @Test
+    void classAudienceOverTheCapFailsOnTheSqlCountBeforeTheRosterIsRead() {
+        when(accounts.countActiveStudents(eq(TENANT), anyCollection())).thenReturn(5_001L);
+
+        assertThatThrownBy(() -> resolver.resolve(TENANT, audience(List.of("BIG"), List.of())))
+                .isInstanceOf(AudienceTooLargeException.class);
+        verify(lms, never()).studentUserIdsInClasses(any(), any(), anyInt());
+    }
+    @Test
     void pickedListOverFiveThousandIsRejectedBeforeAnyLookup() {
         List<String> picked = IntStream.rangeClosed(1, 5001).mapToObj(i -> "p" + i).toList();
 
         assertThatThrownBy(() -> resolver.resolve(TENANT, audience(List.of(), picked)))
                 .isInstanceOf(AudienceTooLargeException.class);
         verifyNoInteractions(lms);
-        verify(users, never()).findByTenantIdAndIds(any(), any());
+        verifyNoInteractions(accounts);
     }
 
     @Test
     void rolesResolveTeachersStudentsAndStaffCountingEachPersonOnce() {
-        when(lms.allStudentUserIds(eq(TENANT), anyInt())).thenReturn(List.of("s1", "s2"));
+        when(accounts.activeStudentUserIds(eq(TENANT), anyInt())).thenReturn(List.of("s1", "s2"));
         when(users.findCalendarTeachersByTenant(eq(TENANT), any(Pageable.class)))
                 .thenReturn(List.of(account("t1u", "ACTIVE"), account("s2", "ACTIVE")));
         when(users.findActiveStaffUserIds(eq(TENANT), any(Pageable.class))).thenReturn(List.of("f1"));
@@ -139,7 +173,7 @@ class NotificationAudienceResolverTest {
 
     @Test
     void wholeTenantReachesEveryoneKind() {
-        when(lms.allStudentUserIds(eq(TENANT), anyInt())).thenReturn(List.of("s1"));
+        when(accounts.activeStudentUserIds(eq(TENANT), anyInt())).thenReturn(List.of("s1"));
         when(users.findCalendarTeachersByTenant(eq(TENANT), any(Pageable.class)))
                 .thenReturn(List.of(account("t1u", "ACTIVE")));
         when(users.findActiveStaffUserIds(eq(TENANT), any(Pageable.class))).thenReturn(List.of("f1"));

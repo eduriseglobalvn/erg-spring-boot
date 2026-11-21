@@ -217,7 +217,7 @@ class UserOperationsUseCaseTest {
     @Test
     void listSessionsReturnsCurrentSessionMarker() {
         AuthSession session = session("session-1", "user-1");
-        when(sessionRepository.findByUserIdAndTenantIdOrderByLastActiveAtDesc("user-1", "erg"))
+        when(sessionRepository.findTop50ByUserIdAndTenantIdOrderByLastActiveAtDesc("user-1", "erg"))
                 .thenReturn(List.of(session));
 
         SessionListResponse response = operations.listSessions("user-1", "erg", "session-1");
@@ -271,9 +271,9 @@ class UserOperationsUseCaseTest {
                 .thenReturn(List.of(currentSession, otherSession));
 
         var response = operations.changePassword(
-                "user-1", "erg", "session-1", new ChangePasswordRequest("old-secret", "new-secret"), null);
+                "user-1", "erg", "session-1", new ChangePasswordRequest("old-secret", "New-secret"), null);
 
-        assertTrue(passwordService.matches("new-secret", user.getPasswordHash()));
+        assertTrue(passwordService.matches("New-secret", user.getPasswordHash()));
         assertFalse(user.getMustChangePassword());
         assertEquals("ACTIVE", user.getStatus());
         assertEquals(null, currentSession.getRevokedReason());
@@ -288,6 +288,12 @@ class UserOperationsUseCaseTest {
     }
 
     @Test
+    void aNewPasswordWithoutUpperLowerAndSpecialCharacterIsRejected() {
+        assertThrows(com.erg.ergspringboot.exception.BadRequestException.class,
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "newsecret1"), null));
+    }
+
+    @Test
     void temporaryPasswordCannotBeChangedBeforeTheRecoveryEmailIsVerified() {
         User user = user("user-1");
         user.setPasswordHash(passwordService.hash("old-secret"));
@@ -296,7 +302,7 @@ class UserOperationsUseCaseTest {
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
 
         var failure = assertThrows(com.erg.ergspringboot.exception.AccountLifecycleException.class,
-                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "new-secret"), null));
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("old-secret", "New-secret"), null));
 
         assertEquals("RECOVERY_EMAIL_NOT_VERIFIED", failure.getCode());
         assertTrue(passwordService.matches("old-secret", user.getPasswordHash()));
@@ -311,7 +317,7 @@ class UserOperationsUseCaseTest {
 
         assertThrows(
                 BadRequestException.class,
-                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("wrong", "new-secret"), null)
+                () -> operations.changePassword("user-1", "erg", null, new ChangePasswordRequest("wrong", "New-secret"), null)
         );
     }
 
@@ -379,7 +385,7 @@ class UserOperationsUseCaseTest {
         User user = user("user-1");
         AuthSession session = session("session-1", "user-1");
         when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(user));
-        when(sessionRepository.findByUserIdAndTenantIdOrderByLastActiveAtDesc("user-1", "erg"))
+        when(sessionRepository.findTop50ByUserIdAndTenantIdOrderByLastActiveAtDesc("user-1", "erg"))
                 .thenReturn(List.of(session));
 
         UserDetailResponse response = operations.getUserDetail("user-1", "erg");
@@ -647,8 +653,8 @@ class UserOperationsUseCaseTest {
     void bulkUpdateStatusUpdatesAllTenantUsers() {
         User userOne = user("user-1");
         User userTwo = user("user-2");
-        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(userOne));
-        when(userRepository.findByIdAndTenantId("user-2", "erg")).thenReturn(Optional.of(userTwo));
+        when(userRepository.findByTenantIdAndIdInAnyStatus(org.mockito.ArgumentMatchers.eq("erg"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(userOne, userTwo));
 
         var response = operations.bulkUpdateStatus(
                 "erg",
@@ -667,12 +673,10 @@ class UserOperationsUseCaseTest {
         User userTwo = user("user-2");
         AuthSession sessionOne = session("session-1", "user-1");
         AuthSession sessionTwo = session("session-2", "user-2");
-        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(userOne));
-        when(userRepository.findByIdAndTenantId("user-2", "erg")).thenReturn(Optional.of(userTwo));
-        when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-1", "erg"))
-                .thenReturn(List.of(sessionOne));
-        when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-2", "erg"))
-                .thenReturn(List.of(sessionTwo));
+        when(userRepository.findByTenantIdAndIdInAnyStatus(org.mockito.ArgumentMatchers.eq("erg"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(userOne, userTwo));
+        when(sessionRepository.findByUserIdInAndTenantIdAndRevokedAtIsNull(List.of("user-1", "user-2"), "erg"))
+                .thenReturn(List.of(sessionOne, sessionTwo));
 
         var response = operations.bulkUpdateStatus(
                 "erg",
@@ -682,16 +686,15 @@ class UserOperationsUseCaseTest {
         assertEquals(2, response.modifiedCount());
         assertEquals("status_changed_banned", sessionOne.getRevokedReason());
         assertEquals("status_changed_banned", sessionTwo.getRevokedReason());
-        verify(sessionRepository).saveAll(List.of(sessionOne));
-        verify(sessionRepository).saveAll(List.of(sessionTwo));
+        verify(sessionRepository).saveAll(List.of(sessionOne, sessionTwo));
     }
 
     @Test
     void bulkDeleteSoftDeletesAllTenantUsers() {
         User userOne = user("user-1");
         User userTwo = user("user-2");
-        when(userRepository.findByIdAndTenantId("user-1", "erg")).thenReturn(Optional.of(userOne));
-        when(userRepository.findByIdAndTenantId("user-2", "erg")).thenReturn(Optional.of(userTwo));
+        when(userRepository.findByTenantIdAndIdInAnyStatus(org.mockito.ArgumentMatchers.eq("erg"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(userOne, userTwo));
 
         var response = operations.bulkDelete("erg", new BulkDeleteRequest(List.of("user-1", "user-2")));
 

@@ -96,6 +96,7 @@ public class CalendarMutationGraphQlController {
         ErgPrincipal principal = accessSupport.currentPrincipal();
         accessSupport.assertPermission(principal, "lms.schedule.delete", "lms.schedule.manage", "lms.manage", "*");
         String tenantId = accessSupport.verifiedTenantId(principal, input.tenantId());
+        com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase.requireSchoolIds(input.schoolIds());
         List<String> schoolIds = scopeService.requireManagedSchools(principal, input.schoolIds());
         return calendar.deleteTeacherSchedule(
                 tenantId, input.teacherUserId(), schoolIds,

@@ -4,7 +4,7 @@ x-backend-environment: &backend-environment
   SERVER_ADDRESS: 0.0.0.0
   SERVER_PORT: 1606
   SPRING_PROFILES_ACTIVE: prod,redis
-  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/erg_benchmark
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/erg_benchmark?reWriteBatchedInserts=true
   SPRING_DATASOURCE_USERNAME: erg_app
   SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-erg-benchmark-runtime}
   # Same pool, timeout and thread model as .env.production.example so the benchmark measures what
@@ -27,7 +27,10 @@ x-backend-environment: &backend-environment
   ERG_OBSERVABILITY_PROMETHEUS_PUBLIC_ENABLED: "true"
   MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
   MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
-  SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+  # The Modulith entries: with module observability on, every module call reads the
+  # Environment under the System properties lock and the stack stalls near 500 req/s, which production never does.
+  SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration,org.springframework.modulith.observability.autoconfigure.SpringDataRestModuleObservabilityAutoConfiguration,org.springframework.modulith.actuator.autoconfigure.ApplicationModulesEndpointConfiguration
+  SPRING_MODULITH_RUNTIME_VERIFICATION_ENABLED: "false"
   SECRET_AUTH__JWT_SECRET: benchmark-only-jwt-secret-0123456789-abcdef
   SECRET_AUTH__JWT_REFRESH_SECRET: benchmark-only-refresh-secret-9876543210-fedcba
   SECRET_MEDIA_URL_SIGNING_KEY: benchmark-only-media-signing-key-abcdef-0123456789
@@ -83,17 +86,6 @@ services:
       context: ../..
       target: jvm-runtime
     image: erg-spring:benchmark-jvm
-
-  backend-native:
-    <<: *backend-common
-    profiles: [native]
-    environment:
-      <<: *backend-environment
-      FLYWAY_LOCATIONS: filesystem:/app/db/migration/postgres
-    build:
-      context: ../..
-      target: native-runtime
-    image: erg-spring:benchmark-native
 
   postgres:
     image: postgres:17-alpine

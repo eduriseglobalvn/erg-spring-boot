@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.lcms.internal.readmodel;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -23,7 +24,7 @@ import com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptio
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionUsageCountProjection;
-import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
+import com.erg.ergspringboot.lcms.persistence.LcmsAccessReadRepository;
 import com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuestionChoice;
 import java.time.OffsetDateTime;
@@ -66,7 +67,7 @@ class LcmsWorkspaceReadServiceTest {
     private RoleRepository roleRepository;
 
     @Mock
-    private UserAccessScopeRepository userAccessScopeRepository;
+    private LcmsAccessReadRepository accessReads;
 
     @Mock
     private QuizDraftRepository quizDraftRepository;
@@ -84,7 +85,7 @@ class LcmsWorkspaceReadServiceTest {
                 quizQuestionRepository,
                 userRepository,
                 roleRepository,
-                userAccessScopeRepository,
+                accessReads,
                 quizDraftRepository
         );
     }
@@ -152,7 +153,7 @@ class LcmsWorkspaceReadServiceTest {
                 .thenReturn(List.of(new QuestionBankOptionProjection("level-1", "Grade 10", "math", null, "Grade 10")));
         when(topicRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500)))
                 .thenReturn(List.of(new QuestionBankOptionProjection("topic-1", "Polynomial", null, "level-1", "Polynomial")));
-        when(quizRepository.findQuestionBankQuizOptions("tenant-a", "algebra", "math", null, null, "active", "test"))
+        when(quizRepository.findQuestionBankQuizOptions("tenant-a", "algebra", "math", null, null, "active", "test", null, PageRequest.of(0, 201)))
                 .thenReturn(List.of(new QuestionBankQuizOptionProjection(
                         "quiz-1",
                         "Midterm",
@@ -229,7 +230,7 @@ class LcmsWorkspaceReadServiceTest {
         verify(subjectRepository).findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500));
         verify(levelRepository).findAssessmentOptions("tenant-a", "math", "active", PageRequest.of(0, 500));
         verify(topicRepository).findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500));
-        verify(quizRepository).findQuestionBankQuizOptions("tenant-a", "algebra", "math", null, null, "active", "test");
+        verify(quizRepository).findQuestionBankQuizOptions("tenant-a", "algebra", "math", null, null, "active", "test", null, PageRequest.of(0, 201));
         verify(quizQuestionRepository).countUsageByQuestionIds("tenant-a", List.of("q-1"));
         verifyNoMoreInteractions(questionRepository, subjectRepository, levelRepository, topicRepository, quizRepository, quizQuestionRepository);
     }
@@ -248,7 +249,8 @@ class LcmsWorkspaceReadServiceTest {
         when(subjectRepository.findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500))).thenReturn(List.of());
         when(levelRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
         when(topicRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
-        when(quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, null)).thenReturn(List.of());
+        when(quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, null, null, PageRequest.of(0, 201)))
+                .thenReturn(List.of());
 
         QuestionBankWorkspaceResponse response = service.questionBankWorkspace(
                 "tenant-a",
@@ -270,8 +272,76 @@ class LcmsWorkspaceReadServiceTest {
         verify(subjectRepository).findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500));
         verify(levelRepository).findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500));
         verify(topicRepository).findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500));
-        verify(quizRepository).findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, null);
+        verify(quizRepository).findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, null, null, PageRequest.of(0, 201));
         verifyNoMoreInteractions(questionRepository, subjectRepository, levelRepository, topicRepository, quizRepository, quizQuestionRepository);
+    }
+
+    @Test
+    void questionBankWorkspaceSkipsQuizzesWhenNotSelectedAndFlagsATruncatedList() {
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(questionRepository.findQuestionBankQuestionsWithoutSearch("tenant-a", null, null, null, null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
+        when(questionRepository.findQuestionBankQuestionsWithoutSearchSlim("tenant-a", null, null, null, null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
+        when(subjectRepository.findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(levelRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(topicRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
+
+        QuestionBankWorkspaceResponse skipped = service.questionBankWorkspace("tenant-a", null, null, null, null, null, null,
+                null, null, null, new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(false, false, null));
+
+        assertThat(skipped.quizzes()).isEmpty();
+        assertThat(skipped.quizzesTruncated()).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(quizRepository, quizDraftRepository);
+
+        QuestionBankQuizOptionProjection quiz = new QuestionBankQuizOptionProjection("quiz-1", "Q", "active", "test", null, null,
+                null, List.of(), "author-1", OffsetDateTime.parse("2026-01-01T00:00:00Z"), 0L, null, null);
+        when(quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, null, null, PageRequest.of(0, 3)))
+                .thenReturn(List.of(quiz, quiz, quiz));
+
+        QuestionBankWorkspaceResponse truncated = service.questionBankWorkspace("tenant-a", null, null, null, null, null, null,
+                null, null, null, new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(true, true, 2));
+
+        assertThat(truncated.quizzes()).hasSize(2);
+        assertThat(truncated.quizzesTruncated()).isTrue();
+    }
+
+    @Test
+    void aTeachersViewerIdReachesTheQuizQuerySoTheOwnerFilterRunsInSqlBeforeTheCap() {
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(questionRepository.findQuestionBankQuestionsWithoutSearch("tenant-a", null, null, null, null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
+        when(subjectRepository.findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(levelRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(topicRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch(
+                "tenant-a", null, null, null, null, "teacher-1", PageRequest.of(0, 201))).thenReturn(List.of());
+
+        service.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
+                com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions.ALL, "teacher-1");
+
+        verify(quizRepository).findQuestionBankQuizOptionsWithoutStatusAndSearch(
+                "tenant-a", null, null, null, null, "teacher-1", PageRequest.of(0, 201));
+    }
+
+    @Test
+    void theQuestionPageSkipsTheContentColumnWhenRuntimeQuestionIsNotSelected() {
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(questionRepository.findQuestionBankQuestionsWithoutSearchSlim("tenant-a", null, null, null, null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
+        when(questionRepository.findQuestionBankQuestionsSlim("tenant-a", "abc", null, null, null, null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
+        when(subjectRepository.findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(levelRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(topicRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
+        var options = new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(false, false, null);
+
+        service.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null, options);
+        service.questionBankWorkspace("tenant-a", "ABC", null, null, null, null, null, null, null, null, options);
+
+        verify(questionRepository).findQuestionBankQuestionsWithoutSearchSlim("tenant-a", null, null, null, null, pageRequest);
+        verify(questionRepository).findQuestionBankQuestionsSlim("tenant-a", "abc", null, null, null, null, pageRequest);
+        verify(questionRepository, org.mockito.Mockito.never()).findQuestionBankQuestions(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -279,7 +349,7 @@ class LcmsWorkspaceReadServiceTest {
         when(subjectRepository.findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500))).thenReturn(List.of());
         when(levelRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
         when(topicRepository.findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500))).thenReturn(List.of());
-        when(quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, "train"))
+        when(quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, "train", null, PageRequest.of(0, 201)))
                 .thenReturn(List.of(new QuestionBankQuizOptionProjection(
                         "quiz-1",
                         "Training quiz",
@@ -313,14 +383,14 @@ class LcmsWorkspaceReadServiceTest {
         verify(subjectRepository).findAssessmentOptions("tenant-a", "active", PageRequest.of(0, 500));
         verify(levelRepository).findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500));
         verify(topicRepository).findAssessmentOptions("tenant-a", null, "active", PageRequest.of(0, 500));
-        verify(quizRepository).findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, "train");
+        verify(quizRepository).findQuestionBankQuizOptionsWithoutStatusAndSearch("tenant-a", null, null, null, "train", null, PageRequest.of(0, 201));
         verifyNoMoreInteractions(questionRepository, subjectRepository, levelRepository, topicRepository, quizRepository, quizQuestionRepository);
     }
 
     @Test
     void accessManagementWorkspaceMapsUsersOptionsAndEffectivePermissionsWhenEnabled() {
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(userRepository.findAccessManagementRows("tenant-a", "vuong", "teacher", "active", pageRequest))
+        when(accessReads.findRows("tenant-a", "vuong", "teacher", "active", pageRequest))
                 .thenReturn(new PageImpl<>(
                         List.of(new UserAccessRowProjection(
                                 "user-1",
@@ -340,7 +410,7 @@ class LcmsWorkspaceReadServiceTest {
                 .thenReturn(List.of(new UserEffectivePermissionProjection("user-1", "rbac.permission.read", "override:grant")));
         when(roleRepository.findAccessManagementRoleOptions(PageRequest.of(0, 500)))
                 .thenReturn(List.of(new RoleOptionProjection("role-1", "teacher")));
-        when(userAccessScopeRepository.findAccessManagementScopeOptions("tenant-a", PageRequest.of(0, 500)))
+        when(accessReads.findScopeOptions("tenant-a", PageRequest.of(0, 500)))
                 .thenReturn(List.of(new ScopeOptionProjection("unit-1", "Primary School", "school")));
 
         AccessManagementWorkspaceResponse response = service.accessManagementWorkspace(
@@ -368,21 +438,21 @@ class LcmsWorkspaceReadServiceTest {
         );
         assertThat(response.effectivePermissionsIncluded()).isTrue();
 
-        verify(userRepository).findAccessManagementRows("tenant-a", "vuong", "teacher", "active", pageRequest);
+        verify(accessReads).findRows("tenant-a", "vuong", "teacher", "active", pageRequest);
         verify(userRepository).findRoleEffectivePermissionsByUserIds(List.of("user-1"));
         verify(userRepository).findOverrideEffectivePermissionsByUserIds(List.of("user-1"));
         verify(roleRepository).findAccessManagementRoleOptions(PageRequest.of(0, 500));
-        verify(userAccessScopeRepository).findAccessManagementScopeOptions("tenant-a", PageRequest.of(0, 500));
-        verifyNoMoreInteractions(userRepository, roleRepository, userAccessScopeRepository);
+        verify(accessReads).findScopeOptions("tenant-a", PageRequest.of(0, 500));
+        verifyNoMoreInteractions(userRepository, roleRepository, accessReads);
     }
 
     @Test
     void accessManagementWorkspaceOmitsEffectivePermissionsWhenDisabled() {
         PageRequest pageRequest = PageRequest.of(1, 50);
-        when(userRepository.findAccessManagementRows("tenant-a", null, null, null, pageRequest))
+        when(accessReads.findRows("tenant-a", null, null, null, pageRequest))
                 .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
         when(roleRepository.findAccessManagementRoleOptions(PageRequest.of(0, 500))).thenReturn(List.of());
-        when(userAccessScopeRepository.findAccessManagementScopeOptions("tenant-a", PageRequest.of(0, 500))).thenReturn(List.of());
+        when(accessReads.findScopeOptions("tenant-a", PageRequest.of(0, 500))).thenReturn(List.of());
 
         AccessManagementWorkspaceResponse response = service.accessManagementWorkspace(
                 "tenant-a",
@@ -397,10 +467,10 @@ class LcmsWorkspaceReadServiceTest {
         assertThat(response.users().size()).isEqualTo(50);
         assertThat(response.effectivePermissionsIncluded()).isFalse();
         assertThat(response.users().items()).isEmpty();
-        verify(userRepository).findAccessManagementRows("tenant-a", null, null, null, pageRequest);
+        verify(accessReads).findRows("tenant-a", null, null, null, pageRequest);
         verify(roleRepository).findAccessManagementRoleOptions(PageRequest.of(0, 500));
-        verify(userAccessScopeRepository).findAccessManagementScopeOptions("tenant-a", PageRequest.of(0, 500));
-        verifyNoMoreInteractions(userRepository, roleRepository, userAccessScopeRepository);
+        verify(accessReads).findScopeOptions("tenant-a", PageRequest.of(0, 500));
+        verifyNoMoreInteractions(userRepository, roleRepository, accessReads);
     }
 
     private QuestionUsageCountProjection questionUsageCount(String questionId, Long usageCount) {

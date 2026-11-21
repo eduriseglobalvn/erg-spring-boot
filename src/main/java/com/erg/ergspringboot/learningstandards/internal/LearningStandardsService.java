@@ -56,9 +56,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Application boundary for SCORM/xAPI/LTI. Protocol payloads are validated and
@@ -83,6 +86,7 @@ public class LearningStandardsService implements LearningStandardsPort {
     private final LtiLaunchTokenVerifier ltiVerifier;
     private final ApplicationEventPublisher events;
     private final LearningStandardsCommandJournal journal;
+    private final TransactionTemplate transaction;
 
     @Autowired
     public LearningStandardsService(
@@ -93,7 +97,9 @@ public class LearningStandardsService implements LearningStandardsPort {
             LearningStandardsArtifactStorage storage,
             LtiLaunchTokenVerifier ltiVerifier,
             ApplicationEventPublisher events,
-            AuditOperations audit) {
+            AuditOperations audit,
+            @Qualifier("postgresTransactionManager") PlatformTransactionManager transactionManager) {
+        this.transaction = new TransactionTemplate(transactionManager);
         this.packages = packages;
         this.registrations = registrations;
         this.statements = statements;
@@ -164,8 +170,11 @@ public class LearningStandardsService implements LearningStandardsPort {
         return values.stream().map(LearningStandardsResponseMapper::packageResponse).toList();
     }
 
+    /**
+     * Claim, call, record: the storage HEAD/hash can take seconds, so no DB transaction or connection is held
+     * across it. The version check and idempotency lookup run again in the recording transaction.
+     */
     @Override
-    @Transactional("postgresTransactionManager")
     public PackageResponse validatePackage(UserAccessContext access, String packageId,
                                            ValidatePackageRequest request, String idempotencyKey,
                                            String correlationId) {
@@ -173,20 +182,51 @@ public class LearningStandardsService implements LearningStandardsPort {
         ensureManage();
         ValidatePackageRequest safe = Objects.requireNonNull(request, "request");
         if (safe.expectedVersion() == null) throw new BadRequestException("expectedVersion is required");
+        ValidationClaim claim = transaction.execute(status -> claimValidation(tenant, packageId, safe, idempotencyKey));
+        if (claim.replay() != null) return claim.replay();
+        ScormPackageValidator.Result manifestResult = ScormPackageValidator.validate(
+                claim.standard(), claim.manifest(), claim.launchPath());
+        Optional<LearningStandardsArtifactStorage.ArtifactMetadata> artifact =
+                storage.head(tenant, claim.artifactKey());
+        return transaction.execute(status -> recordValidation(access, tenant, claim, safe, manifestResult, artifact,
+                correlationId));
+    }
+
+    private record ValidationClaim(PackageResponse replay, String packageId, String key, String hash, String manifest,
+                                   String standard, String launchPath, String artifactKey) {
+    }
+
+    private ValidationClaim claimValidation(String tenant, String packageId, ValidatePackageRequest safe,
+                                            String idempotencyKey) {
         LearningPackage value = findPackage(tenant, required(packageId, "packageId", 96));
         if (version(value) != safe.expectedVersion()) throw new ConflictException("package changed; reload before validation");
         String manifest = required(safe.manifestXml(), "manifestXml", ScormPackageValidator.MAX_MANIFEST_CHARS);
         String key = key(idempotencyKey);
-        String hash = Hashing.sha256("validate-package\u001f" + value.getId() + "\u001f"
-                + safe.expectedVersion() + "\u001f" + Hashing.sha256(manifest));
+        String hash = Hashing.sha256("validate-package" + value.getId() + ""
+                + safe.expectedVersion() + "" + Hashing.sha256(manifest));
+        LearningStandardsCommandReceipt replay = journal.begin(tenant, "VALIDATE_PACKAGE", key, hash);
+        if (replay != null) {
+            return new ValidationClaim(packageResponse(findPackage(tenant, replay.getAggregateId())),
+                    null, null, null, null, null, null, null);
+        }
+        return new ValidationClaim(null, value.getId(), key, hash, manifest, value.getStandard(), value.getLaunchPath(),
+                value.getArtifactKey());
+    }
+
+    private PackageResponse recordValidation(UserAccessContext access, String tenant, ValidationClaim claim,
+                                             ValidatePackageRequest safe,
+                                             ScormPackageValidator.Result manifestResult,
+                                             Optional<LearningStandardsArtifactStorage.ArtifactMetadata> artifact,
+                                             String correlationId) {
+        String key = claim.key();
+        String hash = claim.hash();
+        String manifest = claim.manifest();
         LearningStandardsCommandReceipt replay = journal.begin(tenant, "VALIDATE_PACKAGE", key, hash);
         if (replay != null) return packageResponse(findPackage(tenant, replay.getAggregateId()));
+        LearningPackage value = findPackage(tenant, claim.packageId());
+        if (version(value) != safe.expectedVersion()) throw new ConflictException("package changed; reload before validation");
         value.setStatus(VALIDATING);
         value.setQuarantineReason(null);
-        ScormPackageValidator.Result manifestResult = ScormPackageValidator.validate(
-                value.getStandard(), manifest, value.getLaunchPath());
-        Optional<LearningStandardsArtifactStorage.ArtifactMetadata> artifact =
-                storage.head(tenant, value.getArtifactKey());
         String failure = artifact.isEmpty() ? "artifact is not available in storage" : null;
         if (failure == null && (artifact.get().byteSize() != value.getByteSize()
                 || !artifact.get().sha256().equalsIgnoreCase(value.getArtifactSha256()))) {

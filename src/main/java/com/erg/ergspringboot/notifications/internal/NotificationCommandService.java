@@ -89,21 +89,7 @@ public class NotificationCommandService {
             }
         }
 
-        NotificationMessageEntity message = new NotificationMessageEntity();
-        message.setTenantId(command.tenantId());
-        message.setEventType(firstText(command.eventType(), "GENERAL_NOTICE"));
-        message.setSourceType(trimToNull(command.sourceType()));
-        message.setSourceId(trimToNull(command.sourceId()));
-        message.setTitle(command.title());
-        message.setBodyPreview(command.bodyPreview());
-        message.setActionUrl(trimToNull(command.actionUrl()));
-        message.setPriority(firstText(command.priority(), "normal"));
-        message.setChannel("push");
-        message.setVisibility("private");
-        message.setDedupeKey(dedupeKey);
-        message.setCreatedBy(actorOrNull(command.createdBy()));
-        message.setPayloadData(command.data() == null ? Map.of() : command.data());
-        NotificationMessageEntity savedMessage = messageRepository.saveAndFlush(message);
+        NotificationMessageEntity savedMessage = messageRepository.saveAndFlush(newMessage(command, dedupeKey));
 
         int recipientCount = 0;
         int outboxCount = 0;
@@ -164,6 +150,138 @@ public class NotificationCommandService {
         return new NotificationCommandResult(savedMessage.getId(), recipientCount, outboxCount);
     }
 
+    /**
+     * Same semantics as {@link #enqueue} for many commands of one listener (schedule changes: one per teacher),
+     * with the dedupe, preference and device lookups and the inserts batched per tenant instead of ~7 queries
+     * per recipient. Dedupe keys already stored, or repeated inside the call, are skipped like a retry.
+     */
+    @Transactional
+    public void enqueueAll(List<NotificationCommand> commands) {
+        Map<String, List<NotificationCommand>> byTenant = new java.util.LinkedHashMap<>();
+        for (NotificationCommand command : commands) {
+            byTenant.computeIfAbsent(command.tenantId(), tenant -> new ArrayList<>()).add(command);
+        }
+        byTenant.forEach(this::enqueueTenant);
+    }
+
+    private record Prepared(NotificationCommand command, Set<String> userIds, String topicName, String dedupeKey) {}
+
+    private void enqueueTenant(String tenantId, List<NotificationCommand> commands) {
+        List<Prepared> prepared = new ArrayList<>();
+        for (NotificationCommand command : commands) {
+            Set<String> userIds = normalizedUserIds(command.userIds());
+            String topicName = normalizedTopicName(command.tenantId(), command.topicName());
+            validateTargets(userIds, topicName);
+            validatePayloadData(command.data());
+            prepared.add(new Prepared(command, userIds, topicName, trimToNull(command.idempotencyKey())));
+        }
+        Set<String> keys = new java.util.HashSet<>();
+        prepared.forEach(p -> {
+            if (p.dedupeKey() != null) keys.add(p.dedupeKey());
+        });
+        Set<String> stored = new java.util.HashSet<>();
+        if (!keys.isEmpty()) {
+            messageRepository.findByTenantIdAndDedupeKeyIn(tenantId, keys).forEach(m -> stored.add(m.getDedupeKey()));
+        }
+        List<Prepared> fresh = new ArrayList<>();
+        for (Prepared p : prepared) {
+            if (p.dedupeKey() == null || stored.add(p.dedupeKey())) fresh.add(p);
+        }
+        if (fresh.isEmpty()) return;
+
+        List<NotificationMessageEntity> messages = fresh.stream().map(p -> newMessage(p.command(), p.dedupeKey())).toList();
+        messageRepository.saveAllAndFlush(messages);
+
+        // One preference lookup per (portal, event type) and one device lookup for everybody.
+        Map<String, Set<String>> usersByScope = new java.util.LinkedHashMap<>();
+        Set<String> allUserIds = new LinkedHashSet<>();
+        for (int i = 0; i < fresh.size(); i++) {
+            usersByScope.computeIfAbsent(preferenceScope(fresh.get(i).command(), messages.get(i)), k -> new LinkedHashSet<>())
+                    .addAll(fresh.get(i).userIds());
+            allUserIds.addAll(fresh.get(i).userIds());
+        }
+        Map<String, Set<String>> inboxDisabled = new java.util.HashMap<>();
+        Map<String, Set<String>> pushDisabled = new java.util.HashMap<>();
+        usersByScope.forEach((scope, userIds) -> {
+            if (userIds.isEmpty()) return;
+            String[] parts = scope.split("\u0001", 2);
+            for (NotificationPreferenceEntity preference : preferenceRepository
+                    .findByTenantIdAndPortalAndEventTypeAndUserIdIn(tenantId, parts[0], parts[1], userIds)) {
+                if (Boolean.FALSE.equals(preference.getInboxEnabled())) {
+                    inboxDisabled.computeIfAbsent(scope, k -> new java.util.HashSet<>()).add(preference.getUserId());
+                }
+                if (Boolean.FALSE.equals(preference.getPushEnabled())) {
+                    pushDisabled.computeIfAbsent(scope, k -> new java.util.HashSet<>()).add(preference.getUserId());
+                }
+            }
+        });
+        Map<String, List<NotificationDeviceRegistrationEntity>> devices = new java.util.HashMap<>();
+        if (!allUserIds.isEmpty()) {
+            deviceRepository.findByTenantIdAndUserIdInAndEnabledTrue(tenantId, allUserIds)
+                    .forEach(device -> devices.computeIfAbsent(device.getUserId(), k -> new ArrayList<>()).add(device));
+        }
+
+        List<NotificationRecipientEntity> recipients = new ArrayList<>();
+        List<NotificationOutboxEntity> outboxes = new ArrayList<>();
+        for (int i = 0; i < fresh.size(); i++) {
+            Prepared p = fresh.get(i);
+            NotificationMessageEntity message = messages.get(i);
+            String portal = firstText(p.command().portal(), "lms");
+            String scope = preferenceScope(p.command(), message);
+            int recipientCount = 0;
+            int outboxCount = 0;
+            for (String userId : p.userIds()) {
+                if (!inboxDisabled.getOrDefault(scope, Set.of()).contains(userId)) {
+                    NotificationRecipientEntity recipient = new NotificationRecipientEntity();
+                    recipient.setTenantId(tenantId);
+                    recipient.setNotificationId(message.getId());
+                    recipient.setUserId(userId);
+                    recipient.setPortal(portal);
+                    recipients.add(recipient);
+                    recipientCount++;
+                }
+                if (pushDisabled.getOrDefault(scope, Set.of()).contains(userId)) continue;
+                for (NotificationDeviceRegistrationEntity device : devices.getOrDefault(userId, List.of())) {
+                    if (!properties.sendsTransport(device.getTransport())) continue;
+                    NotificationOutboxEntity outbox = outboxForDevice(message, withPortal(p.command(), device.getPortal()), device);
+                    if (outbox != null) {
+                        outboxes.add(outbox);
+                        outboxCount++;
+                    }
+                }
+            }
+            if (p.topicName() != null) {
+                outboxes.add(outboxForTopic(message, p.command(), p.topicName()));
+                outboxCount++;
+            }
+            metrics.created(message.getEventType(), portal, recipientCount, outboxCount);
+        }
+        if (!recipients.isEmpty()) recipientRepository.saveAll(recipients);
+        if (!outboxes.isEmpty()) outboxRepository.saveAll(outboxes);
+    }
+
+    private String preferenceScope(NotificationCommand command, NotificationMessageEntity message) {
+        return firstText(command.portal(), "lms") + "\u0001" + message.getEventType();
+    }
+
+    private NotificationMessageEntity newMessage(NotificationCommand command, String dedupeKey) {
+        NotificationMessageEntity message = new NotificationMessageEntity();
+        message.setTenantId(command.tenantId());
+        message.setEventType(firstText(command.eventType(), "GENERAL_NOTICE"));
+        message.setSourceType(trimToNull(command.sourceType()));
+        message.setSourceId(trimToNull(command.sourceId()));
+        message.setTitle(command.title());
+        message.setBodyPreview(command.bodyPreview());
+        message.setActionUrl(trimToNull(command.actionUrl()));
+        message.setPriority(firstText(command.priority(), "normal"));
+        message.setChannel("push");
+        message.setVisibility("private");
+        message.setDedupeKey(dedupeKey);
+        message.setCreatedBy(actorOrNull(command.createdBy()));
+        message.setPayloadData(command.data() == null ? Map.of() : command.data());
+        return message;
+    }
+
     /** At most {@value #BODY_PREVIEW_MAX} chars, never cutting a surrogate pair (emoji) in half. */
     static String bodyPreview(String body) {
         if (body.length() <= BODY_PREVIEW_MAX) {
@@ -186,6 +304,12 @@ public class NotificationCommandService {
                 CAMPAIGN_EVENT_TYPE, "notification_campaign", delivery.campaignId(), delivery.title(), preview,
                 null, delivery.priority().name(), CAMPAIGN_PORTAL, delivery.userIds(), null, data);
         Set<String> userIds = normalizedUserIds(delivery.userIds());
+        // Resumable fan-out: a person who already has this campaign's message (unique tenant_id + dedupe_key) is skipped.
+        Set<String> stored = new java.util.HashSet<>();
+        messageRepository.findByTenantIdAndDedupeKeyIn(delivery.tenantId(),
+                userIds.stream().map(userId -> campaignDedupeKey(delivery.campaignId(), userId)).toList())
+                .forEach(existing -> stored.add(existing.getDedupeKey()));
+        userIds.removeIf(userId -> stored.contains(campaignDedupeKey(delivery.campaignId(), userId)));
         Map<String, NotificationMessageEntity> messages = new java.util.LinkedHashMap<>();
         for (String userId : userIds) {
             NotificationMessageEntity message = new NotificationMessageEntity();
@@ -194,6 +318,7 @@ public class NotificationCommandService {
             message.setSourceType(command.sourceType());
             message.setSourceId(delivery.campaignId());
             message.setCampaignId(delivery.campaignId());
+            message.setDedupeKey(campaignDedupeKey(delivery.campaignId(), userId));
             message.setTitle(delivery.title());
             message.setBodyPreview(preview);
             message.setPriority(delivery.priority().name());
@@ -239,6 +364,10 @@ public class NotificationCommandService {
         }
         metrics.created(CAMPAIGN_EVENT_TYPE, CAMPAIGN_PORTAL, recipients.size(), outboxes.size());
         return new NotificationCommandResult(delivery.campaignId(), recipients.size(), outboxes.size());
+    }
+
+    static String campaignDedupeKey(String campaignId, String userId) {
+        return "campaign:" + campaignId + ":" + userId;
     }
 
     /** The push payload carries the device's portal so the SW/tab handlers of that portal react to it. */

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.calendar.TeacherPeriod;
+import com.erg.ergspringboot.calendar.TeachingPeriodReadPort;
 import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.DayStatus;
 import com.erg.ergspringboot.timekeeping.HolidayPayMode;
@@ -65,6 +66,7 @@ class DayAggregationServiceTest {
     private final TkRequestRepository requests = mock(TkRequestRepository.class);
     private final WorkContextResolver context = mock(WorkContextResolver.class);
     private final CalendarReadPort calendar = mock(CalendarReadPort.class);
+    private final TeachingPeriodReadPort bulkCalendar = mock(TeachingPeriodReadPort.class);
     private final UserRepository users = mock(UserRepository.class);
     private final SaturdayModeResolver saturdays = mock(SaturdayModeResolver.class);
     private final LeaveBalanceService balances = mock(LeaveBalanceService.class);
@@ -252,6 +254,17 @@ class DayAggregationServiceTest {
     }
 
     @Test
+    void aDoublePeriodCountsAsTwoLikeTheTeachingSheet() {
+        punched(punch(PunchDirection.IN, "2026-11-12T00:25:00Z"), punch(PunchDirection.OUT, "2026-11-12T04:31:00Z"));
+        TeacherPeriod single = period(1);
+        TeacherPeriod doubled = new TeacherPeriod(single.start(), single.end().plusSeconds(2700), "7A", "Toán", "P201",
+                "e1", "c1", "s1", SCHOOL, null, 1, 2, "MAIN");
+        when(calendar.teacherPeriods(T, U, DAY, DAY)).thenReturn(List.of(doubled, period(3)));
+
+        assertThat(recompute().getPeriods()).isEqualTo(3);
+    }
+
+    @Test
     void lockedPeriodIsNotRewrittenUnlessExplicitlyAsked() {
         punched(punch(PunchDirection.IN, "2026-11-12T00:25:00Z"));
         when(context.isLocked(T, SCHOOL, DAY)).thenReturn(true);
@@ -356,7 +369,8 @@ class DayAggregationServiceTest {
     void closeWritesTheDayWithZeroPeriodsWhenTheCalendarFailsForANewRow() {
         when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY)).thenReturn(List.of(U));
         when(context.schoolsOf(eq(T), anyCollection())).thenReturn(Map.of(U, SCHOOL));
-        when(calendar.teacherPeriods(T, U, DAY, DAY)).thenThrow(new IllegalStateException("calendar down"));
+        when(bulkCalendar.teacherPeriods(eq(T), anyCollection(), eq(DAY), eq(DAY)))
+                .thenThrow(new IllegalStateException("calendar down"));
 
         TkDay day = close().get(U);
 
@@ -376,6 +390,40 @@ class DayAggregationServiceTest {
         assertThat(rows.get(U).getStatus()).isEqualTo(DayStatus.SICK);
         assertThat(rows.get(U2).getStatus()).isEqualTo(DayStatus.ABSENT_UNPAID);
         verify(requests, never()).findApprovedOnForUser(any(), any(), any());
+    }
+
+    @Test
+    void closeReadsThePeriodsOfEveryoneInOneCalendarQuery() {
+        when(users.findActiveUserIdsHoldingPermission(T, "timekeeping.self", DAY)).thenReturn(List.of(U, U2));
+        when(context.schoolsOf(eq(T), anyCollection())).thenReturn(Map.of(U, SCHOOL, U2, SCHOOL));
+        when(bulkCalendar.teacherPeriods(eq(T), anyCollection(), eq(DAY), eq(DAY)))
+                .thenReturn(Map.of(U, List.of(period(1), period(2))));
+
+        Map<String, TkDay> rows = close();
+
+        assertThat(rows.get(U).getPeriods()).isEqualTo(2);
+        assertThat(rows.get(U2).getPeriods()).isZero();
+        verify(bulkCalendar).teacherPeriods(eq(T), anyCollection(), eq(DAY), eq(DAY));
+        verify(calendar, never()).teacherPeriods(any(), any(), any(), any());
+    }
+
+    @Test
+    void approvalRebuildsOnlyDaysTheSchoolHasAShiftOnAndReadsThePeriodsOnce() {
+        LocalDate friday = DAY.plusDays(1);
+        LocalDate sunday = DAY.plusDays(3);
+        when(context.shiftsOf(T, SCHOOL)).thenReturn(List.of(shift()));
+        when(punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(any(), any(), any())).thenReturn(List.of());
+        when(punches.findByTenantIdAndUserIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(T, U, DAY, sunday))
+                .thenReturn(List.of());
+        when(requests.findApprovedOnForUser(any(), any(), any())).thenReturn(List.of());
+        when(bulkCalendar.teacherPeriods(any(), anyCollection(), any(), any())).thenReturn(Map.of());
+
+        service(Instant.parse("2026-11-16T02:00:00Z")).recomputeDays(T, U, List.of(DAY, friday, DAY.plusDays(2), sunday),
+                Optional.of(List.of(period(1))));
+
+        // Thursday and Friday have a shift; Saturday and Sunday have none and no punch, so they are not rebuilt
+        verify(days, org.mockito.Mockito.times(2)).save(any(TkDay.class));
+        verify(calendar, never()).teacherPeriods(any(), any(), any(), any());
     }
 
     // ---- helpers ----
@@ -405,7 +453,7 @@ class DayAggregationServiceTest {
 
     private DayAggregationService service(Instant now) {
         return new DayAggregationService(punches, days, holidays, requests, context,
-                new TeacherPeriodReader(calendar, mock(PlatformTransactionManager.class)), users,
+                new TeacherPeriodReader(calendar, bulkCalendar, mock(PlatformTransactionManager.class)), users,
                 saturdays, balances, Clock.fixed(now, ZoneOffset.UTC));
     }
 

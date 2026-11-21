@@ -28,11 +28,35 @@ class AttemptDeadlinePolicyTest {
     }
 
     @Test
-    void validSnapshotDeadlineWinsOverTheLiveAssignment() {
+    void shortenedLiveDeadlineNeverCutsARunningAttemptShort() {
+        Assignment assignment = new Assignment();
+        assignment.setDueAt(DUE.minusHours(2));
+        Attempt attempt = new Attempt();
+        attempt.setPolicySnapshot(Map.of("deadlineAt", DUE.toString()));
+
+        assertThat(new AttemptDeadlinePolicy(Duration.ZERO).effectiveDeadline(attempt, assignment)).isEqualTo(DUE);
+    }
+
+    @Test
+    void extendedLiveDeadlineLiftsARunningAttempt() {
         Assignment assignment = new Assignment();
         assignment.setDueAt(DUE.plusDays(1));
         Attempt attempt = new Attempt();
         attempt.setPolicySnapshot(Map.of("deadlineAt", DUE.toString()));
+
+        var policy = new AttemptDeadlinePolicy(Duration.ZERO);
+
+        assertThat(policy.effectiveDeadline(attempt, assignment)).isEqualTo(DUE.plusDays(1));
+        assertThat(policy.isLate(attempt, assignment, DUE.plusHours(1))).isFalse();
+    }
+
+    @Test
+    void attemptOwnDurationStillCapsAnExtendedDeadline() {
+        Assignment assignment = new Assignment();
+        assignment.setDueAt(DUE.plusDays(1));
+        Attempt attempt = new Attempt();
+        attempt.setStartedAt(DUE.minusMinutes(30));
+        attempt.setPolicySnapshot(Map.of("deadlineAt", DUE.toString(), "durationMinutes", 30));
 
         assertThat(new AttemptDeadlinePolicy(Duration.ZERO).effectiveDeadline(attempt, assignment)).isEqualTo(DUE);
     }

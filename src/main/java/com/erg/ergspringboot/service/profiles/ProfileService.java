@@ -124,11 +124,11 @@ public class ProfileService {
                 profile.getAddress(),
                 profile.getCity(),
                 profile.getDistrict(),
-                new SocialLinksResponse(Map.of()),
+                new SocialLinksResponse(fromKeyValueString(profile.getSocialLinksJson())),
                 profile.getAvatarUrl(),
                 Boolean.TRUE.equals(profile.getIsProfileCompleted()),
                 profile.getTeachingPhilosophy(),
-                Map.of(),
+                fromKeyValueString(profile.getSpecialtiesJson()),
                 profile.getRating(),
                 withInternalNote ? profile.getInternalNote() : null,
                 iso(profile.getCreatedAt()),
@@ -143,6 +143,17 @@ public class ProfileService {
 
     private OffsetDateTime parseDate(String value) {
         return value == null || value.isBlank() ? null : OffsetDateTime.parse(value);
+    }
+
+    /** Inverse of {@link #toKeyValueString}: "k=v;k=v" (split on the first "=" of each pair). */
+    private Map<String, String> fromKeyValueString(String value) {
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        if (value == null || value.isBlank()) return result;
+        for (String pair : value.split(";")) {
+            int eq = pair.indexOf('=');
+            if (eq > 0) result.put(pair.substring(0, eq), pair.substring(eq + 1));
+        }
+        return result;
     }
 
     private String toKeyValueString(Map<String, String> value) {

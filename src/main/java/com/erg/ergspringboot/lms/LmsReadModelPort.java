@@ -12,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 public interface LmsReadModelPort {
     AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId);
     StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds, String ownerUserId);
+    StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds, String ownerUserId,
+            boolean includeMembers);
     AssignmentProgressWorkspaceResponse assignmentProgressWorkspace(String tenantId, String assignmentId, String attemptStatus, Integer page, Integer size);
     Page<ClassWorkspaceProjection> schoolClassWorkspaces(String tenantId, String schoolId, String status, Pageable pageable);
     ClassWorkspaceResponse classWorkspace(String tenantId, String classId, String schoolId, String studentStatus,

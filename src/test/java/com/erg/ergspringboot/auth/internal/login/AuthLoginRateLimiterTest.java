@@ -36,6 +36,17 @@ class AuthLoginRateLimiterTest {
     }
 
     @Test
+    void clientsWithoutADeviceIdDoNotShareOneThrottledBucket() {
+        AuthLoginRateLimiter limiter = AuthLoginRateLimiter.localForTest(1000, 100, 2);
+        AuthClientContext noDevice = new AuthClientContext("203.0.113.60", "JUnit", null, null, null);
+
+        for (int student = 1; student <= 50; student++) {
+            assertThat(limiter.allow("student" + student, noDevice).allowed()).as("student %s", student).isTrue();
+        }
+        assertThat(limiter.debugKeys()).noneMatch(key -> key.contains(":device:"));
+    }
+
+    @Test
     void limitsOneAccountAcrossRotatingSourceAddresses() {
         AuthLoginRateLimiter limiter = AuthLoginRateLimiter.localForTest(100, 2, 100);
 

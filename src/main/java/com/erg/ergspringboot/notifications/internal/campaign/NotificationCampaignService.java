@@ -7,8 +7,6 @@ import com.erg.ergspringboot.notifications.CampaignStatus;
 import com.erg.ergspringboot.notifications.NotificationCampaignRequests.CampaignDraftRequest;
 import com.erg.ergspringboot.notifications.NotificationCampaignResponses.CampaignResponse;
 import com.erg.ergspringboot.notifications.NotificationPriority;
-import com.erg.ergspringboot.notifications.internal.CampaignDelivery;
-import com.erg.ergspringboot.notifications.internal.NotificationCommandService;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
@@ -31,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Campaign writes. Every write locks the campaign row and checks the sender's scope (AudienceScopeGuard) before
- * anything is stored; a send writes all recipient messages and the SENT status in one transaction.
+ * anything is stored; a send only marks the campaign SENDING, {@link CampaignFanOut} writes the messages.
  */
 @Service
 public class NotificationCampaignService {
@@ -46,7 +44,7 @@ public class NotificationCampaignService {
     private final NotificationCampaignRepository campaigns;
     private final AudienceScopeGuard guard;
     private final NotificationAudienceResolver resolver;
-    private final NotificationCommandService commands;
+    private final CampaignFanOut fanOut;
     private final NotificationCampaignQueryService queries;
     private final UserAuthorizationPort authorizations;
     private final UserDirectoryPort users;
@@ -55,20 +53,20 @@ public class NotificationCampaignService {
 
     @Autowired
     public NotificationCampaignService(NotificationCampaignRepository campaigns, AudienceScopeGuard guard,
-            NotificationAudienceResolver resolver, NotificationCommandService commands,
+            NotificationAudienceResolver resolver, CampaignFanOut fanOut,
             NotificationCampaignQueryService queries, UserAuthorizationPort authorizations, UserDirectoryPort users,
             ErgPolicyService policy) {
-        this(campaigns, guard, resolver, commands, queries, authorizations, users, policy, Clock.systemUTC());
+        this(campaigns, guard, resolver, fanOut, queries, authorizations, users, policy, Clock.systemUTC());
     }
 
     NotificationCampaignService(NotificationCampaignRepository campaigns, AudienceScopeGuard guard,
-            NotificationAudienceResolver resolver, NotificationCommandService commands,
+            NotificationAudienceResolver resolver, CampaignFanOut fanOut,
             NotificationCampaignQueryService queries, UserAuthorizationPort authorizations, UserDirectoryPort users,
             ErgPolicyService policy, Clock clock) {
         this.campaigns = campaigns;
         this.guard = guard;
         this.resolver = resolver;
-        this.commands = commands;
+        this.fanOut = fanOut;
         this.queries = queries;
         this.authorizations = authorizations;
         this.users = users;
@@ -110,12 +108,20 @@ public class NotificationCampaignService {
         return queries.toResponse(campaigns.save(campaign));
     }
 
+    /**
+     * Validates and marks the campaign SENDING; the fan-out itself runs after commit ({@link CampaignFanOut}). A
+     * replay on a SENDING or SENT campaign returns its current state and enqueues nothing.
+     */
     @Transactional
     public CampaignResponse send(CampaignActor actor, String id) {
         NotificationCampaignEntity campaign = lockOwned(actor, id);
+        if (campaign.getStatus() == CampaignStatus.SENDING || campaign.getStatus() == CampaignStatus.SENT) {
+            return queries.toResponse(campaign);
+        }
         requireEditable(campaign, "Thông báo đã được gửi hoặc đã huỷ");
         guard.assertAllowed(actor, campaign.getAudience());
-        deliver(campaign);
+        startSending(campaign);
+        fanOut.triggerAfterCommit(campaign.getTenantId(), campaign.getId());
         return queries.toResponse(campaign);
     }
 
@@ -148,7 +154,8 @@ public class NotificationCampaignService {
 
     /**
      * Job path: the conditional SCHEDULED -> SENDING update is the double-dispatch guard (0 rows: someone else
-     * has it, or it was cancelled). Recipients are resolved now, against the creator's current roles and scope.
+     * has it, or it was cancelled). The creator's current roles and scope are checked here; the job then fans the
+     * SENDING campaign out (recipients are resolved at that moment). True when this call claimed it.
      */
     @Transactional
     public boolean dispatchDue(String tenantId, String id) {
@@ -165,7 +172,6 @@ public class NotificationCampaignService {
             campaigns.save(campaign);
             return false;
         }
-        deliver(campaign);
         return true;
     }
 
@@ -176,17 +182,14 @@ public class NotificationCampaignService {
                 CampaignStatus.FAILED, now());
     }
 
-    private void deliver(NotificationCampaignEntity campaign) {
-        List<String> recipients = resolver.resolve(campaign.getTenantId(), campaign.getAudience()).userIds();
-        if (recipients.isEmpty()) {
+    /** Reads ids only (size cap and "nobody" checks, no inserts); the recipients are written by the fan-out. */
+    private void startSending(NotificationCampaignEntity campaign) {
+        int recipients = resolver.resolve(campaign.getTenantId(), campaign.getAudience()).breakdown().total();
+        if (recipients == 0) {
             throw new BadRequestException("Không có người nhận nào trong phạm vi đã chọn");
         }
-        commands.enqueueCampaign(new CampaignDelivery(campaign.getTenantId(), campaign.getCreatedBy(),
-                campaign.getId(), campaign.getTitle(), campaign.getBody(), campaign.getPriority(),
-                campaign.isPushEnabled(), recipients));
-        campaign.setResolvedCount(recipients.size());
-        campaign.setSentAt(now());
-        campaign.setStatus(CampaignStatus.SENT);
+        campaign.setResolvedCount(recipients);
+        campaign.setStatus(CampaignStatus.SENDING);
         campaigns.save(campaign);
     }
 

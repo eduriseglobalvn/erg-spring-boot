@@ -41,6 +41,19 @@ public class CalendarReadUseCase implements CalendarReadPort {
     private final CalendarEventDetailQueryUseCase eventDetails;
     private final CalendarTeacherPeriodsQueryUseCase teacherPeriods;
 
+    /** Own proxy, so the class-level cache applies; null in plain unit tests. */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private CalendarReadUseCase self;
+
+    /** Cache bean of the filter catalog; null in plain unit tests, which then read it directly. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CalendarCatalogCache catalogCache;
+
+    /** Catalog search read; null in plain unit tests. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CalendarCatalogSearchUseCase catalogSearch;
+
     public CalendarReadUseCase(
             CalendarEventRepository eventRepository,
             CalendarEventTeacherRepository eventTeacherRepository,
@@ -73,7 +86,8 @@ public class CalendarReadUseCase implements CalendarReadPort {
         this.workspaceQueries = new CalendarWorkspaceQueryUseCase(
                 eventRepository, eventTeacherRepository, studentRepository,
                 this::buildReferenceMaps,
-                fullCatalogQueries::catalog,
+                (tenantId, schoolIds, from, to) -> catalogCache == null ? fullCatalogQueries.catalog(tenantId, schoolIds, from, to)
+                        : catalogCache.catalog(tenantId, schoolIds, from, to, fullCatalogQueries::catalog),
                 eventResponses::response,
                 workspaceAssembler::filterOptions,
                 workspaceAssembler::laneSummaries,
@@ -142,8 +156,6 @@ public class CalendarReadUseCase implements CalendarReadPort {
     }
 
     @Override
-    @Cacheable(cacheNames = "calendarWorkspace",
-            key = "{#tenantId, #studentUserId, #from, #to, #viewMode, #principal.userId(), #principal.permissions(), #principal.deniedPermissions()}")
     public CalendarWorkspaceResponse studentTeachingCalendarWorkspace(
             String tenantId,
             String studentUserId,
@@ -154,9 +166,19 @@ public class CalendarReadUseCase implements CalendarReadPort {
             List<String> levelIds,
             List<String> statuses,
             ErgPrincipal principal) {
-        return workspaceQueries.student(
-                tenantId, studentUserId, from, to, viewMode,
-                subjectIds, levelIds, statuses, principal);
+        String classId = workspaceQueries.studentClassId(tenantId, studentUserId, from, to, subjectIds, levelIds);
+        CalendarReadUseCase cached = self == null ? this : self;
+        return workspaceQueries.withPermissions(
+                cached.studentClassWorkspace(tenantId, classId, from, to, viewMode, subjectIds, levelIds), principal);
+    }
+
+    /** One body per class, not per student: classmates share it; the permission block is added outside the cache. */
+    @Cacheable(cacheNames = "calendarWorkspace", sync = true,
+            key = "{'studentClass', #tenantId, #academicClassId, #from, #to, #viewMode, #subjectIds, #levelIds}")
+    public CalendarWorkspaceResponse studentClassWorkspace(
+            String tenantId, String academicClassId, String from, String to, String viewMode,
+            List<String> subjectIds, List<String> levelIds) {
+        return workspaceQueries.studentClassBody(tenantId, academicClassId, from, to, viewMode, subjectIds, levelIds);
     }
 
     @Override
@@ -168,6 +190,13 @@ public class CalendarReadUseCase implements CalendarReadPort {
     @Override
     public CalendarBatchDetailResponse teachingScheduleBatch(String tenantId, String batchId) {
         return scheduleBatchQueries.detail(tenantId, batchId);
+    }
+
+    @Override
+    public com.erg.ergspringboot.calendar.CalendarCatalogSearchResponse catalogSearch(
+            String tenantId, String kind, List<String> schoolIds, String q, Integer page, Integer size) {
+        if (catalogSearch == null) throw new IllegalStateException("Calendar catalog search is not available");
+        return catalogSearch.search(tenantId, kind, schoolIds, q, page, size);
     }
 
     private CalendarReferenceMaps buildReferenceMaps(

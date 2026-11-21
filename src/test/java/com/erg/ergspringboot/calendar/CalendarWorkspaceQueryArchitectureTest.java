@@ -19,6 +19,6 @@ class CalendarWorkspaceQueryArchitectureTest {
         assertThat(facade)
                 .contains("workspaceQueries.lcms(")
                 .contains("workspaceQueries.teacher(")
-                .contains("workspaceQueries.student(");
+                .contains("workspaceQueries.studentClassBody(");
     }
 }

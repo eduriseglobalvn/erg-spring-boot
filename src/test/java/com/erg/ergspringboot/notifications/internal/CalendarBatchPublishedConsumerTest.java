@@ -27,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 class CalendarBatchPublishedConsumerTest {
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void retriesUseTheSameDownstreamIdempotencyKeyAndPublicProjectionOnly() {
         CalendarPublishedBatchProjection calendar = org.mockito.Mockito.mock(CalendarPublishedBatchProjection.class);
         NotificationCommandService notifications = org.mockito.Mockito.mock(NotificationCommandService.class);
@@ -39,25 +40,28 @@ class CalendarBatchPublishedConsumerTest {
         consumer.on(event);
         consumer.on(event);
 
-        ArgumentCaptor<NotificationCommand> commands = ArgumentCaptor.forClass(NotificationCommand.class);
-        verify(notifications, org.mockito.Mockito.times(4)).enqueue(commands.capture());
-        assertThat(commands.getAllValues()).extracting(NotificationCommand::idempotencyKey)
+        ArgumentCaptor<List<NotificationCommand>> batches = ArgumentCaptor.forClass((Class) List.class);
+        verify(notifications, org.mockito.Mockito.times(2)).enqueueAll(batches.capture());
+        List<NotificationCommand> sent = batches.getAllValues().stream().flatMap(List::stream).toList();
+        assertThat(sent).extracting(NotificationCommand::idempotencyKey)
                 .containsOnly("schedule-published:batch-1:t1:0", "schedule-published:batch-1:t2:0");
-        assertThat(commands.getAllValues()).extracting(NotificationCommand::userIds)
+        assertThat(sent).extracting(NotificationCommand::userIds)
                 .containsOnly(List.of("t1"), List.of("t2"));
     }
 
     @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
     void publishedBatchIsAcceptedByTheRealNotificationCommandService() {
         CalendarPublishedBatchProjection calendar = org.mockito.Mockito.mock(CalendarPublishedBatchProjection.class);
         when(calendar.findPublishedBatch("tenant-1", "batch-1"))
                 .thenReturn(Optional.of(ScheduleNotificationFixtures.published()));
         NotificationMessageRepository messages = org.mockito.Mockito.mock(NotificationMessageRepository.class);
         NotificationRecipientRepository recipients = org.mockito.Mockito.mock(NotificationRecipientRepository.class);
-        when(messages.saveAndFlush(any())).thenAnswer(invocation -> {
-            NotificationMessageEntity message = invocation.getArgument(0);
-            message.setId("notification-1");
-            return message;
+        when(messages.saveAllAndFlush(any())).thenAnswer(invocation -> {
+            List<NotificationMessageEntity> saved = invocation.getArgument(0);
+            int next = 1;
+            for (NotificationMessageEntity message : saved) message.setId("notification-" + next++);
+            return saved;
         });
         NotificationCommandService realService = new NotificationCommandService(
                 messages,
@@ -73,11 +77,11 @@ class CalendarBatchPublishedConsumerTest {
         consumer.on(new CalendarBatchPublished(
                 "schedule-published:batch-1", "tenant-1", "batch-1", "user-1", OffsetDateTime.now(), 1));
 
-        ArgumentCaptor<NotificationMessageEntity> saved = ArgumentCaptor.forClass(NotificationMessageEntity.class);
-        verify(messages, org.mockito.Mockito.times(2)).saveAndFlush(saved.capture());
-        assertThat(saved.getAllValues()).extracting(NotificationMessageEntity::getEventType).containsOnly("SCHEDULE_PUBLISHED");
-        assertThat(saved.getAllValues().get(0).getPayloadData()).containsEntry("batchId", "batch-1").doesNotContainKey("eventType");
-        verify(recipients, org.mockito.Mockito.times(2)).saveAll(any());
+        ArgumentCaptor<List<NotificationMessageEntity>> saved = ArgumentCaptor.forClass((Class) List.class);
+        verify(messages).saveAllAndFlush(saved.capture());
+        assertThat(saved.getValue()).hasSize(2).extracting(NotificationMessageEntity::getEventType).containsOnly("SCHEDULE_PUBLISHED");
+        assertThat(saved.getValue().get(0).getPayloadData()).containsEntry("batchId", "batch-1").doesNotContainKey("eventType");
+        verify(recipients).saveAll(any());
     }
 
     @Test

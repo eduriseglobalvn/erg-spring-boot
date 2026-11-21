@@ -170,6 +170,7 @@ public class SchoolCommandService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"lcmsSchoolDirectory", "lcmsSchoolOperations"}, allEntries = true)
     public AcademicYearResponse createAcademicYear(String schoolId, CreateAcademicYearRequest request, UserAccessContext access) {
         assertScope(access, schoolId);
         unit(access, schoolId);
@@ -189,6 +190,7 @@ public class SchoolCommandService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"lcmsSchoolDirectory", "lcmsSchoolOperations"}, allEntries = true)
     public AcademicYearResponse activateAcademicYear(String schoolId, String yearId, VersionRequest request, UserAccessContext access) {
         assertScope(access, schoolId);
         SchoolAcademicYear year = year(access, schoolId, yearId);
@@ -202,6 +204,7 @@ public class SchoolCommandService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"lcmsSchoolDirectory", "lcmsSchoolOperations"}, allEntries = true)
     public AcademicYearResponse closeAcademicYear(String schoolId, String yearId, VersionRequest request, UserAccessContext access) {
         assertScope(access, schoolId);
         SchoolAcademicYear year = year(access, schoolId, yearId);
@@ -219,6 +222,7 @@ public class SchoolCommandService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"lcmsSchoolDirectory", "lcmsSchoolOperations"}, allEntries = true)
     public GradeSyncResponse syncDefaultGrades(String schoolId, UserAccessContext access) {
         assertScope(access, schoolId);
         SchoolOperationalProfile profile = profile(access, schoolId);
@@ -230,6 +234,7 @@ public class SchoolCommandService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"lcmsSchoolDirectory", "lcmsSchoolOperations"}, allEntries = true)
     public GradeResponse createGrade(String schoolId, CreateGradeRequest request, UserAccessContext access) {
         assertScope(access, schoolId);
         SchoolOperationalProfile profile = profile(access, schoolId);
@@ -244,6 +249,7 @@ public class SchoolCommandService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"lcmsSchoolDirectory", "lcmsSchoolOperations"}, allEntries = true)
     public GradeResponse updateGrade(String schoolId, String gradeId, UpdateGradeRequest request, UserAccessContext access) {
         assertScope(access, schoolId);
         SchoolOperationalProfile profile = profile(access, schoolId);

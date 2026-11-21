@@ -39,6 +39,7 @@ class CalendarPublishedScenarioTest {
 
     @MockitoBean CalendarPublishedBatchProjection calendar;
     @MockitoBean NotificationCommandService notifications;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.RecipientDirectoryCache recipientDirectory;
     // Collaborators of the LMS learning-event consumer, which lives in the same module.
     @MockitoBean com.erg.ergspringboot.lms.LmsNotificationProjection lmsAudience;
     @MockitoBean com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher lmsNotifications;
@@ -61,6 +62,7 @@ class CalendarPublishedScenarioTest {
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationCampaignService campaigns;
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.NotificationCampaignQueryService campaignQueries;
     @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.ScheduledCampaignDispatchJob campaignJob;
+    @MockitoBean com.erg.ergspringboot.notifications.internal.campaign.CampaignFanOut campaignFanOut;
 
     @Test
     void publishedEventEventuallyEnqueuesOneIdempotentNotificationPerTeacher(Scenario scenario) {
@@ -71,7 +73,7 @@ class CalendarPublishedScenarioTest {
 
         scenario.publish(event)
                 .andWaitAtMost(Duration.ofSeconds(5))
-                .andWaitForStateChange(() -> mockingDetails(notifications).getInvocations().size(), count -> count == 2)
-                .andVerify(count -> assertThat(count).isEqualTo(2));
+                .andWaitForStateChange(() -> mockingDetails(notifications).getInvocations().size(), count -> count == 1) // one batched enqueueAll for all teachers
+                .andVerify(count -> assertThat(count).isEqualTo(1));
     }
 }

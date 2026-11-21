@@ -8,6 +8,9 @@ import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.auth.AuthSessionRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
@@ -27,6 +30,12 @@ public class ErgPrincipalService {
     private final AuthSessionTenantResolver tenantResolver;
     private UserRoleAssignmentRepository userRoleAssignmentRepository;
     private PrincipalCache principalCache;
+    // Token hashes with a definite "no active session" answer; stops a retrying client from re-running the DB path.
+    private final Cache<String, Boolean> unknownTokens = Caffeine.newBuilder()
+            .maximumSize(50_000).expireAfterWrite(Duration.ofSeconds(5)).build();
+    // A session's tenant never changes; the cached value only skips the resolve transaction, loadPrincipal still validates the session.
+    private final Cache<String, String> tokenTenants = Caffeine.newBuilder()
+            .maximumSize(50_000).expireAfterWrite(Duration.ofMinutes(10)).build();
     private TeacherClassScopeProvider teacherClassScopes;
 
     @Autowired
@@ -83,7 +92,12 @@ public class ErgPrincipalService {
         if (tenantResolver == null || bearerToken == null || bearerToken.isBlank()) {
             return fromBearerToken(bearerToken, resolvedTenantId);
         }
-        return loadPrincipal(bearerToken, AuthenticatedTenant.require(resolvedTenantId));
+        Optional<ErgPrincipal> principal = loadPrincipal(bearerToken, AuthenticatedTenant.require(resolvedTenantId));
+        if (principal.isEmpty()) {
+            // The tenant came from this token's own session, so an empty load is definite (a DB error throws instead).
+            unknownTokens.put(tokenService.hashToken(bearerToken.trim()), Boolean.TRUE);
+        }
+        return principal;
     }
 
     /** A principal cached by an earlier successful load of this token; no database access. */
@@ -129,7 +143,18 @@ public class ErgPrincipalService {
             if (bearerToken == null || bearerToken.isBlank()) {
                 return Optional.empty();
             }
-            return tenantResolver.resolve(tokenService.hashToken(bearerToken.trim()));
+            String tokenHash = tokenService.hashToken(bearerToken.trim());
+            if (unknownTokens.getIfPresent(tokenHash) != null) {
+                return Optional.empty();
+            }
+            String knownTenant = tokenTenants.getIfPresent(tokenHash);
+            if (knownTenant != null) {
+                return Optional.of(knownTenant);
+            }
+            Optional<String> resolved = tenantResolver.resolve(tokenHash);
+            resolved.ifPresentOrElse(tenant -> tokenTenants.put(tokenHash, tenant),
+                    () -> unknownTokens.put(tokenHash, Boolean.TRUE));
+            return resolved;
         }
         return uniqueSession(bearerToken, false).map(AuthSession::getTenantId);
     }

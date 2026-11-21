@@ -17,6 +17,11 @@ public interface ReportJobPort {
 
     ReportJobResponse get(String tenantId, String id);
 
+    /** {@link #get} without the stored result rows (the polling path). */
+    default ReportJobResponse getStatus(String tenantId, String id) {
+        return get(tenantId, id).withoutResult();
+    }
+
     /** The user that requested the job; empty when the adapter cannot tell (callers then require scope). */
     default java.util.Optional<String> requestedBy(String tenantId, String id) {
         return java.util.Optional.empty();

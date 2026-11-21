@@ -10,6 +10,61 @@ import org.springframework.data.domain.Pageable;
 
 public interface QuizVersionRepository extends JpaRepository<QuizVersion, String> {
 
+    /** The summary columns only: a version row's jsonb snapshot, runtime quiz and answer key can be large. */
+    interface Summary {
+        String getId();
+
+        String getVersionLabel();
+
+        Integer getVersionNumber();
+
+        String getGradingMode();
+
+        String getContentHash();
+
+        String getPublishedBy();
+
+        java.time.OffsetDateTime getPublishedAt();
+
+        Boolean getIsActive();
+    }
+
+    List<Summary> findSummariesByQuizIdAndTenantIdOrderByVersionNumberDesc(
+            String quizId, String tenantId, Pageable pageable);
+
+    /** At most one row: (tenant, quiz, idempotency key) is unique (V76). */
+    Optional<Summary> findSummaryByQuizIdAndTenantIdAndIdempotencyKey(String quizId, String tenantId, String idempotencyKey);
+
+    /** What the portable bundle reads from a version row: every column except the three jsonb blobs. */
+    interface Lineage {
+        String getId();
+
+        String getTenantId();
+
+        String getQuizId();
+
+        String getVersionLabel();
+
+        Integer getVersionNumber();
+
+        Integer getSchemaVersion();
+
+        String getGradingMode();
+
+        java.time.OffsetDateTime getPublishedAt();
+    }
+
+    Optional<Lineage> findLineageByQuizIdAndTenantIdAndIsActiveTrue(String quizId, String tenantId);
+
+    Optional<Lineage> findLineageByIdAndTenantId(String id, String tenantId);
+
+    List<Lineage> findLineagesByQuizIdAndTenantIdOrderByVersionNumberDesc(String quizId, String tenantId);
+
+    List<Lineage> findLineagesByQuizIdAndTenantIdOrderByVersionNumberDesc(String quizId, String tenantId, Pageable pageable);
+
+    @Query("select v.quizId from QuizVersion v where v.id = :id and v.tenantId = :tenantId")
+    Optional<String> findQuizIdByIdAndTenantId(@Param("id") String id, @Param("tenantId") String tenantId);
+
     List<QuizVersion> findByQuizIdAndTenantIdOrderByVersionNumberDesc(String quizId, String tenantId);
 
     List<QuizVersion> findByQuizIdAndTenantIdOrderByVersionNumberDesc(

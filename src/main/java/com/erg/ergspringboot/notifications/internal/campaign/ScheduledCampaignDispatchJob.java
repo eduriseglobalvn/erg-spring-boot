@@ -16,9 +16,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Sends scheduled campaigns once they are due. One instance at a time (cluster advisory lock); the due list is
- * read across tenants in maintenance scope, each campaign is then dispatched in its own tenant scope and
- * transaction. The service's conditional SCHEDULED -> SENDING update keeps a campaign from going out twice.
+ * Sends scheduled campaigns once they are due and finishes every SENDING fan-out. One instance at a time (cluster
+ * advisory lock); the due list is read across tenants in maintenance scope, each campaign is then claimed in its own
+ * tenant scope and transaction. The service's conditional SCHEDULED -> SENDING update keeps a campaign from being
+ * claimed twice; {@link CampaignFanOut} keeps a resumed fan-out from duplicating messages.
  */
 @Component
 public class ScheduledCampaignDispatchJob {
@@ -28,19 +29,21 @@ public class ScheduledCampaignDispatchJob {
 
     private final NotificationCampaignRepository campaigns;
     private final NotificationCampaignService service;
+    private final CampaignFanOut fanOut;
     private final ClusterJobLock jobLock;
     private final Clock clock;
 
     @Autowired
     public ScheduledCampaignDispatchJob(NotificationCampaignRepository campaigns, NotificationCampaignService service,
-            ObjectProvider<ClusterJobLock> jobLock) {
-        this(campaigns, service, jobLock.getIfAvailable(), Clock.systemUTC());
+            CampaignFanOut fanOut, ObjectProvider<ClusterJobLock> jobLock) {
+        this(campaigns, service, fanOut, jobLock.getIfAvailable(), Clock.systemUTC());
     }
 
     ScheduledCampaignDispatchJob(NotificationCampaignRepository campaigns, NotificationCampaignService service,
-            ClusterJobLock jobLock, Clock clock) {
+            CampaignFanOut fanOut, ClusterJobLock jobLock, Clock clock) {
         this.campaigns = campaigns;
         this.service = service;
+        this.fanOut = fanOut;
         this.jobLock = jobLock;
         this.clock = clock;
     }
@@ -48,13 +51,19 @@ public class ScheduledCampaignDispatchJob {
     @Scheduled(fixedDelayString = "PT1M")
     public void run() {
         if (jobLock == null) {
-            dispatchDue();
+            pass();
         } else {
-            jobLock.runExclusively(JOB_NAME, this::dispatchDue);
+            jobLock.runExclusively(JOB_NAME, this::pass);
         }
     }
 
-    /** Returns how many campaigns were sent in this pass (at most 100; the rest wait for the next minute). */
+    /** Claim the due scheduled campaigns, then fan out everything still SENDING (send-now ones the trigger missed too). */
+    void pass() {
+        dispatchDue();
+        fanOut.drainSending();
+    }
+
+    /** Returns how many due campaigns were claimed (SCHEDULED -> SENDING) in this pass (at most 100; the rest wait). */
     public int dispatchDue() {
         List<NotificationCampaignEntity> due;
         try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.maintenance())) {

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.common.dto.auth.AuthClientContext;
 import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttempt;
+import com.erg.ergspringboot.users.persistence.auth.LoginAttemptSignal;
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository;
@@ -92,13 +93,17 @@ class LoginFailureEnforcementServiceTest {
         List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(i -> attempt("FAILED", now.minusMinutes(2))).toList();
         LoginFailureEnforcementService service = new LoginFailureEnforcementService(userRepository, sessionRepository, attemptRepository);
 
-        when(attemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any())).thenReturn(failures);
+        when(attemptRepository.findSignalsByUserId(eq("user-1"), any())).thenReturn(signals(failures));
         assertThat(service.isTemporarilyLocked(user())).isTrue();
 
         List<AuthLoginAttempt> afterReset = new java.util.ArrayList<>(failures);
         afterReset.add(0, attempt(AuthLoginAttemptRepository.RESULT_RESET, now.minusMinutes(1)));
-        when(attemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any())).thenReturn(afterReset);
+        when(attemptRepository.findSignalsByUserId(eq("user-1"), any())).thenReturn(signals(afterReset));
         assertThat(service.isTemporarilyLocked(user())).isFalse();
+    }
+
+    private static java.util.List<LoginAttemptSignal> signals(List<AuthLoginAttempt> attempts) {
+        return attempts.stream().map(a -> new LoginAttemptSignal(a.getResult(), a.getReason(), a.getCreatedAt())).toList();
     }
 
     private AuthLoginAttempt attempt(String result, OffsetDateTime at) {

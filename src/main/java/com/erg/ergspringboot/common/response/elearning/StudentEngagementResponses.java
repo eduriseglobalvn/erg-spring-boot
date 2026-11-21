@@ -36,11 +36,14 @@ public final class StudentEngagementResponses {
             String subject,
             boolean pinned,
             String acceptedReplyId,
-            boolean following
+            boolean following,
+            int commentCount,
+            boolean hasMoreComments
     ) {
         public static StudentDiscussionPostResponse empty(String id) {
             return new StudentDiscussionPostResponse(
-                    id, null, null, null, null, null, null, null, null, List.of(), null, List.of(), null, List.of(), false, null, false, null, false
+                    id, null, null, null, null, null, null, null, null, List.of(), null, List.of(), null, List.of(), false, null, false, null, false,
+                    0, false
             );
         }
     }
@@ -57,8 +60,15 @@ public final class StudentEngagementResponses {
             List<StudentDiscussionReactionCountResponse> reactions,
             String viewerReaction,
             List<StudentDiscussionCommentResponse> replies,
-            boolean hidden
+            boolean hidden,
+            int replyCount,
+            boolean hasMoreReplies
     ) {
+    }
+
+    /** One page of a post's top-level comments, or of the replies of one of them. */
+    public record StudentDiscussionCommentPageResponse(List<StudentDiscussionCommentResponse> items, int page, int size,
+                                                       long totalItems, boolean hasNext) {
     }
 
     /** One Hộp thư message; {@code mine} is true for the viewer's own side. */
@@ -124,6 +134,8 @@ public final class StudentEngagementResponses {
     }
 
     /** Dates are ISO yyyy-MM-dd strings (the schema has no Date scalar). */
+    // "protected" is a serialized-only alias of protectedFromDrop (GraphQL name): ignore it when the cache reads the value back.
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(value = "protected", allowGetters = true)
     public record MyTierResponse(String tierKey, Integer division, Integer gradeRank, Integer gradeSize, int courseXp,
                                  boolean eligible, int submittedCount, boolean protectedFromDrop, TierStepResponse nextDivision,
                                  TierStepResponse nextTier, TierPromotionResponse pendingPromotion) {
@@ -131,6 +143,13 @@ public final class StudentEngagementResponses {
         public boolean getProtected() {
             return protectedFromDrop;
         }
+    }
+
+    /** Cached cutoff cells of one school/grade cohort ({@code division} null for the top tier). */
+    public record TierCutoffsResponse(List<TierCutoffCell> cells) {
+    }
+
+    public record TierCutoffCell(String tierKey, Integer division, int rankFrom, int rankTo, int minXp) {
     }
 
     public record TierStepResponse(String tierKey, Integer division, int minXp, int studentsToPass) {

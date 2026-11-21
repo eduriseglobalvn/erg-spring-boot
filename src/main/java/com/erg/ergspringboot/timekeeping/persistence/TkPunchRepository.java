@@ -2,6 +2,7 @@ package com.erg.ergspringboot.timekeeping.persistence;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,6 +29,18 @@ public interface TkPunchRepository extends JpaRepository<TkPunch, String> {
             String tenantId, String userId, LocalDate workDate);
 
     List<TkPunch> findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(String tenantId, LocalDate workDate);
+
+    /** The day's punches of some schools: what the today dashboard shows, instead of the whole tenant. */
+    List<TkPunch> findByTenantIdAndSchoolIdInAndWorkDateOrderByServerTimeAscCodeAsc(
+            String tenantId, Collection<String> schoolIds, LocalDate workDate);
+
+    /** Month close: the punches made at one school over a range. */
+    List<TkPunch> findByTenantIdAndSchoolIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(
+            String tenantId, String schoolId, LocalDate from, LocalDate to);
+
+    /** Month close: the punches of some people, wherever they were made, over a range. */
+    List<TkPunch> findByTenantIdAndUserIdInAndWorkDateBetweenOrderByServerTimeAscCodeAsc(
+            String tenantId, Collection<String> userIds, LocalDate from, LocalDate to);
 
     List<TkPunch> findByTenantIdAndUserIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(
             String tenantId, String userId, LocalDate from, LocalDate to);

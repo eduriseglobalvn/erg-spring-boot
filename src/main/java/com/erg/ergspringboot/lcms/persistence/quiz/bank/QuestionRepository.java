@@ -16,6 +16,14 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
 
     List<Question> findByTenantIdAndIdIn(String tenantId, List<String> ids);
 
+    // Id-only existence check: the full entity carries the stem, choices and content jsonb.
+    @Query("select q.id from Question q where q.tenantId = :tenantId and q.id in :ids")
+    List<String> findIdsByTenantIdAndIdIn(@Param("tenantId") String tenantId, @Param("ids") List<String> ids);
+
+    // Only what QuizDraftCompiler reads per bank question (settings); skips the content jsonb.
+    @Query("select q.id, q.settings from Question q where q.tenantId = :tenantId and q.id in :ids")
+    List<Object[]> findSettingsByTenantIdAndIdIn(@Param("tenantId") String tenantId, @Param("ids") List<String> ids);
+
     List<Question> findByTenantIdAndStatusIgnoreCaseOrderByUpdatedAtDesc(String tenantId, String status);
 
     @Query("""
@@ -56,60 +64,85 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
             """)
     List<Object[]> countActiveByTopic(@Param("tenantId") String tenantId, @Param("topicIds") List<String> topicIds);
 
-    @Query(
-            value = """
-                    select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection(
-                        q.id,
-                        q.scope,
-                        q.subjectId,
-                        s.name,
-                        q.levelId,
-                        l.name,
-                        q.topicId,
-                        t.name,
-                        q.stem,
-                        q.objective,
-                        q.type,
-                        q.difficulty,
-                        q.status,
-                        q.tags,
-                        q.choices,
-                        q.answer,
-                        q.masteryRate,
-                        q.usageCount,
-                        q.schoolsUsing,
-                        q.updatedAt,
-                        q.content
-                    )
-                    from Question q
-                    left join CurriculumSubject s on s.tenantId = q.tenantId and s.id = q.subjectId
-                    left join CurriculumLevel l on l.tenantId = q.tenantId and l.id = q.levelId
-                    left join CurriculumTopic t on t.tenantId = q.tenantId and t.id = q.topicId
-                    where q.tenantId = :tenantId
-                    and """ + VietnameseFold.STEM_CONTAINS_SEARCH + """
+    // The list rows are built from one select list; the "Slim" queries leave out the content jsonb (runtimeQuestion) that
+    // only a caller selecting runtimeQuestion needs.
+    String ROW_SELECT = """
+            select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection(
+                q.id,
+                q.scope,
+                q.subjectId,
+                s.name,
+                q.levelId,
+                l.name,
+                q.topicId,
+                t.name,
+                q.stem,
+                q.objective,
+                q.type,
+                q.difficulty,
+                q.status,
+                q.tags,
+                q.choices,
+                q.answer,
+                q.masteryRate,
+                q.usageCount,
+                q.schoolsUsing,
+                q.updatedAt""";
+    String ROW_FROM = """
 
-                    and (:subjectId is null or q.subjectId = :subjectId)
-                    and (:levelId is null or q.levelId = :levelId)
-                    and (:topicId is null or q.topicId = :topicId)
-                    and (:status is null or lower(q.status) = :status)
-                    and (:status = 'archived' or q.archivedAt is null)
-                    and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
-                    order by q.updatedAt desc, q.id asc
-                    """,
-            countQuery = """
-                    select count(q.id)
-                    from Question q
-                    where q.tenantId = :tenantId
-                    and """ + VietnameseFold.STEM_CONTAINS_SEARCH + """
+            )
+            from Question q
+            left join CurriculumSubject s on s.tenantId = q.tenantId and s.id = q.subjectId
+            left join CurriculumLevel l on l.tenantId = q.tenantId and l.id = q.levelId
+            left join CurriculumTopic t on t.tenantId = q.tenantId and t.id = q.topicId
+            where q.tenantId = :tenantId
+            and\s""";
+    String FILTERS = """
 
-                    and (:subjectId is null or q.subjectId = :subjectId)
-                    and (:levelId is null or q.levelId = :levelId)
-                    and (:topicId is null or q.topicId = :topicId)
-                    and (:status is null or lower(q.status) = :status)
-                    and (:status = 'archived' or q.archivedAt is null)
-                    and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
-                    """
-    )
+            and (:subjectId is null or q.subjectId = :subjectId)
+            and (:levelId is null or q.levelId = :levelId)
+            and (:topicId is null or q.topicId = :topicId)
+            and (:status is null or lower(q.status) = :status)
+            and (:status = 'archived' or q.archivedAt is null)
+            and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
+            """;
+    String ORDER = "order by q.updatedAt desc, q.id asc";
+    String COUNT_SEARCH = """
+            select count(q.id)
+            from Question q
+            where q.tenantId = :tenantId
+            and\s""" + VietnameseFold.STEM_CONTAINS_SEARCH + FILTERS;
+    String COUNT_NO_SEARCH = """
+            select count(q.id)
+            from Question q
+            where q.tenantId = :tenantId
+            and (:subjectId is null or q.subjectId = :subjectId)
+            and (:levelId is null or q.levelId = :levelId)
+            and (:topicId is null or q.topicId = :topicId)
+            and (:status is null or lower(q.status) = :status)
+            and (:status = 'archived' or q.archivedAt is null)
+            and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
+            """;
+    String NO_SEARCH_FROM = """
+
+            )
+            from Question q
+            left join CurriculumSubject s on s.tenantId = q.tenantId and s.id = q.subjectId
+            left join CurriculumLevel l on l.tenantId = q.tenantId and l.id = q.levelId
+            left join CurriculumTopic t on t.tenantId = q.tenantId and t.id = q.topicId
+            where q.tenantId = :tenantId
+            """;
+    String NO_SEARCH_FILTERS = """
+            and (:subjectId is null or q.subjectId = :subjectId)
+            and (:levelId is null or q.levelId = :levelId)
+            and (:topicId is null or q.topicId = :topicId)
+            and (:status is null or lower(q.status) = :status)
+            and (:status = 'archived' or q.archivedAt is null)
+            and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
+            """;
+
+    @Query(value = ROW_SELECT + ", q.content" + ROW_FROM + VietnameseFold.STEM_CONTAINS_SEARCH + FILTERS + ORDER,
+            countQuery = COUNT_SEARCH)
     Page<QuestionBankQuestionProjection> findQuestionBankQuestions(
             @Param("tenantId") String tenantId,
             @Param("search") String search,
@@ -120,57 +153,29 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
             Pageable pageable
     );
 
-    @Query(
-            value = """
-                    select new com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection(
-                        q.id,
-                        q.scope,
-                        q.subjectId,
-                        s.name,
-                        q.levelId,
-                        l.name,
-                        q.topicId,
-                        t.name,
-                        q.stem,
-                        q.objective,
-                        q.type,
-                        q.difficulty,
-                        q.status,
-                        q.tags,
-                        q.choices,
-                        q.answer,
-                        q.masteryRate,
-                        q.usageCount,
-                        q.schoolsUsing,
-                        q.updatedAt,
-                        q.content
-                    )
-                    from Question q
-                    left join CurriculumSubject s on s.tenantId = q.tenantId and s.id = q.subjectId
-                    left join CurriculumLevel l on l.tenantId = q.tenantId and l.id = q.levelId
-                    left join CurriculumTopic t on t.tenantId = q.tenantId and t.id = q.topicId
-                    where q.tenantId = :tenantId
-                    and (:subjectId is null or q.subjectId = :subjectId)
-                    and (:levelId is null or q.levelId = :levelId)
-                    and (:topicId is null or q.topicId = :topicId)
-                    and (:status is null or lower(q.status) = :status)
-                    and (:status = 'archived' or q.archivedAt is null)
-                    and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
-                    order by q.updatedAt desc, q.id asc
-                    """,
-            countQuery = """
-                    select count(q.id)
-                    from Question q
-                    where q.tenantId = :tenantId
-                    and (:subjectId is null or q.subjectId = :subjectId)
-                    and (:levelId is null or q.levelId = :levelId)
-                    and (:topicId is null or q.topicId = :topicId)
-                    and (:status is null or lower(q.status) = :status)
-                    and (:status = 'archived' or q.archivedAt is null)
-                    and (:status = 'archived' or :status = 'deleted' or q.deletedAt is null)
-                    """
-    )
+    @Query(value = ROW_SELECT + ROW_FROM + VietnameseFold.STEM_CONTAINS_SEARCH + FILTERS + ORDER, countQuery = COUNT_SEARCH)
+    Page<QuestionBankQuestionProjection> findQuestionBankQuestionsSlim(
+            @Param("tenantId") String tenantId,
+            @Param("search") String search,
+            @Param("subjectId") String subjectId,
+            @Param("levelId") String levelId,
+            @Param("topicId") String topicId,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @Query(value = ROW_SELECT + ", q.content" + NO_SEARCH_FROM + NO_SEARCH_FILTERS + ORDER, countQuery = COUNT_NO_SEARCH)
     Page<QuestionBankQuestionProjection> findQuestionBankQuestionsWithoutSearch(
+            @Param("tenantId") String tenantId,
+            @Param("subjectId") String subjectId,
+            @Param("levelId") String levelId,
+            @Param("topicId") String topicId,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @Query(value = ROW_SELECT + NO_SEARCH_FROM + NO_SEARCH_FILTERS + ORDER, countQuery = COUNT_NO_SEARCH)
+    Page<QuestionBankQuestionProjection> findQuestionBankQuestionsWithoutSearchSlim(
             @Param("tenantId") String tenantId,
             @Param("subjectId") String subjectId,
             @Param("levelId") String levelId,

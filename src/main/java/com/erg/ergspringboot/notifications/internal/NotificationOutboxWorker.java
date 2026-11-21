@@ -21,10 +21,24 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -36,6 +50,13 @@ public class NotificationOutboxWorker {
     /** Unique per JVM so lease ownership checks distinguish instances (C15). */
     static final String WORKER_ID = workerId();
 
+    /** Provider calls in flight at once (one pool shared by the scheduler and manual runs). */
+    static final int PARALLELISM = 8;
+    private static final Logger log = LoggerFactory.getLogger(NotificationOutboxWorker.class);
+
+    /** One run stops sending after this; claimed rows it did not reach are released back to the queue. */
+    Duration runBudget = Duration.ofSeconds(20);
+
     private final NotificationOutboxRepository outboxRepository;
     private final NotificationMessageRepository messageRepository;
     private final NotificationDeliveryAttemptRepository deliveryAttemptRepository;
@@ -44,6 +65,7 @@ public class NotificationOutboxWorker {
     private final NotificationPushProperties properties;
     private final TransactionTemplate transactionTemplate;
     private final NotificationMetrics metrics;
+    private final ThreadPoolExecutor deliveryPool = newDeliveryPool();
 
     public NotificationOutboxWorker(
             NotificationOutboxRepository outboxRepository,
@@ -77,38 +99,104 @@ public class NotificationOutboxWorker {
     }
 
     public OutboxRunResponse runDueBatch(String tenantId) {
+        return runDueBatch(tenantId, Integer.MAX_VALUE);
+    }
+
+    /** {@code maxRows} caps the claim, so a manual run from an HTTP request never pins the thread for a whole poll. */
+    public OutboxRunResponse runDueBatch(String tenantId, int maxRows) {
         TenantContext previous = TenantContext.current();
         if ((tenantId == null || tenantId.isBlank()) && previous == null) {
             TenantContext.set(TenantContext.maintenance());
         }
         try {
-        List<NotificationOutboxEntity> due = claimDueBatch(tenantId);
-        int sent = 0;
-        int failed = 0;
-        int retried = 0;
-        int dead = 0;
-        for (NotificationOutboxEntity outbox : due) {
-            // Extend the lease per item: a slow provider must not let another instance reclaim and
-            // double-send rows that are still queued in this batch.
-            if (outboxRepository.renewLease(outbox.getId(), WORKER_ID, OffsetDateTime.now()) == 0) {
-                continue;
+            List<NotificationOutboxEntity> due = claimDueBatch(tenantId, Math.max(1, maxRows));
+            long deadline = System.nanoTime() + runBudget.toNanos();
+            Map<String, NotificationMessageEntity> messages = loadMessages(due);
+            TenantContext.Carrier tenant = TenantContext.capture();
+            List<String> unprocessed = new CopyOnWriteArrayList<>();
+            List<Future<DispatchStatus>> pending = new ArrayList<>(due.size());
+            for (NotificationOutboxEntity outbox : due) {
+                try {
+                    pending.add(deliveryPool.submit(() -> deliver(outbox, messages.get(outbox.getNotificationId()), deadline, tenant, unprocessed)));
+                } catch (RejectedExecutionException shuttingDown) {
+                    unprocessed.add(outbox.getId());
+                }
             }
-            SendResult result = send(outbox);
-            DispatchStatus status = recordResult(outbox.getId(), result);
-            if (status == DispatchStatus.SENT) {
-                sent += 1;
-            } else if (status == DispatchStatus.FAILED) {
-                failed += 1;
-            } else if (status == DispatchStatus.RETRIED) {
-                retried += 1;
-            } else if (status == DispatchStatus.DEAD) {
-                dead += 1;
+            int sent = 0;
+            int failed = 0;
+            int retried = 0;
+            int dead = 0;
+            for (Future<DispatchStatus> future : pending) {
+                DispatchStatus status = await(future);
+                if (status == DispatchStatus.SENT) {
+                    sent += 1;
+                } else if (status == DispatchStatus.FAILED) {
+                    failed += 1;
+                } else if (status == DispatchStatus.RETRIED) {
+                    retried += 1;
+                } else if (status == DispatchStatus.DEAD) {
+                    dead += 1;
+                }
             }
-        }
-        return new OutboxRunResponse(due.size(), sent, failed, retried, dead);
+            releaseUnprocessed(unprocessed);
+            return new OutboxRunResponse(due.size(), sent, failed, retried, dead);
         } finally {
             if (previous == null) TenantContext.clear(); else TenantContext.set(previous);
         }
+    }
+
+    /** One row on a pool thread: the lease renewal, the provider call and the atomic result transaction. */
+    private DispatchStatus deliver(NotificationOutboxEntity outbox, NotificationMessageEntity message, long deadline,
+            TenantContext.Carrier tenant, List<String> unprocessed) {
+        if (System.nanoTime() - deadline >= 0) {
+            unprocessed.add(outbox.getId());
+            return null;
+        }
+        try (TenantContext.Scope ignored = TenantContext.install(tenant)) {
+            // Extend the lease per item: a slow provider must not let another instance reclaim and
+            // double-send rows that are still queued in this batch.
+            if (outboxRepository.renewLease(outbox.getId(), WORKER_ID, OffsetDateTime.now()) == 0) {
+                return null;
+            }
+            return recordResult(outbox.getId(), send(outbox, message));
+        } catch (RuntimeException failure) {
+            // The row keeps its lease and is reclaimed when it expires; the other rows of the batch go on.
+            log.warn("Outbox row {} failed unexpectedly: {}", outbox.getId(), failure.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private static DispatchStatus await(Future<DispatchStatus> future) {
+        try {
+            return future.get();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (ExecutionException failure) {
+            return null;
+        }
+    }
+
+    private Map<String, NotificationMessageEntity> loadMessages(List<NotificationOutboxEntity> due) {
+        Set<String> ids = new HashSet<>();
+        due.forEach(outbox -> ids.add(outbox.getNotificationId()));
+        Map<String, NotificationMessageEntity> byId = new HashMap<>();
+        if (!ids.isEmpty()) {
+            messageRepository.findAllById(ids).forEach(message -> byId.put(message.getId(), message));
+        }
+        return byId;
+    }
+
+    /** Rows claimed but not sent (budget spent) go straight back to the queue instead of waiting out the lease. */
+    private void releaseUnprocessed(List<String> ids) {
+        if (!ids.isEmpty()) {
+            outboxRepository.releaseLease(ids, WORKER_ID);
+        }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        deliveryPool.shutdown();
     }
 
     /**
@@ -138,11 +226,11 @@ public class NotificationOutboxWorker {
         return new DeadLetterReplayResponse(replayed == null ? 0 : replayed);
     }
 
-    private List<NotificationOutboxEntity> claimDueBatch(String tenantId) {
+    private List<NotificationOutboxEntity> claimDueBatch(String tenantId, int maxRows) {
         return transactionTemplate.execute(status -> {
             OffsetDateTime now = OffsetDateTime.now();
             OffsetDateTime staleBefore = now.minus(properties.getWorker().getLeaseTimeout());
-            int pollSize = Math.max(1, Math.min(500, properties.getWorker().getPollSize()));
+            int pollSize = Math.max(1, Math.min(Math.min(500, maxRows), properties.getWorker().getPollSize()));
             List<NotificationOutboxEntity> due = tenantId == null || tenantId.isBlank()
                     ? outboxRepository.findDueForUpdate(now, staleBefore, pollSize)
                     : outboxRepository.findDueForUpdateByTenant(tenantId, now, staleBefore, pollSize);
@@ -161,6 +249,13 @@ public class NotificationOutboxWorker {
         return transactionTemplate.execute(status -> outboxRepository.findLeasedForUpdate(outboxId, WORKER_ID)
                 .map(outbox -> applyResult(outbox, result))
                 .orElse(DispatchStatus.LEASE_LOST));
+    }
+
+    private static ThreadPoolExecutor newDeliveryPool() {
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(PARALLELISM, PARALLELISM, 30, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(), Thread.ofPlatform().daemon().name("notification-outbox-", 0).factory());
+        pool.allowCoreThreadTimeOut(true);
+        return pool;
     }
 
     private static String workerId() {
@@ -204,8 +299,7 @@ public class NotificationOutboxWorker {
         return dispatchStatus;
     }
 
-    private SendResult send(NotificationOutboxEntity outbox) {
-        NotificationMessageEntity message = messageRepository.findById(outbox.getNotificationId()).orElse(null);
+    private SendResult send(NotificationOutboxEntity outbox, NotificationMessageEntity message) {
         if (message == null) {
             return SendResult.failure(false, false, 0, "NOTIFICATION_MISSING", "Notification message is missing.", null, 0);
         }

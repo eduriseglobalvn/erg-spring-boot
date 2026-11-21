@@ -42,6 +42,8 @@ input AssignmentProgressWorkspaceInput {
 input StudentGroupsInput {
   tenantId: String
   classId: String
+  "false returns studentIds as [] and only studentCount per group (default true)"
+  includeMembers: Boolean
 }
 
 input QuestionBankWorkspaceInput {
@@ -55,6 +57,7 @@ input QuestionBankWorkspaceInput {
   includeQuestions: Boolean
   page: Int
   size: Int
+  quizLimit: Int
 }
 
 input AccessManagementWorkspaceInput {
@@ -413,6 +416,7 @@ type QuestionBankWorkspace {
   levels: [QuestionBankOption!]!
   topics: [QuestionBankOption!]!
   quizzes: [QuestionBankQuizOption!]!
+  quizzesTruncated: Boolean!
 }
 
 type QuestionBankQuestionPage {
@@ -541,6 +545,7 @@ type LearningResourceLibrary {
   resources: LearningResourceCardPage!
   progress: [LearningResourceProgress!]!
   recentOpened: [LearningRecentResource!]!
+  taxonomyTruncated: Boolean!
 }
 
 type LearningResourceCardPage {
@@ -612,6 +617,7 @@ type ClassScoreBoard {
   students: [ClassScoreBoardStudent!]!
   attempts: [ClassScoreBoardAttempt!]!
   truncated: Boolean!
+  rosterTruncated: Boolean!
 }
 
 type ClassScoreBoardStudent {

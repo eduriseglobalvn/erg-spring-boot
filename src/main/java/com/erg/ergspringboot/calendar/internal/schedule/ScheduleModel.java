@@ -39,9 +39,11 @@ final class ScheduleModel {
     record Leave(String userId, LocalDate from, LocalDate to, String part) {
         boolean covers(Occurrence o) {
             if (o.date().isBefore(from) || o.date().isAfter(to)) return false;
+            // same rule as timekeeping AffectedPeriodsService: the session is the start time against noon
+            boolean morning = o.start().atZoneSameInstant(ScheduleDataLoader.VN).getHour() < 12;
             return switch (part) {
-                case "AM" -> o.periodNo() <= 5;
-                case "PM" -> o.periodNo() >= 6;
+                case "AM" -> morning;
+                case "PM" -> !morning;
                 default -> true;
             };
         }

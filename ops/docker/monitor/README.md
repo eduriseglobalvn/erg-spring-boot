@@ -48,7 +48,7 @@ docker compose --project-directory ops/docker \
 
 - URL: `http://<IP_MAY_SERVER>:3000`
 - Tài khoản mặc định: `admin`
-- Mật khẩu: Cấu hình biến `GRAFANA_PASSWORD` trong file `.env.production` (mặc định: `erg-grafana-password`).
+- Mật khẩu: Cấu hình biến `GRAFANA_PASSWORD` trong file `.env.production` (bắt buộc, không còn giá trị mặc định; `deploy.sh` từ chối giá trị trống hoặc mẫu cũ).
 
 ### Dashboards được nạp sẵn tự động:
 1. **ERG Server Upgrade & Operations (i5-7500 / 16GB RAM)**:

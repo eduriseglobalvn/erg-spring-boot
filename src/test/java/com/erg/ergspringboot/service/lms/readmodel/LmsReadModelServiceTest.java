@@ -18,6 +18,7 @@ import com.erg.ergspringboot.lms.persistence.StudentGroup;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMember;
 import com.erg.ergspringboot.platform.concurrency.ErgReadTaskExecutor;
 import com.erg.ergspringboot.lms.persistence.AssignmentProgressCountRepository;
+import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
@@ -69,6 +70,15 @@ class LmsReadModelServiceTest {
     private AssignmentProgressCountRepository progressCounts;
 
     @Mock
+    private com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository recipientRows;
+
+    @Mock
+    private com.erg.ergspringboot.lms.persistence.AssignmentRecipientProgressRepository recipientProgress;
+
+    @Mock
+    private com.erg.ergspringboot.lms.persistence.ClassRiskSummaryRepository riskRepository;
+
+    @Mock
     private AssignmentResourceRepository assignmentResourceRepository;
 
     @Mock
@@ -96,12 +106,12 @@ class LmsReadModelServiceTest {
     void setUp() {
         readTaskExecutor = new ErgReadTaskExecutor(4, 4, 32, Duration.ofSeconds(1));
         var attempts = new JpaLmsAttemptQueryAdapter(attemptRepository);
-        var assignments = new JpaLmsAssignmentQueryAdapter(assignmentRepository, progressCounts);
+        var assignments = new JpaLmsAssignmentQueryAdapter(assignmentRepository, progressCounts, recipientRows, recipientProgress);
         service = new LmsReadModelUseCase(
                 new LmsStudentGroupReadUseCase(studentGroupRepository, studentGroupMemberRepository),
                 new LmsAssignmentProgressQueryUseCase(attempts, assignments, assignmentResourceRepository),
                 new LmsClassWorkspaceReadUseCase(classroomRepository, studentRepository, assignmentRepository,
-                        assignmentResourceRepository, attemptRepository, classStudentScoreRepository),
+                        assignmentResourceRepository, attemptRepository, classStudentScoreRepository, riskRepository),
                 new LmsTeacherHomeworkReadUseCase(assignments, assignmentResourceRepository,
                         classroomRepository, attempts, studentRepository));
     }
@@ -119,6 +129,20 @@ class LmsReadModelServiceTest {
 
         assertThat(service.assignmentProgress("erg", "assignment-1")).isSameAs(expected);
         verify(attemptRepository).summarizeAssignmentProgress("erg", "assignment-1");
+    }
+
+    @Test
+    void studentGroupsWithoutMembersSkipsTheMemberQueryAndKeepsTheCount() {
+        StudentGroup group = new StudentGroup("erg", "Owned group", "class-1", null, null, "teacher-1", 2);
+        group.setId("group-1");
+        when(studentGroupRepository.findByTenantIdAndOwnerUserIdOrClassIdInOrderByCreatedAtDesc(
+                eq("erg"), eq("teacher-1"), eq(Set.of("class-1")), any(Pageable.class))).thenReturn(List.of(group));
+
+        StudentGroupWorkspaceResponse response = service.studentGroups("erg", null, List.of("class-1"), "teacher-1", false);
+
+        assertThat(response.groups().getFirst().studentIds()).isEmpty();
+        assertThat(response.groups().getFirst().studentCount()).isEqualTo(2);
+        verifyNoMoreInteractions(studentGroupMemberRepository);
     }
 
     @Test
@@ -199,7 +223,7 @@ class LmsReadModelServiceTest {
                 now
         );
         PageRequest clampedAttemptPage = PageRequest.of(3, 50, Sort.by("updatedAt").descending());
-        PageRequest recipientPage = PageRequest.of(0, 50);
+        PageRequest recipientPage = PageRequest.of(3, 50);
         RecipientProgressProjection recipient = new RecipientProgressProjection(
                 "student-1",
                 "school-1",
@@ -275,7 +299,8 @@ class LmsReadModelServiceTest {
                 .thenReturn(new AssignmentProgressProjection(7L, 2L, 1L));
         when(attemptRepository.findAssignmentAttemptSummaries("erg", "assignment-1", "submitted", clampedAttemptPage))
                 .thenReturn(new PageImpl<>(List.of(attempt), clampedAttemptPage, 151));
-        when(assignmentRepository.findAssignmentRecipients("erg", "assignment-1", recipientPage))
+        when(recipientRows.existsByTenantIdAndAssignmentId("erg", "assignment-1")).thenReturn(true);
+        when(recipientProgress.recipientsFromRows("erg", "assignment-1", recipientPage))
                 .thenReturn(new PageImpl<>(List.of(recipient, missingRecipient), recipientPage, 2));
         when(attemptRepository.findLatestAttemptScoresForRecipients(
                 "erg",
@@ -287,7 +312,9 @@ class LmsReadModelServiceTest {
                 "assignment-1",
                 List.of("student-1", "student-2")
         )).thenReturn(List.of(bestAttempt));
-        when(assignmentRepository.findAssignmentMissingLateStudents("erg", "assignment-1", recipientPage))
+        when(recipientProgress.missingLateOf("erg", "assignment-1", List.of("student-1", "student-2"), LmsStatePolicy.completedAttemptStates()))
+                .thenReturn(List.of(missingLateStudent));
+        when(recipientProgress.missingLateFromRows("erg", "assignment-1", recipientPage, LmsStatePolicy.completedAttemptStates()))
                 .thenReturn(new PageImpl<>(List.of(missingLateStudent), recipientPage, 1));
 
         AssignmentProgressWorkspaceResponse response = service.assignmentProgressWorkspace(
@@ -312,7 +339,7 @@ class LmsReadModelServiceTest {
         assertThat(response.attempts().items().getFirst().percent()).isEqualTo(85);
         assertThat(response.attempts().items().getFirst().studentId()).isEqualTo("student-1");
         assertThat(response.recipients().size()).isEqualTo(50);
-        assertThat(response.recipients().totalItems()).isEqualTo(2);
+        assertThat(response.recipients().totalItems()).isEqualTo(152); // page 3 x 50 + 2 rows on the last page
         assertThat(response.recipients().items()).hasSize(2);
         assertThat(response.recipients().items().getFirst().studentId()).isEqualTo("student-1");
         assertThat(response.recipients().items().getFirst().latestAttempt().id()).isEqualTo("attempt-latest");
@@ -330,8 +357,8 @@ class LmsReadModelServiceTest {
         assertThat(response.missingLateStudents().items().getFirst().dueAt()).isEqualTo(now.minusDays(1));
         verify(assignmentRepository).findAssignmentDetail("erg", "assignment-1");
         verify(assignmentResourceRepository).findResourceProjections("erg", "assignment-1");
-        verify(assignmentRepository).findAssignmentRecipients("erg", "assignment-1", recipientPage);
-        verify(assignmentRepository).findAssignmentMissingLateStudents("erg", "assignment-1", recipientPage);
+        verify(recipientProgress).recipientsFromRows("erg", "assignment-1", recipientPage);
+        verify(recipientProgress).missingLateFromRows("erg", "assignment-1", recipientPage, LmsStatePolicy.completedAttemptStates());
         verify(attemptRepository).summarizeAssignmentProgress("erg", "assignment-1");
         verify(attemptRepository).findAssignmentAttemptSummaries("erg", "assignment-1", "submitted", clampedAttemptPage);
         verify(attemptRepository).findLatestAttemptScoresForRecipients(
@@ -662,7 +689,7 @@ class LmsReadModelServiceTest {
                 .thenReturn(new PageImpl<>(List.of(), rosterPage, 0));
         when(assignmentRepository.findClassAssignmentCards("erg", "class-1", null, assignmentPage))
                 .thenReturn(new PageImpl<>(List.of(), assignmentPage, 0));
-        when(studentRepository.summarizeClassWorkspaceRisks("erg", "class-1", 50.0D))
+        when(riskRepository.summarizeClassWorkspaceRisks("erg", "class-1", 50.0D))
                 .thenReturn(new ClassRiskSummaryProjection(3L, 2L, 1L));
 
         ClassWorkspaceResponse response = service.classWorkspace(
@@ -684,7 +711,7 @@ class LmsReadModelServiceTest {
         assertThat(response.riskSummary().lowScoreStudentCount()).isEqualTo(2);
         assertThat(response.riskSummary().inactiveStudentCount()).isEqualTo(1);
         verifyNoMoreInteractions(attemptRepository);
-        verify(studentRepository, times(1)).summarizeClassWorkspaceRisks("erg", "class-1", 50.0D);
+        verify(riskRepository, times(1)).summarizeClassWorkspaceRisks("erg", "class-1", 50.0D);
     }
 
     @Test

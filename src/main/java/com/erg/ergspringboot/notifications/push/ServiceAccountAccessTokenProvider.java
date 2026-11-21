@@ -14,6 +14,7 @@ import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
@@ -69,6 +70,7 @@ public class ServiceAccountAccessTokenProvider implements AccessTokenProvider {
         String form = "grant_type=" + encode("urn:ietf:params:oauth:grant-type:jwt-bearer")
                 + "&assertion=" + encode(assertion);
         HttpRequest request = HttpRequest.newBuilder(URI.create(tokenUri))
+                .timeout(Duration.ofSeconds(10))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(form))
                 .build();

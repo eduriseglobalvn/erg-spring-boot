@@ -287,18 +287,14 @@ public class GlobalExceptionHandler {
             org.springframework.web.ErrorResponseException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleMvcProtocolException(Exception exception, WebRequest request) {
-        if (!(exception instanceof org.springframework.web.ErrorResponse errorResponse)) {
-            return handleUnexpectedException(exception, request);
-        }
+        if (!(exception instanceof org.springframework.web.ErrorResponse errorResponse)) return handleUnexpectedException(exception, request);
         HttpStatus status = HttpStatus.resolve(errorResponse.getStatusCode().value());
-        if (status == null || status.is5xxServerError()) {
-            return handleUnexpectedException(exception, request);
-        }
+        if (status == null) return handleUnexpectedException(exception, request);
         String detail = exception instanceof org.springframework.web.bind.MissingRequestHeaderException missingHeader
                 ? "Missing required request header: " + missingHeader.getHeaderName()
                 : status.getReasonPhrase();
         ApiResponse<Void> response = buildErrorResponse(status, status.getReasonPhrase(), detail,
-                protocolErrorCode(status), request);
+                ErrorResponses.protocolErrorCode(status), request);
         return ResponseEntity.status(status)
                 .headers(errorResponse.getHeaders())
                 .header(RequestCorrelation.REQUEST_ID_HEADER, response.requestId())
@@ -334,15 +330,22 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
-    private String protocolErrorCode(HttpStatus status) {
-        return switch (status) {
-            case METHOD_NOT_ALLOWED -> "METHOD_NOT_ALLOWED";
-            case UNSUPPORTED_MEDIA_TYPE -> "UNSUPPORTED_MEDIA_TYPE";
-            case NOT_ACCEPTABLE -> "NOT_ACCEPTABLE";
-            case NOT_FOUND -> "NOT_FOUND";
-            case CONTENT_TOO_LARGE -> "PAYLOAD_TOO_LARGE";
-            default -> "INVALID_REQUEST";
-        };
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException exception, WebRequest request) {
+        LOGGER.warn("Rejected request with illegal argument [requestId={}]", getRequestId(request), exception);
+        return ErrorResponses.invalidRequest(getRequestPath(request), getRequestId(request));
+    }
+
+    /** Capacity and contention failures (RejectedExecutionException covers Spring's TaskRejectedException). */
+    @ExceptionHandler({
+            java.util.concurrent.RejectedExecutionException.class,
+            org.springframework.transaction.CannotCreateTransactionException.class,
+            org.springframework.dao.QueryTimeoutException.class,
+            org.springframework.dao.PessimisticLockingFailureException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleOverload(Exception exception, WebRequest request) {
+        LOGGER.warn("Service unavailable [requestId={}]: {}", getRequestId(request), exception.toString());
+        return ErrorResponses.unavailable(getRequestPath(request), getRequestId(request));
     }
 
     @ExceptionHandler(Exception.class)

@@ -36,10 +36,19 @@ final class AttemptDeadlinePolicy {
         return result;
     }
 
-    /** Deadline frozen in the start snapshot; legacy attempts without one fall back to the live assignment. */
+    /**
+     * The later of the start-snapshot deadline and the live assignment deadline (a teacher extending dueAt lifts running
+     * attempts, shortening never cuts them), capped by the attempt's own snapshot duration. Legacy attempts use the live one.
+     */
     OffsetDateTime effectiveDeadline(Attempt attempt, Assignment assignment) {
         OffsetDateTime snapshot = snapshotDeadline(attempt);
-        return snapshot != null ? snapshot : deadline(assignment, attempt.getStartedAt());
+        OffsetDateTime live = deadline(assignment, attempt.getStartedAt());
+        if (snapshot == null) return live;
+        OffsetDateTime result = live != null && live.isAfter(snapshot) ? live : snapshot;
+        Integer minutes = snapshotInteger(attempt, "durationMinutes");
+        if (minutes == null || minutes <= 0 || attempt.getStartedAt() == null) return result;
+        OffsetDateTime cap = attempt.getStartedAt().plusMinutes(minutes);
+        return result.isAfter(cap) ? cap : result;
     }
 
     boolean isExpired(Attempt attempt, Assignment assignment, OffsetDateTime now) {
@@ -49,17 +58,12 @@ final class AttemptDeadlinePolicy {
 
     void ensureOpen(Assignment a, OffsetDateTime now) { if (a.getStartAt() != null && now.isBefore(a.getStartAt())) throw new BadRequestException("assignment has not started"); if (a.getDueAt() != null && now.isAfter(a.getDueAt())) throw new BadRequestException("assignment is past due"); }
 
-    /** Accepts submissions up to {@code deadline + grace}; returns true when the submission is late. */
-    boolean ensureSubmitAllowed(Attempt attempt, Assignment assignment, OffsetDateTime submitted) {
+    boolean isPastDue(Assignment a, OffsetDateTime now) { return a.getDueAt() != null && now.isAfter(a.getDueAt()); }
+
+    /** A submission after the deadline is still stored (never dropped); it is just flagged late. */
+    boolean isLate(Attempt attempt, Assignment assignment, OffsetDateTime submitted) {
         OffsetDateTime deadline = effectiveDeadline(attempt, assignment);
-        if (deadline == null || !submitted.isAfter(deadline)) return false;
-        if (!submitted.isAfter(deadline.plus(submitGrace))) return true;
-        Integer minutes = snapshotDeadline(attempt) != null ? snapshotInteger(attempt, "durationMinutes") : assignment.getMaxDurationMinutes();
-        if (minutes != null && minutes > 0 && attempt.getStartedAt() != null
-                && submitted.isAfter(attempt.getStartedAt().plusMinutes(minutes).plus(submitGrace))) {
-            throw new BadRequestException("attempt duration exceeded");
-        }
-        throw new BadRequestException("assignment is past due");
+        return deadline != null && submitted.isAfter(deadline);
     }
 
     private OffsetDateTime snapshotDeadline(Attempt attempt) {

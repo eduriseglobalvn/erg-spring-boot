@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.timekeeping.internal.admin;
 
+import com.erg.ergspringboot.calendar.TeacherPeriod;
 import com.erg.ergspringboot.exception.ApiException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
@@ -41,6 +42,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -83,6 +85,7 @@ public class ApprovalInboxService {
     private final ErgPolicyService policy;
     private final AdminSupport support;
     private final TransactionTemplate ownTransaction;
+    private final TransactionTemplate readOnly;
 
     ApprovalInboxService(TkRequestRepository requests, TkRequestStepRepository steps, TkDayRepository days,
             EmployeeProfileRepository profiles, RequestViewAssembler views, ApprovalService approvals,
@@ -100,6 +103,8 @@ public class ApprovalInboxService {
         this.support = support;
         this.ownTransaction = new TransactionTemplate(transactionManager);
         this.ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.readOnly = new TransactionTemplate(transactionManager);
+        this.readOnly.setReadOnly(true);
     }
 
     @Transactional(readOnly = true)
@@ -120,23 +125,29 @@ public class ApprovalInboxService {
                 found.getTotalElements());
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Two short read-only transactions around the calendar read, so the periods are never read on a second pooled
+     * connection while a transaction holds the first.
+     */
     public ApprovalDetail detail(ErgPrincipal me, String requestId) {
-        String tenantId = me.tenantId();
-        TkRequest r = visible(me, requestId);
-        List<TkRequestStep> all = steps.findByTenantIdAndRequestIdOrderByStepNoAscApproverIdAsc(tenantId, requestId);
-        boolean approver = currentApprover(r, all, me.userId());
-        boolean manager = manages(me);
-        boolean open = r.getStatus() == RequestStatus.PENDING && !me.userId().equals(r.getUserId());
+        TkRequest r = readOnly.execute(status -> visible(me, requestId));
         LocalDate from = r.getType() == RequestType.EXPLANATION ? r.getWorkDate() : r.getFromDate();
         LocalDate to = r.getType() == RequestType.EXPLANATION ? r.getWorkDate() : r.getToDate();
-
         List<PeriodView> affected = r.getType() == RequestType.LEAVE || r.getType() == RequestType.BUSINESS
-                ? periods.read(tenantId, r.getUserId(), from, to).map(list -> AffectedPeriodsService
+                ? periods.read(me.tenantId(), r.getUserId(), from, to).map(list -> AffectedPeriodsService
                         .inPart(list, r.getPart()).stream()
                         .map(p -> new PeriodView(p.start(), p.end(), p.className(), p.subject(), p.room())).toList())
                         .orElse(List.of())
                 : List.of();
+        return readOnly.execute(status -> detailOf(me, r, affected, from, to));
+    }
+
+    private ApprovalDetail detailOf(ErgPrincipal me, TkRequest r, List<PeriodView> affected, LocalDate from, LocalDate to) {
+        String tenantId = me.tenantId();
+        List<TkRequestStep> all = steps.findByTenantIdAndRequestIdOrderByStepNoAscApproverIdAsc(tenantId, r.getId());
+        boolean approver = currentApprover(r, all, me.userId());
+        boolean manager = manages(me);
+        boolean open = r.getStatus() == RequestStatus.PENDING && !me.userId().equals(r.getUserId());
         YearMonth month = YearMonth.from(from);
         MonthContext context = new MonthContext(
                 (int) days.countByTenantIdAndUserIdAndLateMinutesGreaterThanAndWorkDateBetween(tenantId, r.getUserId(),
@@ -148,7 +159,7 @@ public class ApprovalInboxService {
 
     public RequestView approve(ErgPrincipal me, String requestId, String comment) {
         TkRequest r = visible(me, requestId);
-        approvals.approveStep(me.tenantId(), requestId, me, onBehalf(me, r), comment);
+        approvals.approveStep(me.tenantId(), requestId, me, onBehalf(me, r), comment, periodsIfFinal(me.tenantId(), r));
         return view(me.tenantId(), requestId);
     }
 
@@ -170,10 +181,12 @@ public class ApprovalInboxService {
         List<Skipped> skipped = new ArrayList<>();
         for (String id : new LinkedHashSet<>(requestIds)) {
             try {
+                // read before the transaction opens: a final approval rebuilds the days from the periods
+                Optional<List<TeacherPeriod>> preRead = periodsIfFinal(me.tenantId(), visible(me, id));
                 ownTransaction.executeWithoutResult(status -> {
                     TkRequest r = visible(me, id);
                     requireBalance(r);
-                    approvals.approveStep(me.tenantId(), id, me, onBehalf(me, r), null);
+                    approvals.approveStep(me.tenantId(), id, me, onBehalf(me, r), null, preRead);
                 });
                 approved.add(id);
             } catch (AccessDeniedException denied) {
@@ -186,6 +199,19 @@ public class ApprovalInboxService {
             }
         }
         return new BulkApproveResult(approved, skipped);
+    }
+
+    /**
+     * The requester's periods over the request's days, read now (no transaction open) when this approval would be the
+     * last step, so the final approval can rebuild the days without a second connection; null when it is not needed.
+     */
+    private Optional<List<TeacherPeriod>> periodsIfFinal(String tenantId, TkRequest r) {
+        if (r.getStatus() != RequestStatus.PENDING || r.getType() == RequestType.WFH) return null;
+        boolean laterStep = steps.findByTenantIdAndRequestIdOrderByStepNoAscApproverIdAsc(tenantId, r.getId()).stream()
+                .anyMatch(s -> s.getStepNo() > r.getCurrentStep() && s.getStatus() == StepStatus.WAITING);
+        if (laterStep) return null;
+        List<LocalDate> dates = ApprovalService.dates(r);
+        return periods.read(tenantId, r.getUserId(), dates.get(0), dates.get(dates.size() - 1));
     }
 
     private TkRequest visible(ErgPrincipal me, String requestId) {

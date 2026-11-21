@@ -51,6 +51,11 @@ public class CurriculumTreeQueryUseCase {
         this.topics = topics;
     }
 
+    /** Authorization for the requested status; callers run it before the cached tree lookup so a cache hit cannot bypass it. */
+    public void requireReadableStatus(String status) {
+        if (blankToNull(status) != null) normalizeStatus(status);
+    }
+
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public CurriculumTreeResponse tree(String status, UserAccessContext access) {
         String tenantId = tenantId(access);

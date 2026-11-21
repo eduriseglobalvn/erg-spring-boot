@@ -5,7 +5,7 @@ import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -18,8 +18,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, String> 
     Optional<AuditEvent> findTopByTenantIdOrderByOccurredAtDescIdDesc(String tenantId);
 
     /** {@code from}/{@code to} must be non-null: a null Instant binds untyped and Postgres rejects {@code ? is null} (42P18). */
-    @Query("""
-            select e from AuditEvent e
+    String SEARCH_FILTER = """
             where e.tenantId = :tenantId
               and e.occurredAt >= :from
               and e.occurredAt <= :to
@@ -32,9 +31,11 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, String> 
                    or e.scopeType = 'TENANT'
                    or (e.scopeType = 'EDUCATION_UNIT' and e.scopeId in :educationUnitIds)
                    or (e.scopeType = 'CLASS' and e.scopeId in :classIds))
-            order by e.occurredAt desc, e.id desc
-            """)
-    Page<AuditEvent> search(
+            """;
+
+    /** A Slice: the page query never counts; the total comes from {@link #countSearch} only when more rows exist. */
+    @Query("select e from AuditEvent e " + SEARCH_FILTER + " order by e.occurredAt desc, e.id desc")
+    Slice<AuditEvent> search(
             @Param("tenantId") String tenantId,
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to,
@@ -46,6 +47,19 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, String> 
             @Param("educationUnitIds") List<String> educationUnitIds,
             @Param("classIds") List<String> classIds,
             Pageable pageable);
+
+    @Query("select count(e) from AuditEvent e " + SEARCH_FILTER)
+    long countSearch(
+            @Param("tenantId") String tenantId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to,
+            @Param("actorId") String actorId,
+            @Param("resourceType") String resourceType,
+            @Param("resourceId") String resourceId,
+            @Param("outcome") AuditOutcome outcome,
+            @Param("allScopes") boolean allScopes,
+            @Param("educationUnitIds") List<String> educationUnitIds,
+            @Param("classIds") List<String> classIds);
 
     @Modifying
     @Query(value = """

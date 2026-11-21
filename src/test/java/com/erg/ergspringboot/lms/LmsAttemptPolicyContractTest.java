@@ -74,8 +74,7 @@ class LmsAttemptPolicyContractTest {
         Quiz quiz = quiz();
         QuizPackage pkg = packageEntity();
         when(assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
-        when(quizzes.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz));
-        when(packages.activePackageEntity("erg", "quiz-1")).thenReturn(Optional.of(pkg));
+        when(packages.startInfo("erg", "quiz-1", null)).thenReturn(QuizStartInfo.of(quiz, pkg));
 
         AttemptResponse response = useCase.start(
                 "student-1", new StartAttemptRequest("assignment-1", "quiz-1", "pkg-server", "hash-server"),
@@ -99,10 +98,9 @@ class LmsAttemptPolicyContractTest {
         Assignment assignment = assignment();
         assignment.setOfflineAllowed(true);
         when(assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
-        when(quizzes.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz()));
         QuizPackage clientFirst = packageEntity();
         clientFirst.setGradingMode("client-first");
-        when(packages.activePackageEntity("erg", "quiz-1")).thenReturn(Optional.of(clientFirst));
+        when(packages.startInfo("erg", "quiz-1", null)).thenReturn(QuizStartInfo.of(quiz(), clientFirst));
 
         AttemptResponse response = useCase.start(
                 "student-1", new StartAttemptRequest("assignment-1", "quiz-1", "pkg-server", "hash-server"),
@@ -113,7 +111,7 @@ class LmsAttemptPolicyContractTest {
         Assignment defaultDeny = assignment();
         when(assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(defaultDeny));
         clientFirst.setGradingMode("server-authoritative");
-        when(packages.activePackageEntity("erg", "quiz-1")).thenReturn(Optional.of(clientFirst));
+        when(packages.startInfo("erg", "quiz-1", null)).thenReturn(QuizStartInfo.of(quiz(), clientFirst));
         AttemptResponse denied = useCase.start(
                 "student-1", new StartAttemptRequest("assignment-1", "quiz-1", "pkg-server", "hash-server"),
                 null, access());
@@ -123,7 +121,7 @@ class LmsAttemptPolicyContractTest {
     @Test
     void startRejectsClientPackageHashWhenItDoesNotMatchPublishedPackage() {
         when(assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment()));
-        when(packages.activePackageEntity("erg", "quiz-1")).thenReturn(Optional.of(packageEntity()));
+        when(packages.startInfo("erg", "quiz-1", null)).thenReturn(QuizStartInfo.of(quiz(), packageEntity()));
 
         assertThatThrownBy(() -> useCase.start(
                 "student-1", new StartAttemptRequest("assignment-1", "quiz-1", "pkg-server", "hash-client"),
@@ -135,7 +133,7 @@ class LmsAttemptPolicyContractTest {
     }
 
     @Test
-    void submitUsesServerTimeInsteadOfClientSubmittedAtForExpiry() {
+    void submitPastDeadlineAndGraceStillStoresThePayloadAnswersAsLate() {
         Assignment assignment = assignment();
         assignment.setMaxDurationMinutes(10);
         Attempt attempt = attempt();
@@ -143,14 +141,14 @@ class LmsAttemptPolicyContractTest {
         when(attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
         when(assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
 
-        assertThatThrownBy(() -> useCase.submit(
-                "attempt-1",
-                new SubmitAttemptRequest(Map.of(), SERVER_NOW.minusHours(4), "hash-1", "1", Map.of(), List.of()),
-                access()))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("duration exceeded");
+        // The client-supplied submittedAt (4h ago) is ignored; server time decides lateness and nothing throws.
+        useCase.submit("attempt-1",
+                new SubmitAttemptRequest(Map.of("q1", "A"), SERVER_NOW.minusHours(4), "hash-1", "1", Map.of(), List.of()),
+                access());
 
-        verify(attempts, never()).save(any());
+        assertThat(attempt.isLate()).isTrue();
+        assertThat(attempt.getSubmittedAt()).isEqualTo(SERVER_NOW);
+        verify(attempts).save(attempt);
     }
 
     @Test

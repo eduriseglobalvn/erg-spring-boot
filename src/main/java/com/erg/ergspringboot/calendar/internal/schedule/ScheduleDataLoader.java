@@ -33,14 +33,16 @@ public class ScheduleDataLoader {
 
     private static final String EVENT_COLUMNS = """
             select e.id, e.batch_id, b.label batch_label, b.status batch_status, b.created_at batch_created_at,
-                   (select u.full_name from users u where u.id = b.created_by) created_by_name,
-                   (select min(r.name) from user_roles ur join roles r on r.id = ur.role_id
-                     where ur.user_id = b.created_by) created_by_role,
+                   cb.full_name created_by_name, cr.role_name created_by_role,
                    e.school_id, su.name school_name, e.academic_class_id, c.name class_name, e.room_id,
                    coalesce(rm.name, e.room_name) room_name, s.name subject_name,
                    e.start_at, e.end_at, e.period_start, e.status event_status
             from teaching_schedule_events e
             join teaching_schedule_batches b on b.id = e.batch_id
+            left join users cb on cb.id = b.created_by
+            left join (select ur.user_id, min(r.name) role_name from user_roles ur join roles r on r.id = ur.role_id
+                        where ur.user_id in (select bb.created_by from teaching_schedule_batches bb where bb.tenant_id = :tenant)
+                        group by ur.user_id) cr on cr.user_id = b.created_by
             left join education_units su on su.id = e.school_id
             left join academic_classes c on c.id = e.academic_class_id
             left join curriculum_subjects s on s.id = e.subject_id
@@ -59,14 +61,23 @@ public class ScheduleDataLoader {
      */
     List<Occurrence> loadPublished(String tenantId, OffsetDateTime from, OffsetDateTime to, Collection<String> classIds,
             Collection<String> roomIds, Collection<String> teacherIds, Collection<String> excludeEventIds) {
+        return loadPublished(tenantId, from, to, classIds, roomIds, teacherIds, excludeEventIds, null);
+    }
+
+    /** Same, skipping the events of {@code skipSchoolIds} in SQL (the caller already holds them); null skips nothing. */
+    List<Occurrence> loadPublished(String tenantId, OffsetDateTime from, OffsetDateTime to, Collection<String> classIds,
+            Collection<String> roomIds, Collection<String> teacherIds, Collection<String> excludeEventIds,
+            Collection<String> skipSchoolIds) {
         if (classIds.isEmpty() && roomIds.isEmpty() && teacherIds.isEmpty()) return List.of();
         MapSqlParameterSource params = new MapSqlParameterSource("tenant", tenantId)
                 .addValue("from", from).addValue("to", to)
                 .addValue("classes", orSentinel(classIds)).addValue("rooms", orSentinel(roomIds))
-                .addValue("teachers", orSentinel(teacherIds));
+                .addValue("teachers", orSentinel(teacherIds))
+                .addValue("skipNone", skipSchoolIds == null || skipSchoolIds.isEmpty()).addValue("skip", orSentinel(skipSchoolIds));
         List<Occurrence> rows = jdbc.query(EVENT_COLUMNS + """
                 where e.tenant_id = :tenant and e.status = 'PUBLISHED'
                   and e.start_at >= :from and e.start_at < :to
+                  and (:skipNone or e.school_id is null or e.school_id not in (:skip))
                   and (e.academic_class_id in (:classes) or e.room_id in (:rooms)
                        or exists (select 1 from teaching_schedule_event_teachers t
                                   where t.event_id = e.id and t.teacher_user_id in (:teachers)))
@@ -152,10 +163,10 @@ public class ScheduleDataLoader {
         return holidays;
     }
 
-    static final int IN_CHUNK = 5000;
+    public static final int IN_CHUNK = 5000;
 
     /** Splits an id collection so one `in (:ids)` never carries more than {@link #IN_CHUNK} parameters. */
-    static <T> List<List<T>> chunks(Collection<T> ids) {
+    public static <T> List<List<T>> chunks(Collection<T> ids) {
         List<T> all = List.copyOf(ids);
         List<List<T>> result = new ArrayList<>();
         for (int i = 0; i < all.size(); i += IN_CHUNK) result.add(all.subList(i, Math.min(all.size(), i + IN_CHUNK)));

@@ -25,6 +25,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -52,6 +53,7 @@ class NotificationAckIT {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private EntityManager entityManager;
+    @Autowired private CacheManager cacheManager;
 
     private String ackMessage;
     private String infoMessage;
@@ -60,6 +62,8 @@ class NotificationAckIT {
 
     @BeforeEach
     void seed() {
+        // Seeding bypasses the service (no eviction) and each test rolls back: the 15 s unread cache would leak between tests.
+        cacheManager.getCache("notificationUnread").clear();
         entityManager.persist(user("admin-ack", "Cô Hoa"));
         entityManager.persist(user("stu-ack", "Học sinh A"));
         entityManager.persist(user("stu-other", "Học sinh B"));

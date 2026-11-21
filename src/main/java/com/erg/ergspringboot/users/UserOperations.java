@@ -40,7 +40,8 @@ public class UserOperations {
     public UserCreatedResponse createUser(AdminCreateUserRequest request,UserAuditContext audit){return createUser(request,audit,SecurityUtils.principal());}
     public UserCreatedResponse createUser(AdminCreateUserRequest request,UserAuditContext audit,com.erg.ergspringboot.platform.security.ErgPrincipal actor){return provisioning.create(request,audit,actor);}
     public CredentialDeliveryResponse resetCredential(String id,String tenant,String delivery,UserAuditContext audit){guard.assertCanActOn(SecurityUtils.principal(),id,"EMAIL_INVITE".equalsIgnoreCase(delivery)?AccountAction.RESEND_INVITE:AccountAction.RESET_PASSWORD);return provisioning.reset(id,tenant,delivery,audit);}
-    public BulkOperationResponse bulkUpdateStatus(String tenant,BulkStatusRequest request){guard.assertCanActOnAll(SecurityUtils.principal(),request.userIds(),statusAction(request.status()));return lifecycle.bulkStatus(tenant,request);}
+    public BulkOperationResponse bulkUpdateStatus(String tenant,BulkStatusRequest request){return bulkUpdateStatus(tenant,request,null);}
+    public BulkOperationResponse bulkUpdateStatus(String tenant,BulkStatusRequest request,UserAuditContext audit){guard.assertCanActOnAll(SecurityUtils.principal(),request.userIds(),statusAction(request.status()));return lifecycle.bulkStatus(tenant,request,audit);}
     public BulkOperationResponse bulkDelete(String tenant,BulkDeleteRequest request){return bulkDelete(tenant,request,null);}
     public BulkOperationResponse bulkDelete(String tenant,BulkDeleteRequest request,UserAuditContext audit){guard.assertCanActOnAll(SecurityUtils.principal(),request.userIds(),AccountAction.DELETE);return lifecycle.bulkDelete(tenant,request,audit);}
     public UserDetailResponse getUserDetail(String id,String tenant){return queries.detail(id,tenant);}

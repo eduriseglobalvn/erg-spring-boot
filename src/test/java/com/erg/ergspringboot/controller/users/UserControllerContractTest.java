@@ -189,7 +189,8 @@ class UserControllerContractTest {
     @Test
     void bulkStatusDeleteAndAssignRolesUseVersionedAdminRoutes() throws Exception {
         UserOperations userService = mock(UserOperations.class);
-        when(userService.bulkUpdateStatus(eq("erg"), org.mockito.ArgumentMatchers.any(BulkStatusRequest.class)))
+        when(userService.bulkUpdateStatus(eq("erg"), org.mockito.ArgumentMatchers.any(BulkStatusRequest.class),
+                org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))
                 .thenReturn(new BulkOperationResponse(2));
         when(userService.bulkDelete(eq("erg"), org.mockito.ArgumentMatchers.any(BulkDeleteRequest.class),
                 org.mockito.ArgumentMatchers.any(com.erg.ergspringboot.users.UserAuditContext.class)))

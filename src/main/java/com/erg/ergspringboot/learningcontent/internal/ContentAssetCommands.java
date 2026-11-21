@@ -35,13 +35,16 @@ final class ContentAssetCommands {
     private final ContentAssetRepository contentAssetRepository;
     private final ContentItemAssetRepository contentItemAssetRepository;
     private final LearningContentSupport.SyncReceipts receipts;
+    private final ContentOwnership ownership;
 
     ContentAssetCommands(
             ContentItemRepository contentItemRepository,
             ContentAssetRepository contentAssetRepository,
             ContentItemAssetRepository contentItemAssetRepository,
-            LearningContentSupport.SyncReceipts receipts
+            LearningContentSupport.SyncReceipts receipts,
+            ContentOwnership ownership
     ) {
+        this.ownership = ownership;
         this.contentItemRepository = contentItemRepository;
         this.contentAssetRepository = contentAssetRepository;
         this.contentItemAssetRepository = contentItemAssetRepository;
@@ -78,6 +81,7 @@ final class ContentAssetCommands {
                         required(tenantId, "tenantId")
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("content asset not found for tenant"));
+        ownership.requireCanModify(asset.getCreatedBy());
         String resolvedTenantId = required(tenantId, "tenantId");
         String key = blankToNull(request.idempotencyKey());
         LmsSyncOperationService.Receipt receipt = receipts.reserve(resolvedTenantId, userId, request.operationId(), key,
@@ -136,7 +140,8 @@ final class ContentAssetCommands {
         String resolvedContentItemId = required(contentItemId, "contentItemId");
         ContentItem item = contentItemRepository.findByIdAndTenantId(resolvedContentItemId, resolvedTenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("content item not found for tenant"));
-        ContentAsset asset = contentAssetRepository.findByIdAndTenantId(
+        ownership.requireCanModify(item.getCreatedBy());
+        ContentAsset asset =contentAssetRepository.findByIdAndTenantId(
                         required(request.contentAssetId(), "contentAssetId"),
                         resolvedTenantId
                 )

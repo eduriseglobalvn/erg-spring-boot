@@ -16,13 +16,27 @@ public interface StudentRepository extends JpaRepository<Student, String> {
 
     List<Student> findByTenantIdAndIdIn(String tenantId, Collection<String> ids);
 
+    long countByTenantIdAndIdIn(String tenantId, Collection<String> ids);
+
     Optional<Student> findByTenantIdAndId(String tenantId, String id);
 
     /** A student code is unique inside one school only: two schools both have a class 6A1 with student no. 1 (BUG-A-003). */
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId and coalesce(student.schoolId, '') = coalesce(:schoolId, '')
+              and lower(student.studentCode) = lower(:studentCode)
+            """)
     Optional<Student> findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(String tenantId, String schoolId, String studentCode);
 
-    List<Student> findByTenantIdAndSchoolIdAndFullNameIgnoreCase(String tenantId, String schoolId, String fullName);
+    /** Matches on the normalised name (Student.normalizeName) so idx_lms_students_tenant_school_name_normalized (V190) serves it. */
+    @Query("""
+            select student from Student student
+            where student.tenantId = :tenantId and coalesce(student.schoolId, '') = coalesce(:schoolId, '')
+              and student.fullNameNormalized = :normalizedName
+            """)
+    List<Student> findByTenantIdAndSchoolIdAndFullNameNormalized(String tenantId, String schoolId, String normalizedName);
 
+    @Query("select student from Student student where student.tenantId = :tenantId and lower(student.studentCode) = lower(:studentCode)")
     List<Student> findByTenantIdAndStudentCodeIgnoreCase(String tenantId, String studentCode);
 
     long countByTenantIdAndSchoolId(String tenantId, String schoolId);
@@ -65,17 +79,24 @@ public interface StudentRepository extends JpaRepository<Student, String> {
     List<Student> findAudienceStudentsInClassesAmong(
             String tenantId, Collection<String> academicClassIds, Collection<String> authUserIds);
 
-    /** Lookup by code (upper-case), email (lower-case) or phone with spaces/dots/dashes removed. */
+    /** Lookup by code (any case), email (lower-case) or phone with spaces/dots/dashes removed. */
+    default List<Student> findAudienceStudentsByKeys(
+            String tenantId, Collection<String> codes, Collection<String> emails, Collection<String> phones) {
+        return findAudienceStudentsByLowerKeys(tenantId, codes.stream().map(code -> code.toLowerCase(java.util.Locale.ROOT)).toList(),
+                emails, phones);
+    }
+
+    /** The code index is on lower(student_code) (V164), so codes are matched lower-cased. */
     @Query("""
             select student from Student student
             where student.tenantId = :tenantId
               and student.authUserId is not null
               and (student.status is null or lower(student.status) in ('active', 'enrolled'))
-              and (upper(student.studentCode) in :codes
+              and (lower(student.studentCode) in :codes
                    or lower(student.email) in :emails
                    or replace(replace(replace(student.phone, ' ', ''), '.', ''), '-', '') in :phones)
             """)
-    List<Student> findAudienceStudentsByKeys(
+    List<Student> findAudienceStudentsByLowerKeys(
             String tenantId, Collection<String> codes, Collection<String> emails, Collection<String> phones);
 
     Optional<Student> findFirstByTenantIdAndAuthUserId(String tenantId, String authUserId);

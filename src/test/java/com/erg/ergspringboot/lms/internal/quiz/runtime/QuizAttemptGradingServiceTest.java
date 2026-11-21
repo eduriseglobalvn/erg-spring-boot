@@ -54,6 +54,25 @@ class QuizAttemptGradingServiceTest {
     }
 
     @Test
+    void passMarkIsComparedExactlyNotThroughDoubleRounding() {
+        QuizVersion version = new QuizVersion();
+        version.setRuntimeQuiz(Map.of("settings", Map.of("runtime", Map.of("passPercent", 57))));
+        when(versions.findById("ver-1")).thenReturn(Optional.of(version));
+        when(questions.findByQuizVersionIdOrderByOrderIndexAsc("ver-1")).thenReturn(List.of());
+
+        assertThat(service.totals("ver-1", BigDecimal.valueOf(57), BigDecimal.valueOf(100), false, 1, 1).passed()).isTrue();
+        assertThat(service.totals("ver-1", new BigDecimal("56.99"), BigDecimal.valueOf(100), false, 1, 1).passed()).isFalse();
+        // 56.996 is shown as 57.0 (two decimals), so it passes a 57% mark
+        assertThat(service.totals("ver-1", new BigDecimal("56.996"), BigDecimal.valueOf(100), false, 1, 1).passed()).isTrue();
+        assertThat(service.totals("ver-1", new BigDecimal("56.994"), BigDecimal.valueOf(100), false, 1, 1).passed()).isFalse();
+        version.setRuntimeQuiz(Map.of("settings", Map.of("runtime", Map.of("passPercent", 29))));
+        // distinct tenant-less cache key per version id so the new pass mark is read
+        when(versions.findById("ver-2")).thenReturn(Optional.of(version));
+        when(questions.findByQuizVersionIdOrderByOrderIndexAsc("ver-2")).thenReturn(List.of());
+        assertThat(service.totals("ver-2", BigDecimal.valueOf(29), BigDecimal.valueOf(100), false, 1, 1).passed()).isTrue();
+    }
+
+    @Test
     void submitsOfOnePublishedVersionReadItsQuestionsAndPassMarkOncePerTenant() {
         when(versions.findById("ver-1")).thenReturn(Optional.empty());
         when(questions.findByQuizVersionIdOrderByOrderIndexAsc("ver-1")).thenReturn(List.of(choice("vq-1", "q1")));

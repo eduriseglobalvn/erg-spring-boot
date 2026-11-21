@@ -15,23 +15,19 @@ import org.junit.jupiter.api.Test;
 class OpenApiConfigTest {
 
     @Test
-    void publicOperationsDeclareEmptySecurityAndEditorialVariantsStayProtected() throws Exception {
+    void publicOperationsDeclareEmptySecurityAndOthersStayProtected() throws Exception {
         OpenAPI openApi = customizedSnapshot();
 
         assertThat(operation(openApi, "/api/v1/auth/login", HttpMethod.POST).getSecurity()).isEmpty();
         assertThat(operation(openApi, "/api/v1/auth/refresh", HttpMethod.POST).getSecurity()).isEmpty();
         assertThat(operation(openApi, "/api/v1/health", HttpMethod.GET).getSecurity()).isEmpty();
         assertThat(operation(openApi, "/webhooks/telegram", HttpMethod.POST).getSecurity()).isEmpty();
-        assertThat(OpenApiConfig.isPublic(HttpMethod.GET, "/api/v1/posts/{slug}")).isTrue();
         assertThat(Json.mapper().writeValueAsString(operation(openApi, "/api/v1/auth/login", HttpMethod.POST)))
                 .contains("\"security\":[]");
 
-        assertThat(OpenApiConfig.isPublic(HttpMethod.GET, "/api/v1/posts/hidden")).isFalse();
-        assertThat(OpenApiConfig.isPublic(HttpMethod.GET, "/api/v1/reviews/admin")).isFalse();
-        assertThat(OpenApiConfig.isPublic(HttpMethod.POST, "/api/v1/posts")).isFalse();
         assertThat(OpenApiConfig.isPublic(HttpMethod.GET, "/api/v1/users/me")).isFalse();
         assertThat(OpenApiConfig.isPublic(HttpMethod.POST, "/webhooks/telegram")).isTrue();
-        assertThat(OpenApiConfig.isPublic(HttpMethod.POST, "/api/v1/reviews/{reviewId}/helpful")).isTrue();
+        assertThat(OpenApiConfig.isPublic(HttpMethod.GET, "/api/v1/timekeeping/photos/file")).isTrue();
         assertThat(operation(openApi, "/api/v1/users/me", HttpMethod.GET).getSecurity()).isNull();
     }
 

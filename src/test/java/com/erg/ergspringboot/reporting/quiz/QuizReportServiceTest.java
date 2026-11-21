@@ -119,6 +119,30 @@ class QuizReportServiceTest {
     }
 
     @Test
+    void filteredPagesReuseOneSummary() {
+        when(studentProgressRepository.summarizeAssignment("tenant-a", "asg-1", null, null, null, null))
+                .thenReturn(aggregate(250, 200, 30, 10, 60.0));
+        when(studentProgressRepository.findAssignmentReport(
+                org.mockito.ArgumentMatchers.eq("tenant-a"), org.mockito.ArgumentMatchers.eq("asg-1"),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+        QuizReportService service = service();
+        var filter = new com.erg.ergspringboot.reporting.AssignmentProgressFilter(
+                null, null, null, null, java.time.ZoneId.of("UTC"), 0, 100);
+
+        var summary = service.summary("tenant-a", "asg-1", filter);
+        var first = service.assignmentReport("tenant-a", "asg-1", filter, summary);
+        var second = service.assignmentReport("tenant-a", "asg-1", new com.erg.ergspringboot.reporting.AssignmentProgressFilter(
+                null, null, null, null, java.time.ZoneId.of("UTC"), 1, 100), summary);
+
+        assertThat(first.totalRecipients()).isEqualTo(250);
+        assertThat(second.totalRecipients()).isEqualTo(250);
+        verify(studentProgressRepository, org.mockito.Mockito.times(1))
+                .summarizeAssignment("tenant-a", "asg-1", null, null, null, null);
+    }
+
+    @Test
     void reportReadModelsDeclareTenantScopedCacheKeys() throws NoSuchMethodException {
         Cacheable analyticsCache = QuizReportService.class
                 .getMethod("questionAnalyticsByVersion", String.class, String.class)

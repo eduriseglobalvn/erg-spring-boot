@@ -36,6 +36,7 @@ class TypedConfigurationContractTest {
             assertThat(events.getRecovery().getMaxInFlight()).isEqualTo(16);
             assertThat(events.getIo().getCoreSize()).isEqualTo(8);
             assertThat(events.getIo().getMaxSize()).isEqualTo(16);
+            assertThat(events.getIo().getQueueCapacity()).isEqualTo(256);
             assertThat(events.getCpu().getParallelism()).isEqualTo(4);
 
             ErgHttpProperties http = context.getBean(ErgHttpProperties.class);

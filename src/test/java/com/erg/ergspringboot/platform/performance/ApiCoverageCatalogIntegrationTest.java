@@ -21,10 +21,9 @@ import org.springframework.web.servlet.mvc.condition.RequestMethodsRequestCondit
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-@ActiveProfiles({"test", "prototype"})
+@ActiveProfiles("test")
 @SpringBootTest(properties = {
         "erg.auth.bff-enabled=true",
-        "erg.process-local.enabled=true",
         "spring.security.oauth2.client.registration.erg-api.provider=keycloak",
         "spring.security.oauth2.client.registration.erg-api.client-id=catalog-test",
         "spring.security.oauth2.client.registration.erg-api.client-secret=catalog-test",

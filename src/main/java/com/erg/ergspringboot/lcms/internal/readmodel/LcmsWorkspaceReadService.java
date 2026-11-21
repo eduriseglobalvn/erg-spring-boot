@@ -6,6 +6,7 @@ import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.Questio
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.RoleOptionResponse;
 import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.ScopeOptionResponse;
+import com.erg.ergspringboot.lcms.LcmsReadPort;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.UserAccessRowProjection;
 import com.erg.ergspringboot.users.persistence.UserEffectivePermissionProjection;
@@ -22,7 +23,7 @@ import com.erg.ergspringboot.curriculum.persistence.projection.QuestionBankOptio
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuestionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionBankQuizOptionProjection;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.projection.QuestionUsageCountProjection;
-import com.erg.ergspringboot.users.persistence.organization.UserAccessScopeRepository;
+import com.erg.ergspringboot.lcms.persistence.LcmsAccessReadRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -41,6 +42,8 @@ public class LcmsWorkspaceReadService {
 
     private static final String ACTIVE = "active";
     private static final int MAX_OPTION_ROWS = 500;
+    private static final int DEFAULT_QUIZ_ROWS = 200;
+    private static final int MAX_QUIZ_ROWS = 500;
 
     private final QuestionRepository questionRepository;
     private final CurriculumSubjectRepository subjectRepository;
@@ -50,7 +53,7 @@ public class LcmsWorkspaceReadService {
     private final QuizQuestionRepository quizQuestionRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final UserAccessScopeRepository userAccessScopeRepository;
+    private final LcmsAccessReadRepository accessReads;
     private final QuizDraftRepository quizDraftRepository;
 
     public LcmsWorkspaceReadService(
@@ -62,7 +65,7 @@ public class LcmsWorkspaceReadService {
             QuizQuestionRepository quizQuestionRepository,
             UserRepository userRepository,
             RoleRepository roleRepository,
-            UserAccessScopeRepository userAccessScopeRepository,
+            LcmsAccessReadRepository accessReads,
             QuizDraftRepository quizDraftRepository
     ) {
         this.questionRepository = questionRepository;
@@ -73,13 +76,31 @@ public class LcmsWorkspaceReadService {
         this.quizQuestionRepository = quizQuestionRepository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
-        this.userAccessScopeRepository = userAccessScopeRepository;
+        this.accessReads = accessReads;
         this.quizDraftRepository = quizDraftRepository;
     }
 
+    public QuestionBankWorkspaceResponse questionBankWorkspace(
+            String tenantId, String search, String subjectId, String levelId, String topicId, String status,
+            String quizKind, Boolean includeQuestions, Integer page, Integer size
+    ) {
+        return questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page,
+                size, LcmsReadPort.QuestionBankReadOptions.ALL);
+    }
+
+    public QuestionBankWorkspaceResponse questionBankWorkspace(
+            String tenantId, String search, String subjectId, String levelId, String topicId, String status,
+            String quizKind, Boolean includeQuestions, Integer page, Integer size, LcmsReadPort.QuestionBankReadOptions options
+    ) {
+        return questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page, size,
+                options, null);
+    }
+
+    /** {@code viewerUserId} is set for a teacher (their list hides other teachers' quizzes) and is part of the cache key. */
     @Cacheable(
             cacheNames = "lcmsQuestionBankWorkspace",
-            key = "{#tenantId, #search, #subjectId, #levelId, #topicId, #status, #quizKind, #includeQuestions, #page, #size}"
+            key = "{#tenantId, #search, #subjectId, #levelId, #topicId, #status, #quizKind, #includeQuestions, #page, #size,"
+                    + " #options, #viewerUserId}"
     )
     public QuestionBankWorkspaceResponse questionBankWorkspace(
             String tenantId,
@@ -91,8 +112,12 @@ public class LcmsWorkspaceReadService {
             String quizKind,
             Boolean includeQuestions,
             Integer page,
-            Integer size
+            Integer size,
+            LcmsReadPort.QuestionBankReadOptions options,
+            String viewerUserId
     ) {
+        LcmsReadPort.QuestionBankReadOptions selected = options == null ? LcmsReadPort.QuestionBankReadOptions.ALL : options;
+        int quizLimit = quizLimit(selected);
         String normalizedTenantId = requireText(tenantId, "tenantId");
         PageBounds pageBounds = pageBounds(page, size, 50);
         String normalizedSubjectId = blankToNull(subjectId);
@@ -122,15 +147,21 @@ public class LcmsWorkspaceReadService {
                         normalizedLevelId,
                         normalizedTopicId,
                         normalizedStatus,
-                        questionPageRequest
+                        questionPageRequest,
+                        selected.runtimeQuestion()
                 )
                 : new org.springframework.data.domain.PageImpl<>(List.of(), questionPageRequest, 0);
         Map<String, Long> usageCounts = shouldIncludeQuestions
                 ? questionUsageCounts(normalizedTenantId, questions.getContent())
                 : Map.of();
+        List<QuestionBankQuizOptionProjection> quizRows = selected.quizzes()
+                ? quizOptions(normalizedTenantId, normalizedSearch, normalizedSubjectId, normalizedLevelId, normalizedTopicId,
+                        normalizedStatus, normalizedQuizKind, viewerUserId, PageRequest.of(0, quizLimit + 1))
+                : List.of();
+        boolean quizzesTruncated = quizRows.size() > quizLimit;
         return new QuestionBankWorkspaceResponse(
                 normalizedTenantId,
-                LcmsWorkspaceResponseMapper.toQuestionPage(questions, usageCounts),
+                LcmsWorkspaceResponseMapper.toQuestionPage(questions, usageCounts, selected.runtimeQuestion()),
                 subjectOptions.stream()
                         .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
                         .toList(),
@@ -140,19 +171,13 @@ public class LcmsWorkspaceReadService {
                 topicOptions.stream()
                         .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of(), topicQuestionCounts.getOrDefault(option.id(), 0)))
                         .toList(),
-                quizOptionResponses(
-                        normalizedTenantId,
-                        quizOptions(
-                                normalizedTenantId,
-                                normalizedSearch,
-                                normalizedSubjectId,
-                                normalizedLevelId,
-                                normalizedTopicId,
-                                normalizedStatus,
-                                normalizedQuizKind
-                        )
-                )
+                quizOptionResponses(normalizedTenantId, quizzesTruncated ? quizRows.subList(0, quizLimit) : quizRows),
+                quizzesTruncated
         );
+    }
+
+    private static int quizLimit(LcmsReadPort.QuestionBankReadOptions options) {
+        return Math.max(1, Math.min(options.quizLimit() == null ? DEFAULT_QUIZ_ROWS : options.quizLimit(), MAX_QUIZ_ROWS));
     }
 
     private Map<String, Integer> topicQuestionCounts(String tenantId, List<QuestionBankOptionProjection> topics) {
@@ -169,21 +194,21 @@ public class LcmsWorkspaceReadService {
             String levelId,
             String topicId,
             String status,
-            PageRequest pageRequest
+            PageRequest pageRequest,
+            boolean withContent
     ) {
         if (search == null) {
-            return questionRepository.findQuestionBankQuestionsWithoutSearch(
-                    tenantId,
-                    subjectId,
-                    levelId,
-                    topicId,
-                    status,
-                    pageRequest
-            );
+            return withContent
+                    ? questionRepository.findQuestionBankQuestionsWithoutSearch(tenantId, subjectId, levelId, topicId, status, pageRequest)
+                    : questionRepository.findQuestionBankQuestionsWithoutSearchSlim(tenantId, subjectId, levelId, topicId, status, pageRequest);
+        }
+        String folded = com.erg.ergspringboot.lcms.persistence.quiz.bank.VietnameseFold.fold(search);
+        if (!withContent) {
+            return questionRepository.findQuestionBankQuestionsSlim(tenantId, folded, subjectId, levelId, topicId, status, pageRequest);
         }
         return questionRepository.findQuestionBankQuestions(
                 tenantId,
-                com.erg.ergspringboot.lcms.persistence.quiz.bank.VietnameseFold.fold(search),
+                folded,
                 subjectId,
                 levelId,
                 topicId,
@@ -228,7 +253,9 @@ public class LcmsWorkspaceReadService {
             String levelId,
             String topicId,
             String status,
-            String quizKind
+            String quizKind,
+            String viewerUserId,
+            PageRequest limit
     ) {
         if (search == null && status == null) {
             return quizRepository.findQuestionBankQuizOptionsWithoutStatusAndSearch(
@@ -236,7 +263,9 @@ public class LcmsWorkspaceReadService {
                     subjectId,
                     levelId,
                     topicId,
-                    quizKind
+                    quizKind,
+                    viewerUserId,
+                    limit
             );
         }
         if (search == null) {
@@ -246,7 +275,9 @@ public class LcmsWorkspaceReadService {
                     levelId,
                     topicId,
                     status,
-                    quizKind
+                    quizKind,
+                    viewerUserId,
+                    limit
             );
         }
         if (status == null) {
@@ -256,7 +287,9 @@ public class LcmsWorkspaceReadService {
                     subjectId,
                     levelId,
                     topicId,
-                    quizKind
+                    quizKind,
+                    viewerUserId,
+                    limit
             );
         }
         return quizRepository.findQuestionBankQuizOptions(
@@ -266,7 +299,9 @@ public class LcmsWorkspaceReadService {
                 levelId,
                 topicId,
                 status,
-                quizKind
+                quizKind,
+                viewerUserId,
+                limit
         );
     }
 
@@ -281,7 +316,7 @@ public class LcmsWorkspaceReadService {
     ) {
         String normalizedTenantId = requireText(tenantId, "tenantId");
         PageBounds pageBounds = pageBounds(page, size, 50);
-        Page<UserAccessRowProjection> users = userRepository.findAccessManagementRows(
+        Page<UserAccessRowProjection> users = accessReads.findRows(
                 normalizedTenantId,
                 blankToNull(search),
                 blankToNull(roleId),
@@ -331,9 +366,7 @@ public class LcmsWorkspaceReadService {
 
     private List<com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection> boundedScopeOptions(
             String tenantId) {
-        List<com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection> bounded =
-                userAccessScopeRepository.findAccessManagementScopeOptions(tenantId, PageRequest.of(0, MAX_OPTION_ROWS));
-        return bounded == null ? userAccessScopeRepository.findAccessManagementScopeOptions(tenantId) : bounded;
+        return accessReads.findScopeOptions(tenantId, PageRequest.of(0, MAX_OPTION_ROWS));
     }
 
     private Map<String, Long> questionUsageCounts(String tenantId, List<QuestionBankQuestionProjection> questions) {

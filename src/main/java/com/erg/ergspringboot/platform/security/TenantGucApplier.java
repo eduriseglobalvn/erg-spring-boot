@@ -5,13 +5,13 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 /**
- * Applies the request-scoped {@link TenantContext} onto a PostgreSQL connection as transaction-local
- * session GUCs (spec §1, Phase 0.4 groundwork for RLS).
+ * Applies the request-scoped {@link TenantContext} onto a PostgreSQL connection as session GUCs (RLS).
  *
- * <p>Uses {@code set_config(key, value, true)} where the trailing {@code true} scopes the setting to the
- * current transaction, so the value is automatically reset when the transaction ends and never leaks to
- * the next borrower of a pooled connection. {@code current_setting(key, true)} then reads it back without
- * erroring when unset. Strict quiz-domain RLS policies read {@code app.tenant_id} etc. this way.
+ * <p>{@link #apply} uses {@code set_config(key, value, true)}: transaction-local, reverting at commit/rollback to the
+ * connection's session value. That value belongs to whichever borrower used the connection last, so a connection is
+ * only safe for a query when its borrower also set or cleared the session value: {@link #applySession} at checkout,
+ * or {@link #applyTransaction} (both variants in one round trip) at the start of a Spring transaction.
+ * {@code current_setting(key, true)} reads a value back without erroring when unset.
  *
  * <p>The application runtime must use a dedicated non-owner database role; Flyway uses a separate
  * migration-owner credential. Legacy-table policy rollout remains incremental and explicitly gated.
@@ -22,6 +22,10 @@ public final class TenantGucApplier {
     public static final String USER_GUC = "app.user_id";
     public static final String PORTAL_GUC = "app.portal";
     public static final String MAINTENANCE_GUC = "app.maintenance_mode";
+
+    private static final String SET_ALL_SQL = "select "
+            + "set_config(?, ?, false), set_config(?, ?, false), set_config(?, ?, false), set_config(?, ?, false), "
+            + "set_config(?, ?, true), set_config(?, ?, true), set_config(?, ?, true), set_config(?, ?, true)";
 
     private TenantGucApplier() {
     }
@@ -50,6 +54,18 @@ public final class TenantGucApplier {
     }
 
     /**
+     * Transaction start: sets the session-level and the transaction-local values in one statement. The transaction-local
+     * value is what the transaction's queries see (also when no context exists: it clears); the session-level value is
+     * what remains on the connection after commit. No context clears both, as on a fresh connection.
+     */
+    public static void applyTransaction(Connection connection, TenantContext context) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(SET_ALL_SQL)) {
+            bind(statement, bind(statement, 1, context), context);
+            statement.execute();
+        }
+    }
+
+    /**
      * Session-level variant for a connection just taken from the pool: sets the context, or clears what a previous
      * borrower left (no context = unset, as on a fresh connection), so queries Hibernate runs outside a Spring
      * transaction are scoped too. Commits when auto-commit is off, so the setting outlives the implicit transaction.
@@ -57,14 +73,7 @@ public final class TenantGucApplier {
     public static void applySession(Connection connection, TenantContext context) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "select set_config(?, ?, false), set_config(?, ?, false), set_config(?, ?, false), set_config(?, ?, false)")) {
-            statement.setString(1, TENANT_GUC);
-            statement.setString(2, context == null ? "" : normalize(context.tenantId()));
-            statement.setString(3, USER_GUC);
-            statement.setString(4, context == null ? "" : normalize(context.userId()));
-            statement.setString(5, PORTAL_GUC);
-            statement.setString(6, context == null ? "" : normalize(context.portal()));
-            statement.setString(7, MAINTENANCE_GUC);
-            statement.setString(8, context == null ? "" : Boolean.toString(context.isMaintenance()));
+            bind(statement, 1, context);
             statement.execute();
         }
         if (!connection.getAutoCommit()) {
@@ -72,16 +81,19 @@ public final class TenantGucApplier {
         }
     }
 
-    private static String normalize(String value) {
-        return value == null ? "" : value;
+    private static int bind(PreparedStatement statement, int index, TenantContext context) throws SQLException {
+        statement.setString(index, TENANT_GUC);
+        statement.setString(index + 1, context == null ? "" : normalize(context.tenantId()));
+        statement.setString(index + 2, USER_GUC);
+        statement.setString(index + 3, context == null ? "" : normalize(context.userId()));
+        statement.setString(index + 4, PORTAL_GUC);
+        statement.setString(index + 5, context == null ? "" : normalize(context.portal()));
+        statement.setString(index + 6, MAINTENANCE_GUC);
+        statement.setString(index + 7, context == null ? "" : Boolean.toString(context.isMaintenance()));
+        return index + 8;
     }
 
-    private static void setLocal(Connection connection, String key, String value) throws SQLException {
-        // set_config(key, value, true) — transaction-local, auto-reset at commit/rollback.
-        try (PreparedStatement statement = connection.prepareStatement("select set_config(?, ?, true)")) {
-            statement.setString(1, key);
-            statement.setString(2, value == null ? "" : value);
-            statement.execute();
-        }
+    private static String normalize(String value) {
+        return value == null ? "" : value;
     }
 }

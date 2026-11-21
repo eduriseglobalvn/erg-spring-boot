@@ -4,6 +4,7 @@ import com.erg.ergspringboot.audit.persistence.AuditEvent;
 import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -69,11 +70,15 @@ public class AuditChainVerifyJob {
     private String firstBreak(String tenant) {
         String previous = null;
         String carry = null;
-        for (int offset = 0;; offset += PAGE) {
-            List<AuditEvent> page = entityManager.createQuery(
-                            "select e from AuditEvent e where e.tenantId = :t order by e.occurredAt, e.id",
-                            AuditEvent.class)
-                    .setParameter("t", tenant).setFirstResult(offset).setMaxResults(PAGE).getResultList();
+        OffsetDateTime afterAt = null;
+        String afterId = null;
+        for (;;) {
+            // Keyset page on the verified order (occurredAt, id): no OFFSET rescans.
+            var query = entityManager.createQuery("select e from AuditEvent e where e.tenantId = :t"
+                    + (afterAt == null ? "" : " and (e.occurredAt > :at or (e.occurredAt = :at and e.id > :id))")
+                    + " order by e.occurredAt, e.id", AuditEvent.class).setParameter("t", tenant);
+            if (afterAt != null) query.setParameter("at", afterAt).setParameter("id", afterId);
+            List<AuditEvent> page = query.setMaxResults(PAGE).getResultList();
             if (page.isEmpty()) return null;
             // The carried tail links this page to the previous one; null means the very first row.
             List<AuditEvent> window = carry == null ? page : prepend(carry, previous, page);
@@ -82,6 +87,8 @@ public class AuditChainVerifyJob {
             AuditEvent last = page.get(page.size() - 1);
             carry = last.getEventHash();
             previous = last.getId();
+            afterAt = last.getOccurredAt();
+            afterId = last.getId();
             entityManager.clear();
             if (page.size() < PAGE) return null;
         }

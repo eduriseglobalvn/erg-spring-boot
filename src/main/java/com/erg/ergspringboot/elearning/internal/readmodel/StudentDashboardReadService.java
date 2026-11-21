@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.elearning.internal.readmodel;
 
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository;
 import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import static com.erg.ergspringboot.elearning.internal.readmodel.StudentDashboardCards.*;
 
@@ -14,9 +15,8 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardSummaryResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses.StudentDashboardViewerResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
-import com.erg.ergspringboot.users.persistence.User;
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository.UserFallback;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
-import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentEnrollment;
@@ -57,7 +57,7 @@ public class StudentDashboardReadService {
     private final StudentRepository studentRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final ClassroomRepository classroomRepository;
-    private final UserRepository userRepository;
+    private final DashboardUserFallbackRepository userRepository;
     private final ErgPolicyService policyService;
     private final StudentDashboardAnnouncementReadPort announcementReadPort;
     private final ClassLeaderboardRepository leaderboardRepository;
@@ -67,7 +67,7 @@ public class StudentDashboardReadService {
             AssignmentRepository assignmentRepository,
             AttemptRepository attemptRepository,
             StudentRepository studentRepository,
-            UserRepository userRepository,
+            DashboardUserFallbackRepository userRepository,
             ErgPolicyService policyService,
             StudentDashboardAnnouncementReadPort announcementReadPort,
             StudentEnrollmentRepository studentEnrollmentRepository,
@@ -89,7 +89,7 @@ public class StudentDashboardReadService {
             AssignmentRepository assignmentRepository,
             AttemptRepository attemptRepository,
             StudentRepository studentRepository,
-            UserRepository userRepository,
+            DashboardUserFallbackRepository userRepository,
             ErgPolicyService policyService,
             StudentDashboardAnnouncementReadPort announcementReadPort,
             StudentEnrollmentRepository studentEnrollmentRepository,
@@ -103,7 +103,7 @@ public class StudentDashboardReadService {
             AssignmentRepository assignmentRepository,
             AttemptRepository attemptRepository,
             StudentRepository studentRepository,
-            UserRepository userRepository,
+            DashboardUserFallbackRepository userRepository,
             ErgPolicyService policyService,
             StudentDashboardAnnouncementReadPort announcementReadPort
     ) {
@@ -123,7 +123,7 @@ public class StudentDashboardReadService {
             AssignmentRepository assignmentRepository,
             AttemptRepository attemptRepository,
             StudentRepository studentRepository,
-            UserRepository userRepository,
+            DashboardUserFallbackRepository userRepository,
             ErgPolicyService policyService
     ) {
         this(
@@ -148,8 +148,8 @@ public class StudentDashboardReadService {
         assertPermission(safeScope);
         assertTenantSelfScope(safeScope);
 
-        User user = userRepository.findWithDetailsByIdAndTenantId(safeScope.userId(), safeScope.tenantId()).orElse(null);
         Student student = studentRepository.findFirstByTenantIdAndAuthUserId(safeScope.tenantId(), safeScope.userId()).orElse(null);
+        UserFallback user = userFallback(safeScope, student);
         String studentId = student == null ? null : blankToNull(student.getId());
         List<StudentDashboardClassMembershipResponse> classMemberships = classMemberships(safeScope, student);
         String academicClassId = selectedClassId(safeScope, student, classMemberships);
@@ -234,6 +234,15 @@ public class StudentDashboardReadService {
 
     static int sliceLimit(Integer requested) {
         return requested == null ? FIRST_SLICE_LIMIT : Math.max(FIRST_SLICE_LIMIT, Math.min(MAX_SLICE_LIMIT, requested));
+    }
+
+    /** The login's name, email and status only when the student row cannot supply them (or there is no student row). */
+    private UserFallback userFallback(StudentDashboardReadScope scope, Student student) {
+        if (student != null && blankToNull(student.getFullName()) != null && blankToNull(student.getEmail()) != null
+                && blankToNull(student.getStatus()) != null) {
+            return null;
+        }
+        return userRepository.findFallback(scope.tenantId(), scope.userId()).orElse(null);
     }
 
     private long legacyActiveAssignmentCount(

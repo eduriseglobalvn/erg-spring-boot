@@ -49,8 +49,13 @@ public class LeaveBalanceService {
     }
 
     public BigDecimal annualBalance(String tenantId, String userId, int year) {
-        return entitlement(tenantId, userId, year).subtract(requestsUsed(tenantId, userId, year))
-                .subtract(BigDecimal.valueOf(chargedAnnualHolidays(tenantId, userId, year).size()));
+        return annualBalance(tenantId, userId, year, context.schoolOf(tenantId, userId).orElse(null));
+    }
+
+    /** As above for a caller that already resolved the person's school ({@code null}: none), so it is not looked up again. */
+    public BigDecimal annualBalance(String tenantId, String userId, int year, String schoolId) {
+        return entitlement(tenantId, userId, year, schoolId).subtract(requestsUsed(tenantId, userId, year))
+                .subtract(BigDecimal.valueOf(chargedAnnualHolidays(tenantId, userId, year, schoolId).size()));
     }
 
     private BigDecimal requestsUsed(String tenantId, String userId, int year) {
@@ -66,10 +71,13 @@ public class LeaveBalanceService {
      * balance in date order while at least one day is left; a day the balance no longer covers becomes unpaid (KL).
      */
     public Set<LocalDate> chargedAnnualHolidays(String tenantId, String userId, int year) {
-        String school = context.schoolOf(tenantId, userId).orElse(null);
+        return chargedAnnualHolidays(tenantId, userId, year, context.schoolOf(tenantId, userId).orElse(null));
+    }
+
+    private Set<LocalDate> chargedAnnualHolidays(String tenantId, String userId, int year, String school) {
         if (school == null) return Set.of();
         List<TkShift> shifts = context.shiftsOf(tenantId, school);
-        BigDecimal left = entitlement(tenantId, userId, year).subtract(requestsUsed(tenantId, userId, year));
+        BigDecimal left = entitlement(tenantId, userId, year, school).subtract(requestsUsed(tenantId, userId, year));
         Set<LocalDate> charged = new HashSet<>();
         holidays.findForSchool(tenantId, school, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)).stream()
                 .filter(h -> h.getPayMode() == HolidayPayMode.ANNUAL_LEAVE)
@@ -107,8 +115,11 @@ public class LeaveBalanceService {
     }
 
     public BigDecimal entitlement(String tenantId, String userId, int year) {
-        TkPolicy policy = context.policyFor(tenantId, context.schoolOf(tenantId, userId).orElse(""),
-                LocalDate.of(year, 12, 31));
+        return entitlement(tenantId, userId, year, context.schoolOf(tenantId, userId).orElse(null));
+    }
+
+    private BigDecimal entitlement(String tenantId, String userId, int year, String schoolId) {
+        TkPolicy policy = context.policyFor(tenantId, schoolId == null ? "" : schoolId, LocalDate.of(year, 12, 31));
         LocalDate joinedAt = profiles.findByUserIdAndTenantId(userId, tenantId).map(EmployeeProfile::getJoinedAt)
                 .orElse(null);
         return BigDecimal.valueOf(entitlement(policy.getAnnualLeaveDays(), policy.getSeniorityStepYears(), joinedAt, year));

@@ -90,8 +90,9 @@ public class NotificationCampaignController {
             @RequestParam(defaultValue = "false") boolean mine,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String view,
             HttpServletRequest request) {
-        return ok("Campaigns loaded", queries.list(actor(), box, mine, page, size), request);
+        return ok("Campaigns loaded", queries.list(actor(), box, mine, page, size, view), request);
     }
 
     @NotificationCampaignSend

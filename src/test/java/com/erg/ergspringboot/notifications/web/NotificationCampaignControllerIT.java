@@ -137,7 +137,11 @@ class NotificationCampaignControllerIT {
 
         mockMvc.perform(as(post(BASE + "/" + id + "/send"), "admin-1", "admin"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("SENT"));
+                .andExpect(jsonPath("$.data.status").value("SENDING"));
+        // The after-commit trigger never fires inside this rolled-back test transaction: the scheduler pass does the fan-out.
+        job.run();
+        entityManager.flush();
+        entityManager.clear();
 
         mockMvc.perform(as(get(BASE + "/" + id), "admin-1", "admin"))
                 .andExpect(status().isOk())
@@ -157,8 +161,11 @@ class NotificationCampaignControllerIT {
                 .andExpect(jsonPath("$.data.items[0].id").value(id))
                 .andExpect(jsonPath("$.data.items[0].recipientCount").value(3));
 
+        // A replay returns the current state and enqueues nothing.
         mockMvc.perform(as(post(BASE + "/" + id + "/send"), "admin-1", "admin"))
-                .andExpect(status().isConflict());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SENT"))
+                .andExpect(jsonPath("$.data.recipientCount").value(3));
         mockMvc.perform(as(post(BASE + "/" + id + "/cancel"), "admin-1", "admin"))
                 .andExpect(status().isConflict());
     }
@@ -245,7 +252,9 @@ class NotificationCampaignControllerIT {
 
         int firstPass = job.dispatchDue();
         int secondPass = job.dispatchDue();
+        job.run();
 
+        entityManager.flush();
         entityManager.clear();
         assertThat(firstPass).isGreaterThanOrEqualTo(1);
         assertThat(secondPass).isZero();
@@ -305,7 +314,7 @@ class NotificationCampaignControllerIT {
         campaigns.save(foreign);
         entityManager.flush();
 
-        job.dispatchDue();
+        job.run();
 
         entityManager.flush();
         entityManager.clear();
@@ -357,7 +366,7 @@ class NotificationCampaignControllerIT {
         NotificationCampaignEntity expired = due("gv-expired", classesOf("class-asg"));
         entityManager.flush();
 
-        job.dispatchDue();
+        job.run();
 
         entityManager.flush();
         entityManager.clear();

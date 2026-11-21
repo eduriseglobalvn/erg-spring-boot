@@ -33,6 +33,9 @@ import tools.jackson.databind.ObjectMapper;
 @RestController
 @RequestMapping("/api/v1/audit")
 public class AuditController {
+    /** The list never needs more than this per page; /export keeps the AuditQuery maximum. */
+    static final int MAX_EVENTS_PAGE_SIZE = 200;
+
     private final AuditOperations audit;
     private final ObjectMapper objectMapper;
 
@@ -54,7 +57,7 @@ public class AuditController {
             @RequestParam(required = false, defaultValue = "100") int size,
             HttpServletRequest request
     ) {
-        AuditQuery query = query(from, to, actorId, resourceType, resourceId, outcome, page, size);
+        AuditQuery query = query(from, to, actorId, resourceType, resourceId, outcome, page, Math.min(size, MAX_EVENTS_PAGE_SIZE));
         AuditPage data = audit.query(UserAccessContext.from(request), query);
         return ApiResponse.success(200, "Audit events loaded", data, request.getRequestURI(), requestId(request));
     }

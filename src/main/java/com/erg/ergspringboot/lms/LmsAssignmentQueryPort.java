@@ -17,6 +17,8 @@ public interface LmsAssignmentQueryPort {
     Optional<AssignmentDetailProjection> findAssignmentDetail(String tenantId, String assignmentId);
     Page<RecipientProgressProjection> findAssignmentRecipients(String tenantId, String assignmentId, Pageable pageable);
     Page<MissingLateStudentProjection> findAssignmentMissingLateStudents(String tenantId, String assignmentId, Pageable pageable);
+    /** Missing/late rows of just these students (the flags of one recipients page). */
+    List<MissingLateStudentProjection> findMissingLateOf(String tenantId, String assignmentId, Collection<String> studentIds);
     Page<AssignmentCardProjection> findTeacherAssignmentCards(String tenantId, String teacherId, String status, Pageable pageable);
     TeacherHomeworkSummaryProjection summarizeTeacherHomeworkWorkspace(String tenantId, String teacherId);
     List<AssignmentCountProjection> countSavedRecipients(String tenantId, Collection<String> assignmentIds);

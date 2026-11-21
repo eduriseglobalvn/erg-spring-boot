@@ -10,7 +10,6 @@ target
 backups
 docs
 load
-postman
 ops
 *.iml
 *.log

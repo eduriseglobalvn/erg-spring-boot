@@ -63,12 +63,12 @@ class CrmSchoolServiceTest {
         CrmSchoolProfile profile = profile("sch_binh_an", "ref_1", "Nguyen Gioi Thieu", "0901000000");
         CrmSchoolContact contact = contact("sch_binh_an", "principal", "Tran Hieu Truong", "0902000000", true);
 
-        when(dealRepository.findByTenantIdAndOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc("tenant-a", "seo_1", "signed"))
+        when(dealRepository.findByTenantIdAndOwnerUserIdAndSignedAtIsNotNullOrderBySignedAtDesc("tenant-a", "seo_1"))
                 .thenReturn(List.of(deal));
         when(educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(eq("tenant-a"), eq(List.of("sch_binh_an")), any(Pageable.class)))
                 .thenReturn(List.of(school));
         when(profileRepository.findByTenantIdAndSchoolIdIn("tenant-a", List.of("sch_binh_an"))).thenReturn(List.of(profile));
-        when(contactRepository.findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc("tenant-a", List.of("sch_binh_an")))
+        when(contactRepository.findPrimaryContacts("tenant-a", List.of("sch_binh_an")))
                 .thenReturn(List.of(contact));
 
         List<CrmSchoolSummaryResponse> response = service.schoolsBySeo(access("seo_1", List.of("*")), "seo_1", true);
@@ -96,34 +96,34 @@ class CrmSchoolServiceTest {
         CrmSchoolService service = service();
         authenticate("lead_1");
         when(authorization.isAllowed(any(), eq("crm.analytics.read"), eq(null), eq("tenant-a"))).thenReturn(true);
-        when(dealRepository.findByTenantIdAndOwnerUserIdOrderByCreatedAtDesc("tenant-a", "seo_2")).thenReturn(List.of(
-                deal("deal_1", "school-in-scope", "seo_2", "proposal", BigDecimal.ZERO),
-                deal("deal_2", "school-out-of-scope", "seo_2", "signed", BigDecimal.TEN)));
+        // the scope filter now runs in the query: only the in-scope deal comes back
+        when(dealRepository.findInScopeByOwner("tenant-a", "seo_2", List.of("school-in-scope"))).thenReturn(List.of(
+                deal("deal_1", "school-in-scope", "seo_2", "proposal", BigDecimal.ZERO)));
         when(educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(eq("tenant-a"), eq(List.of("school-in-scope")), any(Pageable.class)))
                 .thenReturn(List.of(school("school-in-scope", "In scope", "active")));
         when(profileRepository.findByTenantIdAndSchoolIdIn("tenant-a", List.of("school-in-scope"))).thenReturn(List.of());
-        when(contactRepository.findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc("tenant-a", List.of("school-in-scope")))
+        when(contactRepository.findPrimaryContacts("tenant-a", List.of("school-in-scope")))
                 .thenReturn(List.of());
 
         List<CrmSchoolSummaryResponse> response =
                 service.schoolsBySeo(access("lead_1", List.of("school-in-scope")), "seo_2", false);
 
         assertThat(response).extracting(CrmSchoolSummaryResponse::schoolId).containsExactly("school-in-scope");
-        verify(dealRepository, never()).findByTenantIdAndOwnerUserIdAndStageIgnoreCaseOrderBySignedAtDesc(any(), any(), any());
+        verify(dealRepository, never()).findByTenantIdAndOwnerUserIdAndSignedAtIsNotNullOrderBySignedAtDesc(any(), any());
     }
 
     @Test
-    void calculatesSeoConversionAndRevenueFromDealsInScope() {
+    void calculatesSeoConversionAndRevenueInTheQueryForTheCallersScope() {
         CrmSchoolService service = service();
         OffsetDateTime from = OffsetDateTime.parse("2026-01-01T00:00:00Z");
         OffsetDateTime to = OffsetDateTime.parse("2026-05-26T00:00:00Z");
-        when(dealRepository.findByTenantIdAndOwnerUserIdAndCreatedAtBetween("tenant-a", "seo_1", from, to)).thenReturn(List.of(
-                deal("deal_1", "sch_1", "seo_1", "signed", new BigDecimal("50000000")),
-                deal("deal_2", "sch_2", "seo_1", "lost", BigDecimal.ZERO),
-                deal("deal_3", "sch_3", "seo_1", "negotiating", BigDecimal.ZERO),
-                deal("deal_4", "sch_4", "seo_1", "signed", new BigDecimal("70000000")),
-                deal("deal_5", "sch_foreign", "seo_1", "signed", new BigDecimal("90000000"))
-        ));
+        CrmSchoolDealRepository.DealPerformanceAggregate aggregate = org.mockito.Mockito.mock(CrmSchoolDealRepository.DealPerformanceAggregate.class);
+        when(aggregate.getTotalCount()).thenReturn(4L);
+        when(aggregate.getSignedCount()).thenReturn(2L);
+        when(aggregate.getLostCount()).thenReturn(1L);
+        when(aggregate.getSignedRevenue()).thenReturn(new BigDecimal("120000000"));
+        when(dealRepository.aggregatePerformanceInScope("tenant-a", "seo_1", from, to, List.of("sch_1", "sch_2", "sch_3", "sch_4")))
+                .thenReturn(aggregate);
 
         CrmSchoolPerformanceResponse response = service.performance(
                 access("seo_1", List.of("sch_1", "sch_2", "sch_3", "sch_4")), "seo_1", from, to);
@@ -135,6 +135,7 @@ class CrmSchoolServiceTest {
         assertThat(response.conversionRate()).isEqualByComparingTo("0.50");
         assertThat(response.signedRevenue()).isEqualByComparingTo("120000000");
         assertThat(response.averageDealValue()).isEqualByComparingTo("60000000");
+        verify(dealRepository, never()).findByTenantIdAndOwnerUserIdAndCreatedAtBetween(any(), any(), any(), any());
     }
 
     private CrmSchoolService service() {

@@ -29,7 +29,7 @@ class ScaleFixtureContractTest {
                 "insert into school_operational_profiles",
                 "insert into school_academic_years",
                 "insert into school_grades",
-                "jsonb_build_object('schoolid'",
+                "insert into curriculum_levels",
                 "insert into lms_questions",
                 "insert into lms_quizzes",
                 "insert into lms_quiz_questions",

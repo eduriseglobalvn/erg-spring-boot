@@ -25,6 +25,27 @@ class ReportingOperationsTest {
     }
 
     @Test
+    void enqueueLosingTheIdempotencyRaceReturnsTheWinnersJob() {
+        AssignmentScopeLookup assignments = mock(AssignmentScopeLookup.class);
+        ReportJobPort jobs = mock(ReportJobPort.class);
+        when(assignments.findByTenantIdAndId("tenant-1", "assignment-1"))
+                .thenReturn(Optional.of(new AssignmentScopeLookup.AssignmentScope("tenant-1", "class-1")));
+        var winner = new com.erg.ergspringboot.common.response.reporting.ReportJobResponses.ReportJobResponse(
+                "job-1", "ASSIGNMENT_PROGRESS", "assignment-1", "queued", 0, null, null, null, null);
+        when(jobs.enqueueAssignmentProgress(org.mockito.ArgumentMatchers.eq("tenant-1"), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("assignment-1"), org.mockito.ArgumentMatchers.eq("idem-1"),
+                org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_report_jobs_tenant_idempotency"))
+                .thenReturn(winner);
+        UserAccessContext access = new UserAccessContext("user-1", "tenant-1", java.util.List.of("*"),
+                java.util.List.of("*"), null, null);
+
+        org.assertj.core.api.Assertions.assertThat(
+                new ReportingOperations(jobs, assignments).enqueueAssignmentProgress(access, "assignment-1", "idem-1").id())
+                .isEqualTo("job-1");
+    }
+
+    @Test
     void jobStatusIsLimitedToRequesterOrAssignmentClassScope() {
         AssignmentScopeLookup assignments = mock(AssignmentScopeLookup.class);
         ReportJobPort jobs = mock(ReportJobPort.class);

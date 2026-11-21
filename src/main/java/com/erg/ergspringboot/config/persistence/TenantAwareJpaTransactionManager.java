@@ -47,32 +47,30 @@ public class TenantAwareJpaTransactionManager extends JpaTransactionManager {
 
     @Override
     protected void doBegin(Object transaction, TransactionDefinition definition) {
-        super.doBegin(transaction, definition);
+        // The checkout inside doBegin skips the per-connection session apply; applyTenantGuc does both in one round trip.
+        TenantGucDataSource.beginTransactionCheckout(true);
+        try {
+            super.doBegin(transaction, definition);
+        } finally {
+            TenantGucDataSource.beginTransactionCheckout(false);
+        }
         applyTenantGuc();
     }
 
     private void applyTenantGuc() {
         TenantContext context = TenantContext.current();
-        if (context == null) {
-            return;
-        }
         EntityManagerFactory emf = getEntityManagerFactory();
-        if (emf == null) {
-            return;
-        }
-        Object resource = TransactionSynchronizationManager.getResource(emf);
-        if (!(resource instanceof EntityManagerHolder holder)) {
-            return;
-        }
-        EntityManager entityManager = holder.getEntityManager();
+        Object resource = emf == null ? null : TransactionSynchronizationManager.getResource(emf);
+        EntityManager entityManager = resource instanceof EntityManagerHolder holder ? holder.getEntityManager() : null;
         if (entityManager == null) {
-            return;
+            // The checkout skipped its own apply, so a connection without GUCs must never run a query: fail closed.
+            throw new IllegalStateException("Unable to install tenant transaction context: no EntityManager bound");
         }
         try {
             entityManager.unwrap(Session.class)
-                    .doWork(connection -> TenantGucApplier.apply(connection, context));
+                    .doWork(connection -> TenantGucApplier.applyTransaction(connection, context));
         } catch (RuntimeException ex) {
-            log.error("Failed to apply tenant GUC for {}; aborting transaction", context.tenantId(), ex);
+            log.error("Failed to apply tenant GUC for {}; aborting transaction", context == null ? null : context.tenantId(), ex);
             throw new IllegalStateException("Unable to install tenant transaction context", ex);
         }
     }

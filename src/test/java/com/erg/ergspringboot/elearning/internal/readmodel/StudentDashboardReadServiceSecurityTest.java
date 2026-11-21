@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.elearning.internal.readmodel;
 
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository;
 import com.erg.ergspringboot.elearning.api.StudentDashboardReadScope;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
-import com.erg.ergspringboot.users.persistence.UserRepository;
+import com.erg.ergspringboot.users.persistence.DashboardUserFallbackRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
 import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
@@ -31,7 +32,7 @@ class StudentDashboardReadServiceSecurityTest {
     private StudentRepository studentRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private DashboardUserFallbackRepository userRepository;
 
     @Mock
     private ErgPolicyService policyService;

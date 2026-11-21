@@ -31,8 +31,36 @@ public final class SessionResponses {
             List<SessionBootstrapUnit> manageableUnits,
             List<SessionBootstrapClass> manageableClasses,
             String tenantId,
-            List<String> workspaces
+            List<String> workspaces,
+            /** True when manageableClasses was cut at 500; page the rest through GET /sessions/scope?unitId=. */
+            boolean classesTruncated
     ) {
+    }
+
+    /** Identity only: GET /api/v1/sessions/me, no unit or class lists. */
+    public record SessionIdentityResponse(
+            SessionBootstrapUser user,
+            String tenantId,
+            SessionBootstrapPermissions permissions,
+            List<String> portals,
+            List<String> workspaces,
+            AccountLifecycleResponse lifecycle
+    ) {
+    }
+
+    /** GET /api/v1/sessions/scope: current scope plus one page of units and a bounded list of classes. */
+    public record SessionScopeResponse(
+            SessionBootstrapScope currentScope,
+            SessionScopeUnits units,
+            SessionScopeClasses classes,
+            boolean truncated
+    ) {
+    }
+
+    public record SessionScopeUnits(List<SessionBootstrapUnit> items, int page, int size, long totalItems, boolean hasNext) {
+    }
+
+    public record SessionScopeClasses(List<SessionBootstrapClass> items, boolean hasNext) {
     }
 
     public record SessionBootstrapUser(

@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,7 +44,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Regression tests for B1/B2/B3/(b1)/(b2)/(d1)/N1/N2/N6/SQ-04/SQ-05 on the attempt command boundary. */
@@ -80,6 +82,7 @@ class LmsAttemptOwnershipAndGradingTest {
     void legacyAssignmentWithoutRecipientsDoesNotFailOpenForUnlinkedUsers() {
         Assignment assignment = assignment();
         assignment.setStudentIds(null);
+        when(fixture.recipients.legacySnapshotNames(any(), any(), any())).thenReturn(false); // empty snapshot
         when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment));
 
         assertThatThrownBy(() -> useCase.start("usr-teacher", start("quiz-1"), null, learner("usr-teacher")))
@@ -113,13 +116,13 @@ class LmsAttemptOwnershipAndGradingTest {
         pinned.setQuizVersionId("ver-1");
         pinned.setContentHash("hash-v1");
         pinned.setGradingMode("server-authoritative");
-        when(fixture.packages.packageEntityForVersion("erg", "quiz-2", "ver-1")).thenReturn(Optional.of(pinned));
+        when(fixture.packages.startInfo("erg", "quiz-2", "ver-1")).thenReturn(QuizStartInfo.of(null, pinned));
 
         var response = useCase.start("usr-1", new StartAttemptRequest("asg-1", "quiz-2", "pkg-v1", "hash-v1"), null, learner("usr-1"));
 
         assertThat(response.quizId()).isEqualTo("quiz-2");
         assertThat(response.policySnapshot().quizVersionId()).isEqualTo("ver-1");
-        verify(fixture.packages, never()).activePackageEntity(any(), any());
+        verify(fixture.packages, never()).startInfo("erg", "quiz-2", null); // the pinned version, never the active one
     }
 
     @Test
@@ -204,6 +207,23 @@ class LmsAttemptOwnershipAndGradingTest {
         assertThatCode(() -> useCase.sync("att-1", null, classTeacher)).doesNotThrowAnyException();
     }
 
+
+    @Test
+    void onlyTheOwnerSavesDraftAnswersAReviewerCannotOverwriteThem() {
+        Attempt attempt = attempt("stu-a");
+        when(fixture.attempts.findByTenantIdAndId("erg", "att-1")).thenReturn(Optional.of(attempt));
+        when(fixture.students.findFirstByTenantIdAndAuthUserId("erg", "usr-a")).thenReturn(Optional.of(student("stu-a", "usr-a", "class-a")));
+        var draft = new com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.AttemptDraftRequest(
+                Map.of("q1", "A"), null, null, null, null, null, null, null);
+
+        assertThatCode(() -> useCase.saveDraft("att-1", draft, learner("usr-a"))).doesNotThrowAnyException();
+        verify(fixture.attempts).save(attempt);
+
+        when(fixture.permissions.hasAny(LmsAssignmentAccessPolicy.REVIEW_PERMISSIONS)).thenReturn(true);
+        UserAccessContext classTeacher = new UserAccessContext("usr-t", "erg", List.of("school-1"), List.of("class-a"), null, null);
+        assertThatThrownBy(() -> useCase.saveDraft("att-1", draft, classTeacher)).isInstanceOf(ForbiddenException.class);
+        verify(fixture.attempts, org.mockito.Mockito.times(1)).save(any());
+    }
     @Test
     void submitInsideGraceWindowIsAcceptedAndMarkedLate() {
         Assignment assignment = assignment();
@@ -261,21 +281,65 @@ class LmsAttemptOwnershipAndGradingTest {
     }
 
     @Test
-    void projectionRunsAfterCommitAndItsFailureCannotBreakTheSubmission() {
+    void aProjectionFailureNeverFailsTheSubmission() {
         Attempt attempt = attempt("usr-1");
         when(fixture.attempts.findByTenantIdAndId("erg", "att-1")).thenReturn(Optional.of(attempt));
         when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment()));
         doThrow(new IllegalStateException("student_progress constraint")).when(fixture.grading).projectProgress(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), anyBoolean(), any(), any());
-        TransactionSynchronizationManager.initSynchronization();
 
-        assertThatCode(() -> useCase.submit("att-1", submit(Map.of()), learner("usr-1"))).doesNotThrowAnyException();
-        verify(fixture.grading, never()).projectProgress(any(), any(), any(), any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), any(), anyBoolean(), any(), any());
-
-        List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
-        assertThatCode(() -> synchronizations.forEach(TransactionSynchronization::afterCommit)).doesNotThrowAnyException();
+        useCase.submit("att-1", submit(Map.of()), learner("usr-1"));
         verify(fixture.grading).projectProgress(any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), any(), anyBoolean(), any(), any());
+    }
+
+    @Test
+    void submitRetriesOnceInAFreshTransactionWhenAutosaveWonTheVersionRace() {
+        Attempt attempt = attempt("usr-1");
+        when(fixture.attempts.findByTenantIdAndId("erg", "att-1"))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Attempt.class, "att-1")).thenReturn(Optional.of(attempt));
+        when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment()));
+        useCase.setTransactionManager(mock(PlatformTransactionManager.class));
+
+        useCase.submit("att-1", submit(Map.of()), learner("usr-1"));
+
+        assertThat(attempt.getStatus()).isNotEqualTo("in_progress");
+    }
+
+    @Test
+    void startOnAnExpiredAttemptOfAPastDueAssignmentReturnsTheClosedAttemptInsteadOfRollingTheCloseBack() {
+        Assignment assignment = assignment();
+        assignment.setDueAt(NOW.minusHours(1));
+        Attempt expired = attempt("usr-1");
+        expired.setStartedAt(NOW.minusHours(2));
+        when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment));
+        when(fixture.attempts.findInProgress("erg", "asg-1", "quiz-1", "usr-1")).thenReturn(Optional.of(expired));
+
+        var response = useCase.start("usr-1", start("quiz-1"), null, learner("usr-1"));
+
+        assertThat(response.id()).isEqualTo("att-1");
+        assertThat(response.status()).isNotEqualTo("in_progress");
+        assertThat(expired.isLate()).isTrue();
+    }
+
+    @Test
+    void gradingAnOlderAttemptDoesNotOverwriteTheProgressOfTheNewestHandIn() {
+        Attempt older = attempt("stu-a");
+        older.setStatus("needs_review");
+        older.setQuizVersionId("ver-1");
+        Attempt newest = attempt("stu-a");
+        newest.setId("att-2");
+        when(fixture.attempts.findByTenantIdAndId("erg", "att-1")).thenReturn(Optional.of(older));
+        when(fixture.attempts.findLatestSubmitted("erg", "asg-1", "stu-a")).thenReturn(Optional.of(newest));
+        when(fixture.assignments.findByTenantIdAndId("erg", "asg-1")).thenReturn(Optional.of(assignment()));
+        when(fixture.permissions.hasAny(LmsAssignmentAccessPolicy.REVIEW_PERMISSIONS)).thenReturn(true);
+        when(fixture.grading.gradeManualAnswer("erg", "att-1", "ver-1", "essay-1", BigDecimal.valueOf(2.0), "usr-t"))
+                .thenReturn(new GradedAttempt(BigDecimal.valueOf(9), BigDecimal.TEN, 90, true, false, 9, 9));
+        UserAccessContext teacher = new UserAccessContext("usr-t", "erg", List.of("*"), List.of("*"), null, null);
+
+        useCase.gradeManualAnswer("att-1", "essay-1", new ManualGradeRequest(2.0, null), teacher);
+
+        verify(fixture.grading, never()).projectProgress(any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 anyInt(), anyInt(), any(), anyBoolean(), any(), any());
     }
 

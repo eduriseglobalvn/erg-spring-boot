@@ -26,5 +26,11 @@ public final class ReportJobResponses {
             this(id, reportType, aggregateId, status, progress, createdAt, completedAt, result, error,
                     "json", null, null);
         }
+
+        /** The status view: up to 10k stored rows are fetched from {@code downloadPath}, not on every poll. */
+        public ReportJobResponse withoutResult() {
+            return result == null ? this : new ReportJobResponse(id, reportType, aggregateId, status, progress, createdAt,
+                    completedAt, null, error, format, expiresAt, downloadPath);
+        }
     }
 }

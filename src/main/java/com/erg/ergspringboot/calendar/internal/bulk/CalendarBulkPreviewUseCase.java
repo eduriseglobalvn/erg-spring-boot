@@ -74,6 +74,7 @@ public class CalendarBulkPreviewUseCase {
         CalendarConflictService conflictService = require(conflicts, "conflict service");
 
         input = normalizer.normalize(input);
+        CalendarBulkCreateUseCase.requireWithinEventCap(input);
         ReferenceData refData = references.load(tenantId, input.schoolId(), input);
         List<RowValidationResult> validationResults = validator.validateRows(input, refData);
         boolean allValid = validationResults.stream().allMatch(RowValidationResult::valid);

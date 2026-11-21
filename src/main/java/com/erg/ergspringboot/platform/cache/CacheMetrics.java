@@ -5,20 +5,23 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public final class CacheMetrics {
     private final MeterRegistry registry;
+    private final ConcurrentMap<OperationKey, Counter> operations = new ConcurrentHashMap<>();
 
     public CacheMetrics(MeterRegistry registry) {
         this.registry = registry;
     }
 
     public void record(String cache, String tier, String operation, String outcome) {
-        Counter.builder("erg.cache.operations")
+        operations.computeIfAbsent(new OperationKey(cache, tier, operation, outcome), key -> Counter.builder("erg.cache.operations")
                 .description("Tiered cache operations")
-                .tags("cache", bounded(cache), "tier", bounded(tier),
-                        "operation", bounded(operation), "outcome", bounded(outcome))
-                .register(registry).increment();
+                .tags("cache", bounded(key.cache()), "tier", bounded(key.tier()),
+                        "operation", bounded(key.operation()), "outcome", bounded(key.outcome()))
+                .register(registry)).increment();
     }
 
     public void recordSerialization(String cache, int bytes, long nanos) {
@@ -33,5 +36,8 @@ public final class CacheMetrics {
     private String bounded(String value) {
         if (value == null || value.isBlank()) return "unknown";
         return value.length() <= 96 ? value : value.substring(0, 96);
+    }
+
+    private record OperationKey(String cache, String tier, String operation, String outcome) {
     }
 }

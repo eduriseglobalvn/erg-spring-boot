@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.timekeeping.internal.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
@@ -93,6 +94,49 @@ class TodayDashboardServiceIT extends AdminITBase {
         assertThat(result.sent()).isEqualTo(1); // only u(115) has not punched in
         assertThat(result.skipped()).isEqualTo(3);
         org.mockito.Mockito.verify(notifications).send(eq(T), eq("admin"), any());
+    }
+
+    private void secondSchool() {
+        jdbc.update("insert into education_units (id, tenant_id, name, slug, type, status, created_at, updated_at)"
+                + " values (?, ?, 'Cơ sở B', ?, 'school', 'active', now(), now())", "sch_today_b", T, "sch_today_b");
+        jdbc.update("insert into tk_shifts (id, tenant_id, school_id, name, start_time, end_time, work_units, weekdays,"
+                + " created_at) values ('shift_today_b', ?, 'sch_today_b', 'Ca sáng', '07:30', '11:30', 1.0, '{1,2,3,4,5}',"
+                + " '2020-01-01')", T);
+        teacher(T, "td_b0", "sch_today_b", "Giáo viên B");
+        punch(T, "sch_today_b", "td_b0", "IN", SEVEN_LOCAL, "VALID");
+    }
+
+    @Test
+    void aSchoolScopedCallerIsRefusedAnotherSchool() {
+        secondSchool();
+        var mine = new com.erg.ergspringboot.timekeeping.internal.SchoolScope(Set.of("sch_today_b"));
+
+        assertThatThrownBy(() -> dashboard.today(T, mine, SCHOOL, TODAY)).isInstanceOfSatisfying(
+                com.erg.ergspringboot.timekeeping.TimekeepingException.class,
+                ex -> assertThat(ex.getStatus()).isEqualTo(org.springframework.http.HttpStatus.FORBIDDEN));
+        assertThat(dashboard.today(T, mine, "sch_today_b", TODAY).present()).isEqualTo(1);
+    }
+
+    @Test
+    void withoutASchoolAScopedCallerGetsOnlyTheirSchoolsAndAWideOneGetsAll() {
+        secondSchool();
+        var mine = new com.erg.ergspringboot.timekeeping.internal.SchoolScope(Set.of("sch_today_b"));
+
+        assertThat(dashboard.today(T, mine, null, TODAY).bySite()).extracting(s -> s.schoolId())
+                .containsExactly("sch_today_b");
+        assertThat(dashboard.today(T, com.erg.ergspringboot.timekeeping.internal.SchoolScope.TENANT, null, TODAY).bySite())
+                .extracting(s -> s.schoolId()).containsExactlyInAnyOrder(SCHOOL, "sch_today_b");
+        assertThat(dashboard.today(T, mine, null, TODAY).present()).isEqualTo(1);
+    }
+
+    @Test
+    void remindSkipsPeopleOutsideTheCallersSchools() {
+        secondSchool();
+        var mine = new com.erg.ergspringboot.timekeeping.internal.SchoolScope(Set.of("sch_today_b"));
+
+        var result = dashboard.remind(T, mine, "scoped", java.util.List.of(u(115)));
+
+        assertThat(result.sent()).isZero(); // u(115) works at the other school
     }
 
     private static String u(int i) {

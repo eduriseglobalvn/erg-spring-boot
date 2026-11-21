@@ -42,7 +42,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The requester's side of requests: drafts, submit (rules, approval chain, schedule evidence, step-1 notification),
@@ -70,11 +72,17 @@ public class RequestService {
     private final TeacherPeriodReader periods;
     private final WorkContextResolver context;
     private final Clock clock;
+    private final TransactionTemplate write;
+    private final TransactionTemplate readOnly;
 
     RequestService(TkRequestRepository requests, TkRequestStepRepository steps, TkRequestEvidenceRepository evidence,
             TkCodeCounterRepository counters, RequestRules rules, ApprovalChainResolver chains, RequestNotifier notifier,
             RequestViewAssembler views, LeaveBalanceService balance, AffectedPeriodsService affected,
-            TeacherPeriodReader periods, WorkContextResolver context, Clock clock) {
+            TeacherPeriodReader periods, WorkContextResolver context, Clock clock,
+            PlatformTransactionManager transactionManager) {
+        this.write = new TransactionTemplate(transactionManager);
+        this.readOnly = new TransactionTemplate(transactionManager);
+        this.readOnly.setReadOnly(true);
         this.requests = requests;
         this.steps = steps;
         this.evidence = evidence;
@@ -111,8 +119,28 @@ public class RequestService {
         return views.one(r);
     }
 
-    @Transactional
+    /**
+     * The teaching periods of the request's days are read before the transaction opens, so no second pooled connection
+     * is borrowed inside it; the transaction re-reads them only if the draft's dates changed in between.
+     */
     public RequestView submit(String tenantId, String userId, String id) {
+        SchedulePreRead preRead = requests.findByTenantIdAndUserIdAndId(tenantId, userId, id)
+                .filter(r -> r.getStatus() == RequestStatus.DRAFT).map(this::preRead).orElse(null);
+        return write.execute(status -> submitInTransaction(tenantId, userId, id, preRead));
+    }
+
+    /** The periods of {@code from..to} as read by {@link #preRead}; a failed read is kept as empty. */
+    private record SchedulePreRead(LocalDate from, LocalDate to, Optional<List<TeacherPeriod>> found) {}
+
+    private SchedulePreRead preRead(TkRequest r) {
+        boolean explanation = r.getType() == RequestType.EXPLANATION;
+        LocalDate from = explanation ? r.getWorkDate() : r.getFromDate();
+        LocalDate to = explanation ? r.getWorkDate() : r.getToDate();
+        if (from == null || to == null) return null; // an incomplete draft fails the submit rules inside the transaction
+        return new SchedulePreRead(from, to, periods.read(r.getTenantId(), r.getUserId(), from, to));
+    }
+
+    private RequestView submitInTransaction(String tenantId, String userId, String id, SchedulePreRead preRead) {
         // one submit per person at a time: overlap, balance and explanation-limit checks read the others' rows
         requests.lockSubmitsOf(tenantId + ":" + userId);
         TkRequest r = own(tenantId, userId, id);
@@ -134,7 +162,7 @@ public class RequestService {
         r.setStatus(RequestStatus.PENDING);
         r.setCurrentStep(first.stepNo());
         r.setSubmittedAt(now);
-        attachSchedule(r);
+        attachSchedule(r, preRead);
         notifier.toApprovers(r, "SUBMITTED", first.stepNo(), first.approverIds());
         return views.one(r);
     }
@@ -209,10 +237,15 @@ public class RequestService {
                 chains.refs(tenantId, chains.resolve(tenantId, schoolId, userId, RequestType.LEAVE, days)));
     }
 
-    @Transactional(readOnly = true)
     public ExplanationContext explanationContext(String tenantId, String userId, LocalDate date) {
-        String schoolId = schoolOf(tenantId, userId);
+        // read before the transaction opens: the calendar read must not take a second connection inside it
         List<TeacherPeriod> dayPeriods = periods.read(tenantId, userId, date, date).orElse(List.of());
+        return readOnly.execute(status -> explanationContext(tenantId, userId, date, dayPeriods));
+    }
+
+    private ExplanationContext explanationContext(String tenantId, String userId, LocalDate date,
+            List<TeacherPeriod> dayPeriods) {
+        String schoolId = schoolOf(tenantId, userId);
         Optional<LocalTime> lastEnd = dayPeriods.stream().reduce((a, b) -> b)
                 .map(p -> LocalTime.ofInstant(p.end(), WorkContextResolver.ZONE));
         LocalTime suggested = context.shiftFor(tenantId, schoolId, date)
@@ -226,11 +259,13 @@ public class RequestService {
     }
 
     /** D14: the teaching periods of the request's day(s) (half a day: that half), read once at submit. */
-    private void attachSchedule(TkRequest r) {
+    private void attachSchedule(TkRequest r, SchedulePreRead preRead) {
         boolean explanation = r.getType() == RequestType.EXPLANATION;
         LocalDate from = explanation ? r.getWorkDate() : r.getFromDate();
         LocalDate to = explanation ? r.getWorkDate() : r.getToDate();
-        List<TeacherPeriod> found = periods.read(r.getTenantId(), r.getUserId(), from, to).orElse(List.of());
+        boolean sameRange = preRead != null && preRead.from().equals(from) && preRead.to().equals(to);
+        Optional<List<TeacherPeriod>> read = sameRange ? preRead.found() : periods.read(r.getTenantId(), r.getUserId(), from, to);
+        List<TeacherPeriod> found = read.orElse(List.of());
         for (TeacherPeriod p : AffectedPeriodsService.inPart(found, r.getPart())) {
             TkRequestEvidence row = new TkRequestEvidence();
             row.setTenantId(r.getTenantId());

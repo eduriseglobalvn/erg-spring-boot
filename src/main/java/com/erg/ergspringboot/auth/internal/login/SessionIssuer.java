@@ -126,7 +126,7 @@ final class SessionIssuer {
         session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
         attemptRecorder.recordLoginAttempt(
-                user.getId(), user.getEmail(), context, portal, "SUCCESS", "login_success");
+                user.getId(), tenantId, user.getEmail(), context, portal, "SUCCESS", "login_success");
 
         user.setLastLoginProvider(loginProvider);
         user.setLastLoginAt(now);

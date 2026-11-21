@@ -128,9 +128,10 @@ public interface NotificationRecipientRepository extends JpaRepository<Notificat
             where recipient.tenantId = :tenantId
               and recipient.userId = :userId
               and (recipient.portal = :portal
-                   or recipient.notificationId in (
-                       select message.id from NotificationMessageEntity message
-                       where message.tenantId = :tenantId and message.campaignId is not null))
+                   or exists (
+                       select 1 from NotificationMessageEntity message
+                       where message.id = recipient.notificationId
+                         and message.tenantId = :tenantId and message.campaignId is not null))
               and recipient.status <> 'read'
               and recipient.archivedAt is null
             """)

@@ -218,6 +218,43 @@ class NotificationCommandServiceTest {
                 .satisfies(outbox -> assertThat(outbox.getPayload()).containsEntry("portal", "elearning"));
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void enqueueAllBatchesTheLookupsHonoursOptOutsAndSkipsKnownDedupeKeys() {
+        NotificationMessageEntity known = new NotificationMessageEntity();
+        known.setDedupeKey("k-known");
+        when(messageRepository.findByTenantIdAndDedupeKeyIn(eq("tenant_a"), any())).thenReturn(List.of(known));
+        when(messageRepository.saveAllAndFlush(any())).thenAnswer(invocation -> {
+            List<NotificationMessageEntity> saved = invocation.getArgument(0);
+            for (int i = 0; i < saved.size(); i++) saved.get(i).setId("n" + i);
+            return saved;
+        });
+        when(preferenceRepository.findByTenantIdAndPortalAndEventTypeAndUserIdIn(
+                eq("tenant_a"), eq("lms"), eq("SCHEDULE_PUBLISHED"), any())).thenReturn(List.of(preference("u2", true, false)));
+        when(deviceRepository.findByTenantIdAndUserIdInAndEnabledTrue(eq("tenant_a"), any()))
+                .thenReturn(List.of(device("d1", "u1"), device("d2", "u2")));
+
+        service().enqueueAll(List.of(keyed("k-known", "u0"), keyed("k1", "u1"), keyed("k2", "u2"), keyed("k1", "u1")));
+
+        ArgumentCaptor<List<NotificationMessageEntity>> messages = ArgumentCaptor.forClass(List.class);
+        verify(messageRepository).saveAllAndFlush(messages.capture());
+        assertThat(messages.getValue()).extracting(NotificationMessageEntity::getDedupeKey).containsExactly("k1", "k2");
+        ArgumentCaptor<List<NotificationRecipientEntity>> recipients = ArgumentCaptor.forClass(List.class);
+        verify(recipientRepository).saveAll(recipients.capture());
+        assertThat(recipients.getValue()).extracting(NotificationRecipientEntity::getUserId).containsExactly("u1", "u2");
+        ArgumentCaptor<List<NotificationOutboxEntity>> outboxes = ArgumentCaptor.forClass(List.class);
+        verify(outboxRepository).saveAll(outboxes.capture());
+        assertThat(outboxes.getValue()).singleElement()
+                .satisfies(outbox -> assertThat(outbox.getPayload()).containsEntry("deviceRegistrationId", "d1"));
+        verify(preferenceRepository, org.mockito.Mockito.times(1)).findByTenantIdAndPortalAndEventTypeAndUserIdIn(any(), any(), any(), any());
+        verify(deviceRepository, org.mockito.Mockito.times(1)).findByTenantIdAndUserIdInAndEnabledTrue(any(), any());
+    }
+
+    private NotificationCommand keyed(String key, String userId) {
+        return new NotificationCommand("tenant_a", "admin-1", key, "SCHEDULE_PUBLISHED", "schedule", "schedule-1", "T", "B",
+                "/lms/schedule", "normal", "lms", List.of(userId), null, Map.of());
+    }
+
     private NotificationPreferenceEntity preference(String userId, boolean inbox, boolean push) {
         NotificationPreferenceEntity preference = new NotificationPreferenceEntity();
         preference.setTenantId("tenant_a");

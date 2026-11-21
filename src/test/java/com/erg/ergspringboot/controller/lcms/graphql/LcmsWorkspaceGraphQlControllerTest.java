@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.controller.lcms.graphql;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,8 @@ import com.erg.ergspringboot.controller.lcms.graphql.LcmsWorkspaceGraphQlControl
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.lcms.LcmsQueryOperations;
+import com.erg.ergspringboot.lcms.LcmsReadPort;
+import graphql.schema.DataFetchingFieldSelectionSet;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +33,11 @@ class LcmsWorkspaceGraphQlControllerTest {
 
     @Mock
     private LcmsQueryOperations readService;
+
+    private static final LcmsReadPort.QuestionBankReadOptions OPTIONS = new LcmsReadPort.QuestionBankReadOptions(true, true, null);
+
+    private final DataFetchingFieldSelectionSet all = mock(DataFetchingFieldSelectionSet.class,
+            invocation -> invocation.getMethod().getReturnType() == boolean.class);
 
     private LcmsWorkspaceGraphQlController controller;
 
@@ -48,14 +56,29 @@ class LcmsWorkspaceGraphQlControllerTest {
     @Test
     void questionBankWorkspaceRequiresQuizReadAndUsesPrincipalTenant() {
         authenticate(principal("tenant-a", List.of("lms.quiz.read"), List.of()));
-        when(readService.questionBankWorkspace("tenant-a", "algebra", "math", null, null, "active", "test", false, 0, 25))
+        when(readService.questionBankWorkspace("tenant-a", "algebra", "math", null, null, "active", "test", false, 0, 25, OPTIONS))
                 .thenReturn(questionBank("tenant-a"));
 
         controller.questionBankWorkspace(new QuestionBankWorkspaceInput(
                 null, "algebra", "math", null, null, "active", "test", false, 0, 25
-        ));
+        ), all);
 
-        verify(readService).questionBankWorkspace("tenant-a", "algebra", "math", null, null, "active", "test", false, 0, 25);
+        verify(readService).questionBankWorkspace("tenant-a", "algebra", "math", null, null, "active", "test", false, 0, 25, OPTIONS);
+    }
+
+    @Test
+    void questionBankWorkspaceSkipsTheQuizzesAndRuntimeQuestionWhenTheyAreNotSelected() {
+        authenticate(principal("tenant-a", List.of("lms.quiz.read"), List.of()));
+        DataFetchingFieldSelectionSet none = mock(DataFetchingFieldSelectionSet.class,
+                invocation -> invocation.getMethod().getReturnType() == boolean.class ? Boolean.FALSE : null);
+        when(readService.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
+                new LcmsReadPort.QuestionBankReadOptions(false, false, 300))).thenReturn(questionBank("tenant-a"));
+
+        controller.questionBankWorkspace(new QuestionBankWorkspaceInput(
+                null, null, null, null, null, null, null, null, null, null, 300), none);
+
+        verify(readService).questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
+                new LcmsReadPort.QuestionBankReadOptions(false, false, 300));
     }
 
     @Test
@@ -63,7 +86,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         authenticate(principal("tenant-a", List.of("lms.quiz.read"), List.of()));
 
         assertThatThrownBy(() -> controller.questionBankWorkspace(
-                new QuestionBankWorkspaceInput("tenant-b", null, null, null, null, null, null, null, null, null)
+                new QuestionBankWorkspaceInput("tenant-b", null, null, null, null, null, null, null, null, null), all
         )).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(readService);
     }
@@ -76,7 +99,7 @@ class LcmsWorkspaceGraphQlControllerTest {
 
         controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(
                 null, "vuong", "teacher", "active", 0, 25
-        ));
+        ), all);
 
         verify(readService).accessManagementWorkspace("tenant-a", "vuong", "teacher", "active", 0, 25, false);
     }
@@ -86,7 +109,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         authenticate(principal("tenant-a", List.of("rbac.permission.read"), List.of()));
 
         assertThatThrownBy(() -> controller.accessManagementWorkspace(
-                new AccessManagementWorkspaceInput(null, null, null, null, null, null)
+                new AccessManagementWorkspaceInput(null, null, null, null, null, null), all
         )).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(readService);
     }
@@ -96,7 +119,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         authenticate(principal("tenant-a", List.of("lms.scope.read", "rbac.permission.read"), List.of()));
 
         assertThatThrownBy(() -> controller.accessManagementWorkspace(
-                new AccessManagementWorkspaceInput("tenant-b", null, null, null, null, null)
+                new AccessManagementWorkspaceInput("tenant-b", null, null, null, null, null), all
         )).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(readService);
     }
@@ -107,7 +130,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         when(readService.accessManagementWorkspace("tenant-a", null, null, null, null, null, true))
                 .thenReturn(access("tenant-a", true));
 
-        controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(null, null, null, null, null, null));
+        controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(null, null, null, null, null, null), all);
 
         verify(readService).accessManagementWorkspace("tenant-a", null, null, null, null, null, true);
     }
@@ -118,7 +141,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         when(readService.accessManagementWorkspace("tenant-a", null, null, null, null, null, true))
                 .thenReturn(access("tenant-a", true));
 
-        controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(null, null, null, null, null, null));
+        controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(null, null, null, null, null, null), all);
 
         verify(readService).accessManagementWorkspace("tenant-a", null, null, null, null, null, true);
     }
@@ -133,7 +156,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         when(readService.accessManagementWorkspace("tenant-a", null, null, null, null, null, false))
                 .thenReturn(access("tenant-a", false));
 
-        controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(null, null, null, null, null, null));
+        controller.accessManagementWorkspace(new AccessManagementWorkspaceInput(null, null, null, null, null, null), all);
 
         verify(readService).accessManagementWorkspace("tenant-a", null, null, null, null, null, false);
     }
@@ -147,7 +170,7 @@ class LcmsWorkspaceGraphQlControllerTest {
         ));
 
         assertThatThrownBy(() -> controller.accessManagementWorkspace(
-                new AccessManagementWorkspaceInput(null, null, null, null, null, null)
+                new AccessManagementWorkspaceInput(null, null, null, null, null, null), all
         )).isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(readService);
     }

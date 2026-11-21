@@ -83,12 +83,14 @@ public class ReportWorker {
             AssignmentReportResponse first = null;
             int page = 0;
             AssignmentProgressFilter filter = filter(job);
+            var summary = defaultFilter(filter) ? null
+                    : quizReportService.summary(job.getTenantId(), job.getAggregateId(), filter);
             while (page < MAX_PAGES) {
                 AssignmentReportResponse report = defaultFilter(filter)
                         ? quizReportService.assignmentReport(job.getTenantId(), job.getAggregateId(), page, PAGE_SIZE)
                         : quizReportService.assignmentReport(job.getTenantId(), job.getAggregateId(), new AssignmentProgressFilter(
                                 filter.classId(), filter.status(), filter.submittedFrom(), filter.submittedTo(),
-                                filter.timezone(), page, PAGE_SIZE));
+                                filter.timezone(), page, PAGE_SIZE), summary);
                 if (first == null) first = report;
                 if (report.totalRecipients() > MAX_RESULT_ROWS) {
                     throw new IllegalArgumentException("report exceeds 10,000 result rows; narrow the scope");

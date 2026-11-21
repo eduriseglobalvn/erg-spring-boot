@@ -46,8 +46,16 @@ public class PeriodTemplateService {
     @Transactional("postgresTransactionManager")
     public List<PeriodTemplate> list(String tenantId) {
         ensureDefault(tenantId);
-        return jdbc.queryForList("select id from teaching_period_templates where tenant_id = ? order by is_default desc, name",
-                String.class, tenantId).stream().map(this::load).toList();
+        // two queries for any number of templates (heads, then every slot), not two per template
+        Map<String, List<PeriodSlot>> slots = new java.util.HashMap<>();
+        jdbc.query("select s.template_id, s.period_no, s.session, s.start_time, s.end_time from teaching_period_template_slots s"
+                + " join teaching_period_templates t on t.id = s.template_id where t.tenant_id = ? order by s.period_no", rs -> {
+            slots.computeIfAbsent(rs.getString("template_id"), k -> new ArrayList<>()).add(new PeriodSlot(rs.getInt("period_no"),
+                    rs.getString("session"), rs.getObject("start_time", LocalTime.class), rs.getObject("end_time", LocalTime.class)));
+        }, tenantId);
+        return jdbc.query("select id, name, periods_per_day from teaching_period_templates where tenant_id = ?"
+                + " order by is_default desc, name", (rs, i) -> new PeriodTemplate(rs.getString("id"), rs.getString("name"),
+                rs.getInt("periods_per_day"), slots.getOrDefault(rs.getString("id"), new ArrayList<>())), tenantId);
     }
 
     /** The template a school uses today. */

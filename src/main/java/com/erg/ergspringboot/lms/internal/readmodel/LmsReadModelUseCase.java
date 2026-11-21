@@ -10,13 +10,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /** Composes the LMS read-model use cases behind a stable module port. */
 @Service
 @Primary
-// Without a tenant-aware transaction the tenant GUC is never set and RLS hides every row from the runtime role.
-@Transactional(value = "postgresTransactionManager", readOnly = true)
+// No transaction here: the delegates open their own tenant-aware one, so a cache hit never checks out a connection.
 public class LmsReadModelUseCase implements LmsReadModelPort {
     private final LmsStudentGroupReadUseCase studentGroups;
     private final LmsAssignmentProgressQueryUseCase assignmentProgress;
@@ -34,7 +32,9 @@ public class LmsReadModelUseCase implements LmsReadModelPort {
     }
 
     @Override public AssignmentProgressProjection assignmentProgress(String tenantId, String assignmentId) { return assignmentProgress.summary(tenantId, assignmentId); }
-    @Override public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds, String ownerUserId) { return studentGroups.query(tenantId, classId, allowedClassIds, ownerUserId); }
+    @Override public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds, String ownerUserId) { return studentGroups.query(tenantId, classId, allowedClassIds, ownerUserId, true); }
+    @Override public StudentGroupWorkspaceResponse studentGroups(String tenantId, String classId, Collection<String> allowedClassIds,
+            String ownerUserId, boolean includeMembers) { return studentGroups.query(tenantId, classId, allowedClassIds, ownerUserId, includeMembers); }
     @Override public AssignmentProgressWorkspaceResponse assignmentProgressWorkspace(String tenantId, String assignmentId, String attemptStatus, Integer page, Integer size) { return assignmentProgress.workspace(tenantId, assignmentId, attemptStatus, page, size); }
     @Override public Page<ClassWorkspaceProjection> schoolClassWorkspaces(String tenantId, String schoolId, String status, Pageable pageable) { return classWorkspace.schoolClasses(tenantId, schoolId, status, pageable); }
     @Override public ClassWorkspaceResponse classWorkspace(String tenantId, String classId, String schoolId, String studentStatus, Integer page, Integer size, String assignmentStatus, Integer assignmentPage, Integer assignmentSize) { return classWorkspace(tenantId, classId, schoolId, studentStatus, page, size, assignmentStatus, assignmentPage, assignmentSize, false, false); }

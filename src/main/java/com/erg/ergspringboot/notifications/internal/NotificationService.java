@@ -10,6 +10,7 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.common.response.notifications.NotificationResponses.UnreadCountResponse;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.notifications.NotificationPriority;
 import com.erg.ergspringboot.notifications.persistence.NotificationCampaignRepository;
 import com.erg.ergspringboot.notifications.persistence.NotificationMessageEntity;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,14 +44,17 @@ public class NotificationService {
     private final NotificationMessageRepository messageRepository;
     private final NotificationCampaignRepository campaignRepository;
     private final UserDirectoryPort users;
+    private final LmsReadCacheInvalidator caches;
 
     public NotificationService(
             NotificationRecipientRepository recipientRepository,
             NotificationPreferenceRepository preferenceRepository,
             NotificationMessageRepository messageRepository,
             NotificationCampaignRepository campaignRepository,
-            UserDirectoryPort users
+            UserDirectoryPort users,
+            LmsReadCacheInvalidator caches
     ) {
+        this.caches = caches;
         this.recipientRepository = recipientRepository;
         this.preferenceRepository = preferenceRepository;
         this.messageRepository = messageRepository;
@@ -84,6 +89,8 @@ public class NotificationService {
         return toItems(tenantId, rows.subList(0, 1)).getFirst();
     }
 
+    /** Polled by every open tab: per user and portal for 15 s; read/archive writes evict it, new messages wait for the TTL. */
+    @Cacheable(cacheNames = "notificationUnread", sync = true, key = "{#tenantId, #userId, #portal}")
     @Transactional(readOnly = true)
     public UnreadCountResponse unreadCount(String tenantId, String userId, String portal) {
         return new UnreadCountResponse(recipientRepository.countUnread(tenantId, userId, portal));
@@ -92,7 +99,13 @@ public class NotificationService {
     @Transactional
     public MarkReadResponse markRead(String tenantId, String userId, String portal, String id) {
         NotificationRecipientEntity recipient = ownRecipient(tenantId, userId, portal, id);
-        return new MarkReadResponse(true, markRead(recipient, OffsetDateTime.now()) ? 1 : 0);
+        boolean changed = markRead(recipient, OffsetDateTime.now());
+        evictUnread(tenantId, userId);
+        return new MarkReadResponse(true, changed ? 1 : 0);
+    }
+
+    private void evictUnread(String tenantId, String userId) {
+        caches.evictScopesAfterCommit(tenantId, Map.of("notificationUnread", List.of(userId)));
     }
 
     /**
@@ -115,6 +128,7 @@ public class NotificationService {
         // Microsecond precision = what Postgres stores, so a repeated ack returns the identical value.
         OffsetDateTime now = OffsetDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         markRead(recipient, now);
+        evictUnread(tenantId, userId);
         String messageId = message.getId();
         // Conditional update: concurrent first acks cannot overwrite each other; return what is stored.
         messageRepository.ackOnce(tenantId, userId, messageId, now);
@@ -134,6 +148,7 @@ public class NotificationService {
     @Transactional
     public MarkReadResponse markAllRead(String tenantId, String userId, String portal) {
         int updated = recipientRepository.markAllRead(tenantId, userId, portal, OffsetDateTime.now());
+        evictUnread(tenantId, userId);
         return new MarkReadResponse(true, updated);
     }
 
@@ -142,6 +157,7 @@ public class NotificationService {
         NotificationRecipientEntity recipient = ownRecipient(tenantId, userId, portal, id);
         recipient.setArchivedAt(OffsetDateTime.now());
         recipientRepository.save(recipient);
+        evictUnread(tenantId, userId);
         return new ArchiveResponse(true);
     }
 

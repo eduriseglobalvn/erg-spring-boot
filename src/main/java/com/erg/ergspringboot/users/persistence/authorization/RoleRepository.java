@@ -35,6 +35,35 @@ public interface RoleRepository extends JpaRepository<Role, String> {
     @Query("select distinct role from Role role left join fetch role.permissions")
     List<Role> findAllWithPermissionsAndUsers();
 
+    /**
+     * [roleId, distinct users] per role in one grouped query: users holding the role directly plus users with an active
+     * scoped assignment (a user in both counts once). Replaces loading every User through {@code Role.getUsers()}.
+     */
+    @Query(value = """
+            select x.role_id, count(distinct x.user_id) from (
+                select ur.role_id, ur.user_id from user_roles ur join users u on u.id = ur.user_id
+                union
+                select a.role_id, a.user_id from user_role_assignments a
+                where a.revoked_at is null and (a.expires_at is null or a.expires_at > :now)
+            ) x group by x.role_id
+            """, nativeQuery = true)
+    List<Object[]> countUsersByRole(@Param("now") java.time.OffsetDateTime now);
+
+    /**
+     * [permissionId, distinct users] per permission in one grouped query: direct holders of any role carrying it plus users
+     * with a per-user override on it. Replaces loading every User through {@code Role.getUsers()} (same scope: all tenants).
+     */
+    @Query(value = """
+            select x.permission_id, count(distinct x.user_id) from (
+                select rp.permission_id, ur.user_id from role_permissions rp
+                join user_roles ur on ur.role_id = rp.role_id where rp.permission_id in (:ids)
+                union
+                select p.id, o.user_id from user_permissions o join permissions p on p.name = o.permission
+                where p.id in (:ids)
+            ) x group by x.permission_id
+            """, nativeQuery = true)
+    List<Object[]> countUsersByPermission(@Param("ids") Collection<String> permissionIds);
+
     @Query("""
             select distinct role from Role role
             join fetch role.permissions permission

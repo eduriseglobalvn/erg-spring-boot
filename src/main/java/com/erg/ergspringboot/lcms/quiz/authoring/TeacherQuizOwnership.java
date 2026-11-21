@@ -1,17 +1,22 @@
 package com.erg.ergspringboot.lcms.quiz.authoring;
 
-import com.erg.ergspringboot.common.response.lcms.LcmsWorkspaceResponses.QuestionBankWorkspaceResponse;
-import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizSummaryPageResponse;
-import com.erg.ergspringboot.common.response.quiz.QuizWorkspaceResponses.QuizWorkspaceResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.Quiz;
 import com.erg.ergspringboot.lcms.persistence.quiz.bank.QuizRepository;
+import com.erg.ergspringboot.platform.events.ClusterJobLock;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.MethodAuthorizationEvaluator;
-import java.util.Set;
+import com.erg.ergspringboot.platform.security.TenantContext;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -24,12 +29,31 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TeacherQuizOwnership {
     public static final String PORTAL_TEACHER = "teacher";
+    static final String RETIRE_JOB_NAME = "teacher-quiz-retire";
+    private static final List<String> QUIZ_CACHES = List.of("lcmsQuestionBankWorkspace", "lcmsQuizWorkspace");
     private final MethodAuthorizationEvaluator authorization;
     private final QuizRepository quizzes;
+    private final ClusterJobLock jobLock;
+    private final TransactionTemplate transaction;
+    private final CacheManager caches;
 
-    public TeacherQuizOwnership(MethodAuthorizationEvaluator authorization, QuizRepository quizzes) {
+    @Autowired
+    public TeacherQuizOwnership(MethodAuthorizationEvaluator authorization, QuizRepository quizzes,
+            ObjectProvider<ClusterJobLock> jobLock, PlatformTransactionManager transactionManager, CacheManager caches) {
+        this(authorization, quizzes, jobLock.getIfAvailable(), new TransactionTemplate(transactionManager), caches);
+    }
+
+    TeacherQuizOwnership(MethodAuthorizationEvaluator authorization, QuizRepository quizzes) {
+        this(authorization, quizzes, (ClusterJobLock) null, (TransactionTemplate) null, null);
+    }
+
+    TeacherQuizOwnership(MethodAuthorizationEvaluator authorization, QuizRepository quizzes, ClusterJobLock jobLock,
+            TransactionTemplate transaction, CacheManager caches) {
         this.authorization = authorization;
         this.quizzes = quizzes;
+        this.jobLock = jobLock;
+        this.transaction = transaction;
+        this.caches = caches;
     }
 
     /** True for a signed-in caller who may build quizzes but not publish system ones. */
@@ -60,26 +84,21 @@ public class TeacherQuizOwnership {
         }
     }
 
-    /** Drops other teachers' quizzes from what a teacher sees; the cached response itself is left untouched. */
-    public QuestionBankWorkspaceResponse visibleToCaller(String tenantId, QuestionBankWorkspaceResponse response) {
-        if (response == null || !callerIsTeacher()) return response;
-        Set<String> hidden = quizzes.findTeacherQuizIdsNotOwnedBy(tenantId, callerId());
-        if (hidden.isEmpty()) return response;
-        return new QuestionBankWorkspaceResponse(response.tenantId(), response.questions(), response.subjects(),
-                response.levels(), response.topics(),
-                response.quizzes().stream().filter(quiz -> !hidden.contains(quiz.id())).toList());
+    /** A teacher reads (exports) a system quiz or their own, never another teacher's; reported as missing, like a copy source. */
+    public void requireVisible(String tenantId, String quizId) {
+        if (!callerIsTeacher()) return;
+        Quiz quiz = find(tenantId, quizId);
+        if (PORTAL_TEACHER.equals(quiz.getPortal()) && !callerId().equals(quiz.getOwnerUserId())) {
+            throw new ResourceNotFoundException("quiz not found");
+        }
     }
 
-    /** The editor list, for the same reason; page totals still count the hidden rows. */
-    public QuizWorkspaceResponse visibleToCaller(String tenantId, QuizWorkspaceResponse response) {
-        if (response == null || response.quizzes() == null || !callerIsTeacher()) return response;
-        Set<String> hidden = quizzes.findTeacherQuizIdsNotOwnedBy(tenantId, callerId());
-        if (hidden.isEmpty()) return response;
-        QuizSummaryPageResponse page = response.quizzes();
-        return new QuizWorkspaceResponse(response.tenantId(),
-                new QuizSummaryPageResponse(page.items().stream().filter(quiz -> !hidden.contains(quiz.id())).toList(),
-                        page.page(), page.size(), page.totalItems(), page.totalPages(), page.hasNext(), page.hasPrevious()),
-                response.subjects(), response.levels(), response.categories());
+    /**
+     * The caller's id when quiz lists must hide other teachers' quizzes (a teacher), else null. Lists apply it in SQL and
+     * carry it in their cache key, so paging and totals only ever count what the teacher may see.
+     */
+    public String teacherViewerId() {
+        return callerIsTeacher() ? callerId() : null;
     }
 
     /**
@@ -87,10 +106,24 @@ public class TeacherQuizOwnership {
      * it plays from its published version. Idempotent, so concurrent instances are harmless.
      */
     @Scheduled(fixedDelayString = "${erg.lcms.teacher-quiz-retire-ms:300000}", initialDelayString = "60000")
-    @CacheEvict(cacheNames = {"lcmsQuestionBankWorkspace", "lcmsQuizWorkspace"}, allEntries = true)
-    @Transactional
-    public int retireQuizzesOfLockedOwners() {
-        return quizzes.softDeleteTeacherQuizzesOfLockedOwners(java.time.OffsetDateTime.now());
+    public void retireScheduled() {
+        if (jobLock == null) retireQuizzesOfLockedOwners(); else jobLock.runExclusively(RETIRE_JOB_NAME, this::retireQuizzesOfLockedOwners);
+    }
+
+    /** Returns the retired quiz count; the caches are cleared only when something actually changed. */
+    int retireQuizzesOfLockedOwners() {
+        // quizzes are tenant-protected (RLS) and a scheduled job has no tenant.
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.maintenance())) {
+            int retired = transaction == null ? quizzes.softDeleteTeacherQuizzesOfLockedOwners(java.time.OffsetDateTime.now())
+                    : transaction.execute(status -> quizzes.softDeleteTeacherQuizzesOfLockedOwners(java.time.OffsetDateTime.now()));
+            if (retired > 0 && caches != null) {
+                for (String name : QUIZ_CACHES) {
+                    Cache cache = caches.getCache(name);
+                    if (cache != null) cache.clear();
+                }
+            }
+            return retired;
+        }
     }
 
     private Quiz find(String tenantId, String quizId) {

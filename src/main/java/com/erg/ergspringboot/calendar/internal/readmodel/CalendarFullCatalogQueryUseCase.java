@@ -7,7 +7,6 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOptionResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarSubjectOptionResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarTeacherOptionResponse;
-import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lms.persistence.Classroom;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumSubject;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnit;
@@ -74,7 +73,9 @@ public final class CalendarFullCatalogQueryUseCase {
         // Keep repository access on the transaction-bound request thread. The facade owns
         // the read-only transaction and invokes this object synchronously.
         List<EducationUnit> schools = schoolIds != null && !schoolIds.isEmpty()
-                ? educationUnitRepository.findByIdInOrderByNameAsc(schoolIds) : List.of();
+                ? educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(
+                        tenantId, schoolIds, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1))
+                : List.of();
         List<Classroom> classes = schoolIds != null && !schoolIds.isEmpty()
                 ? nonNull(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
                         tenantId, schoolIds, PageRequest.of(0, MAX_CATALOG_OPTIONS + 1)),
@@ -93,11 +94,13 @@ public final class CalendarFullCatalogQueryUseCase {
                         .map(room -> new CalendarRoomOptionResponse(
                                 room.getId(), room.getName(), room.getSchoolId()))
                         .toList();
-        requireBound(schools, "schools");
-        requireBound(classes, "classes");
-        requireBound(subjects, "subjects");
-        requireBound(scopedTeachers, "teachers");
-        requireBound(roomOptions, "rooms");
+        // Over the cap the first MAX_CATALOG_OPTIONS (stable order) are kept and the flag tells the client to use catalog search.
+        boolean[] cut = {false};
+        schools = cap(schools, cut);
+        classes = cap(classes, cut);
+        subjects = cap(subjects, cut);
+        scopedTeachers = cap(scopedTeachers, cut);
+        roomOptions = cap(roomOptions, cut);
 
         Map<String, EducationUnit> schoolMap = schools.stream()
                 .collect(Collectors.toMap(EducationUnit::getId, Function.identity()));
@@ -124,7 +127,7 @@ public final class CalendarFullCatalogQueryUseCase {
                         .map(level -> new CalendarLevelOptionResponse(
                                 level.getId(), level.getSubjectId(), level.getName(), level.getSortOrder()))
                         .toList();
-        requireBound(levelOptions, "levels");
+        levelOptions = cap(levelOptions, cut);
 
         Set<String> scopedTeacherIds = scopedTeachers.stream()
                 .map(UserAccountProjection::id)
@@ -132,10 +135,9 @@ public final class CalendarFullCatalogQueryUseCase {
         Set<String> referencedTeacherIds = new LinkedHashSet<>();
         referencedTeacherIds.addAll(findHomeroomTeacherIds(tenantId, schoolIds));
         referencedTeacherIds.addAll(teacherColorKeys.keySet());
-        List<String> assignmentOnlyTeacherIds = referencedTeacherIds.stream()
+        List<String> assignmentOnlyTeacherIds = cap(referencedTeacherIds.stream()
                 .filter(id -> !scopedTeacherIds.contains(id))
-                .toList();
-        requireBound(assignmentOnlyTeacherIds, "teachers");
+                .toList(), cut);
         List<UserAccountProjection> assignmentOnlyTeachers = assignmentOnlyTeacherIds.isEmpty() ? List.of()
                 // A deactivated or locked account is never offered for scheduling, even when it still has periods.
                 : userDirectory.findByTenantIdAndIds(tenantId, assignmentOnlyTeacherIds).stream()
@@ -143,7 +145,7 @@ public final class CalendarFullCatalogQueryUseCase {
                         .toList();
         List<UserAccountProjection> teachers = new ArrayList<>(scopedTeachers);
         teachers.addAll(assignmentOnlyTeachers);
-        requireBound(teachers, "teachers");
+        teachers = cap(teachers, cut);
 
         List<CalendarTeacherOptionResponse> teacherOptions = teachers.stream()
                 .map(teacher -> new CalendarTeacherOptionResponse(
@@ -151,7 +153,7 @@ public final class CalendarFullCatalogQueryUseCase {
                 .toList();
         return new CalendarCatalogResponse(
                 schoolOptions, classOptions, teacherOptions, teacherOptions,
-                subjectOptions, levelOptions, roomOptions);
+                subjectOptions, levelOptions, roomOptions, cut[0]);
     }
 
     private List<UserAccountProjection> findTeachers(String tenantId, List<String> schoolIds) {
@@ -204,11 +206,10 @@ public final class CalendarFullCatalogQueryUseCase {
                 .toList();
     }
 
-    private void requireBound(Collection<?> options, String section) {
-        if (options != null && options.size() > MAX_CATALOG_OPTIONS) {
-            throw new BadRequestException("calendar catalog " + section + " exceeds "
-                    + MAX_CATALOG_OPTIONS + " rows; select fewer schools or use catalog search");
-        }
+    private <T> List<T> cap(List<T> options, boolean[] cut) {
+        if (options == null || options.size() <= MAX_CATALOG_OPTIONS) return options;
+        cut[0] = true;
+        return List.copyOf(options.subList(0, MAX_CATALOG_OPTIONS));
     }
 
     private <T> List<T> nonNull(List<T> primary, Supplier<List<T>> fallback) {

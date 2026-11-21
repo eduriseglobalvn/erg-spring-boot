@@ -45,14 +45,17 @@ final class ContentItemCommands {
     private final ContentItemAssetRepository contentItemAssetRepository;
     private final TopicContentItemRepository topicContentItemRepository;
     private final LearningContentSupport.SyncReceipts receipts;
+    private final ContentOwnership ownership;
 
     ContentItemCommands(
             ContentItemRepository contentItemRepository,
             ContentAssetRepository contentAssetRepository,
             ContentItemAssetRepository contentItemAssetRepository,
             TopicContentItemRepository topicContentItemRepository,
-            LearningContentSupport.SyncReceipts receipts
+            LearningContentSupport.SyncReceipts receipts,
+            ContentOwnership ownership
     ) {
+        this.ownership = ownership;
         this.contentItemRepository = contentItemRepository;
         this.contentAssetRepository = contentAssetRepository;
         this.contentItemAssetRepository = contentItemAssetRepository;
@@ -154,6 +157,7 @@ final class ContentItemCommands {
                         resolvedTenantId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("content item not found for tenant"));
+        ownership.requireCanModify(item.getCreatedBy());
         String key = blankToNull(request.idempotencyKey());
         LmsSyncOperationService.Receipt receipt = receipts.reserve(resolvedTenantId, userId, request.operationId(), key,
                 "lms.content_item", item.getId(), request, request.expectedVersion());
@@ -193,6 +197,7 @@ final class ContentItemCommands {
                         resolvedTenantId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("content item not found for tenant"));
+        ownership.requireCanModify(item.getCreatedBy());
         List<ContentItemAsset> assetLinks = contentItemAssetRepository.findAllByTenantIdAndContentItemId(
                 resolvedTenantId,
                 item.getId()

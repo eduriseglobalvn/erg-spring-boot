@@ -3,6 +3,7 @@ package com.erg.ergspringboot.notifications.internal.campaign;
 import com.erg.ergspringboot.common.response.PageResponse;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.notifications.CampaignAudience;
 import com.erg.ergspringboot.notifications.CampaignStatus;
 import com.erg.ergspringboot.notifications.NotificationCampaignResponses.CampaignRecipientResponse;
 import com.erg.ergspringboot.notifications.NotificationCampaignResponses.CampaignResponse;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -42,26 +44,36 @@ public class NotificationCampaignQueryService {
     private final NotificationMessageRepository messages;
     private final AudienceScopeGuard guard;
     private final UserDirectoryPort users;
+    private final CampaignCounterReader counters;
     private final Clock clock;
 
     @Autowired
     public NotificationCampaignQueryService(NotificationCampaignRepository campaigns,
-            NotificationMessageRepository messages, AudienceScopeGuard guard, UserDirectoryPort users) {
-        this(campaigns, messages, guard, users, Clock.systemUTC());
+            NotificationMessageRepository messages, AudienceScopeGuard guard, UserDirectoryPort users,
+            CampaignCounterReader counters) {
+        this(campaigns, messages, guard, users, counters, Clock.systemUTC());
     }
 
     NotificationCampaignQueryService(NotificationCampaignRepository campaigns, NotificationMessageRepository messages,
-            AudienceScopeGuard guard, UserDirectoryPort users, Clock clock) {
+            AudienceScopeGuard guard, UserDirectoryPort users, CampaignCounterReader counters, Clock clock) {
         this.campaigns = campaigns;
         this.messages = messages;
         this.guard = guard;
         this.users = users;
+        this.counters = counters;
         this.clock = clock;
     }
 
     /** Non-admins only ever see their own campaigns, whatever {@code mine} says. */
-    @Transactional(readOnly = true)
     public PageResponse<CampaignResponse> list(CampaignActor actor, String box, boolean mine, int page, int size) {
+        return list(actor, box, mine, page, size, null);
+    }
+
+    /** {@code view=summary} drops the audience id lists (counts stay); anything else keeps the full audience. */
+    @Transactional(readOnly = true)
+    public PageResponse<CampaignResponse> list(
+            CampaignActor actor, String box, boolean mine, int page, int size, String view) {
+        boolean lean = view != null && "summary".equalsIgnoreCase(view.trim());
         String normalizedBox = box == null || box.isBlank() ? "SENT" : box.trim().toUpperCase(java.util.Locale.ROOT);
         List<CampaignStatus> statuses;
         Sort sort;
@@ -83,10 +95,10 @@ public class NotificationCampaignQueryService {
         String createdBy = guard.isAdmin(actor) && !mine ? null : actor.userId();
         Page<NotificationCampaignEntity> result = campaigns.findPage(actor.tenantId(), statuses, createdBy,
                 PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), sort));
-        Map<String, CampaignDeliveryCounts> counts = counts(actor.tenantId(),
+        Map<String, CampaignDeliveryCounts> counts = pageCounts(actor.tenantId(),
                 result.getContent().stream().map(NotificationCampaignEntity::getId).toList());
         List<CampaignResponse> items = result.getContent().stream()
-                .map(campaign -> toResponse(campaign, counts.getOrDefault(campaign.getId(), NONE)))
+                .map(campaign -> toResponse(campaign, counts.getOrDefault(campaign.getId(), NONE), lean))
                 .toList();
         return page(result, items);
     }
@@ -121,6 +133,8 @@ public class NotificationCampaignQueryService {
         return page(rows, items);
     }
 
+    /** KPIs scan this month's and every ack-required campaign's recipients: cached 45 s per tenant and creator scope. */
+    @Cacheable(cacheNames = "notificationCampaignSummary", sync = true, key = "{#actor.tenantId(), #root.target.summaryScope(#actor)}")
     @Transactional(readOnly = true)
     public CampaignSummaryResponse summary(CampaignActor actor) {
         String createdBy = guard.isAdmin(actor) ? null : actor.userId();
@@ -131,6 +145,11 @@ public class NotificationCampaignQueryService {
         CountPair unacked = messages.unacked(actor.tenantId(), createdBy);
         double rate = viewed.firstOrZero() == 0 ? 0 : (double) viewed.secondOrZero() / viewed.firstOrZero();
         return new CampaignSummaryResponse(sent, rate, unacked.firstOrZero(), unacked.secondOrZero());
+    }
+
+    /** Cache scope of {@link #summary}: all campaigns for admins, else the caller's own. */
+    public String summaryScope(CampaignActor actor) {
+        return guard.isAdmin(actor) ? "all" : "own:" + actor.userId();
     }
 
     /** Admins reach every campaign in the tenant; anyone else only their own (404, not 403, to hide existence). */
@@ -160,12 +179,38 @@ public class NotificationCampaignQueryService {
                 .collect(Collectors.toMap(CampaignDeliveryCounts::campaignId, Function.identity()));
     }
 
+    /** Counters for one list page, cached; the page's ordered ids are the cache key. */
+    private Map<String, CampaignDeliveryCounts> pageCounts(String tenantId, List<String> campaignIds) {
+        if (campaignIds.isEmpty()) {
+            return Map.of();
+        }
+        return counters.load(tenantId, digest(campaignIds), campaignIds).rows().stream()
+                .collect(Collectors.toMap(CampaignDeliveryCounts::campaignId, Function.identity()));
+    }
+
+    private static String digest(List<String> ids) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(String.join(",", ids).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
     private static CampaignResponse toResponse(NotificationCampaignEntity campaign, CampaignDeliveryCounts counts) {
+        return toResponse(campaign, counts, false);
+    }
+
+    private static CampaignResponse toResponse(NotificationCampaignEntity campaign, CampaignDeliveryCounts counts, boolean lean) {
+        CampaignAudience audience = campaign.getAudience();
         return new CampaignResponse(campaign.getId(), campaign.getTitle(), campaign.getBody(), campaign.getPriority(),
-                campaign.getAudience(), campaign.getStatus(), campaign.getSenderRole(), campaign.getCreatedBy(),
+                lean && audience != null ? new CampaignAudience(audience.wholeTenant(), null, null, null, null, audience.roles(), null)
+                        : audience, campaign.getStatus(), campaign.getSenderRole(), campaign.getCreatedBy(),
                 campaign.isRequireReadAck(), campaign.isPushEnabled(), campaign.getEstimatedCount(),
                 campaign.getResolvedCount(), campaign.getScheduledAt(), campaign.getSentAt(), campaign.getCreatedAt(),
-                campaign.getUpdatedAt(), zero(counts.recipients()), zero(counts.viewed()), zero(counts.acked()));
+                campaign.getUpdatedAt(), zero(counts.recipients()), zero(counts.viewed()), zero(counts.acked()),
+                campaign.getAudience() == null || campaign.getAudience().userIds() == null
+                        ? 0 : campaign.getAudience().userIds().size());
     }
 
     private static long zero(Long value) {

@@ -18,7 +18,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,8 +58,8 @@ public class LessonLogCommandUseCase {
         LocalDate day = LessonLogQueryUseCase.date(date);
         Row row = ownPeriod(tenantId, actorId, eventId, day, periodNo);
         // The lesson log has no time gate: a teacher may fill it before the period. Only attendance waits for the period.
-        apply(tenantId, actorId, row, actualPeriod, comment, expectedVersion);
-        return reload(tenantId, actorId, eventId, day, periodNo);
+        LessonLogEntry entry = apply(tenantId, actorId, row, actualPeriod, comment, expectedVersion, false);
+        return reader.refreshed(tenantId, row, entry);
     }
 
     /** Confirms (reports) every happened, unconfirmed period of the week; closed months are skipped. */
@@ -68,11 +70,13 @@ public class LessonLogCommandUseCase {
         List<Row> rows = reader.rows(tenantId, schedule.teacherSlots(tenantId, actorId, monday, monday.plusDays(6)), now);
         boolean sawClosed = false;
         boolean confirmedAny = false;
+        Map<YearMonth, Boolean> closed = new HashMap<>(); // one lock query per month of the week, not per period
+        java.util.Set<Row> confirmedNow = new java.util.HashSet<>();
         for (Row row : rows) {
             LessonLogPeriod p = row.period();
             // a period is filled in ahead but confirmed only after it was taught; a week with none taught is a no-op
             if (!p.happened() || "CONFIRMED".equals(p.status())) continue;
-            if (monthLock.isClosed(tenantId, YearMonth.from(p.date()))) {
+            if (closed.computeIfAbsent(YearMonth.from(p.date()), month -> monthLock.isClosed(tenantId, month))) {
                 sawClosed = true;
                 continue;
             }
@@ -82,12 +86,22 @@ public class LessonLogCommandUseCase {
             entry.setConfirmedBy(actorId);
             entry.setLate(isLate(p.date(), now));
             entries.save(entry);
+            confirmedNow.add(row);
             confirmedAny = true;
         }
         if (sawClosed && !confirmedAny) throw LessonLogException.monthClosed();
         entries.flush();
-        return LessonLogReader.stats(reader.rows(tenantId,
-                schedule.teacherSlots(tenantId, actorId, monday, monday.plusDays(6)), now).stream().map(Row::period).toList());
+        // The stats follow from the rows already read: the periods just confirmed count as confirmed, no second pipeline run.
+        int taught = 0;
+        int confirmed = 0;
+        for (Row row : rows) {
+            LessonLogPeriod p = row.period();
+            boolean isConfirmed = "CONFIRMED".equals(p.status()) || confirmedNow.contains(row);
+            if (p.happened()) taught++;
+            if (isConfirmed) confirmed++;
+        }
+        return new LessonLogStats(taught, confirmed, (int) rows.stream()
+                .filter(r -> r.period().happened() && !"CONFIRMED".equals(r.period().status()) && !confirmedNow.contains(r)).count());
     }
 
     /** Saves the attendance of a period and its actual period/comment in one transaction. */
@@ -102,12 +116,16 @@ public class LessonLogCommandUseCase {
         // Validate the log fields first so a bad actual period cannot leave half of the attendance saved.
         checkActual(tenantId, row, actualPeriod);
         LessonSlot slot = row.slot();
-        for (AttendanceMark mark : records) {
-            attendance.upsertAttendance(new AttendanceCommand(tenantId, actorId, slot.classId(), mark.studentId(),
-                    slot.subjectId(), day.toString(), periodNo, mark.status(), null));
+        if (!records.isEmpty()) {
+            // The students must belong to the class (one query), then one insert-on-conflict for the whole period.
+            attendance.assertStudentsInClass(tenantId, slot.classId(), records.stream().map(AttendanceMark::studentId).toList());
+            attendance.upsertAttendanceBatch(tenantId, actorId, slot.classId(), slot.subjectId(), day.toString(), periodNo,
+                    records.stream().map(m -> new LmsAcademicRecordOperations.AttendanceMark(m.studentId(), m.status())).toList());
         }
-        apply(tenantId, actorId, row, actualPeriod, comment, expectedVersion);
-        return reload(tenantId, actorId, eventId, day, periodNo);
+        // Month lock and actual period were validated above for this same row; the entry is returned, not reloaded.
+        LessonLogEntry entry = apply(tenantId, actorId, row, actualPeriod, comment, expectedVersion, true);
+        // Absentees changed with the marks, so they are read again for this one period.
+        return reader.refreshed(tenantId, row, entry);
     }
 
     /** The caller's own MAIN-teacher period, or NOT_TEACHER_OF_PERIOD. */
@@ -123,10 +141,6 @@ public class LessonLogCommandUseCase {
         if (!LessonLogReader.started(row.slot(), periodNo, clock.instant())) throw LessonLogException.periodNotHappened();
     }
 
-    private LessonLogPeriod reload(String tenantId, String actorId, String eventId, LocalDate day, int periodNo) {
-        return ownPeriod(tenantId, actorId, eventId, day, periodNo).period();
-    }
-
     private void checkActual(String tenantId, Row row, int actualPeriod) {
         int max = reader.frameworkSize(tenantId, row.slot());
         if (actualPeriod < 1 || (max > 0 && actualPeriod > max)) {
@@ -134,10 +148,12 @@ public class LessonLogCommandUseCase {
         }
     }
 
-    private void apply(String tenantId, String actorId, Row row, int actualPeriod, String rawComment, Integer expectedVersion) {
+    /** Applies the edit and returns the entry now in effect; {@code validated} skips the month-lock and actual-period checks already done. */
+    private LessonLogEntry apply(String tenantId, String actorId, Row row, int actualPeriod, String rawComment, Integer expectedVersion,
+                                 boolean validated) {
         LessonLogPeriod p = row.period();
-        if (monthLock.isClosed(tenantId, YearMonth.from(p.date()))) throw LessonLogException.monthClosed();
-        checkActual(tenantId, row, actualPeriod);
+        if (!validated && monthLock.isClosed(tenantId, YearMonth.from(p.date()))) throw LessonLogException.monthClosed();
+        if (!validated) checkActual(tenantId, row, actualPeriod);
         if (expectedVersion != null && expectedVersion != p.version()) throw LessonLogException.staleVersion();
         String comment = normalize(rawComment);
 
@@ -147,7 +163,7 @@ public class LessonLogCommandUseCase {
         String oldComment = p.comment();
         boolean actualChanged = actualPeriod != p.actualPeriod();
         boolean commentChanged = !Objects.equals(comment, oldComment);
-        if (!isNew && !actualChanged && !commentChanged) return;
+        if (!isNew && !actualChanged && !commentChanged) return entry;
 
         entry.setActualPeriod(actualPeriod);
         entry.setComment(comment);
@@ -156,6 +172,7 @@ public class LessonLogCommandUseCase {
         if (actualChanged) log.add(change(tenantId, saved, actorId, "actualPeriod", oldActual, String.valueOf(actualPeriod)));
         if (commentChanged) log.add(change(tenantId, saved, actorId, "comment", oldComment, comment));
         changes.saveAll(log);
+        return saved;
     }
 
     private LessonLogEntry newEntry(String tenantId, String actorId, Row row) {

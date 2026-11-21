@@ -88,6 +88,13 @@ public interface UserRepository extends JpaRepository<User, String> {
             @Param("tenantId") String tenantId,
             @Param("ids") Collection<String> ids);
 
+    /** Any status, with the roles and permissions an authority check reads, so a batch loads them in one go. */
+    @EntityGraph(attributePaths = {"roles", "roles.permissions"})
+    @Query("select u from User u where u.tenantId = :tenantId and u.id in :ids")
+    List<User> findWithAuthorityByTenantIdAndIdIn(
+            @Param("tenantId") String tenantId,
+            @Param("ids") Collection<String> ids);
+
     Optional<User> findFirstByTenantIdOrderByCreatedAtAsc(String tenantId);
 
     @EntityGraph(attributePaths = {"roles", "roles.permissions", "permissionOverrides", "accessScopes"})

@@ -221,7 +221,7 @@ public class UserController {
             @Valid @RequestBody BulkStatusRequest request,
             HttpServletRequest servletRequest
     ) {
-        BulkOperationResponse data = users.bulkUpdateStatus(tenantId(servletRequest), request);
+        BulkOperationResponse data = users.bulkUpdateStatus(tenantId(servletRequest), request, auditContext(servletRequest));
         return ok(data, servletRequest);
     }
 

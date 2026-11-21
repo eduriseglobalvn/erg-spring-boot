@@ -50,7 +50,10 @@ public final class LmsAttemptFixture {
         lenient().when(students.findByTenantIdAndId(any(), any())).thenReturn(Optional.empty());
         lenient().when(resources.findByTenantIdAndAssignmentIdAndQuizId(any(), any(), any())).thenReturn(Optional.empty());
         lenient().when(recipients.findFirstByTenantIdAndAssignmentIdAndStudentId(any(), any(), any())).thenReturn(Optional.empty());
+        // The legacy student_ids snapshot is asked in SQL; these fixtures list their learner in it.
+        lenient().when(recipients.legacySnapshotNames(any(), any(), any())).thenReturn(true);
         lenient().when(grading.runtimeQuestionIds(any())).thenReturn(Set.of());
+        lenient().when(packages.startInfo(any(), any(), any())).thenReturn(QuizStartInfo.of(null, null));
     }
 
     public LmsAttemptUseCase useCase(Clock clock) {

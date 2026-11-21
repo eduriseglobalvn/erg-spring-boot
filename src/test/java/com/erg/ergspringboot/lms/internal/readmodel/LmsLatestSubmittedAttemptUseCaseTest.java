@@ -7,9 +7,9 @@ import static org.mockito.Mockito.when;
 import com.erg.ergspringboot.common.dto.lms.LmsRuntimeDtos.LatestSubmittedAttemptResponse;
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRow;
 import com.erg.ergspringboot.lcms.persistence.quiz.runtime.AttemptAnswerRowRepository;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestion;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
 import com.erg.ergspringboot.lms.internal.core.LmsAttemptService;
+import com.erg.ergspringboot.lms.internal.quiz.runtime.QuizAttemptGradingService;
 import com.erg.ergspringboot.lms.internal.core.LmsStudentService;
 import com.erg.ergspringboot.lms.persistence.Attempt;
 import com.erg.ergspringboot.lms.persistence.AttemptAnswer;
@@ -29,7 +29,7 @@ class LmsLatestSubmittedAttemptUseCaseTest {
     private AttemptRepository repository;
     private LmsStudentService students;
     private AttemptAnswerRowRepository rows;
-    private QuizVersionQuestionRepository questions;
+    private QuizAttemptGradingService grading;
     private LmsLatestSubmittedAttemptUseCase useCase;
     private UserAccessContext access;
 
@@ -38,13 +38,14 @@ class LmsLatestSubmittedAttemptUseCaseTest {
         repository = mock(AttemptRepository.class);
         students = mock(LmsStudentService.class);
         rows = mock(AttemptAnswerRowRepository.class);
-        questions = mock(QuizVersionQuestionRepository.class);
         access = mock(UserAccessContext.class);
         when(access.tenantId()).thenReturn("t1");
         Student student = new Student();
         student.setId("stu-1");
         when(students.findFirstByTenantIdAndAuthUserId("t1", "user-1")).thenReturn(Optional.of(student));
-        useCase = new LmsLatestSubmittedAttemptUseCase(new LmsAttemptService(repository), students, rows, questions,
+        grading = mock(QuizAttemptGradingService.class);
+        useCase = new LmsLatestSubmittedAttemptUseCase(new LmsAttemptService(repository),
+                new LmsStudentIdentityLookup(students), rows, grading,
                 mock(com.erg.ergspringboot.lms.persistence.AssignmentRepository.class));
     }
 
@@ -77,11 +78,8 @@ class LmsLatestSubmittedAttemptUseCaseTest {
         when(repository.findLatestByStatuses(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(List.of(attempt("att-1", "graded")));
-        QuizVersionQuestion question = new QuizVersionQuestion();
-        question.setId("vq-1");
-        question.setRuntimeQuestionId("q-1");
-        question.setAnswerKey(Map.of("correct", "B"));
-        when(questions.findByQuizVersionIdOrderByOrderIndexAsc("qv-1")).thenReturn(List.of(question));
+        // The version's question ids come from the grading service's published-version cache, not a per-call reload.
+        when(grading.runtimeIdsByVersionQuestionId("qv-1")).thenReturn(Map.of("vq-1", "q-1"));
         AttemptAnswerRow row = new AttemptAnswerRow();
         row.setAttemptId("att-1");
         row.setQuizVersionQuestionId("vq-1");

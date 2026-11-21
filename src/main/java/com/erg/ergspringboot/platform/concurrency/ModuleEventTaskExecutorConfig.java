@@ -23,24 +23,8 @@ public class ModuleEventTaskExecutorConfig {
         executor.setMaxPoolSize(configuration.getMaxSize());
         executor.setQueueCapacity(configuration.getQueueCapacity());
         executor.setThreadNamePrefix("erg-module-event-io-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(30);
-        executor.initialize();
-        return executor;
-    }
-
-    @Bean(name = "moduleEventCpuExecutor")
-    ThreadPoolTaskExecutor moduleEventCpuExecutor(
-            ErgModuleEventsProperties properties) {
-        properties.validate();
-        ErgModuleEventsProperties.Cpu configuration = properties.getCpu();
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(configuration.getParallelism());
-        executor.setMaxPoolSize(configuration.getParallelism());
-        executor.setQueueCapacity(configuration.getQueueCapacity());
-        executor.setThreadNamePrefix("erg-module-event-cpu-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        // A rejected after-commit listener must not fail a request whose data already committed: run it on the caller.
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();

@@ -20,12 +20,12 @@ class NginxSecurityConfigContractTest {
         // OPS-01: a school computer lab shares one public IP; per-account/per-user limits stay the brute-force fence.
         String config = Files.readString(Path.of("ops/docker/nginx/native.conf"));
         assertThat(config).contains(
-                "zone=erg_general:10m rate=300r/s;",
+                "zone=erg_general:10m rate=1500r/s;",
                 "zone=erg_login:10m rate=30r/s;",
-                "zone=erg_graphql:10m rate=150r/s;",
+                "zone=erg_graphql:10m rate=750r/s;",
                 "limit_req zone=erg_login burst=100 nodelay;",
-                "limit_req zone=erg_graphql burst=300 nodelay;",
-                "limit_req zone=erg_general burst=600;");
+                "limit_req zone=erg_graphql burst=1500 nodelay;",
+                "limit_req zone=erg_general burst=3000;");
         // OPS-03: uploads up to 30 MB (owner's decision 18/11/2026) plus multipart overhead must reach the backend, not die as 413.
         assertThat(config).contains("client_max_body_size 32m;");
         String env = Files.readString(Path.of("ops/docker/.env.production.example"));

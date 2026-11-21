@@ -140,14 +140,15 @@ public class AuthLoginUseCase {
         // Argon2 runs before the transaction: a login may queue up to 10 s for a hash thread, and must not hold a
         // pooled connection meanwhile (a 2000-login burst parked up to 29 connections idle in transaction).
         CheckedPassword password = CheckedPassword.check(passwords, passwordCache, found, request.password());
-        return transaction.execute(status -> loginVerified(identifier, portal, password, context,
+        return transaction.execute(status -> loginVerified(identifier, found, portal, password, context,
                 Boolean.TRUE.equals(request.rememberMe())));
     }
 
     private AuthResponse loginVerified(
-            String identifier, String portal, CheckedPassword password, AuthClientContext context, boolean rememberMe) {
+            String identifier, Optional<User> resolved, String portal, CheckedPassword password,
+            AuthClientContext context, boolean rememberMe) {
         // Re-read inside the transaction so the account updates below act on a managed, current row.
-        Optional<User> found = users.findForLogin(identifier);
+        Optional<User> found = resolved.flatMap(user -> users.findForLoginById(user.getId()));
         CredentialVerifier.VerifiedLogin verified;
         try {
             verified = credentialVerifier.verify(found, identifier, password, context, portal);

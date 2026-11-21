@@ -7,15 +7,18 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
-import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,13 +37,13 @@ public class StudentQuestionThreadService {
 
     private static final int LIST_LIMIT = 50;
 
-    private final StudentRepository students;
+    private final LmsStudentIdentityLookup identities;
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate namedJdbc;
     private final ApplicationEventPublisher events;
 
-    public StudentQuestionThreadService(StudentRepository students, JdbcTemplate jdbc, ApplicationEventPublisher events) {
-        this.students = students;
+    public StudentQuestionThreadService(LmsStudentIdentityLookup identities, JdbcTemplate jdbc, ApplicationEventPublisher events) {
+        this.identities = identities;
         this.jdbc = jdbc;
         this.namedJdbc = new NamedParameterJdbcTemplate(jdbc);
         this.events = events;
@@ -48,9 +51,10 @@ public class StudentQuestionThreadService {
 
     @Transactional
     public QuestionThreadResponse ask(Actor actor, AskCommand command) {
-        Student student = students.findFirstByTenantIdAndAuthUserId(actor.tenantId(), actor.userId())
-                .filter(s -> s.getAcademicClassId() != null && !s.getAcademicClassId().isBlank())
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated student enrollment was not found."));
+        StudentIdentity student = identities.byAuthUser(actor.tenantId(), actor.userId());
+        if (!student.exists() || student.academicClassId() == null || student.academicClassId().isBlank()) {
+            throw new ResourceNotFoundException("Authenticated student enrollment was not found.");
+        }
         requireText(command.idempotencyKey(), "idempotencyKey", 192);
         requireText(command.assignmentId(), "assignmentId", 36);
         requireText(command.message(), "message", 4000);
@@ -66,7 +70,7 @@ public class StudentQuestionThreadService {
                 where a.tenant_id = ? and a.id = ? and a.academic_class_id = ?
                   and (a.student_ids is null or jsonb_array_length(a.student_ids) = 0 or jsonb_exists(a.student_ids, ?))
                 """, rs -> rs.next() ? rs.getString(1) : null,
-                actor.tenantId(), command.assignmentId().trim(), student.getAcademicClassId(), student.getId());
+                actor.tenantId(), command.assignmentId().trim(), student.academicClassId(), student.studentId());
         if (teacherId == null) throw new ResourceNotFoundException("Assignment was not found for the student.");
         String id = IdGenerator.newId();
         OffsetDateTime now = OffsetDateTime.now();
@@ -76,7 +80,7 @@ public class StudentQuestionThreadService {
                       (id, tenant_id, student_id, student_user_id, academic_class_id, teacher_id, assignment_id, question_index,
                        question_prompt, student_answer_text, status, idempotency_key, last_message_at, created_at)
                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)
-                    """, id, actor.tenantId(), student.getId(), actor.userId(), student.getAcademicClassId(), teacherId,
+                    """, id, actor.tenantId(), student.studentId(), actor.userId(), student.academicClassId(), teacherId,
                     command.assignmentId().trim(), command.questionIndex(), blank(command.questionPrompt()),
                     blank(command.studentAnswerText()), command.idempotencyKey().trim(), now, now);
         } catch (DataIntegrityViolationException race) {
@@ -108,6 +112,12 @@ public class StudentQuestionThreadService {
     /** Student: own threads. Teacher side: threads addressed to the viewer (all of the tenant for a tenant-wide admin). */
     @Transactional(readOnly = true)
     public List<QuestionThreadResponse> list(Actor actor, boolean teacherSide, String status) {
+        return list(actor, teacherSide, status, true);
+    }
+
+    /** {@code includeCorrectAnswer = false} skips the quiz-version lookup of every row's {@code correctAnswerText} (left null). */
+    @Transactional(readOnly = true)
+    public List<QuestionThreadResponse> list(Actor actor, boolean teacherSide, String status, boolean includeCorrectAnswer) {
         String wanted = status == null || status.isBlank() ? null : status.trim().toUpperCase(Locale.ROOT);
         if (wanted != null && !Set.of("OPEN", "ANSWERED").contains(wanted)) throw new BadRequestException("status must be OPEN or ANSWERED.");
         MapSqlParameterSource params = new MapSqlParameterSource().addValue("tenantId", actor.tenantId())
@@ -116,7 +126,84 @@ public class StudentQuestionThreadService {
         List<ThreadRow> rows = namedJdbc.query(THREAD_SELECT + " where t.tenant_id = :tenantId and " + scope
                 + " and (cast(:status as varchar) is null or t.status = :status) order by t.last_message_at desc limit :limit",
                 params, this::mapThread);
-        return rows.stream().map(row -> toResponse(actor, row, false)).toList();
+        return toListResponses(actor, rows, includeCorrectAnswer);
+    }
+
+    /** The list view of {@link #toResponse}: one query per kind for every row instead of about four per row. */
+    private List<QuestionThreadResponse> toListResponses(Actor actor, List<ThreadRow> rows, boolean includeCorrectAnswer) {
+        if (rows.isEmpty()) return List.of();
+        MapSqlParameterSource byThread = new MapSqlParameterSource("tenantId", actor.tenantId())
+                .addValue("ids", rows.stream().map(ThreadRow::id).toList());
+        Map<String, String> previews = new HashMap<>();
+        namedJdbc.query("""
+                select distinct on (m.thread_id) m.thread_id, left(m.body, 120) preview from student_question_messages m
+                where m.tenant_id = :tenantId and m.thread_id in (:ids) order by m.thread_id, m.created_at desc, m.id desc
+                """, byThread, rs -> { previews.put(rs.getString(1), rs.getString(2)); });
+        Map<String, OffsetDateTime> lastTeacherAt = new HashMap<>();
+        namedJdbc.query("""
+                select thread_id, max(created_at) from student_question_messages
+                where tenant_id = :tenantId and thread_id in (:ids) and sender_role = 'TEACHER' group by thread_id
+                """, byThread, rs -> { lastTeacherAt.put(rs.getString(1), rs.getObject(2, OffsetDateTime.class)); });
+        Map<String, String> correct = includeCorrectAnswer ? correctAnswers(actor, rows) : Map.of();
+        return rows.stream().map(t -> {
+            boolean studentSide = actor.userId().equals(t.studentUserId());
+            OffsetDateTime teacherAt = lastTeacherAt.get(t.id());
+            boolean unread = studentSide && teacherAt != null && (t.studentReadAt() == null || teacherAt.isAfter(t.studentReadAt()));
+            return new QuestionThreadResponse(t.id(), t.assignmentId(), t.assignmentTitle(), t.subjectName(), t.className(),
+                    t.questionIndex(), t.questionPrompt(), t.studentAnswerText(), correct.get(t.id()), t.teacherId(),
+                    t.teacherName(), t.studentName(), t.status(), t.lastMessageAt(), previews.get(t.id()), List.of(), unread);
+        }).toList();
+    }
+
+    /** Thread id to the text of the correct answer, for the rows that may show it (same rules as {@link #answersVisible}). */
+    private Map<String, String> correctAnswers(Actor actor, List<ThreadRow> rows) {
+        String tenantId = actor.tenantId();
+        Set<String> studentSideAssignments = new HashSet<>();
+        rows.stream().filter(t -> actor.userId().equals(t.studentUserId())).forEach(t -> studentSideAssignments.add(t.assignmentId()));
+        Set<String> showing = new HashSet<>();
+        if (!studentSideAssignments.isEmpty()) {
+            namedJdbc.query("""
+                    select a.id from lms_assignments a join lms_quizzes q on q.id = a.quiz_id and q.tenant_id = a.tenant_id
+                    where a.tenant_id = :tenantId and a.id in (:ids)
+                      and coalesce(q.settings ->> 'showAnswersAfterSubmit', q.settings -> 'runtime' ->> 'showAnswersAfterSubmit') = 'true'
+                    """, new MapSqlParameterSource("tenantId", tenantId).addValue("ids", studentSideAssignments),
+                    rs -> { showing.add(rs.getString(1)); });
+        }
+        Map<String, String> versions = new HashMap<>();
+        namedJdbc.query("""
+                select distinct on (assignment_id, student_id) assignment_id, student_id, quiz_version_id from lms_attempts
+                where tenant_id = :tenantId and assignment_id in (:aids) and student_id in (:sids)
+                  and quiz_version_id is not null and lower(status) in (:states)
+                order by assignment_id, student_id, submitted_at desc nulls last
+                """, new MapSqlParameterSource("tenantId", tenantId)
+                        .addValue("aids", rows.stream().map(ThreadRow::assignmentId).distinct().toList())
+                        .addValue("sids", rows.stream().map(ThreadRow::studentId).distinct().toList())
+                        .addValue("states", LmsStatePolicy.completedAttemptStates()),
+                rs -> { versions.put(rs.getString(1) + '|' + rs.getString(2), rs.getString(3)); });
+        Map<String, String> versionOf = new HashMap<>();
+        for (ThreadRow t : rows) {
+            boolean studentSide = actor.userId().equals(t.studentUserId());
+            String version = versions.get(t.assignmentId() + '|' + t.studentId());
+            if (version != null && (!studentSide || showing.contains(t.assignmentId()))) versionOf.put(t.id(), version);
+        }
+        if (versionOf.isEmpty()) return Map.of();
+        Map<String, String> texts = new HashMap<>();
+        namedJdbc.query("""
+                -- the window ranks ids only; body and answer key are read for the matching rows alone
+                select x.quiz_version_id, x.rn, q.body::text, q.answer_key::text from (
+                  select id, quiz_version_id, row_number() over (partition by quiz_version_id order by order_index, id) rn
+                  from quiz_version_questions where tenant_id = :tenantId and quiz_version_id in (:vids)) x
+                join quiz_version_questions q on q.tenant_id = :tenantId and q.id = x.id
+                where x.rn in (:positions)
+                """, new MapSqlParameterSource("tenantId", tenantId).addValue("vids", Set.copyOf(versionOf.values()))
+                        .addValue("positions", rows.stream().map(ThreadRow::questionIndex).distinct().toList()),
+                rs -> { texts.put(rs.getString(1) + '#' + rs.getInt(2), QuestionAnswerText.of(rs.getString(3), rs.getString(4))); });
+        Map<String, String> result = new HashMap<>();
+        for (ThreadRow t : rows) {
+            String text = versionOf.containsKey(t.id()) ? texts.get(versionOf.get(t.id()) + '#' + t.questionIndex()) : null;
+            if (text != null) result.put(t.id(), text);
+        }
+        return result;
     }
 
     @Transactional(readOnly = true)

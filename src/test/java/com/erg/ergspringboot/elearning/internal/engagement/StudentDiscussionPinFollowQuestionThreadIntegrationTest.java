@@ -19,12 +19,12 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.lms.persistence.ClassroomRepository;
-import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -54,7 +54,7 @@ class StudentDiscussionPinFollowQuestionThreadIntegrationTest {
     private static String studentId;
     private static String classId;
 
-    private final StudentRepository students = mock(StudentRepository.class);
+    private final LmsStudentIdentityLookup identities = mock(LmsStudentIdentityLookup.class);
     private final ClassroomRepository classrooms = mock(ClassroomRepository.class);
     private final List<Object> events = new ArrayList<>();
 
@@ -181,7 +181,17 @@ class StudentDiscussionPinFollowQuestionThreadIntegrationTest {
         QuestionThreadResponse thanks = service.send(new Actor(tenantId, STUDENT_USER, false), thread.id(), "Em cảm ơn cô ạ!", List.of());
         assertThat(thanks.status()).isEqualTo("ANSWERED");
         assertThat(thanks.messages()).hasSize(3);
-        assertThat(service.list(new Actor(tenantId, STUDENT_USER, false), false, "ANSWERED")).hasSize(1);
+        var listed = service.list(new Actor(tenantId, STUDENT_USER, false), false, "ANSWERED");
+        assertThat(listed).hasSize(1);
+        assertThat(listed.getFirst().lastMessagePreview()).isEqualTo("Em cảm ơn cô ạ!");
+        assertThat(listed.getFirst().correctAnswerText()).isEqualTo("x = 4");
+        // includeCorrectAnswer = false skips the answer lookup; everything else of the row is unchanged
+        var withoutAnswer = service.list(new Actor(tenantId, STUDENT_USER, false), false, "ANSWERED", false);
+        assertThat(withoutAnswer).extracting(QuestionThreadResponse::id).containsExactly(listed.getFirst().id());
+        assertThat(withoutAnswer.getFirst().correctAnswerText()).isNull();
+        assertThat(withoutAnswer.getFirst().lastMessagePreview()).isEqualTo("Em cảm ơn cô ạ!");
+        assertThat(listed.getFirst().messages()).isEmpty();
+        assertThat(listed.getFirst().unread()).isFalse(); // read before the thank-you, which is the student own message
         assertThatThrownBy(() -> service.detail(new Actor(tenantId, OTHER_USER, false), thread.id())).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> service.send(new Actor(tenantId, OTHER_USER, false), thread.id(), "chen ngang", List.of()))
                 .isInstanceOf(ForbiddenException.class);
@@ -253,25 +263,24 @@ class StudentDiscussionPinFollowQuestionThreadIntegrationTest {
 
     private StudentEngagementService studentService(String user) {
         registerStudent(user);
-        return new StudentEngagementService(students, jdbc, events::add);
+        return new StudentEngagementService(identities, jdbc, events::add, feeds());
     }
 
     private StudentQuestionThreadService threadService(String user) {
         registerStudent(user);
-        return new StudentQuestionThreadService(students, jdbc, events::add);
+        return new StudentQuestionThreadService(identities, jdbc, events::add);
     }
 
     private void registerStudent(String user) {
-        Student student = new Student();
-        student.setId(studentId);
-        student.setTenantId(tenantId);
-        student.setAuthUserId(user);
-        student.setAcademicClassId(classId);
-        when(students.findFirstByTenantIdAndAuthUserId(tenantId, user)).thenReturn(Optional.of(student));
+        when(identities.byAuthUser(tenantId, user)).thenReturn(new StudentIdentity(studentId, user, classId, null, null, "ENROLLED"));
+    }
+
+    private StudentDiscussionFeedCache feeds() {
+        return new StudentDiscussionFeedCache(jdbc, mock(LmsReadCacheInvalidator.class));
     }
 
     private StudentDiscussionModerationService moderation() {
-        return new StudentDiscussionModerationService(classrooms, jdbc);
+        return new StudentDiscussionModerationService(classrooms, jdbc, feeds());
     }
 
     private static List<String> ids(List<StudentDiscussionPostResponse> posts) {

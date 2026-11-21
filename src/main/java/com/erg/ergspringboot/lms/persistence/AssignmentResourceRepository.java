@@ -50,5 +50,13 @@ public interface AssignmentResourceRepository extends JpaRepository<AssignmentRe
 
     java.util.Optional<AssignmentResource> findByTenantIdAndAssignmentIdAndQuizId(String tenantId, String assignmentId, String quizId);
 
-    void deleteByAssignmentId(String assignmentId);
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
+    @Query("delete from AssignmentResource r where r.assignmentId = :assignmentId")
+    void deleteByAssignmentId(@Param("assignmentId") String assignmentId);
+
+    /** Ids of the visible assignments of the quiz that reach this learner (offline import); same predicate as existsVisibleQuizForLearner. */
+    @Query(value = AssignmentRecipientScope.VISIBLE_ASSIGNMENT_IDS_SQL, nativeQuery = true)
+    List<String> findVisibleAssignmentIdsForLearner(@Param("tenantId") String tenantId, @Param("quizId") String quizId,
+            @Param("assignmentId") String assignmentId, @Param("studentId") String studentId,
+            @Param("academicClassId") String academicClassId, @Param("authUserId") String authUserId);
 }

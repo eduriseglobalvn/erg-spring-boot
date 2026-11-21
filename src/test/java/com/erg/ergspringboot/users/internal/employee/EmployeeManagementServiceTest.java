@@ -140,10 +140,12 @@ class EmployeeManagementServiceTest {
                 org.mockito.ArgumentMatchers.eq(List.of("user-1")),
                 org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of(assignment));
-        SecurityEvent risk = new SecurityEvent(); risk.setUserId("user-1");
-        risk.setRiskCode("RAPID_SESSION_REPLACEMENT"); risk.setSeverity("HIGH");
-        when(securityEventRepository.findByTenantIdAndUserIdInOrderByOccurredAtDesc(
-                "tenant-a", List.of("user-1"))).thenReturn(List.of(risk));
+        SecurityEventRepository.LatestRisk risk = new SecurityEventRepository.LatestRisk() {
+            public String getUserId() { return "user-1"; }
+            public String getRiskCode() { return "RAPID_SESSION_REPLACEMENT"; }
+            public String getSeverity() { return "HIGH"; }
+        };
+        when(securityEventRepository.findLatestRiskByUserIds("tenant-a", List.of("user-1"))).thenReturn(List.of(risk));
 
         var response = service.listEmployees("tenant-a", 1, 25, null, null, null);
 

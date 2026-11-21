@@ -92,10 +92,11 @@ public class ScheduleTeacherOverviewService {
         Map<String, List<Leave>> leaves = loader.loadLeaves(tenantId, names.keySet(), week.monday(), week.monday().plusDays(6));
         Map<String, AccessChangeResponse> notices = access.revokeNotices(tenantId, shortNames(names), weekly, now);
         Flags flags = flags(week);
+        TravelTimeService.TravelMatrix matrix = travel.matrix(tenantId);
 
         List<TeacherRowResponse> rows = new ArrayList<>();
         for (Map.Entry<String, String> teacher : names.entrySet()) {
-            rows.add(row(tenantId, week, teacher.getKey(), teacher.getValue(), mine.getOrDefault(teacher.getKey(), new Mine(List.of(), List.of())),
+            rows.add(row(matrix, week, teacher.getKey(), teacher.getValue(), mine.getOrDefault(teacher.getKey(), new Mine(List.of(), List.of())),
                     leaves.getOrDefault(teacher.getKey(), List.of()), limits, notices.get(teacher.getKey()), flags));
         }
         TeacherQuickCounts counts = new TeacherQuickCounts(count(rows, "CONFLICT", limits), count(rows, "TRAVEL", limits),
@@ -153,7 +154,7 @@ public class ScheduleTeacherOverviewService {
         return new Flags(shared, teacher, travel);
     }
 
-    private TeacherRowResponse row(String tenantId, Week week, String teacherId, String fullName, Mine mine, List<Leave> leaves,
+    private TeacherRowResponse row(TravelTimeService.TravelMatrix matrix, Week week, String teacherId, String fullName, Mine mine, List<Leave> leaves,
             LoadSettingsResponse limits, AccessChangeResponse notice, Flags flags) {
         Set<String> myEvents = new HashSet<>();
         mine.events().forEach(e -> myEvents.add(e.eventId()));
@@ -165,7 +166,7 @@ public class ScheduleTeacherOverviewService {
 
         List<TeacherDayResponse> days = new ArrayList<>();
         for (int weekday = 1; weekday <= 6; weekday++) {
-            days.add(day(tenantId, week, weekday, mine, leaves));
+            days.add(day(matrix, week, weekday, mine, leaves));
         }
         // periods 5 and 10 (only when a school gave them a time) share the slot of the period before them
         Map<String, List<Integer>> slotRows = new TreeMap<>();
@@ -196,7 +197,7 @@ public class ScheduleTeacherOverviewService {
                 notice, days, slots);
     }
 
-    private TeacherDayResponse day(String tenantId, Week week, int weekday, Mine mine, List<Leave> leaves) {
+    private TeacherDayResponse day(TravelTimeService.TravelMatrix matrix, Week week, int weekday, Mine mine, List<Leave> leaves) {
         List<Occurrence> events = mine.events().stream().filter(e -> e.weekday() == weekday).sorted(Comparator.comparing(Occurrence::start)).toList();
         List<String> schools = events.stream().map(e -> SchoolShortName.of(e.schoolName())).distinct().toList();
         boolean multi = false;
@@ -214,7 +215,7 @@ public class ScheduleTeacherOverviewService {
             // overlapping periods are a clash, not a travel problem
             if (gap >= 0 && gap < tightestGap) {
                 tightestGap = gap;
-                tightest = ScheduleConflictEngine.travelGap(earlier, later, (int) gap, travel.requiredMinutes(tenantId, earlier.schoolId(), later.schoolId()));
+                tightest = ScheduleConflictEngine.travelGap(earlier, later, (int) gap, matrix.requiredMinutes(earlier.schoolId(), later.schoolId()));
             }
         }
         LocalDate date = week.monday().plusDays(weekday - 1L);

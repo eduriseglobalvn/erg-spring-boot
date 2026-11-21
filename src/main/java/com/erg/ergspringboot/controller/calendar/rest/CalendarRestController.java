@@ -74,6 +74,22 @@ public class CalendarRestController {
                 request);
     }
 
+    @GetMapping("/catalog/search")
+    @CalendarRead
+    public ApiResponse<com.erg.ergspringboot.calendar.CalendarCatalogSearchResponse> catalogSearch(
+            @RequestParam String kind,
+            @RequestParam(required = false) List<String> schoolIds,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        ErgPrincipal principal = getRequiredPrincipal();
+        String tenantId = verifiedTenantId(principal, null);
+        List<String> effectiveSchoolIds = scopeService.requireManagedSchools(principal, schoolIds);
+        return ok("Catalog search loaded",
+                calendar.catalogSearch(tenantId, kind, effectiveSchoolIds, q, page, size), request);
+    }
+
     @GetMapping("/my-calendar")
     @CalendarSelfRead
     public ApiResponse<CalendarWorkspaceResponse> myCalendar(
@@ -186,6 +202,7 @@ public class CalendarRestController {
             @Valid @RequestBody DeleteTeacherScheduleRequest body, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
         String tenantId = verifiedTenantId(principal, body.tenantId());
+        com.erg.ergspringboot.calendar.internal.mutation.CalendarEventMutationUseCase.requireSchoolIds(body.schoolIds());
         List<String> schoolIds = scopeService.requireManagedSchools(principal, body.schoolIds());
         return ok("Teacher schedule cancelled", calendar.deleteTeacherSchedule(
                 tenantId, body.teacherUserId(), schoolIds, body.dateFrom(), body.dateTo(), principal.userId()), request);
@@ -217,7 +234,8 @@ public class CalendarRestController {
             @RequestParam(required = false) String schoolId, HttpServletRequest request) {
         ErgPrincipal principal = getRequiredPrincipal();
         String tenantId = verifiedTenantId(principal, null);
-
+        // same school-scope rule as creating a room; no schoolId lists nothing
+        if (blankToNull(schoolId) != null) requireManagedSchool(principal, schoolId);
         return ok("Rooms loaded", calendar.rooms(tenantId, schoolId), request);
     }
 

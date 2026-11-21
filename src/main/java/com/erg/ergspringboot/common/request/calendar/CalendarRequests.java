@@ -48,7 +48,9 @@ public final class CalendarRequests {
             String viewMode,
             List<String> subjectIds,
             List<String> levelIds,
-            List<String> statuses
+            List<String> statuses,
+            /** False drops the catalog lists from the response; null or true keeps them. */
+            Boolean includeCatalog
     ) {}
 
     public record CalendarBulkCreateRequest(

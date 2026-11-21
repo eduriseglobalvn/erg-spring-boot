@@ -89,7 +89,7 @@ class CurriculumClassSubjectServiceTest {
     void removingASubjectTaughtWithinTheLastMonthIsRejectedAndNothingIsDeleted() {
         when(allocations.findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(
                 "tenant-1", "school-1", "2026-2027")).thenReturn(List.of(row("class-1", "subject-1", 2)));
-        when(allocations.lastTeachingDate("tenant-1", "class-1", "subject-1"))
+        when(allocations.lastTeachingDate("tenant-1", java.util.Set.of("class-1"), java.util.Set.of("class-1|subject-1")))
                 .thenReturn(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).minusDays(3));
 
         assertThatThrownBy(() -> service().replace("school-1", "2026-2027",
@@ -102,12 +102,27 @@ class CurriculumClassSubjectServiceTest {
     void removingASubjectLastTaughtOverAMonthAgoIsAllowed() {
         when(allocations.findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(
                 "tenant-1", "school-1", "2026-2027")).thenReturn(List.of(row("class-1", "subject-1", 2)));
-        when(allocations.lastTeachingDate("tenant-1", "class-1", "subject-1"))
+        when(allocations.lastTeachingDate("tenant-1", java.util.Set.of("class-1"), java.util.Set.of("class-1|subject-1")))
                 .thenReturn(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).minusMonths(1).minusDays(1));
 
         service().replace("school-1", "2026-2027", new CurriculumClassSubjectsRequest(List.of(), 2L), access, false);
 
         verify(allocations).deleteScope("tenant-1", "school-1", "2026-2027");
+    }
+
+    @Test
+    void removedPairsAreCheckedWithOneGroupedQueryEach() {
+        when(allocations.findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(
+                "tenant-1", "school-1", "2026-2027")).thenReturn(List.of(
+                row("class-1", "subject-1", 2), row("class-1", "subject-2", 2), row("class-2", "subject-1", 2)));
+
+        service().replace("school-1", "2026-2027", new CurriculumClassSubjectsRequest(List.of(), 2L), access, false);
+
+        verify(allocations, org.mockito.Mockito.times(1)).lastTeachingDate("tenant-1",
+                java.util.Set.of("class-1", "class-2"),
+                java.util.Set.of("class-1|subject-1", "class-1|subject-2", "class-2|subject-1"));
+        verify(allocations, org.mockito.Mockito.times(1)).lastTeachingHoursMonth("tenant-1", "school-1",
+                java.util.Set.of("subject-1", "subject-2"));
     }
 
     @Test
@@ -175,5 +190,16 @@ class CurriculumClassSubjectServiceTest {
         assertThatThrownBy(() -> service().replace("school-1", "2026-2027", request, access, false))
                 .isInstanceOf(CurriculumException.class).hasMessageContaining("level not found");
         verify(allocations, never()).deleteScope(any(), any(), any());
+    }
+
+    @Test
+    void withoutAnAcademicYearMoreThanTheCapIsRefusedWithACode() {
+        when(allocations.findByTenantIdAndSchoolIdOrderByAcademicClassIdAscSubjectIdAsc(
+                any(), any(), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(java.util.Collections.nCopies(CurriculumClassSubjectService.MAX_ALL_YEARS_ROWS + 1, row("c", "math", 1)));
+
+        assertThatThrownBy(() -> service().get("school-1", null, access, true))
+                .isInstanceOf(CurriculumException.class)
+                .hasFieldOrPropertyWithValue("code", "CURRICULUM_ALL_YEARS_TOO_LARGE");
     }
 }

@@ -37,6 +37,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingViews.PhotoFile;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.PunchCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.PunchResult;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.TodayView;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.admin.ApprovalInboxService;
 import com.erg.ergspringboot.timekeeping.internal.admin.HolidayImportService;
 import com.erg.ergspringboot.timekeeping.internal.admin.HolidayService;
@@ -197,65 +198,66 @@ public class TimekeepingOperations {
     // ---- admin (timekeeping.manage); tenant and actor always from the verified principal
 
     public TodayDashboard adminToday(ErgPrincipal p, String schoolId, LocalDate date) {
-        return admin.today().today(p.tenantId(), schoolId, date);
+        return admin.today().today(p.tenantId(), SchoolScope.of(p), schoolId, date);
     }
 
     public RemindResult remind(ErgPrincipal p, List<String> userIds) {
-        return admin.today().remind(p.tenantId(), p.userId(), userIds);
+        return admin.today().remind(p.tenantId(), SchoolScope.of(p), p.userId(), userIds);
     }
 
     public Timesheet timesheet(ErgPrincipal p, String schoolId, String period, String team, String q, int page,
             int size) {
-        return admin.timesheet().timesheet(p.tenantId(), schoolId, period, team, q, page, size);
+        return admin.timesheet().timesheet(p.tenantId(), SchoolScope.of(p), schoolId, period, team, q, page,
+                size);
     }
 
     public PeriodLockView lockPeriod(ErgPrincipal p, String schoolId, String period) {
-        return admin.locks().lock(p.tenantId(), p.userId(), schoolId, period);
+        return admin.locks().lock(p.tenantId(), SchoolScope.of(p).requireWide(), p.userId(), schoolId, period);
     }
 
     public PeriodLockView reopenPeriod(ErgPrincipal p, String schoolId, String period, String reason) {
-        return admin.locks().reopen(p.tenantId(), p.userId(), schoolId, period, reason);
+        return admin.locks().reopen(p.tenantId(), SchoolScope.of(p).requireWide(), p.userId(), schoolId, period, reason);
     }
 
     public RecentPunch reviewPunch(ErgPrincipal p, String punchId, PunchReviewCommand command) {
-        return admin.reviews().review(p.tenantId(), p.userId(), punchId, command);
+        return admin.reviews().review(p.tenantId(), SchoolScope.of(p), p.userId(), punchId, command);
     }
 
     public List<SiteConfig> sites(ErgPrincipal p, String schoolId) {
-        return admin.sitesShifts().sites(p.tenantId(), schoolId);
+        return admin.sitesShifts().sites(p.tenantId(), SchoolScope.of(p), schoolId);
     }
 
     /** {@code id} null = create. */
     public SiteConfig saveSite(ErgPrincipal p, String id, SiteCommand command) {
-        return admin.sitesShifts().saveSite(p.tenantId(), p.userId(), id, command);
+        return admin.sitesShifts().saveSite(p.tenantId(), SchoolScope.of(p), p.userId(), id, command);
     }
 
     public void deleteSite(ErgPrincipal p, String id) {
-        admin.sitesShifts().deleteSite(p.tenantId(), p.userId(), id);
+        admin.sitesShifts().deleteSite(p.tenantId(), SchoolScope.of(p), p.userId(), id);
     }
 
     public List<ShiftConfig> shifts(ErgPrincipal p, String schoolId) {
-        return admin.sitesShifts().shifts(p.tenantId(), schoolId);
+        return admin.sitesShifts().shifts(p.tenantId(), SchoolScope.of(p), schoolId);
     }
 
     public ShiftConfig saveShift(ErgPrincipal p, String id, ShiftCommand command) {
-        return admin.sitesShifts().saveShift(p.tenantId(), p.userId(), id, command);
+        return admin.sitesShifts().saveShift(p.tenantId(), SchoolScope.of(p), p.userId(), id, command);
     }
 
     public void deleteShift(ErgPrincipal p, String id) {
-        admin.sitesShifts().deleteShift(p.tenantId(), p.userId(), id);
+        admin.sitesShifts().deleteShift(p.tenantId(), SchoolScope.of(p), p.userId(), id);
     }
 
     public PolicyVersions policy(ErgPrincipal p, String schoolId) {
-        return admin.config().policy(p.tenantId(), schoolId);
+        return admin.config().policy(p.tenantId(), SchoolScope.of(p), schoolId);
     }
 
     public PolicyConfig savePolicy(ErgPrincipal p, String schoolId, PolicyCommand command) {
-        return admin.config().savePolicy(p.tenantId(), p.userId(), schoolId, command);
+        return admin.config().savePolicy(p.tenantId(), SchoolScope.of(p), p.userId(), schoolId, command);
     }
 
     public List<HolidayConfig> holidays(ErgPrincipal p, String schoolId, Integer year) {
-        return dayOffs.holidays().holidays(p.tenantId(), schoolId, year);
+        return dayOffs.holidays().holidays(p.tenantId(), SchoolScope.of(p), schoolId, year);
     }
 
     public List<HolidayConfig> createHoliday(ErgPrincipal p, HolidayCommand command) {
@@ -288,15 +290,15 @@ public class TimekeepingOperations {
     }
 
     public List<RemoteRuleConfig> remoteRules(ErgPrincipal p, String schoolId) {
-        return admin.config().remoteRules(p.tenantId(), schoolId);
+        return admin.config().remoteRules(p.tenantId(), SchoolScope.of(p), schoolId);
     }
 
     public RemoteRuleConfig saveRemoteRule(ErgPrincipal p, String id, RemoteRuleCommand command) {
-        return admin.config().saveRemoteRule(p.tenantId(), p.userId(), id, command);
+        return admin.config().saveRemoteRule(p.tenantId(), SchoolScope.of(p), p.userId(), id, command);
     }
 
     public void deleteRemoteRule(ErgPrincipal p, String id) {
-        admin.config().deleteRemoteRule(p.tenantId(), p.userId(), id);
+        admin.config().deleteRemoteRule(p.tenantId(), SchoolScope.of(p), p.userId(), id);
     }
 
     // ---- approval inbox (timekeeping.approve)

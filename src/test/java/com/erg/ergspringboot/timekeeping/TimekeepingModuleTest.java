@@ -41,6 +41,7 @@ class TimekeepingModuleTest {
     @MockitoBean com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository roleAssignments;
     @MockitoBean UserAccessScopeRepository accessScopes;
     @MockitoBean ClusterJobLock jobLock;
+    @MockitoBean com.erg.ergspringboot.lms.LmsReadCacheInvalidator lmsCaches;
     @MockitoBean ErgPolicyService policy;
     @MockitoBean UserRepository users;
     @MockitoBean EmployeeProfileRepository profiles;

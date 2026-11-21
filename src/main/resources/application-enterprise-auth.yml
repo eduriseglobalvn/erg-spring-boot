@@ -1,6 +1,7 @@
 spring:
   autoconfigure:
-    exclude: ${SPRING_AUTOCONFIGURE_EXCLUDE:org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration}
+    # Redis stays enabled here (the shared default excludes it).
+    exclude: ${SPRING_AUTOCONFIGURE_EXCLUDE:}
   security:
     oauth2:
       client:

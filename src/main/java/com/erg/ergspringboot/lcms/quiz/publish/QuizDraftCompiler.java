@@ -30,11 +30,13 @@ final class QuizDraftCompiler {
         List<String> bankQuestionIds = extractBankQuestionIds(draft.getTree());
         Map<String, Map<String, Object>> questionSettings = new LinkedHashMap<>();
         if (!bankQuestionIds.isEmpty()) {
-            bankQuestionRepository.findByTenantIdAndIdIn(tenantId, bankQuestionIds).forEach(question -> {
-                if (question.getSettings() != null && !question.getSettings().isEmpty()) {
-                    questionSettings.put(question.getId(), question.getSettings());
+            for (Object[] row : bankQuestionRepository.findSettingsByTenantIdAndIdIn(tenantId, bankQuestionIds)) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> settings = (Map<String, Object>) row[1];
+                if (settings != null && !settings.isEmpty()) {
+                    questionSettings.put((String) row[0], settings);
                 }
-            });
+            }
         }
 
         Map<String, Map<String, Object>> questionSetSettings = new LinkedHashMap<>();

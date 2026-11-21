@@ -37,16 +37,32 @@ public class LmsAssignmentAccessPolicy {
     private final AssignmentRecipientRepository recipients;
     private final AssignmentResourceRepository resources;
     private final LmsCallerPermissions permissions;
+    private final LmsStudentIdentityLookup identities;
 
+    /** Explicit wiring (tests): the learner lookup is then uncached. */
     public LmsAssignmentAccessPolicy(LmsAssignmentService assignments, LmsClassroomService classrooms,
             LmsStudentService students, AssignmentRecipientRepository recipients,
             AssignmentResourceRepository resources, LmsCallerPermissions permissions) {
+        this(assignments, classrooms, students, recipients, resources, permissions, new LmsStudentIdentityLookup(students));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LmsAssignmentAccessPolicy(LmsAssignmentService assignments, LmsClassroomService classrooms,
+            LmsStudentService students, AssignmentRecipientRepository recipients,
+            AssignmentResourceRepository resources, LmsCallerPermissions permissions,
+            LmsStudentIdentityLookup identities) {
         this.assignments = assignments;
         this.classrooms = classrooms;
         this.students = students;
         this.recipients = recipients;
         this.resources = resources;
         this.permissions = permissions;
+        this.identities = identities;
+    }
+
+    /** The cached login -> student lookup, shared with the other learner hot paths. */
+    public LmsStudentIdentityLookup identities() {
+        return identities;
     }
 
     /** A quiz the assignment distributes, with the version pinned at assign time (null for legacy rows). */
@@ -64,9 +80,12 @@ public class LmsAssignmentAccessPolicy {
         return assignment;
     }
 
+    /** A detached read-only snapshot (60 s cache, see {@link LmsStudentIdentityLookup}); do not persist it. */
     public Optional<Student> learner(String tenantId, String authUserId) {
         if (authUserId == null || authUserId.isBlank()) return Optional.empty();
-        return students.findFirstByTenantIdAndAuthUserId(tenant(tenantId), authUserId);
+        String tenant = tenant(tenantId);
+        var identity = identities.byAuthUser(tenant, authUserId);
+        return identity.exists() ? Optional.of(identity.toStudent(tenant)) : Optional.empty();
     }
 
     /** The persisted learner key: {@code Student.id} when linked, otherwise the auth user id (legacy rows). */
@@ -74,20 +93,28 @@ public class LmsAssignmentAccessPolicy {
         return learner(tenantId, authUserId).map(Student::getId).orElse(authUserId);
     }
 
-    /** Whether the resolved learner is a recipient of the assignment. Fails closed without a Student. */
+    /**
+     * Same rule as the student assignment SQL: saved recipient rows decide when the assignment has any; only an
+     * assignment without rows falls back to the learner's class or the legacy {@code student_ids} snapshot.
+     */
     public boolean isRecipient(Assignment assignment, Student learner, String authUserId) {
-        List<String> studentIds = assignment.getStudentIds();
-        if (studentIds != null && !studentIds.isEmpty()) {
-            return (learner != null && studentIds.contains(learner.getId()))
-                    || (authUserId != null && studentIds.contains(authUserId));
-        }
-        if (learner == null) return false;
-        if (recipients.findFirstByTenantIdAndAssignmentIdAndStudentId(
-                assignment.getTenantId(), assignment.getId(), learner.getId()).isPresent()) {
+        String tenantId = assignment.getTenantId();
+        if (learner != null && recipients.findFirstByTenantIdAndAssignmentIdAndStudentId(
+                tenantId, assignment.getId(), learner.getId()).isPresent()) {
             return true;
         }
+        if (recipients.existsByTenantIdAndAssignmentId(tenantId, assignment.getId())) return false;
         String classId = blank(assignment.getAcademicClassId());
-        return classId != null && classId.equals(learner.getAcademicClassId());
+        if (learner != null && classId != null && classId.equals(learner.getAcademicClassId())) return true;
+        // Legacy snapshot, asked in SQL: the jsonb attribute is lazy and the assignment may be detached here.
+        return recipients.legacySnapshotNames(assignment.getId(), learner == null ? null : learner.getId(), authUserId);
+    }
+
+    /** Recipient rows when the assignment has any, else the legacy {@code student_ids} snapshot size. */
+    public int recipientCount(Assignment assignment) {
+        long rows = recipients.countByAssignmentId(assignment.getId());
+        if (rows > 0) return (int) rows;
+        return recipients.countLegacyStudentIds(assignment.getId()); // SQL count: the lazy jsonb snapshot may be detached here
     }
 
     /** Resolves the quiz inside the assignment (primary quiz or any {@code assignment_resources} row). */
@@ -102,15 +129,13 @@ public class LmsAssignmentAccessPolicy {
                 : Optional.empty();
     }
 
-    /** Visible assignments distributing the quiz to this learner (offline result import). */
+    /** Visible assignments distributing the quiz to this learner (offline result import); the recipient rule runs in SQL. */
     public List<Assignment> visibleAssignmentsFor(String tenantId, String quizId, Student learner) {
         String tenant = tenant(tenantId);
-        java.util.Set<String> assignmentIds = new java.util.LinkedHashSet<>();
-        resources.findByTenantIdAndQuizId(tenant, quizId).forEach(row -> assignmentIds.add(row.getAssignmentId()));
-        assignments.findByTenantIdAndQuizId(tenant, quizId).forEach(row -> assignmentIds.add(row.getId()));
-        return assignments.findByTenantIdAndIdIn(tenant, assignmentIds).stream()
-                .filter(assignment -> LmsStatePolicy.assignmentIsVisible(assignment.getStatus())
-                        && isRecipient(assignment, learner, learner.getAuthUserId()))
+        List<String> ids = resources.findVisibleAssignmentIdsForLearner(tenant, quizId, null, learner.getId(),
+                blank(learner.getAcademicClassId()), blank(learner.getAuthUserId()));
+        return assignments.findByTenantIdAndIdIn(tenant, ids).stream()
+                .filter(assignment -> LmsStatePolicy.assignmentIsVisible(assignment.getStatus()))
                 .toList();
     }
 
@@ -136,13 +161,17 @@ public class LmsAssignmentAccessPolicy {
 
     /** Whether any assignment visible to the learner distributes the quiz (used by the learner package endpoint). */
     public boolean isAssignedQuiz(String tenantId, String quizId, Student learner, String authUserId) {
-        String tenant = tenant(tenantId);
-        java.util.Set<String> assignmentIds = new java.util.LinkedHashSet<>();
-        resources.findByTenantIdAndQuizId(tenant, quizId).forEach(row -> assignmentIds.add(row.getAssignmentId()));
-        assignments.findByTenantIdAndQuizId(tenant, quizId).forEach(row -> assignmentIds.add(row.getId()));
-        return assignments.findByTenantIdAndIdIn(tenant, assignmentIds).stream()
-                .anyMatch(assignment -> LmsStatePolicy.assignmentIsVisible(assignment.getStatus())
-                        && isRecipient(assignment, learner, authUserId));
+        return isAssignedQuiz(tenantId, quizId, null, learner, authUserId);
+    }
+
+    /**
+     * One exists query (same recipient + visibility rule as {@link #isRecipient} and the student assignment SQL);
+     * {@code assignmentId} narrows it to that assignment, null means any visible assignment of the quiz.
+     */
+    public boolean isAssignedQuiz(String tenantId, String quizId, String assignmentId, Student learner, String authUserId) {
+        return assignments.existsVisibleQuizForLearner(tenant(tenantId), quizId, assignmentId,
+                learner == null ? null : learner.getId(), learner == null ? null : blank(learner.getAcademicClassId()),
+                blank(authUserId));
     }
 
     public boolean isReviewer() {

@@ -61,7 +61,7 @@ public class ScheduleSlotOptionsService {
 
     /** The cell a request asks about; {@code overlaps} compares an occurrence with its time window. */
     private record Cell(String tenantId, String schoolId, LocalDate date, int periodNo, OffsetDateTime start, OffsetDateTime end,
-            Occurrence self) {
+            Occurrence self, TravelTimeService.TravelMatrix travel) {
         boolean overlaps(Occurrence o) {
             return o.start().isBefore(end) && start.isBefore(o.end());
         }
@@ -79,14 +79,16 @@ public class ScheduleSlotOptionsService {
         // the asked cell as an occurrence, so travel lines and leave checks can reuse the engine helpers
         Occurrence self = new Occurrence(null, "cell", null, null, null, "DRAFT", schoolId, schoolName, null, null, null, null, null,
                 List.of(), date, date.getDayOfWeek().getValue(), periodNo, start, end, null, null, null, true);
-        Cell cell = new Cell(tenantId, schoolId, date, periodNo, start, end, self);
+        Cell cell = new Cell(tenantId, schoolId, date, periodNo, start, end, self, travel.matrix(tenantId));
         LocalDate monday = ScheduleConflictEngine.weekStart(date);
-        List<Occurrence> loaded = loader.loadWeek(tenantId, monday.minusWeeks(1).atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime(),
-                monday.plusWeeks(1).atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime(), null, false, batchId);
-        List<Occurrence> week = loaded.stream().filter(o -> !o.date().isBefore(monday) && !Objects.equals(o.eventId(), excludeEventId)).toList();
-        // same weekday and period of the week before, at this school
-        List<Occurrence> lastWeek = loaded.stream().filter(o -> o.date().equals(date.minusWeeks(1)) && o.periodNo() == periodNo
-                && o.schoolId().equals(schoolId)).toList();
+        List<Occurrence> week = loader.loadWeek(tenantId, monday.atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime(),
+                monday.plusWeeks(1).atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime(), null, false, batchId).stream()
+                .filter(o -> !Objects.equals(o.eventId(), excludeEventId)).toList();
+        // same weekday and period of the week before, at this school: only that one day is read, not the whole week before
+        LocalDate lastDay = date.minusWeeks(1);
+        List<Occurrence> lastWeek = loader.loadWeek(tenantId, lastDay.atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime(),
+                lastDay.plusDays(1).atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime(), List.of(schoolId), false, batchId).stream()
+                .filter(o -> o.periodNo() == periodNo).toList();
 
         List<ClassRef> allClasses = loader.loadClasses(tenantId, schoolId);
         Integer grade = classId == null ? null : allClasses.stream().filter(c -> c.id().equals(classId)).map(ClassRef::grade)
@@ -146,12 +148,12 @@ public class ScheduleSlotOptionsService {
     private TravelGapResponse travelGap(Cell cell, Occurrence before, Occurrence after) {
         if (before != null && !before.schoolId().equals(cell.schoolId())) {
             int gap = (int) Duration.between(before.end(), cell.start()).toMinutes();
-            int required = travel.requiredMinutes(cell.tenantId(), before.schoolId(), cell.schoolId());
+            int required = cell.travel().requiredMinutes(before.schoolId(), cell.schoolId());
             if (gap < required) return ScheduleConflictEngine.travelGap(before, cell.self(), gap, required);
         }
         if (after != null && !after.schoolId().equals(cell.schoolId())) {
             int gap = (int) Duration.between(cell.end(), after.start()).toMinutes();
-            int required = travel.requiredMinutes(cell.tenantId(), cell.schoolId(), after.schoolId());
+            int required = cell.travel().requiredMinutes(cell.schoolId(), after.schoolId());
             if (gap < required) return ScheduleConflictEngine.travelGap(cell.self(), after, gap, required);
         }
         return null;

@@ -45,11 +45,32 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, String
 
     List<AuthSession> findByUserIdAndTenantIdOrderByLastActiveAtDesc(String userId, String tenantId);
 
-    List<AuthSession> findByUserIdAndTenantIdAndRevokedAtIsNull(String userId, String tenantId);
+    /** One bounded retention batch per call, in its own transaction; a result below {@code batch} marks the tail. */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query(value = "delete from user_sessions where id in (select id from user_sessions"
+            + " where expires_at < :cutoff or revoked_at < :cutoff limit :batch)", nativeQuery = true)
+    int deleteDeadBefore(@Param("cutoff") java.time.OffsetDateTime cutoff, @Param("batch") int batch);
+
+    /** The newest 50: a listing never needs a user's whole session history. */
+    List<AuthSession> findTop50ByUserIdAndTenantIdOrderByLastActiveAtDesc(String userId, String tenantId);
+
+    /** Unrevoked AND unexpired: expired rows are not purged inline and would be hydrated on every login. */
+    @Query("""
+            select s from AuthSession s
+            where s.userId = :userId and s.tenantId = :tenantId and s.revokedAt is null and s.expiresAt > current_timestamp
+            """)
+    List<AuthSession> findByUserIdAndTenantIdAndRevokedAtIsNull(
+            @Param("userId") String userId, @Param("tenantId") String tenantId);
 
     Optional<AuthSession> findBySessionIdAndUserIdAndTenantId(String sessionId, String userId, String tenantId);
 
-    List<AuthSession> findByUserIdInAndTenantIdAndRevokedAtIsNull(Collection<String> userIds, String tenantId);
+    @Query("""
+            select s from AuthSession s
+            where s.userId in :userIds and s.tenantId = :tenantId and s.revokedAt is null and s.expiresAt > current_timestamp
+            """)
+    List<AuthSession> findByUserIdInAndTenantIdAndRevokedAtIsNull(
+            @Param("userIds") Collection<String> userIds, @Param("tenantId") String tenantId);
 
     @Query("""
             select session from AuthSession session
