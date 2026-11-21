@@ -31,13 +31,14 @@ class SchoolCommandServiceTest {
     @Mock SchoolAcademicYearRepository yearRepository;
     @Mock SchoolGradeRepository gradeRepository;
     @Mock ClassroomRepository classroomRepository;
+    @Mock SchoolArchiveHolds archiveHolds;
 
     private SchoolCommandService service;
     private final UserAccessContext access = new UserAccessContext("user-1", "tenant-1", List.of("*"), List.of("*"), null, null);
 
     @BeforeEach
     void setUp() {
-        service = new SchoolCommandService(unitRepository, profileRepository, yearRepository, gradeRepository, classroomRepository);
+        service = new SchoolCommandService(unitRepository, profileRepository, yearRepository, gradeRepository, classroomRepository, archiveHolds);
         org.mockito.Mockito.lenient().when(gradeRepository.findByTenantIdAndSchoolIdAndAcademicYearIdOrderBySortOrderAsc(any(), any(), any()))
                 .thenReturn(List.of());
     }
@@ -96,6 +97,39 @@ class SchoolCommandServiceTest {
             assertThat(evict.cacheNames()).containsExactlyInAnyOrder("lcmsSchoolDirectory", "lcmsSchoolOperations");
             assertThat(evict.allEntries()).isTrue();
         }
+    }
+
+    @Test
+    void archiveLocksTheSchoolsClassesAndStudentsInsteadOfRefusingWhileClassesAreOpen() {
+        stubSchool("ACTIVE");
+        org.mockito.Mockito.lenient().when(classroomRepository.countByTenantIdAndSchoolIdAndStatusIgnoreCase(any(), any(), any())).thenReturn(3L);
+
+        assertThat(service.archive("sch-1", access).status()).isEqualTo("ARCHIVED");
+        verify(archiveHolds).archive("tenant-1", "sch-1", "user-1");
+    }
+
+    @Test
+    void archivingAnArchivedSchoolAgainLocksNothingMore() {
+        stubSchool("ARCHIVED");
+        service.archive("sch-1", access);
+        verify(archiveHolds, never()).archive(any(), any(), any());
+    }
+
+    @Test
+    void restoreReopensWhatTheArchiveLockedAndPausesTheSchool() {
+        stubSchool("ARCHIVED");
+        assertThat(service.restore("sch-1", access).status()).isEqualTo("PAUSED");
+        verify(archiveHolds).restore("tenant-1", "sch-1", "user-1");
+    }
+
+    private void stubSchool(String status) {
+        com.erg.ergspringboot.users.persistence.organization.EducationUnit unit =
+                new com.erg.ergspringboot.users.persistence.organization.EducationUnit();
+        unit.setId("sch-1");
+        unit.setStatus(status);
+        when(unitRepository.findByIdAndTenantId("sch-1", "tenant-1")).thenReturn(java.util.Optional.of(unit));
+        when(profileRepository.findBySchoolIdAndTenantId("sch-1", "tenant-1"))
+                .thenReturn(java.util.Optional.of(new com.erg.ergspringboot.school.persistence.SchoolOperationalProfile()));
     }
 
     private CreateSchoolRequest request(String type, int startYear) {

@@ -1,5 +1,5 @@
 -- Relationship integrity for the enrollment / attendance / gradebook tables (they were created without FKs).
--- NOT VALID: enforced for new and updated rows at once, existing rows are checked by V176 (the pattern of V12/V13/V34).
+-- NOT VALID: enforced for new and updated rows at once, existing rows are checked by V178 (the pattern of V12/V13/V34).
 -- Each ADD CONSTRAINT only takes a short SHARE ROW EXCLUSIVE lock and does not scan the table.
 -- Write paths already check the student/class first (LmsAcademicRecordUseCase.assertStudentInClass); nothing deletes
 -- students or classes at runtime, so the default NO ACTION delete rule changes no flow.

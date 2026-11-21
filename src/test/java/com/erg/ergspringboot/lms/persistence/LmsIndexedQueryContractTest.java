@@ -7,7 +7,7 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
 
-/** The SQL shapes the V173/V174 indexes and the V115/V164 unique indexes need; changing them silently re-introduces scans. */
+/** The SQL shapes the V175/V176 indexes and the V115/V164 unique indexes need; changing them silently re-introduces scans. */
 class LmsIndexedQueryContractTest {
 
     private static String sql(Class<?> repository, String method) {

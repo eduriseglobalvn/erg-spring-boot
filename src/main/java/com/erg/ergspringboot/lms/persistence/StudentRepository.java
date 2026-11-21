@@ -28,7 +28,7 @@ public interface StudentRepository extends JpaRepository<Student, String> {
             """)
     Optional<Student> findFirstByTenantIdAndSchoolIdAndStudentCodeIgnoreCase(String tenantId, String schoolId, String studentCode);
 
-    /** Matches on the normalised name (Student.normalizeName) so idx_lms_students_tenant_school_name_normalized (V188) serves it. */
+    /** Matches on the normalised name (Student.normalizeName) so idx_lms_students_tenant_school_name_normalized (V190) serves it. */
     @Query("""
             select student from Student student
             where student.tenantId = :tenantId and coalesce(student.schoolId, '') = coalesce(:schoolId, '')
@@ -113,7 +113,25 @@ public interface StudentRepository extends JpaRepository<Student, String> {
                         student.authUserId,
                         student.email,
                         student.status,
-                        student.updatedAt
+                        student.updatedAt,
+                        (select latestAssignment.title from Attempt latest
+                            join Assignment latestAssignment
+                                on latestAssignment.tenantId = latest.tenantId
+                                and latestAssignment.id = latest.assignmentId
+                            where latest.tenantId = student.tenantId
+                              and latest.studentId = student.id
+                              and latestAssignment.academicClassId = :academicClassId
+                            order by latest.startedAt desc nulls last, latest.id desc
+                            limit 1),
+                        (select latest.status from Attempt latest
+                            join Assignment latestAssignment
+                                on latestAssignment.tenantId = latest.tenantId
+                                and latestAssignment.id = latest.assignmentId
+                            where latest.tenantId = student.tenantId
+                              and latest.studentId = student.id
+                              and latestAssignment.academicClassId = :academicClassId
+                            order by latest.startedAt desc nulls last, latest.id desc
+                            limit 1)
                     )
                     from Student student
                     where student.tenantId = :tenantId
@@ -129,6 +147,7 @@ public interface StudentRepository extends JpaRepository<Student, String> {
                       and (:status is null or lower(student.status) = :status)
                     """
     )
+    // BUG-C-013: each student's own newest attempt in this class comes from subqueries in the page query, no extra statement.
     Page<StudentRosterProjection> findClassRoster(
             String tenantId,
             String academicClassId,

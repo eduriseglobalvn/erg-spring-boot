@@ -542,6 +542,10 @@ type StudentRosterItem {
   averagePercent: Int
   "Assignments of this class the student has handed in; null without lms.grade.read"
   completedAssignmentCount: Int
+  "Title of the assignment of the student's newest attempt in this class; null when they have none"
+  currentAssignmentTitle: String
+  "Status of that newest attempt (in_progress, submitted, graded, ...)"
+  currentAttemptStatus: String
 }
 
 type AssignmentSummaryPage {

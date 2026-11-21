@@ -98,7 +98,7 @@ public class Student extends BaseEntity {
     @Column(name = "record_version", nullable = false)
     private Long recordVersion;
 
-    /** NFC, inner whitespace (incl. NBSP) collapsed to one space, trimmed, lower-cased. Mirrors the V187 backfill. */
+    /** NFC, inner whitespace (incl. NBSP) collapsed to one space, trimmed, lower-cased. Mirrors the V189 backfill. */
     public static String normalizeName(String value) {
         return value == null ? "" : Normalizer.normalize(value, Normalizer.Form.NFC)
                 .replaceAll("[\\s\\u00A0]+", " ").trim().toLowerCase(Locale.ROOT);

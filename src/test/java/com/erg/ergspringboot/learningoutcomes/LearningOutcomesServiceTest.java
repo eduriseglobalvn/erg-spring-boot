@@ -52,6 +52,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import com.erg.ergspringboot.authorization.catalog.BusinessRoleCatalog;
+import com.erg.ergspringboot.lms.persistence.Student;
+import com.erg.ergspringboot.lms.persistence.StudentRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -66,6 +69,7 @@ class LearningOutcomesServiceTest {
     @Mock private OutcomeCertificateRepository certificates;
     @Mock private LearningOutcomeCommandReceiptRepository receipts;
     @Mock private ApplicationEventPublisher events;
+    @Mock private StudentRepository students;
     @Mock(answer = Answers.RETURNS_DEEP_STUBS) private AuditOperations audit;
 
     private AutoCloseable mocks;
@@ -76,7 +80,7 @@ class LearningOutcomesServiceTest {
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         LearningPathLookup lookup = new LearningPathLookup(paths);
-        OutcomeVisibilityPolicy visibility = new OutcomeVisibilityPolicy();
+        OutcomeVisibilityPolicy visibility = new OutcomeVisibilityPolicy(students);
         OutcomeReceiptStore receiptStore = new OutcomeReceiptStore(receipts);
         OutcomeAuditTrail auditTrail = new OutcomeAuditTrail(audit);
         service = new LearningOutcomesService(
@@ -560,5 +564,39 @@ class LearningOutcomesServiceTest {
         path.setCreatedAt(OffsetDateTime.now());
         path.setUpdatedAt(OffsetDateTime.now());
         return path;
+    }
+
+    @Test
+    void teacherReadsOutcomesOfLearnersInAssignedClassOnly() {
+        signIn("teacher-1", BusinessRoleCatalog.TEACHER, "learning.outcomes.read");
+        UserAccessContext teacher = new UserAccessContext("teacher-1", "tenant-1", List.of(), List.of("class-a"), null, null);
+        when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "learner-a")).thenReturn(Optional.of(student("class-a", "school-1")));
+        when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "learner-b")).thenReturn(Optional.of(student("class-b", "school-1")));
+
+        assertThat(service.attainments(teacher, "learner-a")).isEmpty();
+        assertThatThrownBy(() -> service.attainments(teacher, "learner-b")).isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void studentWithClassScopeCannotReadAClassmate() {
+        signIn("learner-a", BusinessRoleCatalog.STUDENT, "learning.outcomes.read");
+        UserAccessContext student = new UserAccessContext("learner-a", "tenant-1", List.of(), List.of("class-a"), null, null);
+        when(students.findFirstByTenantIdAndAuthUserId("tenant-1", "learner-c")).thenReturn(Optional.of(student("class-a", "school-1")));
+
+        assertThat(service.attainments(student, "learner-a")).isEmpty();
+        assertThatThrownBy(() -> service.attainments(student, "learner-c")).isInstanceOf(ForbiddenException.class);
+    }
+
+    private void signIn(String userId, String role, String permission) {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                ErgPrincipal.authenticated(userId, "session", "tenant-1", List.of(role),
+                        List.of(permission), List.of(), List.of(), "user", role, Map.of()), "token", List.of()));
+    }
+
+    private static Student student(String classId, String schoolId) {
+        Student value = new Student();
+        value.setAcademicClassId(classId);
+        value.setSchoolId(schoolId);
+        return value;
     }
 }

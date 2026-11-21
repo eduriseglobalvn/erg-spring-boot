@@ -1,4 +1,4 @@
--- Validates the V175 constraints. VALIDATE CONSTRAINT scans under SHARE UPDATE EXCLUSIVE, so reads and writes continue.
+-- Validates the V177 constraints. VALIDATE CONSTRAINT scans under SHARE UPDATE EXCLUSIVE, so reads and writes continue.
 -- If orphan rows exist the constraint stays NOT VALID (still enforced for new rows) and a warning is logged instead of
 -- failing the deploy: find them with
 --   SELECT count(*) FROM lms_attendance_records r WHERE NOT EXISTS (SELECT 1 FROM lms_students s WHERE s.id = r.student_id);

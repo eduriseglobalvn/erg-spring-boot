@@ -41,7 +41,7 @@ public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttem
 
     List<AuthLoginAttempt> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
 
-    // Explicit lower(): matches the V182 expression index (a derived IgnoreCase query does not say which function it emits).
+    // Explicit lower(): matches the V184 expression index (a derived IgnoreCase query does not say which function it emits).
     @Query("select a from AuthLoginAttempt a where lower(a.attemptedEmail) = lower(:email) order by a.createdAt desc")
     List<AuthLoginAttempt> findByAttemptedEmailIgnoreCaseOrderByCreatedAtDesc(@Param("email") String attemptedEmail);
 

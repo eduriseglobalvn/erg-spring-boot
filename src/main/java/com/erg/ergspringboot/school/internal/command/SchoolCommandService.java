@@ -40,14 +40,17 @@ public class SchoolCommandService {
     private final SchoolAcademicYearRepository yearRepository;
     private final SchoolGradeRepository gradeRepository;
     private final ClassroomRepository classroomRepository;
+    private final SchoolArchiveHolds archiveHolds;
 
     public SchoolCommandService(
             EducationUnitRepository unitRepository,
             SchoolOperationalProfileRepository profileRepository,
             SchoolAcademicYearRepository yearRepository,
             SchoolGradeRepository gradeRepository,
-            ClassroomRepository classroomRepository
+            ClassroomRepository classroomRepository,
+            SchoolArchiveHolds archiveHolds
     ) {
+        this.archiveHolds = archiveHolds;
         this.unitRepository = unitRepository;
         this.profileRepository = profileRepository;
         this.yearRepository = yearRepository;
@@ -141,9 +144,8 @@ public class SchoolCommandService {
         assertScope(access, schoolId);
         EducationUnit unit = unit(access, schoolId);
         SchoolOperationalProfile profile = profile(access, schoolId);
-        if (classroomRepository.countByTenantIdAndSchoolIdAndStatusIgnoreCase(access.tenantId(), schoolId, "active") > 0) {
-            throw new ConflictException("Archive active classes before archiving the school.");
-        }
+        // Locks the school's open classes, students and their logins; restore reopens exactly those.
+        if (!"ARCHIVED".equalsIgnoreCase(unit.getStatus())) archiveHolds.archive(access.tenantId(), schoolId, access.userId());
         unit.setStatus("ARCHIVED");
         profile.setOnboardingStatus("ARCHIVED");
         profile.setUpdatedBy(access.userId());
@@ -158,6 +160,7 @@ public class SchoolCommandService {
         assertScope(access, schoolId);
         EducationUnit unit = unit(access, schoolId);
         SchoolOperationalProfile profile = profile(access, schoolId);
+        archiveHolds.restore(access.tenantId(), schoolId, access.userId());
         unit.setStatus("PAUSED");
         profile.setOnboardingStatus("PAUSED");
         profile.setUpdatedBy(access.userId());

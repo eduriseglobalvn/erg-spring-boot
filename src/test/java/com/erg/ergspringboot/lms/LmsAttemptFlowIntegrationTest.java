@@ -121,6 +121,30 @@ class LmsAttemptFlowIntegrationTest {
     }
 
     @Test
+    void classRosterNamesEachStudentsOwnNewestAttemptNotTheClassAssignmentList() {
+        seed();
+        entityManager.find(Assignment.class, "asg-flow").setTitle("Bài 1");
+        Assignment second = new Assignment();
+        second.setId("asg-flow-2"); second.setTenantId(TENANT); second.setAcademicClassId("class-flow");
+        second.setQuizId("qz_math_g6_base"); second.setStudentIds(List.of("stu-flow-a")); second.setStatus("active");
+        second.setAssignedBy("usr-flow-teacher"); second.setRecipientMode("students"); second.setTitle("Bài 2");
+        second.setDueAt(OffsetDateTime.now().plusDays(1));
+        entityManager.persist(second);
+        OffsetDateTime base = OffsetDateTime.now().minusHours(1);
+        attemptRepository.saveAndFlush(handedIn("att-cur-a1", "stu-flow-a", 70.0, base));
+        Attempt aNewest = inProgress("att-cur-a2");
+        aNewest.setAssignmentId("asg-flow-2");
+        aNewest.setStartedAt(base.plusMinutes(5));
+        attemptRepository.saveAndFlush(aNewest);
+        attemptRepository.saveAndFlush(handedIn("att-cur-b1", "stu-flow-b", 50.0, base));
+
+        var roster = classWorkspace.query(TENANT, "class-flow", null, null, null, null, null, null, null, false, false)
+                .students().items();
+        assertThat(roster).extracting("id", "currentAssignmentTitle", "currentAttemptStatus")
+                .containsExactlyInAnyOrder(tuple("stu-flow-a", "Bài 2", "in_progress"), tuple("stu-flow-b", "Bài 1", "graded"));
+    }
+
+    @Test
     void assignmentProgressCountsStudentsByTheirLatestHandIn() {
         seed();
         entityManager.persist(student("stu-flow-c", null, "FLOW-C"));

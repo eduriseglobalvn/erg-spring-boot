@@ -42,6 +42,30 @@ class RuntimePermissionCatalogContractTest {
                         .as(permission).isTrue());
     }
 
+    /** B-008: a guard anywhere in the code (not only controllers) must name a permission that exists. */
+    @Test
+    void everyPermissionNamedInAMethodGuardIsSeeded() throws Exception {
+        Set<String> seeded = com.erg.ergspringboot.authorization.catalog.PermissionCatalog.all().stream()
+                .map(com.erg.ergspringboot.authorization.catalog.PermissionCatalog.PermissionDef::name)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        seeded.addAll(valuesFromFiles(MIGRATIONS, ".sql"));
+        Pattern guard = Pattern.compile("@PreAuthorize\\(\"([^\"]*)\"\\)");
+        Set<String> guarded = new LinkedHashSet<>();
+        try (Stream<Path> files = Files.walk(JAVA)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                Matcher annotation = guard.matcher(Files.readString(file));
+                while (annotation.find()) {
+                    Matcher key = KEY.matcher(annotation.group(1));
+                    while (key.find()) {
+                        guarded.add(key.group(1));
+                    }
+                }
+            }
+        }
+        assertThat(guarded).isNotEmpty();
+        assertThat(seeded).containsAll(guarded);
+    }
+
     private Set<String> runtimePermissions() throws IOException {
         Set<String> keys = new LinkedHashSet<>();
         keys.addAll(valuesFromFile(JAVA.resolve("platform/security/SecurityConfig.java")));

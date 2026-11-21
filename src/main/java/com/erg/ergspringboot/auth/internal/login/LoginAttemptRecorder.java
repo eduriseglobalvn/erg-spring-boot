@@ -62,6 +62,7 @@ final class LoginAttemptRecorder {
         if ("SUCCESS".equalsIgnoreCase(result)) {
             log.info("AUTH_LOGIN_SUCCESS user={} ip={} portal={} device={} tenant={}",
                     userId, context.ipAddress(), portal, context.deviceName(), attempt.getTenantId());
+            failureEnforcement.auditLogin(userId, attempt.getTenantId(), context, portal, true, null);
         } else {
             log.warn("AUTH_LOGIN_FAILED user={} ip={} portal={} reason={}",
                     userId, context.ipAddress(), portal, reason);

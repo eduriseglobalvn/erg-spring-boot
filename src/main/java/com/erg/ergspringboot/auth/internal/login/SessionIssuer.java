@@ -15,7 +15,7 @@ import com.erg.ergspringboot.users.persistence.auth.SecurityEventRepository;
 import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import com.erg.ergspringboot.auth.AuthTokenService;
-import com.erg.ergspringboot.auth.internal.session.RememberedStudentSession;
+import com.erg.ergspringboot.auth.internal.session.RememberedSession;
 import com.erg.ergspringboot.utils.IdGenerator;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -120,9 +120,9 @@ final class SessionIssuer {
         session.setLastActiveAt(now);
         // createdAt anchors the remembered session's 90-day limit, so it must equal the issue time.
         session.setCreatedAt(now);
-        boolean remembered = RememberedStudentSession.applies(rememberMe, portals);
-        session.setRememberMe(remembered);
-        session.setExpiresAt(now.plus(remembered ? RememberedStudentSession.SLIDING_TTL : sessionTtl(permissions)));
+        session.setRememberMe(rememberMe);
+        session.setRememberStaff(rememberMe && !RememberedSession.isStudent(portals));
+        session.setExpiresAt(now.plus(rememberMe ? RememberedSession.slidingTtl(session) : sessionTtl(permissions)));
         session.setAccessTokenExpiresAt(now.plus(ACCESS_TOKEN_TTL));
         sessions.save(session);
         attemptRecorder.recordLoginAttempt(

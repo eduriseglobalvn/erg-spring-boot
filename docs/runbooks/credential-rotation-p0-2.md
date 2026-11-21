@@ -23,7 +23,8 @@ dumps and the reset manifest expose:
   open sessions. It runs on the next migration of each database.
 - The temporary password set by V110 is guessable: change it immediately after the first login.
 - ENV-002: at startup, while the admin row still carries the V110 hash, `BootstrapAdminPasswordInitializer`
-  sets the password from `ERG_BOOTSTRAP_ADMIN_PASSWORD` (default `Admin123`) and flags `must_change_password`.
+  sets the password from `ERG_BOOTSTRAP_ADMIN_PASSWORD` (no default: when it is empty the admin stays without a usable
+  password and startup logs a warning) and flags `must_change_password`.
   A changed password is never overwritten. First login: verify a recovery email
   (`POST /api/v1/users/me/recovery-email/challenges`, then `/verify`), then `PUT /api/v1/users/me/password`
   (409 `RECOVERY_EMAIL_NOT_VERIFIED` before that). Break-glass when SMTP is down:

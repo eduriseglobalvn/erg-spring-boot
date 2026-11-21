@@ -62,7 +62,10 @@ public final class LmsClassWorkspaceResponses {
             OffsetDateTime updatedAt,
             // Latest hand-in per assignment, averaged; null when the student has none or the viewer lacks lms.grade.read.
             Integer averagePercent,
-            Integer completedAssignmentCount
+            Integer completedAssignmentCount,
+            // The assignment of the student's newest attempt in this class; null when they have none.
+            String currentAssignmentTitle,
+            String currentAttemptStatus
     ) {
     }
 

@@ -41,6 +41,20 @@ class BootstrapAdminPasswordInitializerTest {
                 .contains("id = 'usr_super_admin' and password_hash = ?");
     }
 
+    /** ENV-002: no password in the code; without the variable the admin is not given one. */
+    @Test
+    void withoutTheVariableTheAdminGetsNoPassword() throws Exception {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH)))
+                .thenReturn(1);
+
+        assertThat(new BootstrapAdminPasswordInitializer(jdbc, passwords, "").apply()).isFalse();
+
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        org.springframework.beans.factory.annotation.Value value = BootstrapAdminPasswordInitializer.class.getConstructors()[0]
+                .getParameters()[2].getAnnotation(org.springframework.beans.factory.annotation.Value.class);
+        assertThat(value.value()).isEqualTo("${erg.bootstrap.admin-password:}");
+    }
+
     @Test
     void neverTouchesAnAdminPasswordThatWasChanged() {
         when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(BootstrapAdminPasswordInitializer.MIGRATION_HASH)))
