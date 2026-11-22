@@ -9114,6 +9114,9 @@
           "gameType": {
             "type": "string"
           },
+          "questionSet": {
+            "type": "string"
+          },
           "quizVersionId": {
             "type": "string"
           },
@@ -11231,6 +11234,23 @@
             "type": "string"
           },
           "sourceModel": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "LastGame": {
+        "properties": {
+          "className": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string"
+          },
+          "gameType": {
+            "type": "string"
+          },
+          "roomId": {
             "type": "string"
           }
         },
@@ -14441,6 +14461,10 @@
       },
       "RoomSummary": {
         "properties": {
+          "accuracy": {
+            "format": "double",
+            "type": "number"
+          },
           "classId": {
             "type": "string"
           },
@@ -14474,7 +14498,16 @@
             "format": "int32",
             "type": "integer"
           },
+          "questionSet": {
+            "type": "string"
+          },
+          "quizId": {
+            "type": "string"
+          },
           "quizTitle": {
+            "type": "string"
+          },
+          "quizVersionId": {
             "type": "string"
           },
           "rules": {
@@ -15641,6 +15674,14 @@
       },
       "SourceItem": {
         "properties": {
+          "classSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "classWrongCount": {
+            "format": "int32",
+            "type": "integer"
+          },
           "filteredByKind": {
             "additionalProperties": {
               "format": "int32",
@@ -15651,6 +15692,9 @@
           "filteredCount": {
             "format": "int32",
             "type": "integer"
+          },
+          "lastGame": {
+            "$ref": "#/components/schemas/LastGame"
           },
           "playableCount": {
             "format": "int32",
@@ -25414,7 +25458,7 @@
           {
             "in": "query",
             "name": "classId",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
