@@ -189,7 +189,7 @@ class LmsHomeworkWorkspaceGraphQlControllerTest {
         when(lmsReadModelService.studentGroups("tenant-a", "class-1", List.of("class-1"), "teacher-1"))
                 .thenReturn(new StudentGroupWorkspaceResponse("tenant-a", List.of()));
 
-        controller.studentGroups(new StudentGroupsInput(null, "class-1"));
+        controller.studentGroups(new StudentGroupsInput(null, "class-1", null));
 
         verify(lmsReadModelService).studentGroups("tenant-a", "class-1", List.of("class-1"), "teacher-1");
     }
@@ -204,7 +204,7 @@ class LmsHomeworkWorkspaceGraphQlControllerTest {
                 Map.of("managedClassIds", List.of("class-1"))
         ));
 
-        assertThatThrownBy(() -> controller.studentGroups(new StudentGroupsInput(null, "class-2")))
+        assertThatThrownBy(() -> controller.studentGroups(new StudentGroupsInput(null, "class-2", null)))
                 .isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(lmsReadModelService);
     }

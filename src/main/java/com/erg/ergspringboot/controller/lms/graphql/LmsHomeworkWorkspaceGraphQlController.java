@@ -86,12 +86,11 @@ public class LmsHomeworkWorkspaceGraphQlController {
         if (requestedClassId != null) {
             accessSupport.assertClassScope(principal, requestedClassId, null);
         }
-        return queries.studentGroups(
-                tenantId,
-                requestedClassId,
-                readableClassIds(principal),
-                accessSupport.blankToNull(principal == null ? null : principal.userId())
-        );
+        String userId = accessSupport.blankToNull(principal == null ? null : principal.userId());
+        if (Boolean.FALSE.equals(safeInput.includeMembers())) {
+            return queries.studentGroups(tenantId, requestedClassId, readableClassIds(principal), userId, false);
+        }
+        return queries.studentGroups(tenantId, requestedClassId, readableClassIds(principal), userId);
     }
 
     private String requirePrincipalUserId(ErgPrincipal principal) {
@@ -140,11 +139,12 @@ public class LmsHomeworkWorkspaceGraphQlController {
 
     public record StudentGroupsInput(
             String tenantId,
-            String classId
+            String classId,
+            Boolean includeMembers
     ) {
 
         static StudentGroupsInput empty() {
-            return new StudentGroupsInput(null, null);
+            return new StudentGroupsInput(null, null, null);
         }
     }
 }

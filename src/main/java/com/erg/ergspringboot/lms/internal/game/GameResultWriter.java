@@ -100,7 +100,8 @@ public class GameResultWriter {
     /** Ended rooms of a host, newest first (the live ones come from memory). */
     public List<RoomRow> history(String tenantId, String hostUserId, int limit) {
         return jdbc.query("""
-                select r.id, r.game_type, r.join_code, r.status, r.class_id, r.quiz_version_id, r.question_set, v.quiz_id, q.title as quiz_title, r.duration_minutes,
+                select r.id, r.game_type, r.join_code, r.status, r.class_id, r.quiz_version_id, r.question_set,
+                       v.quiz_id, q.title as quiz_title, r.duration_minutes,
                        r.question_count, r.rules_json::text as rules_json, r.created_at, r.started_at, r.ended_at,
                        (select count(*) from game_player p where p.room_id = r.id) as player_count,
                        (select (count(*) filter (where a.correct))::float8 / nullif(count(*), 0)

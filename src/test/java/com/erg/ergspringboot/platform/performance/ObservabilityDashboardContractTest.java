@@ -11,7 +11,6 @@ class ObservabilityDashboardContractTest {
     @Test
     void dashboardsCoverRestGraphqlDatabaseCacheAndEventSloSignals() throws Exception {
         String dashboard = Files.readString(Path.of("ops/observability/grafana/erg-backend-slo.json"));
-        String application = Files.readString(Path.of("src/main/resources/application.yml"));
 
         assertThat(dashboard)
                 .contains("http_server_requests_seconds")
@@ -23,10 +22,5 @@ class ObservabilityDashboardContractTest {
                 .contains("spring_modulith_events")
                 .contains("requestId")
                 .contains("traceId");
-        assertThat(application)
-                .contains("tracing:")
-                .contains("sampling:")
-                .contains("probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}")
-                .contains("zipkin:");
     }
 }

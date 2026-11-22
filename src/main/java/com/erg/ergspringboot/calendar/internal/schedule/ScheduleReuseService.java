@@ -203,7 +203,8 @@ public class ScheduleReuseService {
                     c.className(), in.keepRoomAndAssistant() ? c.roomId() : null, in.keepRoomAndAssistant() ? c.roomName() : null,
                     c.subjectName(), teachers, date, c.weekday(), c.periodNo(), start, end, null, null, null, true));
         }
-        List<ConflictDetailResponse> details = engine.detect(tenantId, copies, Set.of(), true);
+        // no fix suggestions: up to 52 weeks are detected and each suggestion costs queries per conflict
+        List<ConflictDetailResponse> details = engine.detect(tenantId, copies, Set.of(), false);
         Set<String> blocked = details.stream().filter(d -> "ERROR".equals(d.severity())).map(ConflictDetailResponse::clientRowId)
                 .collect(Collectors.toSet());
         List<Occurrence> toCreate = copies.stream().filter(o -> !blocked.contains(o.clientRowId())).toList();

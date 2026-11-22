@@ -1,3 +1,4 @@
+# Production override for the JVM image (deploy.sh builds --target jvm-runtime); the name is historical.
 services:
   backend:
     image: ${ERG_APP_IMAGE:?set ERG_APP_IMAGE to an immutable registry tag}
@@ -12,15 +13,12 @@ services:
       SERVER_PORT: 1606
       ERG_HTTP_CORS_ALLOWED_ORIGINS: "${ERG_HTTP_CORS_ALLOWED_ORIGINS:-https://erg.edu.vn,https://cms.erg.edu.vn,https://crm.erg.edu.vn,https://lms.erg.edu.vn,https://lcms.erg.edu.vn,https://elearning.erg.edu.vn,https://app.erg.edu.vn,https://monitor.erg.edu.vn}"
       SPRING_AUTOCONFIGURE_EXCLUDE: >-
-        org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,
-        org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,
-        org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration,
         org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,
         org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration,
         org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration,
         org.springframework.modulith.observability.autoconfigure.SpringDataRestModuleObservabilityAutoConfiguration,
         org.springframework.modulith.actuator.autoconfigure.ApplicationModulesEndpointConfiguration
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-erg}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-erg}?reWriteBatchedInserts=true
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_RUNTIME_USER:-erg_app}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:?set POSTGRES_RUNTIME_PASSWORD}
       SPRING_FLYWAY_USER: ${POSTGRES_USER:-erg}

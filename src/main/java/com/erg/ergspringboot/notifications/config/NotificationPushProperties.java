@@ -15,7 +15,6 @@ public class NotificationPushProperties {
     /** fcm | webpush; blank picks fcm when FCM credentials are configured, otherwise webpush. */
     private String provider = "";
     private String senderMode = "http-v1";
-    private boolean nativeImageStrict = true;
     private String projectId = "";
     private String endpoint = "https://fcm.googleapis.com";
     private Duration connectTimeout = Duration.ofSeconds(3);
@@ -90,14 +89,6 @@ public class NotificationPushProperties {
 
     public void setSenderMode(String senderMode) {
         this.senderMode = senderMode;
-    }
-
-    public boolean isNativeImageStrict() {
-        return nativeImageStrict;
-    }
-
-    public void setNativeImageStrict(boolean nativeImageStrict) {
-        this.nativeImageStrict = nativeImageStrict;
     }
 
     public String getProjectId() {

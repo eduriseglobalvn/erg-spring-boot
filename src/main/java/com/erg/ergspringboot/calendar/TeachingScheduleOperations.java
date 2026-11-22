@@ -30,7 +30,6 @@ import com.erg.ergspringboot.calendar.CalendarHolidayPort.DayLoad;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 /**
@@ -78,32 +77,32 @@ public class TeachingScheduleOperations {
         return drafts.draft(tenantId, batchId);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public DraftResultResponse saveDraft(String tenantId, TeachingScheduleDraftInput input, String actorId) {
         return drafts.saveDraft(tenantId, input, actorId);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public BatchResponse publishBatch(String tenantId, String batchId, int expectedVersion, String actorId) {
         return lifecycle.publishBatch(tenantId, batchId, expectedVersion, actorId);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public BatchResponse cancelBatch(String tenantId, String batchId, int expectedVersion, String actorId) {
         return lifecycle.cancelBatch(tenantId, batchId, expectedVersion, actorId);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public BatchResponse renameBatch(String tenantId, String batchId, String label, int expectedVersion) {
         return lifecycle.renameBatch(tenantId, batchId, label, expectedVersion);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public SlotChangeResponse editSlot(String tenantId, TeachingScheduleSlotChanges.Edit input, String actorId) {
         return slotChanges.edit(tenantId, input, actorId);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public SlotChangeResponse swapTeacher(String tenantId, TeachingScheduleSlotChanges.Swap input, String actorId) {
         return slotChanges.swap(tenantId, input, actorId);
     }
@@ -147,7 +146,7 @@ public class TeachingScheduleOperations {
         return reuse.preview(tenantId, input);
     }
 
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public DraftResultResponse reuseWeek(String tenantId, TeachingScheduleReuseInput input, String actorId) {
         return reuse.reuse(tenantId, input, actorId);
     }
@@ -183,11 +182,13 @@ public class TeachingScheduleOperations {
         return travelTimes.list(tenantId, search, page, size).stream().map(TeachingScheduleOperations::toResponse).toList();
     }
 
+    @CalendarCacheEvict // travel times decide the TRAVEL_TIME conflicts of the cached overview week
     public SchoolTravelTimeResponse upsertTravelTime(String tenantId, String schoolA, String schoolB, int minutes,
             String actorId) {
         return toResponse(travelTimes.upsert(tenantId, schoolA, schoolB, minutes, actorId));
     }
 
+    @CalendarCacheEvict
     public boolean deleteTravelTime(String tenantId, String schoolA, String schoolB) {
         return travelTimes.delete(tenantId, schoolA, schoolB);
     }

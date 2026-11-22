@@ -303,6 +303,60 @@ class LearningOutcomesServiceTest {
     }
 
     @Test
+    void pathListPushesScopeIntoQueryAndCountsNodesInOneGroupedQuery() {
+        UserAccessContext scoped = new UserAccessContext(
+                "teacher-1", "tenant-1", List.of("unit-1"), List.of("class-1"), "unit-1", "class-1");
+        LearningPath own = persistedPath();
+        when(paths.findScoped(org.mockito.ArgumentMatchers.eq("tenant-1"), org.mockito.ArgumentMatchers.eq("PUBLISHED"),
+                org.mockito.ArgumentMatchers.eq(""), org.mockito.ArgumentMatchers.eq(""),
+                org.mockito.ArgumentMatchers.eq(false), org.mockito.ArgumentMatchers.eq(List.of("unit-1")),
+                org.mockito.ArgumentMatchers.eq(false), org.mockito.ArgumentMatchers.eq(List.of("class-1")), any()))
+                .thenReturn(List.of(own));
+        LearningPathNodeRepository.NodeCountProjection count = org.mockito.Mockito.mock(
+                LearningPathNodeRepository.NodeCountProjection.class);
+        when(count.getPathId()).thenReturn("path-1");
+        when(count.getNodeCount()).thenReturn(3L);
+        when(nodes.countGroupedByPathId("tenant-1", List.of("path-1"))).thenReturn(List.of(count));
+
+        List<LearningOutcomesResponses.LearningPathResponse> result = service.paths(scoped, "published", null, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).nodeCount()).isEqualTo(3);
+        verify(nodes, never()).findTop100ByTenantIdAndPathIdOrderBySortOrderAsc(any(), any());
+    }
+
+    @Test
+    void completionListResolvesPathsInOneBatchAndDropsOutOfScopeRows() {
+        UserAccessContext scoped = new UserAccessContext(
+                "learner-1", "tenant-1", List.of("unit-1"), List.of("class-1"), "unit-1", "class-1");
+        LearningPath inScope = persistedPath();
+        inScope.setId("path-1");
+        inScope.setEducationUnitId("unit-1");
+        LearningPath outOfScope = persistedPath();
+        outOfScope.setId("path-2");
+        outOfScope.setEducationUnitId("unit-9");
+        List<LearningPathCompletion> rows = new java.util.ArrayList<>();
+        for (String pathId : List.of("path-1", "path-2", "path-1")) {
+            LearningPathCompletion row = new LearningPathCompletion();
+            row.setId("c-" + rows.size());
+            row.setTenantId("tenant-1");
+            row.setLearnerId("learner-1");
+            row.setLearningPathId(pathId);
+            row.setStatus("IN_PROGRESS");
+            row.setRequiredNodeCount(1);
+            row.setCompletedNodeCount(0);
+            row.setProgressPercent(0);
+            row.setEvaluatedAt(OffsetDateTime.now());
+            rows.add(row);
+        }
+        when(completions.findTop100ByTenantIdAndLearnerIdOrderByEvaluatedAtDesc("tenant-1", "learner-1")).thenReturn(rows);
+        when(paths.findAllById(List.of("path-1", "path-2"))).thenReturn(List.of(inScope, outOfScope));
+
+        assertThat(service.completions(scoped, "learner-1")).hasSize(2);
+        verify(paths, never()).findByTenantIdAndId(any(), any());
+    }
+
+    @Test
     void publishChecksNodeExistenceWithBoundedRepositoryProbe() {
         LearningPath path = persistedPath();
         path.setStatus("DRAFT");

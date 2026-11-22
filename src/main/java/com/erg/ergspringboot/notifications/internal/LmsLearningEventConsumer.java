@@ -3,7 +3,7 @@ package com.erg.ergspringboot.notifications.internal;
 import com.erg.ergspringboot.lms.LmsAssignmentCreated;
 import com.erg.ergspringboot.lms.LmsAttemptSubmitted;
 import com.erg.ergspringboot.lms.LmsNotificationProjection;
-import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentAudience;
+import com.erg.ergspringboot.lms.LmsNotificationProjection.AssignmentSummary;
 import com.erg.ergspringboot.lms.LmsNotificationProjection.Submitter;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublisher;
@@ -33,7 +33,8 @@ public class LmsLearningEventConsumer {
 
     @ApplicationModuleListener
     public void on(LmsAttemptSubmitted event) {
-        AssignmentAudience audience = lms.assignmentAudience(event.tenantId(), event.assignmentId()).orElse(null);
+        // Submit is the hot path: it must not load the whole recipient list just to find the teacher.
+        AssignmentSummary audience = lms.assignmentSummary(event.tenantId(), event.assignmentId()).orElse(null);
         if (audience == null || audience.assignedBy() == null) {
             return;
         }

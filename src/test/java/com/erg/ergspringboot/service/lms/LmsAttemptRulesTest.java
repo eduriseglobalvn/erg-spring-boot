@@ -119,16 +119,17 @@ class LmsAttemptRulesTest {
                 org.mockito.ArgumentMatchers.eq("lms-student-1"), org.mockito.ArgumentMatchers.eq("class-1"),
                 org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(assignment)));
-        Attempt attempt = attempt();
-        attempt.setStudentId("lms-student-1");
-        attempt.setScore(7d);
+        var summary = new com.erg.ergspringboot.lms.persistence.projection.AttemptSummaryProjection("attempt-1", "assignment-1",
+                "quiz-1", "lms-student-1", "submitted", 7d, 10d, 70d, true, null, null, null);
         when(fixture.attempts.findTop3ByAssignmentsAndStudent("erg", List.of("assignment-1"), "lms-student-1"))
-                .thenReturn(List.of(attempt));
+                .thenReturn(List.of(summary));
 
         var scores = readModel().listScores("student-user-1", access(), 0, 50);
 
         assertThat(scores.items()).hasSize(1);
         assertThat(scores.items().getFirst().bestScore()).isEqualTo(7d);
+        // The list view is built from summaries: no answers payload is loaded.
+        assertThat(scores.items().getFirst().recentAttemptsTop3().getFirst().answers()).isEmpty();
         // N5: the learner view never exposes the other recipients' internal student ids.
         assertThat(scores.items().getFirst().assignment().studentIds()).isEmpty();
     }
@@ -152,8 +153,8 @@ class LmsAttemptRulesTest {
     void startAttemptEvictsAttemptReadCachesAfterPersistingNewAttempt() {
         Assignment assignment = assignment();
         when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
-        when(fixture.packages.activePackageEntity("erg", "quiz-1")).thenReturn(Optional.empty());
-        when(fixture.quizzes.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz()));
+        when(fixture.packages.startInfo("erg", "quiz-1", null))
+                .thenReturn(com.erg.ergspringboot.lms.QuizStartInfo.of(quiz(), null));
 
         var response = service.start("student-1", startRequest(), null, access());
 
@@ -238,7 +239,7 @@ class LmsAttemptRulesTest {
     }
 
     @Test
-    void submitAttemptRejectsWhenMaxDurationAndGraceAreExceeded() {
+    void submitAttemptPastDurationAndGraceIsStoredAsLateInsteadOfRolledBack() {
         Assignment assignment = assignment();
         assignment.setMaxDurationMinutes(10);
         Attempt attempt = attempt();
@@ -249,15 +250,10 @@ class LmsAttemptRulesTest {
         when(fixture.attempts.findByTenantIdAndId("erg", "attempt-1")).thenReturn(Optional.of(attempt));
         when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
 
-        assertThatThrownBy(() -> service.submit(
-                "attempt-1",
-                new SubmitAttemptRequest(Map.of(), submittedAt, "hash-1", "1", Map.of(), List.of()),
-                access()))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("duration exceeded");
+        service.submit("attempt-1", new SubmitAttemptRequest(Map.of(), submittedAt, "hash-1", "1", Map.of(), List.of()), access());
 
-        verify(fixture.attempts, never()).save(any());
-        verifyAttemptReadCachesNotCleared();
+        assertThat(attempt.isLate()).isTrue();
+        verify(fixture.attempts).save(attempt);
     }
 
     @Test

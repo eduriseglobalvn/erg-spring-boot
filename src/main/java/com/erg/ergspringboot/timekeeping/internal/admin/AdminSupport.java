@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.timekeeping.internal.admin;
 
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkAuditLog;
 import com.erg.ergspringboot.timekeeping.persistence.TkAuditLogRepository;
@@ -45,6 +46,13 @@ class AdminSupport {
         if (schoolId == null || schoolId.isBlank()) throw bad("SCHOOL_REQUIRED", "Chọn cơ sở");
         return units.findByIdAndTenantId(schoolId, tenantId)
                 .orElseThrow(() -> notFound("Không tìm thấy cơ sở"));
+    }
+
+    /** Choke point of every school-bound admin read/write: 403 outside the caller's scope, then the tenant check above. */
+    EducationUnit requireSchool(String tenantId, SchoolScope scope, String schoolId) {
+        if (schoolId == null || schoolId.isBlank()) throw bad("SCHOOL_REQUIRED", "Chọn cơ sở");
+        scope.require(schoolId);
+        return requireSchool(tenantId, schoolId);
     }
 
     Map<String, String> schoolNames(String tenantId, Collection<String> schoolIds) {

@@ -44,6 +44,19 @@ class PortableQuizBundleServiceTest {
         return version;
     }
 
+    private static QuizVersionRepository.Lineage lineage(QuizVersion v) {
+        return new QuizVersionRepository.Lineage() {
+            public String getId() { return v.getId(); }
+            public String getTenantId() { return v.getTenantId(); }
+            public String getQuizId() { return v.getQuizId(); }
+            public String getVersionLabel() { return v.getVersionLabel(); }
+            public Integer getVersionNumber() { return v.getVersionNumber(); }
+            public Integer getSchemaVersion() { return v.getSchemaVersion(); }
+            public String getGradingMode() { return v.getGradingMode(); }
+            public OffsetDateTime getPublishedAt() { return v.getPublishedAt(); }
+        };
+    }
+
     private QuizPackage pkg(String gradingMode) {
         QuizPackage pkg = new QuizPackage();
         pkg.setId("pkg-1");
@@ -67,8 +80,8 @@ class PortableQuizBundleServiceTest {
 
     @Test
     void clientFirstBundleKeepsAnswerKeyForOfflineGrading() {
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
-                .thenReturn(Optional.of(version()));
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version())));
         when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg("client-first")));
 
@@ -89,8 +102,8 @@ class PortableQuizBundleServiceTest {
     void serverAuthoritativeBundleStripsAnswerKey() {
         QuizVersion version = version();
         version.setGradingMode("server-authoritative");
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
-                .thenReturn(Optional.of(version));
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version)));
         when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg("server-authoritative")));
 
@@ -104,7 +117,7 @@ class PortableQuizBundleServiceTest {
 
     @Test
     void missingActiveVersionIsNotFound() {
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().exportActive("tenant-a", "quiz-1"))
@@ -118,8 +131,8 @@ class PortableQuizBundleServiceTest {
         QuizPackage pkg = pkg("server-authoritative");
         pkg.getPackageJson().put("credentials", Map.of("accessToken", "must-not-escape"));
         pkg.getPackageJson().put("sections", java.util.List.of(Map.of("answer_key", Map.of("q1", "a"))));
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
-                .thenReturn(Optional.of(version));
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version)));
         when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg));
 
@@ -131,8 +144,8 @@ class PortableQuizBundleServiceTest {
 
     @Test
     void packageMetadataIsExposedForVerificationAndUpdateCaching() {
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
-                .thenReturn(Optional.of(version()));
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version())));
         when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg("client-first")));
 
@@ -148,8 +161,8 @@ class PortableQuizBundleServiceTest {
     void signedSelfContainedPackageIsPortableReadyBeforeBinaryArtifactIsPublished() {
         QuizPackage pkg = pkg("client-first");
         pkg.setDownloadUrl(null);
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
-                .thenReturn(Optional.of(version()));
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version())));
         when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg));
 
@@ -164,8 +177,8 @@ class PortableQuizBundleServiceTest {
         pkg.setPackageJson(Map.of("quiz", Map.of(
                 "sections", List.of(Map.of("questions", List.of(Map.of(
                         "contentImage", Map.of("url", "https://cdn.example.test/question.png"))))))));
-        when(quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
-                .thenReturn(Optional.of(version()));
+        when(quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue("quiz-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version())));
         when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg));
 
@@ -177,16 +190,15 @@ class PortableQuizBundleServiceTest {
     void metadataManifestOmitsPackagePayload() {
         when(packageRepository.findByIdAndTenantId("pkg-1", "tenant-a"))
                 .thenReturn(Optional.of(pkg("client-first")));
-        when(quizVersionRepository.findByIdAndTenantId("ver-1", "tenant-a"))
-                .thenReturn(Optional.of(version()));
-        when(packageRepository.findByQuizVersionIdAndTenantId("ver-1", "tenant-a"))
-                .thenReturn(Optional.of(pkg("client-first")));
+        when(quizVersionRepository.findLineageByIdAndTenantId("ver-1", "tenant-a"))
+                .thenReturn(Optional.of(lineage(version())));
 
         var manifest = service().manifest("tenant-a", "pkg-1");
 
         assertThat(manifest.artifactType()).isEqualTo("exam-package");
         assertThat(manifest.packageId()).isEqualTo("pkg-1");
         assertThat(manifest.downloadUrl()).startsWith("https://");
+        org.mockito.Mockito.verify(packageRepository, org.mockito.Mockito.never()).findByQuizVersionIdAndTenantId(any(), any());
         assertThat(manifest).hasNoNullFieldsOrPropertiesExcept("sizeBytes", "expiresAt", "minRuntimeVersion");
     }
 
@@ -205,11 +217,11 @@ class PortableQuizBundleServiceTest {
         nextPackage.setMinRuntimeVersion("1.2.0");
         nextPackage.setReleaseChannel("stable");
 
-        when(quizVersionRepository.findByQuizIdAndTenantIdOrderByVersionNumberDesc(
+        when(quizVersionRepository.findLineagesByQuizIdAndTenantIdOrderByVersionNumberDesc(
                 eq("quiz-1"), eq("tenant-a"), any()))
-                .thenReturn(List.of(next, current));
-        when(packageRepository.findByQuizVersionIdAndTenantId("ver-2", "tenant-a"))
-                .thenReturn(Optional.of(nextPackage));
+                .thenReturn(List.of(lineage(next), lineage(current)));
+        when(packageRepository.findByQuizVersionIdInAndTenantId(List.of("ver-2"), "tenant-a"))
+                .thenReturn(List.of(nextPackage));
 
         var feed = service().updates("tenant-a", "quiz-1", "stable", 1, "1.2.5");
 
@@ -230,10 +242,10 @@ class PortableQuizBundleServiceTest {
         nextPackage.setId("pkg-2");
         nextPackage.setQuizVersionId("ver-2");
         nextPackage.setMinRuntimeVersion("2.0.0");
-        when(quizVersionRepository.findByQuizIdAndTenantIdOrderByVersionNumberDesc(eq("quiz-1"), eq("tenant-a"), any()))
-                .thenReturn(List.of(next));
-        when(packageRepository.findByQuizVersionIdAndTenantId("ver-2", "tenant-a"))
-                .thenReturn(Optional.of(nextPackage));
+        when(quizVersionRepository.findLineagesByQuizIdAndTenantIdOrderByVersionNumberDesc(eq("quiz-1"), eq("tenant-a"), any()))
+                .thenReturn(List.of(lineage(next)));
+        when(packageRepository.findByQuizVersionIdInAndTenantId(List.of("ver-2"), "tenant-a"))
+                .thenReturn(List.of(nextPackage));
 
         assertThat(service().updates("tenant-a", "quiz-1", "stable", null, "1.9.9").available()).isEmpty();
     }

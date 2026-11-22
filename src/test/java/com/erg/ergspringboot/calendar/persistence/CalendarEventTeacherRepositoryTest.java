@@ -32,6 +32,7 @@ class CalendarEventTeacherRepositoryTest {
                 .contains("e.startAt < :to")
                 .contains("e.endAt > :from")
                 .contains("e.status IN :statuses")
+                .contains("GROUP BY et.teacherUserId, et.colorKey")
                 .doesNotContain("1970")
                 .doesNotContain("2100");
     }

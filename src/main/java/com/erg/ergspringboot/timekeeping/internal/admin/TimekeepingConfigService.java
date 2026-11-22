@@ -7,6 +7,8 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyConfig;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.PolicyVersions;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemoteRuleConfig;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
+import com.erg.ergspringboot.timekeeping.internal.schedule.SchoolSetupCache;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicyRepository;
@@ -42,9 +44,12 @@ public class TimekeepingConfigService {
     private final UserRepository users;
     private final WorkContextResolver context;
     private final AdminSupport support;
+    private final SchoolSetupCache setups;
 
     TimekeepingConfigService(TkShiftRepository shifts, TkPolicyRepository policies,
-            TkRemoteRuleRepository remoteRules, UserRepository users, WorkContextResolver context, AdminSupport support) {
+            TkRemoteRuleRepository remoteRules, UserRepository users, WorkContextResolver context, AdminSupport support,
+            SchoolSetupCache setups) {
+        this.setups = setups;
         this.shifts = shifts;
         this.policies = policies;
         this.remoteRules = remoteRules;
@@ -57,7 +62,12 @@ public class TimekeepingConfigService {
 
     @Transactional(readOnly = true)
     public PolicyVersions policy(String tenantId, String schoolId) {
-        support.requireSchool(tenantId, schoolId);
+        return policy(tenantId, SchoolScope.TENANT, schoolId);
+    }
+
+    @Transactional(readOnly = true)
+    public PolicyVersions policy(String tenantId, SchoolScope scope, String schoolId) {
+        support.requireSchool(tenantId, scope, schoolId);
         LocalDate today = support.today();
         return new PolicyVersions(policy(context.policyFor(tenantId, schoolId, today)),
                 policies.findFirstByTenantIdAndSchoolIdAndEffectiveFromGreaterThanOrderByEffectiveFromAsc(
@@ -70,8 +80,13 @@ public class TimekeepingConfigService {
      */
     @Transactional
     public PolicyConfig savePolicy(String tenantId, String actorId, String schoolId, PolicyCommand c) {
+        return savePolicy(tenantId, SchoolScope.TENANT, actorId, schoolId, c);
+    }
+
+    @Transactional
+    public PolicyConfig savePolicy(String tenantId, SchoolScope scope, String actorId, String schoolId, PolicyCommand c) {
         if (c == null) throw AdminSupport.bad("BODY_REQUIRED", "Thiếu dữ liệu");
-        support.requireSchool(tenantId, schoolId);
+        support.requireSchool(tenantId, scope, schoolId);
         LocalDate effectiveFrom = YearMonth.from(support.today()).plusMonths(1).atDay(1);
         TkPolicy row = policies.findByTenantIdAndSchoolIdAndEffectiveFrom(tenantId, schoolId, effectiveFrom)
                 .orElseGet(TkPolicy::new);
@@ -95,6 +110,7 @@ public class TimekeepingConfigService {
         row.setLockDayOfMonth(range(c.lockDayOfMonth(), now.getLockDayOfMonth(), 1, 28, "Ngày chốt công"));
         row.setApprovalChains(c.approvalChains() == null ? now.getApprovalChains() : chains(c.approvalChains()));
         PolicyConfig saved = policy(policies.save(row));
+        setups.evict(tenantId, schoolId);
         support.auditChange(tenantId, actorId, "UPDATE_POLICY", "POLICY", saved.id(), before,
                 AdminSupport.summary(saved));
         return saved;
@@ -104,18 +120,32 @@ public class TimekeepingConfigService {
 
     @Transactional(readOnly = true)
     public List<RemoteRuleConfig> remoteRules(String tenantId, String schoolId) {
-        List<TkRemoteRule> rows = schoolId == null ? remoteRules.findByTenantId(tenantId)
-                : remoteRules.findByTenantIdAndSchoolId(tenantId, support.requireSchool(tenantId, schoolId).getId());
+        return remoteRules(tenantId, SchoolScope.TENANT, schoolId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RemoteRuleConfig> remoteRules(String tenantId, SchoolScope scope, String schoolId) {
+        List<TkRemoteRule> rows = schoolId == null
+                ? remoteRules.findByTenantId(tenantId).stream().filter(r -> scope.allows(r.getSchoolId())).toList()
+                : remoteRules.findByTenantIdAndSchoolId(tenantId,
+                        support.requireSchool(tenantId, scope, schoolId).getId());
         return rows.stream().map(TimekeepingConfigService::rule).toList();
     }
 
     @Transactional
     public RemoteRuleConfig saveRemoteRule(String tenantId, String actorId, String id, RemoteRuleCommand c) {
+        return saveRemoteRule(tenantId, SchoolScope.TENANT, actorId, id, c);
+    }
+
+    @Transactional
+    public RemoteRuleConfig saveRemoteRule(String tenantId, SchoolScope scope, String actorId, String id,
+            RemoteRuleCommand c) {
         if (c == null || c.kind() == null) throw AdminSupport.bad("KIND_REQUIRED", "Chọn loại quy tắc");
         TkRemoteRule row = id == null ? new TkRemoteRule()
                 : remoteRules.findByIdAndTenantId(id, tenantId).orElseThrow(ruleNotFound());
+        if (id != null) scope.require(row.getSchoolId());
         Map<String, Object> before = id == null ? null : AdminSupport.summary(rule(row));
-        support.requireSchool(tenantId, c.schoolId());
+        support.requireSchool(tenantId, scope, c.schoolId());
         List<String> userIds = List.of();
         Integer weekday = null;
         if (c.kind() == RemoteRuleKind.USERS) {
@@ -153,7 +183,13 @@ public class TimekeepingConfigService {
 
     @Transactional
     public void deleteRemoteRule(String tenantId, String actorId, String id) {
+        deleteRemoteRule(tenantId, SchoolScope.TENANT, actorId, id);
+    }
+
+    @Transactional
+    public void deleteRemoteRule(String tenantId, SchoolScope scope, String actorId, String id) {
         TkRemoteRule row = remoteRules.findByIdAndTenantId(id, tenantId).orElseThrow(ruleNotFound());
+        scope.require(row.getSchoolId());
         remoteRules.delete(row);
         support.auditChange(tenantId, actorId, "DELETE_REMOTE_RULE", "REMOTE_RULE", id,
                 AdminSupport.summary(rule(row)), null);

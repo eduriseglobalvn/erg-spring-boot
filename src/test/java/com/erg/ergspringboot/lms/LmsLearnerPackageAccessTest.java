@@ -34,6 +34,8 @@ class LmsLearnerPackageAccessTest {
         quiz.setId("quiz-1");
         quiz.setTenantId("erg");
         when(fixture.quizzes.findByTenantIdAndId("erg", "quiz-1")).thenReturn(Optional.of(quiz));
+        // The recipient rule is one SQL exists query now; asg-1 distributes quiz-1 to usr-1, nothing else does.
+        when(fixture.assignments.existsVisibleQuizForLearner("erg", "quiz-1", "asg-1", null, null, "usr-1")).thenReturn(true);
     }
 
     @Test
@@ -88,6 +90,21 @@ class LmsLearnerPackageAccessTest {
         when(fixture.permissions.hasAny("lms.quiz.read", "*")).thenReturn(true);
         when(fixture.packages.activePackage("erg", "quiz-1")).thenReturn(Optional.of(packageWithKey()));
 
+        assertThat(resources.getQuizPackage("quiz-1", null, learner).answerKey()).containsKey("q1");
+    }
+
+    @Test
+    void teacherCannotReadAnotherTeachersQuizButThePublisherCan() {
+        var versions = org.mockito.Mockito.mock(com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository.class);
+        resources = new LmsResourceQueryUseCase(fixture.quizzes, fixture.packages, fixture.policy, fixture.permissions, versions);
+        when(fixture.permissions.hasAny("lms.quiz.read", "*")).thenReturn(true);
+        when(fixture.packages.activePackage("erg", "quiz-1")).thenReturn(Optional.of(packageWithKey()));
+        when(versions.countTeacherQuizzesNotOwnedBy("erg", List.of("quiz-1"), "usr-1")).thenReturn(1L);
+
+        assertThatThrownBy(() -> resources.getQuizPackage("quiz-1", null, learner))
+                .isInstanceOf(com.erg.ergspringboot.exception.ResourceNotFoundException.class);
+
+        when(fixture.permissions.hasAny("lms.quiz.publish", "*")).thenReturn(true);
         assertThat(resources.getQuizPackage("quiz-1", null, learner).answerKey()).containsKey("q1");
     }
 

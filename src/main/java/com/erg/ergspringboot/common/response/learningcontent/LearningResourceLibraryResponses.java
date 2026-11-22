@@ -15,7 +15,8 @@ public final class LearningResourceLibraryResponses {
             List<LearningResourceTaxonomyNodeResponse> taxonomyTree,
             PageResponse<LearningResourceCardResponse> resources,
             List<LearningResourceProgressResponse> progress,
-            List<LearningRecentResourceResponse> recentOpened
+            List<LearningRecentResourceResponse> recentOpened,
+            boolean taxonomyTruncated
     ) {
     }
 

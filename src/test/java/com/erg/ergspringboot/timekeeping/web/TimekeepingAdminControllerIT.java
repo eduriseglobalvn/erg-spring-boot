@@ -112,8 +112,29 @@ class TimekeepingAdminControllerIT extends AdminITBase {
                 .content("{\"comment\":\" \"}"), f.lead(), "timekeeping.approve")).andExpect(status().isBadRequest());
     }
 
+    @Test
+    void aCallerScopedToAnotherSchoolIsRefusedThisSchoolAndSeesOnlyTheirOwnWhenNoneIsAsked() throws Exception {
+        mvc.perform(asScoped(get(ADMIN + "/timesheet").param("schoolId", f.school()).param("period", "2026-11"),
+                "timekeeping.read", "sch_somewhere_else")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errors").value("SCHOOL_SCOPE_FORBIDDEN"));
+        mvc.perform(asScoped(get(ADMIN + "/today").param("schoolId", f.school()), "timekeeping.read", "sch_somewhere_else"))
+                .andExpect(status().isForbidden());
+        mvc.perform(asScoped(get(ADMIN + "/today"), "timekeeping.read", "sch_somewhere_else"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.bySite").isEmpty());
+        mvc.perform(asScoped(get(ADMIN + "/today").param("schoolId", f.school()), "timekeeping.read", f.school()))
+                .andExpect(status().isOk());
+        mvc.perform(asScoped(get("/api/v1/timekeeping/admin/teaching/periods").param("schoolId", f.school()),
+                "timekeeping.approve", "sch_somewhere_else")).andExpect(status().isForbidden());
+    }
+
+    private static <B extends AbstractMockHttpServletRequestBuilder<B>> B asScoped(B request, String perms, String schools) {
+        return request.header("X-Tenant-ID", T).header("X-User-ID", "scoped-user").header("X-Roles", "lms.instructor")
+                .header("X-Permissions", perms).header("X-Managed-EducationUnit-IDs", schools);
+    }
+
+    /** A tenant-wide admin (managed education units "*"): what these tests always meant. */
     private static <B extends AbstractMockHttpServletRequestBuilder<B>> B as(B request, String user, String perms) {
-        return request.header("X-Tenant-ID", T).header("X-User-ID", user)
+        return request.header("X-Tenant-ID", T).header("X-User-ID", user).header("X-Managed-EducationUnit-IDs", "*")
                 .header("X-Roles", "lms.instructor").header("X-Permissions", perms);
     }
 }

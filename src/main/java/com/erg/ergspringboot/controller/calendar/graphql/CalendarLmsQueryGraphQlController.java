@@ -2,6 +2,7 @@ package com.erg.ergspringboot.controller.calendar.graphql;
 
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.MyCalendarRequest;
 import com.erg.ergspringboot.common.request.calendar.CalendarRequests.MyStudentCalendarInput;
+import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarCatalogResponse;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarWorkspaceResponse;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.graphql.GraphQlAccessSupport;
@@ -66,7 +67,7 @@ public class CalendarLmsQueryGraphQlController {
         String tenantId = accessSupport.verifiedTenantId(principal, input == null ? null : input.tenantId());
         String studentUserId = requirePrincipalUserId(principal);
 
-        return calendar.studentWorkspace(
+        CalendarWorkspaceResponse workspace = calendar.studentWorkspace(
                 tenantId, studentUserId,
                 input == null ? null : input.from(),
                 input == null ? null : input.to(),
@@ -75,6 +76,11 @@ public class CalendarLmsQueryGraphQlController {
                 input == null ? null : input.levelIds(),
                 input == null ? null : input.statuses(),
                 principal);
+        if (input == null || !Boolean.FALSE.equals(input.includeCatalog())) return workspace;
+        return new CalendarWorkspaceResponse(workspace.tenantId(), workspace.from(), workspace.to(), workspace.viewMode(),
+                workspace.events(), workspace.filterOptions(), workspace.laneSummaries(),
+                new CalendarCatalogResponse(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of()),
+                workspace.permissions(), workspace.generatedAt());
     }
 
     private String requirePrincipalUserId(ErgPrincipal principal) {

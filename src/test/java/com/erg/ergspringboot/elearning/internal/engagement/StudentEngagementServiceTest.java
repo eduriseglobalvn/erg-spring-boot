@@ -7,13 +7,13 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
-import com.erg.ergspringboot.lms.persistence.Student;
-import com.erg.ergspringboot.lms.persistence.StudentRepository;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup;
+import com.erg.ergspringboot.lms.LmsStudentIdentityLookup.StudentIdentity;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.CreateDiscussionCommand;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.MarkAnnouncementReadCommand;
 import com.erg.ergspringboot.elearning.internal.engagement.StudentEngagementService.SetReactionCommand;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class StudentEngagementServiceTest {
 
     @Mock
-    private StudentRepository students;
+    private LmsStudentIdentityLookup identities;
     @Mock
     private JdbcTemplate jdbc;
 
@@ -33,12 +33,13 @@ class StudentEngagementServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StudentEngagementService(students, jdbc);
+        service = new StudentEngagementService(identities, jdbc, event -> { },
+                new StudentDiscussionFeedCache(jdbc, org.mockito.Mockito.mock(LmsReadCacheInvalidator.class)));
     }
 
     @Test
     void createDiscussionRequiresIdempotencyKeyBeforeWriting() {
-        when(students.findFirstByTenantIdAndAuthUserId("tenant-a", "user-1")).thenReturn(Optional.of(student()));
+        when(identities.byAuthUser("tenant-a", "user-1")).thenReturn(student());
 
         assertThatThrownBy(() -> service.createDiscussion(new CreateDiscussionCommand(
                 "tenant-a", "user-1", "", "Title", "Content", null, List.of()
@@ -49,7 +50,7 @@ class StudentEngagementServiceTest {
 
     @Test
     void reactionCannotTargetAThreadOutsideAuthenticatedStudentClass() {
-        when(students.findFirstByTenantIdAndAuthUserId("tenant-a", "user-1")).thenReturn(Optional.of(student()));
+        when(identities.byAuthUser("tenant-a", "user-1")).thenReturn(student());
         when(jdbc.queryForObject(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.eq(Integer.class),
@@ -65,7 +66,7 @@ class StudentEngagementServiceTest {
 
     @Test
     void announcementReadCannotCreateReceiptForUntargetedAnnouncement() {
-        when(students.findFirstByTenantIdAndAuthUserId("tenant-a", "user-1")).thenReturn(Optional.of(student()));
+        when(identities.byAuthUser("tenant-a", "user-1")).thenReturn(student());
         when(jdbc.queryForObject(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.eq(Integer.class),
@@ -81,12 +82,7 @@ class StudentEngagementServiceTest {
         verify(jdbc, never()).update(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.<Object[]>any());
     }
 
-    private Student student() {
-        Student student = new Student();
-        student.setId("student-1");
-        student.setTenantId("tenant-a");
-        student.setAuthUserId("user-1");
-        student.setAcademicClassId("class-1");
-        return student;
+    private StudentIdentity student() {
+        return new StudentIdentity("student-1", "user-1", "class-1", "school-1", "Nguyen An", "ENROLLED");
     }
 }

@@ -26,6 +26,13 @@ class CalendarScheduleChangeConsumerTest {
     private final CalendarScheduleChangeConsumer consumer = new CalendarScheduleChangeConsumer(calendar, notifications);
     private final OffsetDateTime now = OffsetDateTime.parse("2026-11-10T08:00:00+07:00");
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<NotificationCommand> enqueued(int calls) {
+        ArgumentCaptor<List<NotificationCommand>> captor = ArgumentCaptor.forClass((Class) List.class);
+        verify(notifications, times(calls)).enqueueAll(captor.capture());
+        return captor.getAllValues().stream().flatMap(List::stream).toList();
+    }
+
     @Test
     void cancelledBatchNotifiesEveryoneAndARetryReusesTheSameKeys() {
         when(calendar.findCancelledBatch("tenant-1", "batch-1", now))
@@ -36,12 +43,11 @@ class CalendarScheduleChangeConsumerTest {
         consumer.on(event);
         consumer.on(event);
 
-        ArgumentCaptor<NotificationCommand> sent = ArgumentCaptor.forClass(NotificationCommand.class);
-        verify(notifications, times(4)).enqueue(sent.capture());
-        assertThat(sent.getAllValues()).extracting(NotificationCommand::idempotencyKey).containsExactlyInAnyOrder(
+        List<NotificationCommand> sent = enqueued(2);
+        assertThat(sent).extracting(NotificationCommand::idempotencyKey).containsExactlyInAnyOrder(
                 "schedule-cancelled:batch-1:t1:7", "schedule-cancelled:batch-1:t2:7",
                 "schedule-cancelled:batch-1:t1:7", "schedule-cancelled:batch-1:t2:7");
-        assertThat(sent.getAllValues()).extracting(NotificationCommand::eventType).containsOnly("SCHEDULE_CANCELLED");
+        assertThat(sent).extracting(NotificationCommand::eventType).containsOnly("SCHEDULE_CANCELLED");
     }
 
     @Test
@@ -66,13 +72,12 @@ class CalendarScheduleChangeConsumerTest {
         consumer.on(event);
         consumer.on(event);
 
-        ArgumentCaptor<NotificationCommand> sent = ArgumentCaptor.forClass(NotificationCommand.class);
-        verify(notifications, times(6)).enqueue(sent.capture());
-        assertThat(sent.getAllValues()).extracting(NotificationCommand::idempotencyKey).containsExactlyInAnyOrder(
+        List<NotificationCommand> sent = enqueued(4);
+        assertThat(sent).extracting(NotificationCommand::idempotencyKey).containsExactlyInAnyOrder(
                 "schedule-slots-changed:c1:t1:5", "schedule-slots-changed:c1:t2:5", "schedule-slots-changed:c1:removed:t9:5",
                 "schedule-slots-changed:c1:t1:5", "schedule-slots-changed:c1:t2:5", "schedule-slots-changed:c1:removed:t9:5");
-        assertThat(sent.getAllValues()).extracting(NotificationCommand::eventType).containsOnly("SCHEDULE_CHANGED");
-        NotificationCommand removed = sent.getAllValues().stream().filter(c -> c.idempotencyKey().contains("removed")).findFirst().orElseThrow();
+        assertThat(sent).extracting(NotificationCommand::eventType).containsOnly("SCHEDULE_CHANGED");
+        NotificationCommand removed = sent.stream().filter(c -> c.idempotencyKey().contains("removed")).findFirst().orElseThrow();
         assertThat(removed.title()).startsWith("Tiết dạy được chuyển đi");
     }
 
@@ -94,10 +99,9 @@ class CalendarScheduleChangeConsumerTest {
         consumer.on(new CalendarEventChanged(
                 "schedule-event-changed:e2:3", "tenant-1", "e2", "batch-1", "admin-1", now, 1, 3L));
 
-        ArgumentCaptor<NotificationCommand> sent = ArgumentCaptor.forClass(NotificationCommand.class);
-        verify(notifications, times(2)).enqueue(sent.capture());
-        assertThat(sent.getAllValues()).extracting(NotificationCommand::eventType).containsOnly("SCHEDULE_CHANGED");
-        assertThat(sent.getAllValues()).extracting(NotificationCommand::idempotencyKey)
+        List<NotificationCommand> sent = enqueued(1);
+        assertThat(sent).extracting(NotificationCommand::eventType).containsOnly("SCHEDULE_CHANGED");
+        assertThat(sent).extracting(NotificationCommand::idempotencyKey)
                 .containsExactlyInAnyOrder("schedule-event-changed:e2:t1:3", "schedule-event-changed:e2:t2:3");
     }
 }

@@ -91,8 +91,16 @@ public class TeachingScheduleDraftService {
         }
         PeriodTemplate template = templates.byId(tenantId, in.periodTemplateId());
 
+        String storedKey = in.batchId() == null ? storedKey(actorId, in.idempotencyKey()) : null;
+        if (storedKey != null) {
+            // same lock newBatch takes: two concurrent retries of one key cannot both miss the lookup
+            batches.advisoryXactLock("teaching-schedule-label:" + in.schoolId());
+            var replay = batches.findByTenantIdAndIdempotencyKey(tenantId, storedKey);
+            if (replay.isPresent()) return draft(tenantId, replay.get().getId());
+        }
         CalendarBatch batch = in.batchId() == null ? newBatch(tenantId, in.schoolId(), from, weeks, actorId)
                 : existingDraft(tenantId, in);
+        if (storedKey != null) batch.setIdempotencyKey(storedKey);
         requireOwnEventIds(tenantId, batch.getId(), in);
         batch.setApplyFrom(from);
         batch.setRepeatWeeks(weeks);
@@ -116,21 +124,29 @@ public class TeachingScheduleDraftService {
                 rowIdMap, conflicts, access.accessChanges(tenantId, batch.getSchoolId(), expansion.occurrences(), now));
     }
 
+    /** Shares the batch idempotency column with bulk create; the prefix and the actor keep the two key spaces apart. */
+    static String storedKey(String actorId, String clientKey) {
+        if (clientKey == null || clientKey.isBlank()) return null;
+        if (clientKey.length() > 100) {
+            throw TeachingScheduleException.badRequest("IDEMPOTENCY_KEY_TOO_LONG", "Khóa idempotency tối đa 100 ký tự.");
+        }
+        return "draft:" + actorId + ":" + clientKey.trim();
+    }
+
     /** Re-read of a stored draft. Rows are keyed by their first event id (clients have no clientRowId any more). */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public DraftResultResponse draft(String tenantId, String batchId) {
         CalendarBatch batch = batches.findByTenantIdAndId(tenantId, batchId)
                 .orElseThrow(() -> TeachingScheduleException.notFound("Batch not found: " + batchId));
         Map<String, String> firstEventOfRow = new LinkedHashMap<>();
-        loader.loadBatchCandidates(tenantId, batchId, "DRAFT").stream()
-                .sorted(java.util.Comparator.comparing(Occurrence::start))
+        List<Occurrence> drafted = loader.loadBatchCandidates(tenantId, batchId, "DRAFT");
+        drafted.stream().sorted(java.util.Comparator.comparing(Occurrence::start))
                 .forEach(o -> firstEventOfRow.putIfAbsent(o.rowKey(), o.eventId()));
         List<RowIdPairResponse> rowIdMap = firstEventOfRow.values().stream()
                 .map(id -> new RowIdPairResponse(id, id)).toList();
         OffsetDateTime now = now();
         return new DraftResultResponse(toResponse(batch, 0), batch.getRecordVersion().intValue(), now.toString(), rowIdMap,
-                conflictService.checkStoredDraft(tenantId, batchId), access.accessChanges(tenantId, batch.getSchoolId(),
-                loader.loadBatchCandidates(tenantId, batchId, "DRAFT"), now));
+                engine.detect(tenantId, drafted, Set.of(), true), access.accessChanges(tenantId, batch.getSchoolId(), drafted, now));
     }
 
     public static BatchResponse toResponse(CalendarBatch batch, int affected) {

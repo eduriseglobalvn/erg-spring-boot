@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.response.reporting.ReportJobResponses.Report
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 /** Public reporting facade. Web adapters do not authorize against JPA entities. */
@@ -45,7 +46,12 @@ public class ReportingOperations {
                 && !safe.filter().classId().equals(assignment.academicClassId())) {
             throw new ForbiddenException("report class filter is outside the assignment scope");
         }
-        return jobs.enqueueAssignmentProgress(access.tenantId(), access.userId(), assignmentId, idempotencyKey, safe);
+        try {
+            return jobs.enqueueAssignmentProgress(access.tenantId(), access.userId(), assignmentId, idempotencyKey, safe);
+        } catch (DataIntegrityViolationException race) {
+            // Lost the unique (tenant, idempotency key) race: that transaction is gone, so look the winner up afresh.
+            return jobs.enqueueAssignmentProgress(access.tenantId(), access.userId(), assignmentId, idempotencyKey, safe);
+        }
     }
 
     /**
@@ -53,7 +59,12 @@ public class ReportingOperations {
      * reported assignment; a job id alone (logs, shared URLs) is not a capability.
      */
     public ReportJobResponse status(UserAccessContext access, String jobId) {
-        ReportJobResponse job = jobs.get(access.tenantId(), jobId);
+        return status(access, jobId, true);
+    }
+
+    /** {@code includeResult} false skips loading the stored result rows (status polling). */
+    public ReportJobResponse status(UserAccessContext access, String jobId, boolean includeResult) {
+        ReportJobResponse job = includeResult ? jobs.get(access.tenantId(), jobId) : jobs.getStatus(access.tenantId(), jobId);
         boolean requester = access.userId() != null
                 && jobs.requestedBy(access.tenantId(), jobId).filter(access.userId()::equals).isPresent();
         if (requester) return job;

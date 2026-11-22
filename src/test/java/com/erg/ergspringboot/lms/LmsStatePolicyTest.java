@@ -66,6 +66,9 @@ class LmsStatePolicyTest {
         assertThat(LmsStatePolicy.assignmentIsPendingAction("active", "in_progress")).isTrue();
         assertThat(LmsStatePolicy.assignmentIsPendingAction("active", "Graded")).isFalse();
         assertThat(LmsStatePolicy.assignmentIsPendingAction("archived", null)).isFalse();
+        // a published or assigned assignment can be started, so it is also a pending action
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("published", null)).isTrue();
+        assertThat(LmsStatePolicy.assignmentIsPendingAction("assigned", "in_progress")).isTrue();
         assertThat(LmsStatePolicy.assignmentIsPendingAction(null, null)).isFalse();
         assertThat(LmsStatePolicy.learnerAssignmentStatus("active", " needs_review ")).isEqualTo("needs_review");
         assertThat(LmsStatePolicy.learnerAssignmentStatus(" active ", null)).isEqualTo("active");

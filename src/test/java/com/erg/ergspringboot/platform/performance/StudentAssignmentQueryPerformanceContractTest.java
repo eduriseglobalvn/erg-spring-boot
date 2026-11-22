@@ -11,10 +11,11 @@ class StudentAssignmentQueryPerformanceContractTest {
     @Test
     void explicitAndLegacyRecipientsUseIndependentIndexableBranches() throws Exception {
         String repository = Files.readString(Path.of(
-                "src/main/java/com/erg/ergspringboot/lms/persistence/AssignmentRepository.java"));
+                "src/main/java/com/erg/ergspringboot/lms/persistence/AssignmentRecipientScope.java"));
 
         assertThat(repository)
                 .contains("union all")
+                .contains("assignment.student_ids @>")
                 .contains("join assignment_recipients recipient")
                 .contains("not exists (")
                 .doesNotContain("left join assignment_recipients recipient");

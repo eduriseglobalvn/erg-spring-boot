@@ -27,10 +27,15 @@ final class AttemptCompletionEffects {
 
     void submitted(Attempt saved, Assignment assignment, String tenant, LmsAttemptUseCase.Score score,
             OffsetDateTime submitted, boolean late) {
+        submitted(saved, assignment, tenant, score, submitted, late, null);
+    }
+
+    void submitted(Attempt saved, Assignment assignment, String tenant, LmsAttemptUseCase.Score score,
+            OffsetDateTime submitted, boolean late, String callerUserId) {
         events.record(null, saved.getTenantId(), saved.getId(), saved.getQuizId(), saved.getPackageId(), "attempt_submitted",
                 null, null, Map.of("score", score.score(), "percent", score.percent(), "passed", score.passed(), "late", late),
                 submitted);
-        evictReads(tenant, saved, assignment, progress.projectAfterCommit(saved, assignment, tenant));
+        evictReads(tenant, saved, assignment, progress.project(saved, assignment, tenant, callerUserId));
         publisher.publishEvent(new LmsAttemptSubmitted("attempt-submitted:" + saved.getId(), tenant, saved.getId(),
                 saved.getAssignmentId(), saved.getStudentId(), saved.getStatus(), score.score(), score.max(), score.passed(),
                 submitted));

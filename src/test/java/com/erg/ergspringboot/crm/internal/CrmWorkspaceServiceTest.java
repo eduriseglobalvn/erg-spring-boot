@@ -69,10 +69,11 @@ class CrmWorkspaceServiceTest {
                 .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(allowed)));
         when(profileRepository.findByTenantIdAndSchoolIdIn("tenant-a", List.of("school-1")))
                 .thenReturn(List.of(profile("lead-1", "school-1")));
-        when(contactRepository.findByTenantIdAndSchoolIdInOrderByIsPrimaryDescCreatedAtAsc("tenant-a", List.of("school-1")))
+        when(contactRepository.findPrimaryContacts("tenant-a", List.of("school-1")))
                 .thenReturn(List.of());
         when(dealRepository.findByTenantIdAndSchoolIdInOrderByCreatedAtDesc("tenant-a", List.of("school-1"))).thenReturn(List.of());
-        when(activityRepository.findByTenantIdAndSchoolIdInOrderByDueAtAsc("tenant-a", List.of("school-1"))).thenReturn(List.of());
+        when(activityRepository.findFollowUpsWithRecentCompleted(eq("tenant-a"), eq(List.of("school-1")), any(java.time.LocalDate.class)))
+                .thenReturn(List.of());
         when(handoverRepository.findByTenantIdAndSchoolIdInOrderByCreatedAtDesc("tenant-a", List.of("school-1")))
                 .thenReturn(List.of());
 
@@ -82,6 +83,19 @@ class CrmWorkspaceServiceTest {
         assertThat(response.page().hasMore()).isFalse();
         assertThat(response.page().totalSchools()).isEqualTo(1);
         verify(profileRepository).findByTenantIdAndSchoolIdIn("tenant-a", List.of("school-1"));
+    }
+
+    @Test
+    void openFollowUpsOnlyReadsTheOpenQueryAndLeavesTheFullOneAlone() {
+        CrmWorkspaceService service = service();
+        when(unitRepository.findPageByTenantIdAndIdInOrderByNameAsc(eq("tenant-a"), eq(List.of("school-1")), any(Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(unit("school-1", "tenant-a"))));
+        when(activityRepository.findOpenFollowUps("tenant-a", List.of("school-1"))).thenReturn(List.of());
+
+        service.workspace(access("seo-1", "tenant-a", List.of("school-1")), 0, 50, true);
+
+        verify(activityRepository).findOpenFollowUps("tenant-a", List.of("school-1"));
+        verify(activityRepository, never()).findFollowUpsWithRecentCompleted(any(), any(), any());
     }
 
     @Test
@@ -213,6 +227,7 @@ class CrmWorkspaceServiceTest {
         CrmSchoolDeal deal = new CrmSchoolDeal();
         deal.setId("deal-1");
         deal.setSchoolId("school-1");
+        deal.setExpectedRevenue(new java.math.BigDecimal("120000000"));
         when(dealRepository.findByIdAndTenantId("deal-1", "tenant-a")).thenReturn(Optional.of(deal));
         when(handoverRepository.save(any(CrmHandover.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -221,6 +236,9 @@ class CrmWorkspaceServiceTest {
 
         assertThat(response.status()).isEqualTo("approved");
         assertThat(deal.getStage()).isEqualTo("active");
+        // approval is the signature: the SEO signed KPI counts signed_at and sums signedRevenue
+        assertThat(deal.getSignedAt()).isNotNull();
+        assertThat(deal.getSignedRevenue()).isEqualByComparingTo("120000000");
     }
 
     private void stubLeadAndDeal() {

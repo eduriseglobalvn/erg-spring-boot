@@ -3,6 +3,8 @@ package com.erg.ergspringboot.controller.sessions;
 import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionBootstrapResponse;
 import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionContextResponse;
+import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionIdentityResponse;
+import com.erg.ergspringboot.common.response.sessions.SessionResponses.SessionScopeResponse;
 import com.erg.ergspringboot.exception.UnauthorizedException;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
@@ -11,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,6 +36,36 @@ public class SessionController {
         );
     }
 
+    @GetMapping("/api/v1/sessions/me")
+    public ApiResponse<SessionIdentityResponse> currentIdentity(HttpServletRequest request) {
+        return ApiResponse.success(
+                200,
+                "Session identity loaded",
+                sessionService.currentIdentity(sessionId(request), tenantId(request), principal()),
+                request.getRequestURI(),
+                requestId(request)
+        );
+    }
+
+    @GetMapping("/api/v1/sessions/scope")
+    public ApiResponse<SessionScopeResponse> currentScope(
+            HttpServletRequest request,
+            @RequestParam(name = "unitQ", required = false) String unitQ,
+            @RequestParam(name = "unitPage", defaultValue = "0") int unitPage,
+            @RequestParam(name = "unitSize", defaultValue = "50") int unitSize,
+            @RequestParam(name = "unitId", required = false) String unitId,
+            @RequestParam(name = "classSize", defaultValue = "100") int classSize
+    ) {
+        return ApiResponse.success(
+                200,
+                "Session scope loaded",
+                sessionService.currentScope(sessionId(request), tenantId(request), UserAccessContext.from(request),
+                        new SessionService.ScopeRequest(unitQ, unitPage, unitSize, unitId, classSize)),
+                request.getRequestURI(),
+                requestId(request)
+        );
+    }
+
     @GetMapping("/api/v1/sessions/context")
     public ApiResponse<SessionContextResponse> currentSession(HttpServletRequest request) {
         return ApiResponse.success(
@@ -42,6 +75,11 @@ public class SessionController {
                 request.getRequestURI(),
                 requestId(request)
         );
+    }
+
+    private ErgPrincipal principal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getPrincipal() instanceof ErgPrincipal principal ? principal : null;
     }
 
     private String sessionId(HttpServletRequest request) {

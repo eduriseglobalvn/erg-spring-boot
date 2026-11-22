@@ -45,11 +45,11 @@ public final class LmsStatePolicy {
     }
 
     /**
-     * Learner "next action": an {@code active} assignment whose latest attempt is missing or not handed in yet.
+     * Learner "next action": an open ({@link #assignmentIsVisible}) assignment whose latest attempt is missing or not handed in yet.
      * {@code needs_review} counts as handed in, exactly like the attempt-limit rule.
      */
     public static boolean assignmentIsPendingAction(String assignmentStatus, String latestAttemptStatus) {
-        if (!"active".equalsIgnoreCase(blankToNull(assignmentStatus))) {
+        if (!assignmentIsVisible(assignmentStatus)) {
             return false;
         }
         String attemptStatus = blankToNull(latestAttemptStatus);

@@ -57,7 +57,9 @@ import com.erg.ergspringboot.curriculum.persistence.CurriculumLevelRepository;
 import com.erg.ergspringboot.curriculum.persistence.CurriculumSubjectRepository;
 import com.erg.ergspringboot.users.persistence.organization.EducationUnitRepository;
 import com.erg.ergspringboot.calendar.internal.batch.CalendarBatchLifecycleUseCase;
+import com.erg.ergspringboot.calendar.CalendarSlotsChanged;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleConflictService;
+import com.erg.ergspringboot.calendar.internal.schedule.ScheduleDataLoader;
 import java.time.Clock;
 import org.springframework.beans.factory.ObjectProvider;
 import com.erg.ergspringboot.calendar.internal.bulk.CalendarBulkCreateUseCase;
@@ -139,6 +141,8 @@ class CalendarCommandUseCaseTest {
     private ScheduleConflictService scheduleConflicts;
     @Mock
     private ObjectProvider<Clock> clockProvider;
+    @Mock
+    private ScheduleDataLoader scheduleLoader;
 
     private CalendarCommandUseCase service;
 
@@ -157,7 +161,7 @@ class CalendarCommandUseCaseTest {
                 new CalendarBulkPreviewUseCase(inputNormalizer, refs, validationService, expansionService, conflictService),
                 new CalendarBulkCreateUseCase(batchRepository, eventRepository, eventTeacherRepository,
                         expansionService, validationService, inputNormalizer, conflictService, accessSupport,
-                        refs, entityManager));
+                        refs, entityManager, scheduleLoader, eventPublisher));
     }
 
     // =========================================================================
@@ -412,6 +416,30 @@ class CalendarCommandUseCaseTest {
         }
 
         @Test
+        void lessonsOnASchoolHolidayAreNotCreated() {
+            CalendarBulkCreateRequest input = createBulkRequestNoIdempotency();
+            CalendarBulkRowRequest row = input.rows().get(0);
+            mockLockQuery(true);
+            mockReferenceData();
+            when(validationService.validateRows(eq(input), any()))
+                    .thenReturn(List.of(new RowValidationResult("row-1", true, List.of(), List.of())));
+            when(scheduleLoader.loadHolidays(eq(TENANT_ID), any(), any(), eq(List.of(SCHOOL_ID))))
+                    .thenReturn(Map.of(LocalDate.parse("2026-06-15"), new ScheduleDataLoader.Holiday("Nghỉ lễ", "STATE")));
+            when(expansionService.expand(eq(row), anyString(), eq(TENANT_ID), eq(SCHOOL_ID),
+                    eq(USER_ID), eq(LocalDate.parse(APPLY_FROM)), eq(1), any()))
+                    .thenReturn(new ExpansionResult(List.of(createEvent(EVENT_ID)),
+                            List.of(createTeacherAssignment(EVENT_ID, "teacher-1", "MAIN"))));
+            when(conflictService.detectConflicts(eq(TENANT_ID), anyList(), anyList(), anyMap())).thenReturn(List.of());
+            when(batchRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(eventRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+            CalendarBulkPayload payload = service.create(TENANT_ID, input, USER_ID);
+
+            assertEquals(0, payload.createdEventCount());
+            assertEquals(0, payload.teacherScheduleCount());
+        }
+
+        @Test
         void shouldThrowWhenLockNotAcquired() {
             CalendarBulkCreateRequest input = createBulkRequestNoIdempotency();
 
@@ -453,12 +481,10 @@ class CalendarCommandUseCaseTest {
             when(batchRepository.findByTenantIdAndIdempotencyKey(TENANT_ID, IDEMPOTENCY_KEY))
                     .thenReturn(Optional.of(batch));
 
-            // Mock findEventsByBatchId
-            when(eventRepository.findByTenantIdAndBatchId(TENANT_ID, BATCH_ID))
-                    .thenReturn(List.of(event));
-
-            when(eventTeacherRepository.findByTenantIdAndEventIdIn(TENANT_ID, List.of(EVENT_ID)))
-                    .thenReturn(List.of(createTeacherAssignment(EVENT_ID, "teacher-1", "MAIN")));
+            // a replay reports totals counted in SQL, without loading the batch
+            when(eventRepository.countByTenantIdAndBatchId(TENANT_ID, BATCH_ID)).thenReturn(1L);
+            when(eventRepository.sumPeriodCountByBatch(TENANT_ID, BATCH_ID)).thenReturn(3L);
+            when(eventTeacherRepository.countByBatch(TENANT_ID, BATCH_ID)).thenReturn(1L);
 
             CalendarBulkPayload payload = service.create(TENANT_ID, input, USER_ID);
 
@@ -466,6 +492,8 @@ class CalendarCommandUseCaseTest {
             assertEquals(BATCH_ID, payload.batchId());
             assertEquals(1, payload.createdEventCount());
             assertEquals(1, payload.teacherScheduleCount());
+            assertEquals(3, payload.totalPeriodCount());
+            verify(eventRepository, never()).findByTenantIdAndBatchId(any(), any());
 
             verify(batchRepository, never()).save(any());
             verify(eventRepository, never()).saveAll(any());
@@ -820,6 +848,19 @@ class CalendarCommandUseCaseTest {
 
             verify(eventRepository).cancelByIds(
                     eq(TENANT_ID), eq(List.of(EVENT_ID)), eq("ADMIN_CANCEL"), eq(USER_ID), any());
+            // timekeeping hears it, so a confirmed month total is re-checked
+            ArgumentCaptor<CalendarSlotsChanged> told = ArgumentCaptor.forClass(CalendarSlotsChanged.class);
+            verify(eventPublisher).publishEvent(told.capture());
+            assertEquals(List.of(EVENT_ID), told.getValue().calendarEventIds());
+        }
+
+        @Test
+        void deletingADraftEventTellsNobody() {
+            when(eventRepository.findById(EVENT_ID)).thenReturn(Optional.of(createEvent(EVENT_ID)));
+
+            service.deleteEvent(TENANT_ID, new CalendarEventDeleteRequest(TENANT_ID, EVENT_ID), USER_ID);
+
+            verify(eventPublisher, never()).publishEvent(any(CalendarSlotsChanged.class));
         }
 
         @Test

@@ -52,11 +52,12 @@ class K6ExamScenariosContractTest {
     void fixtureCanRunTheExamAndTeacherScenarios() throws Exception {
         String sql = Files.readString(Path.of("load/fixtures/seed-postgres-scale.sql")).toLowerCase();
 
-        // Without a published package, a gradable kind and a homeroom role, S3 cannot submit and S5 gets 403.
+        // Without a published package, a gradable kind and a class-scoped teacher role, S3 cannot submit and S5 gets 403.
+        // V160 merged the homeroom role into role_lms_teacher, so the class assignment carries that role.
         assertThat(sql)
                 .contains("insert into quiz_packages")
                 .contains("'single_choice', 'multiple_choice', 1, true, 'auto'")
-                .contains("'role_lms_homeroom_teacher'");
+                .contains("'role_lms_teacher', class.tenant_id, 'class'");
     }
 
     @Test

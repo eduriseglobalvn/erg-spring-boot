@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.calendar.internal.schedule;
 
+import com.erg.ergspringboot.calendar.CalendarCaches;
 import com.erg.ergspringboot.calendar.TeachingScheduleResponses.ConflictDetailResponse;
 import com.erg.ergspringboot.calendar.internal.schedule.ScheduleModel.Occurrence;
 import java.time.LocalDate;
@@ -9,7 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ScheduleWeekAnalyzer {
 
     /** {@code details} has every hit from both sides of a pair (cells need that); {@code pairs} counts a pair once. */
-    record Week(LocalDate monday, List<Occurrence> events, List<ConflictDetailResponse> details,
+    public record Week(LocalDate monday, List<Occurrence> events, List<ConflictDetailResponse> details,
             List<ConflictDetailResponse> pairs) {}
 
     private final ScheduleDataLoader loader;
@@ -33,13 +34,19 @@ public class ScheduleWeekAnalyzer {
         this.engine = engine;
     }
 
+    /**
+     * Cached 20 s per (tenant, ISO week, school scope; null = every school): an overview click re-reads the same week, and
+     * every calendar write evicts it through {@code @CalendarCacheEvict}. The key's week number is {@code (epochDay + 3) / 7},
+     * the same for Monday to Sunday.
+     */
+    @Cacheable(cacheNames = CalendarCaches.OVERVIEW_WEEK, key = "{#tenantId, (#anyDayOfWeek.toEpochDay() + 3) / 7, "
+            + "(#schoolIds == null ? '*' : new java.util.TreeSet(#schoolIds))}")
     @Transactional(value = "postgresTransactionManager", readOnly = true)
-    Week analyze(String tenantId, LocalDate anyDayOfWeek, Collection<String> schoolIds) {
+    public Week analyze(String tenantId, LocalDate anyDayOfWeek, Collection<String> schoolIds) {
         LocalDate monday = ScheduleConflictEngine.weekStart(anyDayOfWeek);
         OffsetDateTime from = monday.atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime();
         List<Occurrence> events = loader.loadWeek(tenantId, from, from.plusWeeks(1), schoolIds, true, null);
-        Set<String> ids = events.stream().map(Occurrence::eventId).collect(Collectors.toSet());
-        List<ConflictDetailResponse> details = engine.detect(tenantId, events, ids, false).stream()
+        List<ConflictDetailResponse> details = engine.detectCovering(tenantId, events, schoolIds).stream()
                 .filter(c -> !draftsOfDifferentBatches(c)).toList();
         Set<String> seen = new HashSet<>();
         List<ConflictDetailResponse> pairs = details.stream().filter(c -> seen.add(pairKey(c))).toList();

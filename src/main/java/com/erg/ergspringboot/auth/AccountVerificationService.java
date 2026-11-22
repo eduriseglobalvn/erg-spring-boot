@@ -102,14 +102,14 @@ public class AccountVerificationService {
                 challenge.getId(), maskEmail(email), challenge.getExpiresAt().toString(), COOLDOWN.toSeconds());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AccountLifecycleException.class) // a wrong code must still persist its attempt
     public RecoveryEmailVerificationResponse verifyRecoveryEmail(
             String userId, String tenantId, String challengeId, String otp
     ) {
         return verifyRecoveryEmail(userId, tenantId, challengeId, otp, null);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AccountLifecycleException.class) // a wrong code must still persist its attempt
     public RecoveryEmailVerificationResponse verifyRecoveryEmail(
             String userId, String tenantId, String challengeId, String otp, UserAuditContext auditContext
     ) {

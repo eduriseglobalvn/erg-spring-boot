@@ -5,6 +5,7 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -25,19 +26,24 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
 
     long countByTenantIdAndBatchId(String tenantId, String batchId);
 
+    @Query("SELECT COALESCE(SUM(e.periodCount), 0) FROM CalendarEvent e WHERE e.tenantId = :tenantId AND e.batchId = :batchId")
+    long sumPeriodCountByBatch(@Param("tenantId") String tenantId, @Param("batchId") String batchId);
+
     List<CalendarEvent> findByTenantIdAndSchoolIdInAndStartAtLessThanAndEndAtGreaterThanAndStatusIn(
             String tenantId, List<String> schoolIds, OffsetDateTime to, OffsetDateTime from, List<String> statuses, Sort sort);
 
-    @Query("SELECT DISTINCT e FROM CalendarEvent e LEFT JOIN CalendarEventTeacher et ON e.id = et.eventId " +
+    /** EXISTS, not a join, so an event with several matching teachers is one row; callers cap the read with {@code limit}. */
+    @Query("SELECT e FROM CalendarEvent e " +
            "WHERE e.tenantId = :tenantId " +
            "AND (:schoolFiltered = false OR e.schoolId IN :schoolIds) " +
            "AND e.startAt < :to AND e.endAt > :from " +
            "AND e.status IN :statuses " +
-           "AND (:teacherFiltered = false OR et.teacherUserId IN :teacherIds) " +
+           "AND (:teacherFiltered = false OR EXISTS (SELECT 1 FROM CalendarEventTeacher et " +
+           "WHERE et.eventId = e.id AND et.teacherUserId IN :teacherIds)) " +
            "AND (:classFiltered = false OR e.academicClassId IN :classIds) " +
            "AND (:subjectFiltered = false OR e.subjectId IN :subjectIds) " +
            "AND (:levelFiltered = false OR e.levelId IN :levelIds) " +
-           "ORDER BY e.startAt")
+           "ORDER BY e.startAt, e.id")
     List<CalendarEvent> findLcmsWorkspaceEvents(
             @Param("tenantId") String tenantId,
             @Param("schoolFiltered") boolean schoolFiltered,
@@ -52,7 +58,8 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, St
             @Param("subjectFiltered") boolean subjectFiltered,
             @Param("subjectIds") Collection<String> subjectIds,
             @Param("levelFiltered") boolean levelFiltered,
-            @Param("levelIds") Collection<String> levelIds);
+            @Param("levelIds") Collection<String> levelIds,
+            Pageable limit);
 
     @Query("SELECT DISTINCT et.teacherUserId FROM CalendarEvent e JOIN CalendarEventTeacher et ON e.id = et.eventId " +
            "WHERE e.tenantId = :tenantId AND et.teacherUserId IN :teacherUserIds " +

@@ -55,6 +55,19 @@ public interface UserRoleAssignmentRepository extends JpaRepository<UserRoleAssi
             @Param("now") OffsetDateTime now
     );
 
+    /** Distinct [roleId, scopeType] of the active assignments: a role listing needs the types, never the rows. */
+    @Query("""
+            select assignment.roleId, assignment.scopeType from UserRoleAssignment assignment
+            where assignment.roleId in :roleIds and assignment.scopeType is not null
+              and assignment.revokedAt is null
+              and (assignment.expiresAt is null or assignment.expiresAt > :now)
+            group by assignment.roleId, assignment.scopeType
+            """)
+    List<Object[]> findActiveScopeTypes(
+            @Param("roleIds") Collection<String> roleIds,
+            @Param("now") OffsetDateTime now
+    );
+
     List<UserRoleAssignment> findByUserIdAndTenantIdAndRevokedAtIsNull(String userId, String tenantId);
 
     @EntityGraph(attributePaths = {"role"})

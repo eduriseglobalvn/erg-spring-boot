@@ -64,7 +64,7 @@ class PortableResultImportTest {
         when(fixture.students.findByTenantIdAndStudentCode("erg", "HS001")).thenReturn(java.util.List.of(student));
         when(fixture.classrooms.findByTenantIdAndId("erg", "class-1")).thenReturn(Optional.of(classroom));
         when(fixture.packages.packageEntityById("erg", "pkg-1")).thenReturn(Optional.of(pkg));
-        when(fixture.assignments.findByTenantIdAndQuizId("erg", "quiz-1")).thenReturn(List.of(assignment));
+        when(fixture.resources.findVisibleAssignmentIdsForLearner(any(), any(), any(), any(), any(), any())).thenReturn(List.of("assignment-1"));
         when(fixture.assignments.findByTenantIdAndIdIn(any(), any())).thenReturn(List.of(assignment));
         when(fixture.assignments.findByTenantIdAndId("erg", "assignment-1")).thenReturn(Optional.of(assignment));
     }

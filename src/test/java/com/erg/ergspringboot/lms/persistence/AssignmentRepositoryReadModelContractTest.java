@@ -109,9 +109,9 @@ class AssignmentRepositoryReadModelContractTest {
                 .contains("TeacherHomeworkSummaryProjection")
                 .contains("assignment.tenantId = :tenantId")
                 .contains("assignment.assignedBy = :assignedBy")
-                .contains("count(distinct case when lower(assignment.status) = 'active'")
-                .contains("count(distinct case when lower(assignment.status) = 'active'")
-                .contains("count(distinct case when lower(attempt.status) = 'submitted'")
+                .contains("count(distinct case when lower(assignment.status) in ('assigned', 'active', 'published')")
+                .contains("count(distinct case when lower(assignment.status) in ('assigned', 'active', 'published')")
+                .contains("lower(attempt.status) = 'submitted'")
                 .doesNotContain("sum(case when lower(assignment.status) = 'active'")
                 .doesNotContain("select assignment")
                 .doesNotContain("join fetch");

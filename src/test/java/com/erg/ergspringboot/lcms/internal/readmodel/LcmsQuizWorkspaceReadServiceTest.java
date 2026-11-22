@@ -33,12 +33,10 @@ class LcmsQuizWorkspaceReadServiceTest {
 
     @Test
     void rejectsUnboundedQuizVersionHistory() {
-        List<QuizVersion> versions = IntStream.range(0, 101).mapToObj(index -> {
-            QuizVersion version = new QuizVersion();
-            version.setId("version-" + index);
-            return version;
-        }).toList();
-        when(quizVersionRepository.findByQuizIdAndTenantIdOrderByVersionNumberDesc(
+        List<QuizVersionRepository.Summary> versions = IntStream.range(0, 101)
+                .mapToObj(index -> (QuizVersionRepository.Summary) org.mockito.Mockito.mock(QuizVersionRepository.Summary.class))
+                .toList();
+        when(quizVersionRepository.findSummariesByQuizIdAndTenantIdOrderByVersionNumberDesc(
                 eq("quiz-1"), eq("tenant-a"), any(Pageable.class)))
                 .thenReturn(versions);
         LcmsQuizWorkspaceReadService service = new LcmsQuizWorkspaceReadService(

@@ -118,6 +118,47 @@ class ErgTieredCacheTest {
         assertThat(fixture.cache.get(assignmentA, String.class)).isNull();
     }
 
+    @Test
+    void valueLoadedAcrossAnInvalidationIsNotStoredInL1() throws Exception {
+        Fixture fixture = new Fixture();
+
+        String loaded = fixture.cache.get("student-1", () -> {
+            fixture.generations.increment("tenant-a", "studentDashboard");
+            return "stale-by-the-time-it-returns";
+        });
+
+        assertThat(loaded).isEqualTo("stale-by-the-time-it-returns");
+        assertThat(((com.github.benmanes.caffeine.cache.Cache<?, ?>) fixture.cache.getNativeCache()).asMap()).isEmpty();
+    }
+
+    @Test
+    void clearBumpsTheGenerationBeforeDroppingL1() {
+        Fixture fixture = new Fixture();
+        ErgTieredCache[] holder = new ErgTieredCache[1];
+        List<Integer> l1SizeAtBump = new java.util.ArrayList<>();
+        CacheGenerationService spy = new CacheGenerationService() {
+            @Override
+            public long current(String tenantId, String cacheName) {
+                return fixture.generations.current(tenantId, cacheName);
+            }
+
+            @Override
+            public long increment(String tenantId, String cacheName) {
+                l1SizeAtBump.add(((com.github.benmanes.caffeine.cache.Cache<?, ?>) holder[0].getNativeCache()).asMap().size());
+                return fixture.generations.increment(tenantId, cacheName);
+            }
+        };
+        holder[0] = new ErgTieredCache(fixture.descriptor, new CacheKeyFactory(fixture.mapper),
+                new JacksonCacheValueCodec(fixture.mapper), fixture.store, () -> "tenant-a", spy,
+                new CacheFailurePolicy(2, Duration.ofSeconds(1)), new CacheLoadCoordinator());
+        holder[0].put("student-1", "v");
+
+        holder[0].clear();
+
+        assertThat(l1SizeAtBump).containsExactly(1);
+        assertThat(((com.github.benmanes.caffeine.cache.Cache<?, ?>) holder[0].getNativeCache()).asMap()).isEmpty();
+    }
+
     private static final class Fixture {
         private final JsonMapper mapper = JsonMapper.builder().build();
         private final CacheDescriptor<String> descriptor;

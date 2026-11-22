@@ -53,6 +53,10 @@ public class CalendarOperations {
     public CalendarBatchDetailResponse batch(String tenantId, String batchId) {
         return reads.teachingScheduleBatch(tenantId, batchId);
     }
+    public CalendarCatalogSearchResponse catalogSearch(String tenantId, String kind, List<String> schools, String q,
+            Integer page, Integer size) {
+        return reads.catalogSearch(tenantId, kind, schools, q, page, size);
+    }
     public List<CalendarRoomOptionResponse> rooms(String tenantId, String schoolId) { return reads.activeRooms(tenantId, schoolId); }
     public CalendarPreviewPayload preview(String tenantId, CalendarBulkCreateRequest request, String actor) {
         return commands.preview(tenantId, request, actor);

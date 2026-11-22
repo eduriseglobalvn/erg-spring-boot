@@ -49,14 +49,15 @@ public class LearningContentService {
             ContentItemAssetRepository contentItemAssetRepository,
             TopicContentItemRepository topicContentItemRepository,
             CurriculumTopicLookupRepository curriculumTopicLookupRepository,
-            ObjectProvider<LmsSyncOperationService> sync
+            ObjectProvider<LmsSyncOperationService> sync,
+            ContentOwnership ownership
     ) {
         LearningContentSupport.SyncReceipts receipts =
                 new LearningContentSupport.SyncReceipts(sync == null ? null : sync.getIfAvailable());
         this.contentItems = new ContentItemCommands(contentItemRepository, contentAssetRepository,
-                contentItemAssetRepository, topicContentItemRepository, receipts);
+                contentItemAssetRepository, topicContentItemRepository, receipts, ownership);
         this.contentAssets = new ContentAssetCommands(contentItemRepository, contentAssetRepository,
-                contentItemAssetRepository, receipts);
+                contentItemAssetRepository, receipts, ownership);
         this.topicPlacements = new TopicPlacementService(contentItemRepository, topicContentItemRepository,
                 curriculumTopicLookupRepository);
         this.googleSlidesLectures = new GoogleSlidesLectureFactory(contentItems, contentAssets, topicPlacements);

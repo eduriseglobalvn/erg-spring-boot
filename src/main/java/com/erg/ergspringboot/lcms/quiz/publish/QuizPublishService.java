@@ -123,10 +123,8 @@ public class QuizPublishService {
                 .orElseThrow(() -> new ResourceNotFoundException("quiz not found"));
 
         // Idempotent replay: a version already stamped with this publish key returns unchanged.
-        QuizVersion existing = quizVersionRepository
-                .findByQuizIdAndTenantIdOrderByVersionNumberDesc(quizId, tenantId).stream()
-                .filter(version -> key.equals(version.getIdempotencyKey()))
-                .findFirst()
+        QuizVersionRepository.Summary existing = quizVersionRepository
+                .findSummaryByQuizIdAndTenantIdAndIdempotencyKey(quizId, tenantId, key)
                 .orElse(null);
         if (existing != null) {
             QuizPackage pkg = packageRepository.findByQuizVersionIdAndTenantId(existing.getId(), tenantId).orElse(null);
@@ -233,7 +231,7 @@ public class QuizPublishService {
             quiz.setLatestDraftId(savedDraft.getId());
             quizRepository.save(quiz);
         });
-        cacheEvictor.evictQuizCachesAfterCommit(tenantId, quizId);
+        cacheEvictor.evictAuthoringCachesAfterCommit(); // a fork only adds a draft: nothing a student reads changed
         return new ForkResponse(savedDraft.getId(), 0L, version.getVersionLabel());
     }
 
@@ -241,10 +239,9 @@ public class QuizPublishService {
     private Map<String, String> previousBankLinks(String tenantId, String previousVersionId) {
         Map<String, String> links = new LinkedHashMap<>();
         if (previousVersionId == null) return links;
-        for (QuizVersionQuestion previous : versionQuestionRepository.findByQuizVersionIdOrderByOrderIndexAsc(previousVersionId)) {
-            if (previous.getSourceSlideId() != null && previous.getBankQuestionId() != null && !previous.getBankQuestionId().isBlank()) {
-                links.put(previous.getSourceSlideId(), previous.getBankQuestionId());
-            }
+        // Two columns only: the full rows carry the body and answer-key jsonb.
+        for (Object[] previous : versionQuestionRepository.findBankLinks(previousVersionId)) {
+            links.put((String) previous[0], (String) previous[1]);
         }
         return links;
     }
@@ -261,6 +258,8 @@ public class QuizPublishService {
             sectionIdMap.put(section.sectionId(), saved.getId());
         }
         java.util.Set<String> keptBankIds = new java.util.HashSet<>();
+        List<QuizVersionQuestion> rows = new java.util.ArrayList<>();
+        boolean mirrored = false;
         for (CompiledQuestion question : compiled.questions()) {
             QuizVersionQuestion entity = new QuizVersionQuestion();
             entity.setQuizVersionId(versionId);
@@ -271,6 +270,7 @@ public class QuizPublishService {
             String bankQuestionId = question.bankQuestionId();
             if (bankQuestionId == null || bankQuestionId.isBlank()) {
                 bankQuestionId = authoredBankSync.upsert(tenantId, userId, quiz, question, previousBankLinks.get(question.sourceSlideId()));
+                mirrored = mirrored || bankQuestionId != null;
             }
             entity.setBankQuestionId(bankQuestionId);
             if (bankQuestionId != null) keptBankIds.add(bankQuestionId);
@@ -282,8 +282,10 @@ public class QuizPublishService {
             entity.setOrderIndex(question.orderIndex());
             entity.setBody(question.body());
             entity.setAnswerKey(question.answerKey().isEmpty() ? null : question.answerKey());
-            versionQuestionRepository.save(entity);
+            rows.add(entity);
         }
+        if (mirrored) authoredBankSync.flush(); // bank rows first: the version rows reference them by FK
+        versionQuestionRepository.saveAll(rows);
         authoredBankSync.retireUnused(tenantId, previousBankLinks.values(), keptBankIds);
     }
 

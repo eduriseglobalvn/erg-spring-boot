@@ -22,6 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class ApiAccessLogFilter extends OncePerRequestFilter {
 
+    private static final long SLOW_MS = 500;
     private static final Logger log = LoggerFactory.getLogger(ApiAccessLogFilter.class);
     private static final String MASKED_VALUE = "***";
     private static final Pattern UUID_PATTERN =
@@ -44,28 +45,31 @@ public class ApiAccessLogFilter extends OncePerRequestFilter {
         try {
             filterChain.doFilter(request, response);
         } finally {
-            long durationMs = System.currentTimeMillis() - startedAt;
-            String queryString = request.getQueryString();
-            String maskedPath = maskUriPath(request.getRequestURI());
-            String path = queryString == null || queryString.isBlank()
-                    ? maskedPath
-                    : maskedPath + "?" + maskQueryString(queryString);
-            String requestId = toText(request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE));
-            String tenantId = firstPresent(principalTenantId(), request.getHeader("X-Tenant-ID"), "erg");
-            String userId = firstPresent(principalUserId(), request.getHeader("X-User-ID"), "anonymous");
-            String clientIp = resolveClientIp(request);
+            logAccess(request, response, System.currentTimeMillis() - startedAt);
+        }
+    }
 
-            log.info(
-                    "api {} {} -> {} ({} ms) [requestId={}, tenantId={}, userId={}, ip={}]",
-                    request.getMethod(),
-                    path,
-                    response.getStatus(),
-                    durationMs,
-                    requestId,
-                    tenantId,
-                    userId,
-                    clientIp
-            );
+    /** INFO only for errors and slow calls; nginx already logs every request, so the rest is DEBUG. */
+    private void logAccess(HttpServletRequest request, HttpServletResponse response, long durationMs) {
+        String method = request.getMethod();
+        boolean notable = response.getStatus() >= 400 || durationMs >= SLOW_MS;
+        if (notable ? !log.isInfoEnabled() : !log.isDebugEnabled()) {
+            return;
+        }
+        String queryString = request.getQueryString();
+        String maskedPath = maskUriPath(request.getRequestURI());
+        String path = queryString == null || queryString.isBlank()
+                ? maskedPath
+                : maskedPath + "?" + maskQueryString(queryString);
+        String requestId = toText(request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE));
+        String tenantId = firstPresent(principalTenantId(), request.getHeader("X-Tenant-ID"), "erg");
+        String userId = firstPresent(principalUserId(), request.getHeader("X-User-ID"), "anonymous");
+        String format = "api {} {} -> {} ({} ms) [requestId={}, tenantId={}, userId={}, ip={}]";
+        Object[] args = {method, path, response.getStatus(), durationMs, requestId, tenantId, userId, resolveClientIp(request)};
+        if (notable) {
+            log.info(format, args);
+        } else {
+            log.debug(format, args);
         }
     }
 

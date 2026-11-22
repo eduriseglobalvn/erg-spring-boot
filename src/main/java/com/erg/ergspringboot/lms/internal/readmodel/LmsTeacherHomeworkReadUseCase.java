@@ -18,9 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Teacher homework dashboard projection; all JDBC reads stay on the transaction-bound thread. */
 @Service
+@Transactional(value = "postgresTransactionManager", readOnly = true)
 public class LmsTeacherHomeworkReadUseCase {
     private final LmsAssignmentQueryPort assignments; private final AssignmentResourceRepository resources;
     private final ClassroomRepository classrooms; private final LmsAttemptQueryPort attempts; private final StudentRepository students;

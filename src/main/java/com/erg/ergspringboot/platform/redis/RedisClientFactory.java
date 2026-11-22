@@ -38,6 +38,9 @@ final class RedisClientFactory {
                         .poolConfig(pool)
                         .commandTimeout(properties.getCommandTimeout())
                         .clientOptions(io.lettuce.core.ClientOptions.builder()
+                                .autoReconnect(true)
+                                // fail fast during a Redis outage instead of queueing commands
+                                .disconnectedBehavior(io.lettuce.core.ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
                                 .socketOptions(SocketOptions.builder()
                                         .connectTimeout(properties.getConnectTimeout())
                                         .build())
@@ -48,7 +51,6 @@ final class RedisClientFactory {
         }
 
         LettuceConnectionFactory factory = new LettuceConnectionFactory(server, builder.build());
-        factory.setValidateConnection(true);
         factory.setShareNativeConnection(true);
         return factory;
     }

@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -123,6 +124,9 @@ class CalendarReadUseCaseTest {
                 eventTeacherRepository, classroomRepository, subjectRepository, levelRepository,
                 educationUnitRepository, roomRepository, userDirectory);
         // Existing fixtures stub the pre-bounded methods; bridge them to the new DB-limited overloads.
+        lenient().when(educationUnitRepository.findByTenantIdAndIdInOrderByNameAsc(
+                anyString(), anyCollection(), any(Pageable.class)))
+                .thenAnswer(invocation -> educationUnitRepository.findByIdInOrderByNameAsc(invocation.getArgument(1)));
         lenient().when(classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
                 anyString(), anyList(), any(Pageable.class)))
                 .thenAnswer(invocation -> classroomRepository.findByTenantIdAndSchoolIdInOrderByNameAsc(
@@ -202,7 +206,7 @@ class CalendarReadUseCaseTest {
                 any(OffsetDateTime.class), any(OffsetDateTime.class),
                 eq(List.of("DRAFT", "PUBLISHED")),
                 anyBoolean(), any(), anyBoolean(), any(),
-                anyBoolean(), any(), anyBoolean(), any()))
+                anyBoolean(), any(), anyBoolean(), any(), any(Pageable.class)))
                 .thenReturn(events);
     }
 
@@ -1023,20 +1027,6 @@ class CalendarReadUseCaseTest {
 
             assertSame(requestThread, repositoryThread.get(),
                     "JPA/JDBC reads must retain the request transaction and transaction-local tenant GUCs");
-        }
-
-        @Test
-        void shouldRejectCatalogAboveFiveHundredOptions() {
-            List<CurriculumSubject> subjects = IntStream.range(0, 501)
-                    .mapToObj(index -> createSubject("subject-" + index, "Subject " + index))
-                    .toList();
-            when(subjectRepository.findByTenantIdAndStatusIgnoreCaseOrderBySortOrderAscNameAsc(TENANT_ID, "ACTIVE"))
-                    .thenReturn(subjects);
-
-            BadRequestException failure = assertThrows(BadRequestException.class,
-                    () -> fullCatalog.catalog(TENANT_ID, List.of(), BASE_TIME, BASE_TIME.plusDays(7)));
-            assertTrue(failure.getMessage().contains("500"));
-            assertTrue(failure.getMessage().contains("subjects"));
         }
 
         @Test

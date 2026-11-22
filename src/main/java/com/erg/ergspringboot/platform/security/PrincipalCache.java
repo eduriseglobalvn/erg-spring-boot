@@ -5,9 +5,13 @@ import com.erg.ergspringboot.platform.cache.CacheInvalidationService;
 import com.erg.ergspringboot.platform.cache.ErgTieredCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -21,22 +25,56 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class PrincipalCache {
 
     static final String CACHE_NAME = "ergPrincipal";
-    static final Duration TTL = Duration.ofSeconds(30);
+    // Revocations reach other instances through the generation counters, so a long TTL only bounds inputs they do not cover.
+    static final Duration TTL = Duration.ofSeconds(120);
+    // While the generation store (Redis) is unreachable a cached principal is trusted only this long.
+    static final Duration OUTAGE_TTL = Duration.ofSeconds(30);
     // User ids are global primary keys, so per-user generations share one namespace instead of a tenant.
     private static final String GENERATION_NAMESPACE = "principal";
+    private static final String ALL_SCOPE = "*all*";
 
+    // Monotonic sequence of local invalidations; a load snapshots it (epoch()) and put refuses if its user was evicted since.
+    private final AtomicLong epoch = new AtomicLong();
+    // Highest sequence at which every load in flight must be refused: evictAll, or a per-user marker dropped by size pressure.
+    private final AtomicLong floor = new AtomicLong();
+    private final Cache<String, Long> userEvictions = Caffeine.newBuilder()
+            .maximumSize(100_000)
+            .expireAfterWrite(Duration.ofMinutes(10))
+            .executor(Runnable::run)
+            .removalListener((String user, Long seq, RemovalCause cause) -> {
+                if (cause == RemovalCause.SIZE && seq != null) {
+                    floor.accumulateAndGet(seq, Math::max);
+                }
+            })
+            .build();
+    // userId -> token hashes; entries may go stale (the removal listener cleans them), so eviction re-checks via invalidate.
+    private final ConcurrentHashMap<String, Set<String>> tokensByUser = new ConcurrentHashMap<>();
     private final Cache<String, Entry> entries = Caffeine.newBuilder()
             .expireAfterWrite(TTL)
-            .maximumSize(10_000)
+            .maximumSize(25_000)
+            .executor(Runnable::run)
+            .removalListener((String tokenHash, Entry entry, RemovalCause cause) -> {
+                if (entry != null && cause != RemovalCause.REPLACED) {
+                    tokensByUser.computeIfPresent(entry.principal().userId(), (user, tokens) -> {
+                        tokens.remove(tokenHash);
+                        return tokens.isEmpty() ? null : tokens;
+                    });
+                }
+            })
             .build();
-    // Bumped by every local invalidation; a load that overlapped one is not stored (see put).
-    private final AtomicLong epoch = new AtomicLong();
     private final CacheGenerationService generations;
     private final CacheInvalidationService invalidations;
+    private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public PrincipalCache(CacheGenerationService generations, CacheInvalidationService invalidations) {
+        this(generations, invalidations, Clock.systemUTC());
+    }
+
+    PrincipalCache(CacheGenerationService generations, CacheInvalidationService invalidations, Clock clock) {
         this.generations = generations;
         this.invalidations = invalidations;
+        this.clock = clock;
     }
 
     Optional<ErgPrincipal> get(String tokenHash) {
@@ -44,7 +82,13 @@ public class PrincipalCache {
         if (entry == null) {
             return Optional.empty();
         }
-        if (!Instant.now().isBefore(entry.validUntil()) || entry.generation() != generation(entry.principal().userId())) {
+        // A negative generation means the generation store (Redis) is unreachable: serve the entry only for OUTAGE_TTL.
+        long current = generation(entry.principal().userId());
+        long all = allGeneration();
+        Instant now = clock.instant();
+        boolean stale = (current >= 0 && entry.generation() != current) || (all >= 0 && entry.allGeneration() != all)
+                || ((current < 0 || all < 0) && now.isAfter(entry.createdAt().plus(OUTAGE_TTL)));
+        if (!now.isBefore(entry.validUntil()) || stale) {
             entries.invalidate(tokenHash);
             return Optional.empty();
         }
@@ -55,18 +99,30 @@ public class PrincipalCache {
         return epoch.get();
     }
 
-    /** Stores a successfully loaded principal unless an invalidation committed since {@code epochBeforeLoad}. */
+    /** Stores a successfully loaded principal unless this user (or everyone) was invalidated since {@code epochBeforeLoad}. */
     void put(String tokenHash, ErgPrincipal principal, Instant validUntil, long epochBeforeLoad) {
-        long generation = generation(principal.userId());
-        if (generation < 0 || epoch.get() != epochBeforeLoad) {
+        String userId = principal.userId();
+        long generation = generation(userId);
+        long all = allGeneration();
+        if (generation < 0 || all < 0 || overlapped(userId, epochBeforeLoad)) {
             return;
         }
-        entries.put(tokenHash, new Entry(principal, validUntil, generation));
-        // An invalidation may have bumped the epoch between the check and the put; it then also clears,
-        // but only if its clear ran after this put, so drop the entry here too.
-        if (epoch.get() != epochBeforeLoad) {
+        entries.put(tokenHash, new Entry(principal, validUntil, generation, all, clock.instant()));
+        tokensByUser.compute(userId, (user, tokens) -> {
+            Set<String> updated = tokens == null ? ConcurrentHashMap.newKeySet() : tokens;
+            updated.add(tokenHash);
+            return updated;
+        });
+        // An eviction may have marked the user between the check and the put and removed the index before it held this
+        // token, so drop the entry here too.
+        if (overlapped(userId, epochBeforeLoad)) {
             entries.invalidate(tokenHash);
         }
+    }
+
+    private boolean overlapped(String userId, long epochBeforeLoad) {
+        Long evictedAt = userEvictions.getIfPresent(userId);
+        return epochBeforeLoad < floor.get() || (evictedAt != null && epochBeforeLoad < evictedAt);
     }
 
     /** Drops every cached principal of this user after the current transaction commits, on all instances. */
@@ -75,22 +131,30 @@ public class PrincipalCache {
             return;
         }
         afterCommit(() -> {
-            epoch.incrementAndGet();
-            entries.asMap().values().removeIf(entry -> userId.equals(entry.principal().userId()));
+            userEvictions.put(userId, epoch.incrementAndGet());
+            Set<String> tokens = tokensByUser.get(userId);
+            if (tokens != null) {
+                tokens.forEach(entries::invalidate);
+            }
         });
         invalidations.clearTenantCacheScope(GENERATION_NAMESPACE, CACHE_NAME, userId);
     }
 
-    /** Role/permission definition changed: drop this instance's cache; other instances expire within the TTL. */
+    /** Role/permission definition changed: drop every cached principal here and, through one shared generation, on other instances. */
     public void evictAll() {
         afterCommit(() -> {
-            epoch.incrementAndGet();
+            floor.accumulateAndGet(epoch.incrementAndGet(), Math::max);
             entries.invalidateAll();
         });
+        invalidations.clearTenantCacheScope(GENERATION_NAMESPACE, CACHE_NAME, ALL_SCOPE);
     }
 
     private long generation(String userId) {
         return generations.current(GENERATION_NAMESPACE, ErgTieredCache.scopeGenerationName(CACHE_NAME, userId));
+    }
+
+    private long allGeneration() {
+        return generation(ALL_SCOPE);
     }
 
     private static void afterCommit(Runnable action) {
@@ -106,6 +170,6 @@ public class PrincipalCache {
         });
     }
 
-    private record Entry(ErgPrincipal principal, Instant validUntil, long generation) {
+    private record Entry(ErgPrincipal principal, Instant validUntil, long generation, long allGeneration, Instant createdAt) {
     }
 }

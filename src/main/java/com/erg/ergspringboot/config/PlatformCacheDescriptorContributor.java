@@ -2,6 +2,7 @@ package com.erg.ergspringboot.config;
 
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarWorkspaceResponse;
 import com.erg.ergspringboot.common.response.learningcontent.LearningResourceLibraryResponses.LearningResourceLibraryResponse;
+import com.erg.ergspringboot.common.response.notifications.NotificationResponses.UnreadCountResponse;
 import com.erg.ergspringboot.common.response.organization.EducationUnitResponses.EducationUnitListResponse;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolDirectoryWorkspace;
 import com.erg.ergspringboot.common.response.school.SchoolOperationsResponses.SchoolOperationsWorkspace;
@@ -22,10 +23,9 @@ public class PlatformCacheDescriptorContributor implements CacheDescriptorContri
     public List<CacheDescriptor<?>> descriptors(ObjectMapper mapper) {
         JavaType untyped = mapper.constructType(Object.class);
         return List.of(
-                descriptor("contentLibraryBootstrap", untyped, Duration.ofSeconds(60), 32),
-                descriptor("contentStudioBootstrap", untyped, Duration.ofSeconds(60), 16),
-                descriptor("contentResources", untyped, Duration.ofSeconds(60), 32),
-                descriptor("contentResourceDetail", untyped, Duration.ofSeconds(60), 32),
+                // Key {tenantId, userId, portal}: read/archive writes clear one user's counts, new messages wait for the TTL.
+                descriptor("notificationUnread", mapper.constructType(UnreadCountResponse.class), Duration.ofSeconds(15), 8,
+                        LmsCacheDescriptorContributor.keyPart(1)),
                 // Scoped by school so one school's class/student write keeps the other schools' entries.
                 descriptor("lmsClassesBySchool", untyped, Duration.ofSeconds(60), 32, LmsCacheDescriptorContributor.keyPart(1)),
                 descriptor("organizationEducationUnits", mapper.constructType(EducationUnitListResponse.class), Duration.ofSeconds(60), 32),

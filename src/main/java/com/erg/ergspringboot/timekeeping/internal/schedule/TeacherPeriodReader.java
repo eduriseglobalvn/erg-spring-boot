@@ -2,8 +2,11 @@ package com.erg.ergspringboot.timekeeping.internal.schedule;
 
 import com.erg.ergspringboot.calendar.CalendarReadPort;
 import com.erg.ergspringboot.calendar.TeacherPeriod;
+import com.erg.ergspringboot.calendar.TeachingPeriodReadPort;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,10 +28,13 @@ public class TeacherPeriodReader {
     private static final Logger log = LoggerFactory.getLogger(TeacherPeriodReader.class);
 
     private final CalendarReadPort calendar;
+    private final TeachingPeriodReadPort bulk;
     private final TransactionTemplate suspended;
 
-    public TeacherPeriodReader(CalendarReadPort calendar, PlatformTransactionManager transactionManager) {
+    public TeacherPeriodReader(CalendarReadPort calendar, TeachingPeriodReadPort bulk,
+            PlatformTransactionManager transactionManager) {
         this.calendar = calendar;
+        this.bulk = bulk;
         this.suspended = new TransactionTemplate(transactionManager);
         this.suspended.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
     }
@@ -42,5 +48,24 @@ public class TeacherPeriodReader {
                     ex.getClass().getSimpleName());
             return Optional.empty();
         }
+    }
+
+    /** One query for a whole roster over a date range (period lock, daily close); empty when the read failed. */
+    public Optional<Map<String, List<TeacherPeriod>>> readMany(String tenantId, Collection<String> userIds, LocalDate from,
+            LocalDate to) {
+        try {
+            return Optional.of(suspended.execute(status -> bulk.teacherPeriods(tenantId, userIds, from, to)));
+        } catch (RuntimeException ex) {
+            log.warn("Teacher periods bulk read failed for {} users from {} to {}: {}", userIds.size(), from, to,
+                    ex.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    /** The periods of {@code list} overlapping {@code day} (Vietnam time): what a one-day {@code read} returns. */
+    public static List<TeacherPeriod> onDay(List<TeacherPeriod> list, LocalDate day) {
+        java.time.Instant from = day.atStartOfDay(WorkContextResolver.ZONE).toInstant();
+        java.time.Instant to = day.plusDays(1).atStartOfDay(WorkContextResolver.ZONE).toInstant();
+        return list.stream().filter(p -> p.start().isBefore(to) && p.end().isAfter(from)).toList();
     }
 }

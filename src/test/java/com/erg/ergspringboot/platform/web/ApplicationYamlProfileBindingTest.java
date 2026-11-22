@@ -54,7 +54,7 @@ class ApplicationYamlProfileBindingTest {
             assertThat(binder.bind("spring.mail.properties.mail.smtp.timeout", String.class).get())
                     .as(profile).isEqualTo("30000");
             assertThat(binder.bind("spring.task.scheduling.pool.size", Integer.class).get())
-                    .as(profile).isEqualTo(4);
+                    .as(profile).isEqualTo(8);
             assertThat(binder.bind("management.endpoint.health.show-details", String.class).get())
                     .as(profile).isEqualTo("never");
         }

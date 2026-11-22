@@ -11,6 +11,7 @@ import com.erg.ergspringboot.lms.persistence.projection.ClassWorkspaceProjection
 import java.time.Duration;
 import java.util.List;
 import java.util.NoSuchElementException;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -36,17 +37,20 @@ public class LmsClassScoreBoardOperations {
         this.attempts = attempts;
     }
 
+    /** Finished (handed-in) attempts only, never live attempt state; 30 s, evicted by the attempt and roster writes of the class. */
+    @Cacheable(cacheNames = "lmsClassScoreBoard", sync = true, key = "{#tenantId, #classId}")
     public ClassScoreBoardResponse scoreBoard(String tenantId, String classId) {
         ClassWorkspaceProjection info = classrooms.findClassWorkspace(tenantId, classId, null)
                 .orElseThrow(() -> new NoSuchElementException("Class not found."));
-        List<ScoreBoardStudent> roster = students.findClassRoster(tenantId, classId, null,
-                        PageRequest.of(0, MAX_STUDENTS, Sort.by("fullName").ascending().and(Sort.by("studentCode").ascending())))
-                .getContent().stream().map(s -> new ScoreBoardStudent(s.id(), s.studentCode(), s.fullName())).toList();
+        var rosterPage = students.findClassRoster(tenantId, classId, null,
+                        PageRequest.of(0, MAX_STUDENTS, Sort.by("fullName").ascending().and(Sort.by("studentCode").ascending())));
+        List<ScoreBoardStudent> roster = rosterPage.getContent().stream()
+                .map(s -> new ScoreBoardStudent(s.id(), s.studentCode(), s.fullName())).toList();
         List<ClassScoreBoardAttemptProjection> rows = attempts.findClassAttempts(tenantId, classId,
                 LmsStatePolicy.completedAttemptStates(), PageRequest.of(0, MAX_ATTEMPTS + 1));
         boolean truncated = rows.size() > MAX_ATTEMPTS;
         List<ScoreBoardAttempt> items = rows.stream().limit(MAX_ATTEMPTS).map(LmsClassScoreBoardOperations::attempt).toList();
-        return new ClassScoreBoardResponse(info.id(), info.name(), roster, items, truncated);
+        return new ClassScoreBoardResponse(info.id(), info.name(), roster, items, truncated, rosterPage.hasNext());
     }
 
     static ScoreBoardAttempt attempt(ClassScoreBoardAttemptProjection row) {

@@ -21,6 +21,11 @@ public class LcmsQueryOperations {
     public QuizWorkspaceResponse quizWorkspace(String tenantId, String search, String subjectId, String levelId, String categoryId, String status, String kind, Integer page, Integer size) { return reads.quizWorkspace(tenantId, search, subjectId, levelId, categoryId, status, kind, page, size); }
     public QuizDraftDocumentResponse quizDraft(String tenantId, String quizId) { return reads.quizDraft(tenantId, quizId); }
     public QuizVersionHistoryResponse quizVersions(String tenantId, String quizId) { return reads.quizVersions(tenantId, quizId); }
-    public QuestionBankWorkspaceResponse questionBankWorkspace(String tenantId, String search, String subjectId, String levelId, String topicId, String status, String quizKind, Boolean includeQuestions, Integer page, Integer size) { return reads.questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page, size); }
+    public QuestionBankWorkspaceResponse questionBankWorkspace(String tenantId, String search, String subjectId, String levelId,
+            String topicId, String status, String quizKind, Boolean includeQuestions, Integer page, Integer size,
+            LcmsReadPort.QuestionBankReadOptions options) {
+        return reads.questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page,
+                size, options);
+    }
     public AccessManagementWorkspaceResponse accessManagementWorkspace(String tenantId, String search, String roleId, String status, Integer page, Integer size, boolean includeEffectivePermissions) { return reads.accessManagementWorkspace(tenantId, search, roleId, status, page, size, includeEffectivePermissions); }
 }

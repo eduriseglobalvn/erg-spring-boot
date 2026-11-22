@@ -66,7 +66,7 @@ class NotificationOutboxWorkerLeaseTest {
         when(outboxRepository.renewLease(eq("outbox-1"), eq(NotificationOutboxWorker.WORKER_ID), any())).thenReturn(1);
         NotificationMessageEntity message = new NotificationMessageEntity();
         message.setId("notification-1");
-        when(messageRepository.findById("notification-1")).thenReturn(Optional.of(message));
+        when(messageRepository.findAllById(any())).thenReturn(List.of(message));
         when(deliveryAdapters.deliver(any())).thenReturn(SendResult.success(200, "msg", 3));
         when(outboxRepository.findLeasedForUpdate("outbox-1", NotificationOutboxWorker.WORKER_ID)).thenReturn(Optional.empty());
 
@@ -77,6 +77,20 @@ class NotificationOutboxWorkerLeaseTest {
         // only the claim itself saved the row; the stale result never overwrote another owner's state
         verify(outboxRepository, org.mockito.Mockito.times(1)).save(row);
         assertThat(row.getLockedBy()).isEqualTo(NotificationOutboxWorker.WORKER_ID);
+    }
+
+    @Test
+    void runStopsSendingOnceItsTimeBudgetIsSpent() {
+        when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(outboxRepository.findDueForUpdate(any(), any(), anyInt())).thenReturn(List.of(row("outbox-1")));
+        NotificationOutboxWorker worker = worker();
+        worker.runBudget = java.time.Duration.ZERO;
+
+        worker.runDueBatch();
+
+        verify(outboxRepository, never()).renewLease(any(), any(), any());
+        verify(outboxRepository).releaseLease(List.of("outbox-1"), NotificationOutboxWorker.WORKER_ID);
+        verify(deliveryAdapters, never()).deliver(any());
     }
 
     private NotificationOutboxEntity row(String id) {

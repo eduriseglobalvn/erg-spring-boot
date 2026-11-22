@@ -121,34 +121,13 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/health", "/api/v1/ready", "/api/health", "/api/ready",
                                 "/healthz", "/ready",
-                                "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**",
-                                "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-*.xml"
+                                "/v3/api-docs", "/v3/api-docs/**", "/scalar", "/scalar/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhooks/discord", "/webhooks/telegram").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login", "/api/v1/auth/refresh"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/login", "/oauth2/**", "/login/oauth2/**").permitAll()
-                        // CMS has a deliberately public read surface, but editorial-only
-                        // variants must be matched before the broad public posts rule below.
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/posts/hidden", "/api/v1/posts/trash", "/api/v1/posts/preview/**")
-                        .access((auth, context) -> permissions.requireAny(auth, context,
-                                List.of("cms.posts.update", "cms.posts.delete", "*")))
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/reviews/admin", "/api/v1/reviews/admin/all")
-                        .authenticated()
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/v1/pages/**", "/api/v1/menus/structure",
-                                "/api/v1/posts", "/api/v1/posts/**",
-                                "/api/v1/courses", "/api/v1/courses/**",
-                                "/api/v1/elearning/categories/**", "/api/v1/elearning/levels/**",
-                                "/api/v1/recruitment/jobs/**", "/api/v1/reviews", "/api/v1/reviews/stats",
-                                "/api/v1/public-disclosure/**", "/api/v1/trending/**"
-                        ).permitAll()
-                        .requestMatchers(HttpMethod.POST,
-                                "/api/v1/recruitment/apply", "/api/v1/reviews", "/api/v1/reviews/*/helpful"
-                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/graphql").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/roles/**", "/api/v1/permissions/**", "/api/v1/permission-groups/**")
                         .access((auth, context) -> permissions.require("rbac.role.read", auth, context))
@@ -199,10 +178,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/lcms/media/upload/quiz-media/**").permitAll()
                         // Dev punch-photo file: the HMAC-signed, 5-minute URL is the authorisation (no session).
                         .requestMatchers(HttpMethod.GET, "/api/v1/timekeeping/photos/file").permitAll()
-                        .requestMatchers("/api/v1/ai-content/keys/**")
-                        .access((auth, context) -> permissions.require("api-keys.manage", auth, context))
-                        .requestMatchers("/api/v1/ai-content/**")
-                        .access((auth, context) -> permissions.require("ai-content.use", auth, context))
                         .requestMatchers(HttpMethod.GET, "/api/v1/curriculum/**", "/api/curriculum/**")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("curriculum.read", "curriculum.manage", "content.resource.read", "content.manage", "lms.resource.read", "*")))
                         .requestMatchers(HttpMethod.GET, "/api/v1/content/**", "/api/content/**")
@@ -223,12 +198,8 @@ public class SecurityConfig {
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("audit.export", "audit.manage")))
                         .requestMatchers("/api/v1/audit/**")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("audit.read", "audit.manage")))
-                        .requestMatchers("/api/v1/operations/**", "/api/v1/operations/firewall/**")
-                        .access((auth, context) -> permissions.require("operations.manage", auth, context))
                         .requestMatchers("/api/v1/migration/**", "/api/v1/platform/**")
                         .access((auth, context) -> permissions.require("platform.read", auth, context))
-                        .requestMatchers("/api/v1/crawler/**", "/api/crawler/**", "/api/v1/rss/**")
-                        .access((auth, context) -> permissions.require("crawler.manage", auth, context))
                         // Self notification API — requires profile.self only (not notifications.manage)
                         .requestMatchers(HttpMethod.GET, "/api/v1/notifications", "/api/v1/notifications/unread-count")
                         .access((auth, context) -> permissions.requireAny(auth, context, List.of("lms.notification.read", "profile.self", "*")))
@@ -260,63 +231,6 @@ public class SecurityConfig {
                         // Fallback catch-all for other notification routes
                         .requestMatchers("/api/v1/notifications/**")
                         .access((auth, context) -> permissions.require("notifications.manage", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/elearning/**", "/api/v1/elearning/**")
-                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("elearning.read", "elearning.manage", "*")))
-                        .requestMatchers("/api/v1/admin/elearning/**", "/api/v1/elearning/**")
-                        .access((auth, context) -> permissions.require("elearning.manage", auth, context))
-                        .requestMatchers("/api/v1/seo/**")
-                        .access((auth, context) -> permissions.require("seo.manage", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/posts", "/api/v1/posts/preview")
-                        .access((auth, context) -> permissions.require("cms.posts.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/posts/**")
-                        .access((auth, context) -> permissions.require("cms.posts.update", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/posts/**")
-                        .access((auth, context) -> permissions.require("cms.posts.delete", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/posts/categories")
-                        .access((auth, context) -> permissions.require("cms.categories.create", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/posts/categories/**")
-                        .access((auth, context) -> permissions.require("cms.categories.update", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/posts/categories/**")
-                        .access((auth, context) -> permissions.require("cms.categories.delete", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/posts/images/**")
-                        .access((auth, context) -> permissions.require("media.upload", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/posts/images/**")
-                        .access((auth, context) -> permissions.require("media.delete", auth, context))
-                        // Prototype-profile admin writes (promote, crawler, bot, recruitment, review moderation)
-                        .requestMatchers(HttpMethod.POST, "/api/v1/posts/*/promote")
-                        .access((auth, context) -> permissions.require("cms.posts.update", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/blacklist", "/api/v1/trending/**")
-                        .access((auth, context) -> permissions.require("crawler.manage", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/blacklist/**")
-                        .access((auth, context) -> permissions.require("crawler.manage", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/bot/**")
-                        .access((auth, context) -> permissions.require("operations.manage", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/bot/**")
-                        .access((auth, context) -> permissions.require("operations.manage", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/recruitment/jobs", "/api/v1/reviews/batch/status", "/api/v1/reviews/*/reply")
-                        .access((auth, context) -> permissions.require("content.manage", auth, context))
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/recruitment/jobs/**")
-                        .access((auth, context) -> permissions.require("content.manage", auth, context))
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/recruitment/**", "/api/v1/reviews/**")
-                        .access((auth, context) -> permissions.require("content.manage", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/recruitment/jobs/**")
-                        .access((auth, context) -> permissions.require("content.manage", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/courses")
-                        .access((auth, context) -> permissions.require("courses.create", auth, context))
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/courses/**")
-                        .access((auth, context) -> permissions.require("courses.update", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/courses/**")
-                        .access((auth, context) -> permissions.require("courses.update", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**")
-                        .access((auth, context) -> permissions.require("courses.delete", auth, context))
-                        .requestMatchers(HttpMethod.GET, "/api/v1/documents/**")
-                        .access((auth, context) -> permissions.requireAny(auth, context, List.of("documents.read", "documents.manage", "*")))
-                        .requestMatchers("/api/v1/documents/**")
-                        .access((auth, context) -> permissions.require("documents.manage", auth, context))
-                        .requestMatchers(HttpMethod.POST, "/api/v1/public-disclosure/**")
-                        .access((auth, context) -> permissions.require("public-disclosure.manage", auth, context))
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/public-disclosure/**")
-                        .access((auth, context) -> permissions.require("public-disclosure.manage", auth, context))
                         // Game sockets: authenticated here; the handshake interceptor checks the games permission.
                         .requestMatchers("/ws/games/**").authenticated()
                         .requestMatchers("/api/v1/**").authenticated()

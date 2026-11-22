@@ -69,6 +69,29 @@ class AuditQueryServiceTest {
     }
 
     @Test
+    void countsTheTenantOnlyWhenMoreRowsExistAndSharesTheCountBriefly() {
+        AuditEvent event = new AuditEvent();
+        event.setId("audit-1");
+        event.setTenantId("tenant-a");
+        when(repository.search(eq("tenant-a"), any(), any(), any(), any(), any(), any(), eq(true), any(), any(), any()))
+                .thenReturn(new org.springframework.data.domain.SliceImpl<>(List.of(event), PageRequest.of(0, 1), true));
+        when(repository.countSearch(eq("tenant-a"), any(), any(), any(), any(), any(), any(), eq(true), any(), any()))
+                .thenReturn(41L);
+        UserAccessContext access = new UserAccessContext("actor-a", "tenant-a", List.of("*"), List.of(), null, null);
+        AuditQueryService service = new AuditQueryService(repository, redaction);
+        AuditQuery firstPage = new AuditQuery(null, null, null, null, null, null, 0, 1);
+
+        AuditPage page = service.query(access, firstPage);
+        service.query(access, firstPage);
+
+        assertThat(page.totalElements()).isEqualTo(41);
+        assertThat(page.totalPages()).isEqualTo(41);
+        assertThat(page.hasNext()).isTrue();
+        verify(repository, org.mockito.Mockito.times(1))
+                .countSearch(eq("tenant-a"), any(), any(), any(), any(), any(), any(), eq(true), any(), any());
+    }
+
+    @Test
     void failsClosedWhenTenantIdentityIsMissing() {
         AuditQueryService service = new AuditQueryService(repository, redaction);
         UserAccessContext noTenant = new UserAccessContext("actor-a", " ", List.of(), List.of(), null, null);

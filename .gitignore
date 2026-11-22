@@ -42,6 +42,7 @@ load/results/**
 !load/results/.gitkeep
 
 .claude/
+.openidea/
 
 # Database dumps and agent runtime output must never be committed
 backups/

@@ -22,6 +22,8 @@ public class TransactionalOutboxWorker {
     private static final int BATCH_SIZE = 50;
     private static final int MAX_ATTEMPTS = 8;
     private static final Duration LEASE = Duration.ofSeconds(60);
+    /** Stop dispatching once the batch has run this long; the rest stay leased and are reclaimed after {@link #LEASE}. */
+    private static final Duration RUN_BUDGET = Duration.ofSeconds(20);
     /** Per-instance lease owner (host:UUID), stored in outbox_events.locked_by (V120). */
     static final String WORKER_ID = workerId();
     private final OutboxEventRepository repository;
@@ -64,7 +66,9 @@ public class TransactionalOutboxWorker {
             });
         }
         if (due == null) return 0;
+        long deadline = System.nanoTime() + RUN_BUDGET.toNanos();
         for (OutboxEvent event : due) {
+            if (System.nanoTime() - deadline >= 0) break;
             if (renewLease(event)) dispatch(event);
         }
         return due.size();

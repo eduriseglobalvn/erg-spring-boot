@@ -35,6 +35,13 @@ public class ErgAuthProperties {
     @Max(256)
     private int passwordHashConcurrency = 3;
 
+    /** Password of a new student account, and what a teacher's reset returns it to (owner rule 21/11/2026). */
+    @jakarta.validation.constraints.Size(min = 6, max = 128)
+    private String studentDefaultPassword = "erg2026";
+
+    public String getStudentDefaultPassword() { return studentDefaultPassword; }
+    public void setStudentDefaultPassword(String studentDefaultPassword) { this.studentDefaultPassword = studentDefaultPassword; }
+
     public int getPasswordHashConcurrency() { return passwordHashConcurrency; }
     public void setPasswordHashConcurrency(int passwordHashConcurrency) { this.passwordHashConcurrency = passwordHashConcurrency; }
 

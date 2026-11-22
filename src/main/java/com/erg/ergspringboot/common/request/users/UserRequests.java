@@ -30,7 +30,8 @@ public final class UserRequests {
 
     public record ChangePasswordRequest(
             @JsonProperty("old_password") @NotBlank String oldPassword,
-            @JsonProperty("new_password") @NotBlank @Size(min = 8, max = 128) String newPassword
+            @JsonProperty("new_password") @NotBlank @Size(min = 6, max = 128)
+            String newPassword
     ) {
     }
 

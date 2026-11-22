@@ -22,6 +22,7 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.lms.persistence.AssignmentRecipientRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentRepository;
+import com.erg.ergspringboot.lms.persistence.AttemptRepository;
 import com.erg.ergspringboot.lms.persistence.AssignmentResourceRepository;
 import com.erg.ergspringboot.lms.persistence.StudentGroupMemberRepository;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
@@ -36,6 +37,7 @@ import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class LmsAssignmentCommandService {
 
     private static final String STATUS_ACTIVE = "active";
+    private static final String STUDENT_DASHBOARD = "studentDashboard";
+    // each scope is one shared-generation bump: past this a tenant-wide drop of the 30 s dashboard cache is cheaper
+    private static final int MAX_SCOPED_DASHBOARD_EVICTIONS = 200;
     private final AssignmentRepository assignmentRepository;
     private final AssignmentResourceRepository resourceRepository;
     private final AssignmentRecipientRepository recipientRepository;
@@ -63,6 +68,8 @@ public class LmsAssignmentCommandService {
     private final LmsAssignmentAccessPolicy policy;
     private final LmsSyncOperationService sync;
     private final ApplicationEventPublisher events;
+    private AssignmentRecipientLogins recipientLogins;
+    private AttemptRepository attemptRepository;
 
     @Autowired
     public LmsAssignmentCommandService(
@@ -104,6 +111,17 @@ public class LmsAssignmentCommandService {
         this.policy = policy;
         this.sync = sync;
         this.events = events;
+    }
+
+    @Autowired(required = false)
+    public void setAttemptRepository(AttemptRepository attemptRepository) {
+        this.attemptRepository = attemptRepository;
+    }
+
+    /** Optional: without it every assignment write drops the tenant's student dashboards, as before. */
+    @Autowired(required = false)
+    public void setRecipientLogins(AssignmentRecipientLogins recipientLogins) {
+        this.recipientLogins = recipientLogins;
     }
 
     public CreateAssignmentResponse create(UserAccessContext access, String idempotencyKey, CreateAssignmentRequest request) {
@@ -156,7 +174,7 @@ public class LmsAssignmentCommandService {
 
         List<AssignmentResource> resources = persistResources(tenantId, saved.getId(), request.quizIds(), userId);
         persistRecipients(tenantId, saved.getId(), primaryClassId, mode, recipients);
-        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+        evictAssignmentReads(tenantId, loginsOf(recipients));
         events.publishEvent(new LmsAssignmentCreated("assignment-created:" + saved.getId(), tenantId, saved.getId(),
                 userId, OffsetDateTime.now(ZoneOffset.UTC)));
 
@@ -180,6 +198,7 @@ public class LmsAssignmentCommandService {
             throw new BadRequestException("assignment resolved to zero recipients");
         }
         ensureRecipientScope(tenantId, recipients, access);
+        List<String> before = recipientLogins(tenantId, assignmentId);
         recipientRepository.deleteByAssignmentId(assignmentId);
         String primaryClassId = this.recipients.primaryClassId(mode, request == null ? null : request.classId(), recipients);
         persistRecipients(tenantId, assignmentId, primaryClassId, mode, recipients);
@@ -189,7 +208,8 @@ public class LmsAssignmentCommandService {
         assignment.setStudentIds(recipients.stream().map(Student::getId).toList());
         assignment.setRecipientCount(recipients.size());
         assignmentRepository.save(assignment);
-        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+        List<String> after = loginsOf(recipients);
+        evictAssignmentReads(tenantId, before == null ? null : java.util.stream.Stream.concat(before.stream(), after.stream()).toList());
         return describe(assignment);
     }
 
@@ -225,17 +245,49 @@ public class LmsAssignmentCommandService {
             assignment.setStatus(LmsStatePolicy.assignmentState(request.status()));
         }
         assignmentRepository.save(assignment);
-        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+        evictAssignmentReads(tenantId, recipientLogins(tenantId, assignmentId));
     }
 
     public void delete(UserAccessContext access, String assignmentId) {
         String tenantId = AuthenticatedTenant.require(access.tenantId());
         Assignment assignment = requireAssignment(tenantId, assignmentId);
         policy.ensureManagedScope(assignment, access);
+        // lms_attempts references the assignment: answer 409 up front instead of a late integrity error.
+        if (attemptRepository != null && attemptRepository.existsByTenantIdAndAssignmentId(tenantId, assignmentId)) {
+            throw new AssignmentHasAttemptsException();
+        }
+        List<String> logins = recipientLogins(tenantId, assignmentId);
         recipientRepository.deleteByAssignmentId(assignmentId);
         resourceRepository.deleteByAssignmentId(assignmentId);
         assignmentRepository.delete(assignment);
-        caches.evictAfterCommit(tenantId, LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+        evictAssignmentReads(tenantId, logins);
+    }
+
+    /**
+     * studentDashboard is keyed per student login, so an assignment write drops only its recipients' dashboards; the other
+     * assignment read caches stay tenant-wide. A null (unknown) or large audience falls back to the whole tenant's dashboards.
+     */
+    private void evictAssignmentReads(String tenantId, java.util.Collection<String> studentLogins) {
+        boolean scoped = studentLogins != null && studentLogins.size() <= MAX_SCOPED_DASHBOARD_EVICTIONS;
+        caches.evictAfterCommit(tenantId, scoped
+                ? LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES.stream().filter(name -> !STUDENT_DASHBOARD.equals(name)).toList()
+                : LmsReadCacheInvalidator.ASSIGNMENT_READ_CACHES);
+        if (scoped && !studentLogins.isEmpty()) {
+            caches.evictScopesAfterCommit(tenantId, Map.of(STUDENT_DASHBOARD, studentLogins.stream().distinct().toList()));
+        }
+    }
+
+    private static List<String> loginsOf(List<Student> students) {
+        return students.stream().map(Student::getAuthUserId).filter(login -> login != null && !login.isBlank()).toList();
+    }
+
+    /** Logins of the assignment's current recipients; null when unknown (no recipient rows, too many, or no lookup). */
+    private List<String> recipientLogins(String tenantId, String assignmentId) {
+        if (recipientLogins == null) return null;
+        List<String> logins = recipientLogins.findLogins(assignmentId, PageRequest.of(0, MAX_SCOPED_DASHBOARD_EVICTIONS + 1));
+        if (logins.size() > MAX_SCOPED_DASHBOARD_EVICTIONS) return null;
+        // No login among them: either recipients without accounts (nothing to evict) or a legacy assignment without rows.
+        return logins.isEmpty() && !recipientRepository.existsByTenantIdAndAssignmentId(tenantId, assignmentId) ? null : logins;
     }
 
     /** Every recipient must sit in a class the caller manages: an assignment always belongs to a class. */

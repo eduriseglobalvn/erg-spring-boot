@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.timekeeping.RemoteRuleKind;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLockRepository;
-import com.erg.ergspringboot.timekeeping.persistence.TkPolicyRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRemoteRule;
 import com.erg.ergspringboot.timekeeping.persistence.TkRemoteRuleRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
@@ -26,9 +25,9 @@ class WorkContextResolverRemoteTest {
     private final TkRequestRepository requests = mock(TkRequestRepository.class);
     private final WorkContextResolver resolver = new WorkContextResolver(mock(UserAccessScopeRepository.class),
             mock(com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository.class),
-            mock(TkShiftRepository.class), mock(TkSiteRepository.class), mock(TkPolicyRepository.class), rules,
+            mock(TkShiftRepository.class), mock(TkSiteRepository.class), rules,
             mock(TkPeriodLockRepository.class), requests,
-            mock(SaturdayModeResolver.class));
+            mock(SaturdayModeResolver.class), mock(SchoolSetupCache.class));
 
     @Test
     void anApprovedWfhRequestIsRemoteWithoutAnyRule() {

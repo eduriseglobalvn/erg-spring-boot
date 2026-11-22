@@ -29,9 +29,15 @@ public class LcmsReadModelUseCase implements LcmsReadPort {
         this.ownership = ownership;
     }
 
-    @Override public QuizWorkspaceResponse quizWorkspace(String tenantId, String search, String subjectId, String levelId, String categoryId, String status, String kind, Integer page, Integer size) { return ownership.visibleToCaller(tenantId, quizWorkspaces.quizWorkspace(tenantId, search, subjectId, levelId, categoryId, status, kind, page, size)); }
+    @Override public QuizWorkspaceResponse quizWorkspace(String tenantId, String search, String subjectId, String levelId, String categoryId, String status, String kind, Integer page, Integer size) { return quizWorkspaces.quizWorkspace(tenantId, search, subjectId, levelId, categoryId, status, kind, page, size, ownership.teacherViewerId()); }
     @Override public QuizDraftDocumentResponse quizDraft(String tenantId, String quizId) { ownership.requireOwn(tenantId, quizId); return quizWorkspaces.quizDraft(tenantId, quizId); }
     @Override public QuizVersionHistoryResponse quizVersions(String tenantId, String quizId) { ownership.requireOwn(tenantId, quizId); return quizWorkspaces.quizVersions(tenantId, quizId); }
-    @Override public QuestionBankWorkspaceResponse questionBankWorkspace(String tenantId, String search, String subjectId, String levelId, String topicId, String status, String quizKind, Boolean includeQuestions, Integer page, Integer size) { return ownership.visibleToCaller(tenantId, workspaces.questionBankWorkspace(tenantId, search, subjectId, levelId, topicId, status, quizKind, includeQuestions, page, size)); }
+    @Override public QuestionBankWorkspaceResponse questionBankWorkspace(String tenantId, String search, String subjectId,
+            String levelId, String topicId, String status, String quizKind, Boolean includeQuestions, Integer page, Integer size,
+            QuestionBankReadOptions options) {
+        // A teacher's quiz list is filtered in SQL (before the cap) and cached per teacher.
+        return workspaces.questionBankWorkspace(tenantId, search, subjectId, levelId, topicId,
+                status, quizKind, includeQuestions, page, size, options, ownership.teacherViewerId());
+    }
     @Override public AccessManagementWorkspaceResponse accessManagementWorkspace(String tenantId, String search, String roleId, String status, Integer page, Integer size, boolean includeEffectivePermissions) { return workspaces.accessManagementWorkspace(tenantId, search, roleId, status, page, size, includeEffectivePermissions); }
 }

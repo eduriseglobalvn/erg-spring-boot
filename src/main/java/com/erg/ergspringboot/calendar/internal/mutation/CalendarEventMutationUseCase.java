@@ -13,6 +13,7 @@ import com.erg.ergspringboot.calendar.internal.schedule.ScheduleConflictService;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
+import com.erg.ergspringboot.calendar.internal.support.CalendarCancelAnnouncer;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -69,16 +70,22 @@ public class CalendarEventMutationUseCase {
         if (input.expectedVersion() != null && event.getRecordVersion() != input.expectedVersion().longValue()) {
             throw TeachingScheduleException.staleVersion();
         }
+        // roomId and roomName always agree: an id wins and brings its stored name, a name alone resolves to the school's room
         if (input.roomId() != null) {
-            conflicts.requireRoomOfSchool(tenantId, event.getSchoolId(), input.roomId());
+            String stored = conflicts.requireRoomOfSchool(tenantId, event.getSchoolId(), input.roomId());
             event.setRoomId(input.roomId());
+            if (stored != null) event.setRoomName(stored);
+            else if (input.roomName() != null) event.setRoomName(input.roomName());
+        } else if (input.roomName() != null) {
+            var match = conflicts.roomByName(tenantId, event.getSchoolId(), input.roomName());
+            event.setRoomId(match.map(ScheduleConflictService.RoomMatch::id).orElse(null));
+            event.setRoomName(match.map(ScheduleConflictService.RoomMatch::name).orElse(input.roomName()));
         }
-        if (input.roomName() != null) event.setRoomName(input.roomName());
         if (input.note() != null) event.setNote(input.note());
         event.setUpdatedBy(actorId);
         events.saveAndFlush(event);
         boolean published = PUBLISHED.equals(event.getStatus());
-        if (published && input.roomId() != null) {
+        if (published && (input.roomId() != null || input.roomName() != null)) {
             // a published period must not land in a room another published period holds at the same time
             long blocking = conflicts.checkPublishedEvents(tenantId, event.getBatchId(), Set.of(event.getId())).stream()
                     .filter(conflict -> "ROOM_TIME".equals(conflict.kind())).count();
@@ -108,6 +115,7 @@ public class CalendarEventMutationUseCase {
         String reason = DRAFT.equals(event.getStatus()) ? "DRAFT_REMOVED" : "ADMIN_CANCEL";
         int affected = events.cancelByIds(
                 tenantId, List.of(event.getId()), reason, actorId, OffsetDateTime.now());
+        CalendarCancelAnnouncer.announce(eventPublisher, tenantId, List.of(event), "DELETE", actorId);
         return new CalendarDeletePayload(event.getId(), true, affected);
     }
 
@@ -119,6 +127,7 @@ public class CalendarEventMutationUseCase {
             String dateFrom,
             String dateTo,
             String actorId) {
+        requireSchoolIds(schoolIds);
         LocalDate fromDate = requiredDate(dateFrom, "dateFrom");
         LocalDate toDate = requiredDate(dateTo, "dateTo");
         if (fromDate.isAfter(toDate)) {
@@ -130,10 +139,8 @@ public class CalendarEventMutationUseCase {
         OffsetDateTime from = fromDate.atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
         OffsetDateTime to = toDate.plusDays(1).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
 
-        Set<String> draftIds = new HashSet<>(eventTeachers.findEventIdsByTeacher(
-                tenantId, teacherUserId, schoolIds, from, to, DRAFT));
-        Set<String> publishedIds = new HashSet<>(eventTeachers.findEventIdsByTeacher(
-                tenantId, teacherUserId, schoolIds, from, to, PUBLISHED));
+        Set<String> draftIds = new HashSet<>(teacherEventIds(tenantId, teacherUserId, schoolIds, from, to, DRAFT));
+        Set<String> publishedIds = new HashSet<>(teacherEventIds(tenantId, teacherUserId, schoolIds, from, to, PUBLISHED));
         if (draftIds.isEmpty() && publishedIds.isEmpty()) {
             return new CalendarDeletePayload(teacherUserId, true, 0);
         }
@@ -144,9 +151,23 @@ public class CalendarEventMutationUseCase {
             affected += events.cancelByIds(tenantId, new ArrayList<>(draftIds), "DRAFT_REMOVED", actorId, now);
         }
         if (!publishedIds.isEmpty()) {
+            List<CalendarEvent> before = events.findAllById(publishedIds);
             affected += events.cancelByIds(tenantId, new ArrayList<>(publishedIds), "ADMIN_CANCEL", actorId, now);
+            CalendarCancelAnnouncer.announce(eventPublisher, tenantId, before, "DELETE", actorId);
         }
         return new CalendarDeletePayload(teacherUserId, true, affected);
+    }
+
+    private List<String> teacherEventIds(String tenantId, String teacherUserId, List<String> schoolIds, OffsetDateTime from,
+            OffsetDateTime to, String status) {
+        return eventTeachers.findEventIdsByTeacher(tenantId, teacherUserId, schoolIds, from, to, status);
+    }
+
+    /** Owner decision: the schools are always named, even by a tenant-wide caller; the controllers call this before scope resolution. */
+    public static void requireSchoolIds(List<String> schoolIds) {
+        if (schoolIds == null || schoolIds.stream().noneMatch(id -> id != null && !id.isBlank())) {
+            throw new BadRequestException("Phải chọn ít nhất một trường (schoolIds) để xóa lịch dạy của giáo viên.");
+        }
     }
 
     private CalendarEvent findEvent(String eventId) {

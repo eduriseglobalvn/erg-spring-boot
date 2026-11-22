@@ -36,6 +36,10 @@ public final class ElearningCommands {
         }
     }
 
+    /** {@code parentId} null pages the post's top-level comments; else the replies of that top-level comment. */
+    public record DiscussionCommentsQuery(String tenantId, String actorUserId, String postId, String parentId, int page, int size) {
+    }
+
     public record CreateDiscussionCommand(
             String tenantId,
             String actorUserId,

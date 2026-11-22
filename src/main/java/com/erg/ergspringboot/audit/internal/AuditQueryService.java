@@ -9,7 +9,10 @@ import com.erg.ergspringboot.audit.persistence.AuditEventRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import org.springframework.data.domain.Page;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +25,10 @@ public class AuditQueryService {
 
     private static final OffsetDateTime MIN_TIME = OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
     private static final OffsetDateTime MAX_TIME = OffsetDateTime.of(9999, 12, 31, 0, 0, 0, 0, ZoneOffset.UTC);
+
+    /** Total per full filter (tenant and scope sets included): up to 30 s stale, bounded; never shared across filters. */
+    private final Cache<Object, Long> totals = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofSeconds(30)).maximumSize(2_000).build();
 
     public AuditQueryService(AuditEventRepository repository, AuditRedactionPolicy redaction) {
         this.repository = repository;
@@ -37,13 +44,24 @@ public class AuditQueryService {
         List<String> educationUnits = safeIds(access.managedEducationUnitIds());
         List<String> classes = safeIds(access.managedClassIds());
         boolean allScopes = educationUnits.contains("*") || classes.contains("*");
-        Page<AuditEvent> page = repository.search(
-                access.tenantId(), safe.from() == null ? MIN_TIME : safe.from(), safe.to() == null ? MAX_TIME : safe.to(),
-                safe.actorId(), safe.resourceType(), safe.resourceId(),
+        OffsetDateTime from = safe.from() == null ? MIN_TIME : safe.from();
+        OffsetDateTime to = safe.to() == null ? MAX_TIME : safe.to();
+        Slice<AuditEvent> slice = repository.search(
+                access.tenantId(), from, to, safe.actorId(), safe.resourceType(), safe.resourceId(),
                 safe.outcome(), allScopes, educationUnits, classes, PageRequest.of(safe.page(), safe.size()));
-        return new AuditPage(
-                page.map(this::entry).getContent(), page.getNumber(), page.getSize(), page.getTotalElements(),
-                page.getTotalPages(), page.hasNext());
+        List<AuditEntry> items = slice.getContent().stream().map(this::entry).toList();
+        long seen = (long) slice.getNumber() * slice.getSize() + items.size();
+        // The last page knows the exact total; otherwise the tenant-wide count is shared for a few seconds.
+        long total = slice.hasNext()
+                ? Math.max(seen + 1, totals.get(
+                        List.of(access.tenantId(), from, to, String.valueOf(safe.actorId()), String.valueOf(safe.resourceType()),
+                                String.valueOf(safe.resourceId()), String.valueOf(safe.outcome()), allScopes, educationUnits, classes),
+                        key -> repository.countSearch(access.tenantId(), from, to, safe.actorId(), safe.resourceType(),
+                                safe.resourceId(), safe.outcome(), allScopes, educationUnits, classes)))
+                : seen;
+        int size = Math.max(1, slice.getSize());
+        return new AuditPage(items, slice.getNumber(), slice.getSize(), total, (int) Math.ceil((double) total / size),
+                slice.hasNext());
     }
 
     private AuditEntry entry(AuditEvent event) {

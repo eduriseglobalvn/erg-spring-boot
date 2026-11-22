@@ -29,12 +29,15 @@ public class CurriculumImpactQueryUseCase {
     private final CurriculumLevelRepository levels;
     private final CurriculumTopicRepository topics;
     private final List<CurriculumUsageCounter> usageCounters;
+    private final CurriculumAttemptImpactCounter attemptCounter;
 
     public CurriculumImpactQueryUseCase(
             CurriculumSubjectRepository subjects,
             CurriculumLevelRepository levels,
             CurriculumTopicRepository topics,
-            List<CurriculumUsageCounter> usageCounters) {
+            List<CurriculumUsageCounter> usageCounters,
+            CurriculumAttemptImpactCounter attemptCounter) {
+        this.attemptCounter = attemptCounter;
         this.subjects = subjects;
         this.levels = levels;
         this.topics = topics;
@@ -46,11 +49,16 @@ public class CurriculumImpactQueryUseCase {
     }
 
     public CurriculumImpactResponse subjectImpact(String id, UserAccessContext access) {
+        return subjectImpact(id, access, false);
+    }
+
+    /** @param existenceOnly hard-delete gate: studentAttempts is then 0 or 1 instead of the exact count */
+    public CurriculumImpactResponse subjectImpact(String id, UserAccessContext access, boolean existenceOnly) {
         String tenantId = tenantId(access);
         CurriculumSubject subject = requireSubject(id, tenantId);
         long childLevels = levels.countByTenantIdAndSubjectId(tenantId, id);
         List<String> topicIds = topicIdsForSubject(tenantId, id);
-        Usage usage = usage(tenantId, Node.SUBJECT, id, topicIds);
+        Usage usage = usage(tenantId, Node.SUBJECT, id, topicIds, existenceOnly);
         CurriculumImpactCounts counts = new CurriculumImpactCounts(
                 usage.questions(),
                 usage.quizzes(),
@@ -64,11 +72,16 @@ public class CurriculumImpactQueryUseCase {
     }
 
     public CurriculumImpactResponse levelImpact(String id, UserAccessContext access) {
+        return levelImpact(id, access, false);
+    }
+
+    /** @param existenceOnly hard-delete gate: studentAttempts is then 0 or 1 instead of the exact count */
+    public CurriculumImpactResponse levelImpact(String id, UserAccessContext access, boolean existenceOnly) {
         String tenantId = tenantId(access);
         CurriculumLevel level = requireLevel(id, tenantId);
         long childTopics = topics.countByTenantIdAndLevelId(tenantId, id);
         List<String> topicIds = topicIdsForLevel(tenantId, id);
-        Usage usage = usage(tenantId, Node.LEVEL, id, topicIds);
+        Usage usage = usage(tenantId, Node.LEVEL, id, topicIds, existenceOnly);
         CurriculumImpactCounts counts = new CurriculumImpactCounts(
                 usage.questions(),
                 usage.quizzes(),
@@ -82,9 +95,14 @@ public class CurriculumImpactQueryUseCase {
     }
 
     public CurriculumImpactResponse topicImpact(String id, UserAccessContext access) {
+        return topicImpact(id, access, false);
+    }
+
+    /** @param existenceOnly hard-delete gate: studentAttempts is then 0 or 1 instead of the exact count */
+    public CurriculumImpactResponse topicImpact(String id, UserAccessContext access, boolean existenceOnly) {
         String tenantId = tenantId(access);
         CurriculumTopic topic = requireTopic(id, tenantId);
-        Usage usage = usage(tenantId, Node.TOPIC, id, List.of(id));
+        Usage usage = usage(tenantId, Node.TOPIC, id, List.of(id), existenceOnly);
         CurriculumImpactCounts counts = new CurriculumImpactCounts(
                 usage.questions(),
                 usage.quizzes(),
@@ -144,12 +162,17 @@ public class CurriculumImpactQueryUseCase {
                 .stream().map(CurriculumTopic::getId).toList();
     }
 
-    private Usage usage(String tenantId, Node node, String id, List<String> topicIds) {
+    private Usage usage(String tenantId, Node node, String id, List<String> topicIds, boolean existenceOnly) {
         Usage total = Usage.NONE;
         for (CurriculumUsageCounter counter : usageCounters) {
             total = total.plus(counter.count(tenantId, node, id, topicIds));
         }
-        return total;
+        // Attempts come from the curriculum-owned index-driven SQL; any value a module counter reported is replaced.
+        long attempts = existenceOnly
+                ? (attemptCounter.exists(tenantId, node, id) ? 1 : 0)
+                : attemptCounter.count(tenantId, node, id);
+        return new Usage(total.questions(), total.quizzes(), total.publishedQuizVersions(), total.contentItems(),
+                total.assignments(), attempts);
     }
 
     private CurriculumSubject requireSubject(String id, String tenantId) {

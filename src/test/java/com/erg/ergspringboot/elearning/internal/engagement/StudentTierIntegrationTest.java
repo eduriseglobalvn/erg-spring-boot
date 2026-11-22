@@ -60,6 +60,7 @@ class StudentTierIntegrationTest {
 
     @BeforeEach
     void seed() {
+        leaderboard.clearBoardCache(); // the 45-second board cache outlives each test's rolled-back transaction
         EducationUnit school = new EducationUnit();
         school.setId("school-tier"); school.setTenantId(TENANT); school.setName("Tier School"); school.setType("school");
         entityManager.persist(school);
@@ -215,7 +216,7 @@ class StudentTierIntegrationTest {
         Attempt attempt = new Attempt();
         attempt.setId("att-tier-" + (++attempts)); attempt.setTenantId(TENANT); attempt.setAssignmentId(assignmentId);
         attempt.setQuizId("qz_math_g6_base"); attempt.setStudentId(studentId); attempt.setStatus("submitted");
-        attempt.setTotalQuestions(questions); attempt.setLate(false); attempt.setPercent(50.0D); attempt.setScore(50.0D);
+        attempt.setTotalQuestions(questions); attempt.setSubmittedCount(questions); attempt.setLate(false); attempt.setPercent(50.0D); attempt.setScore(50.0D);
         attempt.setMaxScore(100.0D); attempt.setPassed(true); attempt.setStartedAt(LAST_SUNDAY.minusHours(1));
         attempt.setSubmittedAt(LAST_SUNDAY); attempt.setUpdatedAt(LAST_SUNDAY);
         entityManager.persist(attempt);

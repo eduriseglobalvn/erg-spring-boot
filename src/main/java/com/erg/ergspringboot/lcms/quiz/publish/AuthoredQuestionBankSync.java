@@ -66,9 +66,13 @@ final class AuthoredQuestionBankSync {
         metadata.put("slideId", compiled.sourceSlideId());
         question.setMetadata(metadata);
         question.setSettings(Map.of());
-        // Flush now: quiz_version_questions.bank_question_id is a real FK and Hibernate may order that insert first.
-        Question saved = questions.saveAndFlush(question);
+        Question saved = questions.save(question);
         return (saved == null ? question : saved).getId();
+    }
+
+    /** Flush once after the last upsert: quiz_version_questions.bank_question_id is a real FK and order_inserts may reorder the inserts. */
+    void flush() {
+        questions.flush();
     }
 
     /** Retires bank rows the previous version mirrored from slides this version no longer has. */

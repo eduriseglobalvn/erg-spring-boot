@@ -122,7 +122,7 @@ public class SelfViewService {
         Optional<String> school = context.schoolOf(tenantId, userId);
         TkPolicy policy = context.policyFor(tenantId, school.orElse(""), from);
         BigDecimal standard = school.map(s -> standardUnits(tenantId, s, from, to)).orElse(BigDecimal.ZERO);
-        BigDecimal leaveRemaining = leaveBalance.annualBalance(tenantId, userId, period.getYear());
+        BigDecimal leaveRemaining = leaveBalance.annualBalance(tenantId, userId, period.getYear(), school.orElse(null));
         int lockDay = Math.min(policy.getLockDayOfMonth(), period.plusMonths(1).lengthOfMonth());
         return new MonthView(period.toString(), actual.setScale(1), standard.setScale(1), lateCount, lateMinutes,
                 leaveRemaining, requests.countByTenantIdAndUserIdAndStatus(tenantId, userId, RequestStatus.PENDING),

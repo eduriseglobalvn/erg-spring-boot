@@ -5,6 +5,7 @@ import com.erg.ergspringboot.timekeeping.DayStatus;
 import com.erg.ergspringboot.timekeeping.HolidayPayMode;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
 import com.erg.ergspringboot.timekeeping.PunchDirection;
+import com.erg.ergspringboot.calendar.TeacherPeriod;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.RequestType;
 import com.erg.ergspringboot.timekeeping.SaturdayMode;
@@ -33,6 +34,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -43,6 +45,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,6 +126,90 @@ public class DayAggregationService {
     /** @param evenIfLocked true only for an explicit admin recompute of a reopened or locked period (T6). */
     @Transactional
     public void recompute(String tenantId, String userId, LocalDate date, boolean evenIfLocked) {
+        recompute(tenantId, userId, date, evenIfLocked, () -> periods.read(tenantId, userId, date, date));
+    }
+
+    /** The punch path: the day's periods were read before its transaction, so no second connection is taken inside it. */
+    @Transactional
+    public void recompute(String tenantId, String userId, LocalDate date, Optional<List<TeacherPeriod>> dayPeriods) {
+        recompute(tenantId, userId, date, false, () -> dayPeriods);
+    }
+
+    /** {@link #recomputeDays(String, String, List, Optional)} reading the range's periods here, once, in one query. */
+    @Transactional
+    public void recomputeDays(String tenantId, String userId, List<LocalDate> dates) {
+        if (dates.isEmpty()) return;
+        recomputeDays(tenantId, userId, dates, periods.read(tenantId, userId, dates.get(0), dates.get(dates.size() - 1)));
+    }
+
+    /**
+     * Rebuilds the given days of one person (an approved request): every day goes through {@code recompute}, except a
+     * day the person's school has no shift for and without a punch. That day is OFF or a holiday whatever the request
+     * says, so it is left alone. {@code rangePeriods} is the calendar read of the whole range, taken once (and before
+     * the caller's transaction when it can) instead of one connection borrow per day.
+     */
+    @Transactional
+    public void recomputeDays(String tenantId, String userId, List<LocalDate> dates,
+            Optional<List<TeacherPeriod>> rangePeriods) {
+        if (dates.isEmpty()) return;
+        List<TkShift> shifts = context.schoolOf(tenantId, userId).map(school -> context.shiftsOf(tenantId, school))
+                .orElse(List.of());
+        Set<LocalDate> punched = punches.findByTenantIdAndUserIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId,
+                userId, dates.get(0), dates.get(dates.size() - 1)).stream().map(TkPunch::getWorkDate)
+                .collect(Collectors.toSet());
+        for (LocalDate date : dates) {
+            if (!punched.contains(date) && WorkContextResolver.shiftOn(shifts, date).isEmpty()) continue;
+            recompute(tenantId, userId, date, false, () -> rangePeriods.map(list -> TeacherPeriodReader.onDay(list, date)));
+        }
+    }
+
+    /**
+     * Rebuilds one day for many people after a day off or a Saturday mode changed (the same result as
+     * {@link #recompute(String, String, LocalDate)} for each), with the reads shared: punches, approved requests,
+     * stored rows and periods once for the group, holidays and shift once per school. A locked day is skipped.
+     * shortcut: no per-person {@code lockDay} (a lock row per person would swamp the lock table); a punch recomputing the
+     * same person in the same instants could be overwritten, so call this only from admin writes of a day off.
+     */
+    @Transactional
+    public void recomputeMany(String tenantId, LocalDate date, Collection<String> userIds) {
+        if (userIds.isEmpty()) return;
+        Map<String, List<TkPunch>> punchesOf = punches
+                .findByTenantIdAndUserIdInAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId, userIds, date, date).stream()
+                .collect(Collectors.groupingBy(TkPunch::getUserId));
+        Map<String, String> schoolOf = context.schoolsOf(tenantId, userIds);
+        Map<String, List<TkRequest>> approvedOf = requests.findApprovedBetween(tenantId, userIds, date, date).stream()
+                .collect(Collectors.groupingBy(TkRequest::getUserId));
+        Map<String, TkDay> existingOf = days.findByTenantIdAndUserIdInAndWorkDateBetween(tenantId, userIds, date, date).stream()
+                .collect(Collectors.toMap(TkDay::getUserId, Function.identity(), (a, b) -> a));
+        List<TkHoliday> dayHolidays = holidays.findByTenantIdAndHolidayDate(tenantId, date);
+        Optional<SaturdayMode> saturdayMode = saturdays.modeOn(tenantId, date);
+        Optional<Map<String, List<TeacherPeriod>>> dayPeriods = periods.readMany(tenantId, userIds, date, date);
+        Map<String, SchoolDay> schools = new HashMap<>();
+        List<TkDay> rows = new ArrayList<>();
+        List<TkDay> gone = new ArrayList<>();
+        for (String userId : userIds) {
+            List<TkPunch> dayPunches = punchesOf.getOrDefault(userId, List.of());
+            String schoolId = schoolOf(dayPunches).orElse(schoolOf.get(userId));
+            if (schoolId == null) continue;
+            SchoolDay school = schools.computeIfAbsent(schoolId, id -> schoolDay(tenantId, id, date,
+                    dayHolidays.stream().filter(h -> h.getSchoolId() == null || h.getSchoolId().equals(id)).toList(),
+                    saturdayMode));
+            if (school.locked()) continue;
+            TkDay existing = existingOf.get(userId);
+            Optional<TkDay> row = build(school, userId, date, dayPunches, approvedOf.getOrDefault(userId, List.of()),
+                    existing, closed(school, date), () -> dayPeriods.map(all -> all.getOrDefault(userId, List.of())));
+            if (row.isPresent()) {
+                rows.add(row.get());
+            } else if (existing != null) {
+                gone.add(existing);
+            }
+        }
+        days.saveAll(rows);
+        days.deleteAll(gone);
+    }
+
+    private void recompute(String tenantId, String userId, LocalDate date, boolean evenIfLocked,
+            Supplier<Optional<List<TeacherPeriod>>> dayPeriods) {
         lockDay(tenantId, userId, date);
         List<TkPunch> dayPunches = punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date);
         String schoolId = schoolOf(dayPunches).or(() -> context.schoolOf(tenantId, userId)).orElse(null);
@@ -135,7 +222,7 @@ public class DayAggregationService {
         }
         Optional<TkDay> existing = days.findByTenantIdAndUserIdAndWorkDate(tenantId, userId, date);
         Optional<TkDay> row = build(school, userId, date, dayPunches,
-                requests.findApprovedOnForUser(tenantId, userId, date), existing.orElse(null), closed(school, date));
+                requests.findApprovedOnForUser(tenantId, userId, date), existing.orElse(null), closed(school, date), dayPeriods);
         if (row.isPresent()) {
             days.save(row.get());
         } else {
@@ -150,29 +237,6 @@ public class DayAggregationService {
      * person is logged and skipped. Re-running gives the same rows. Returns the number of rows written.
      */
     public int closeDay(String tenantId, LocalDate date) {
-        return closeDay(tenantId, date, null);
-    }
-
-    /**
-     * Closes every day of {@code month} for one school, before its period lock (I1): the nightly close may not have
-     * reached the last day yet, or may have missed a night. The caller locks only afterwards, so nothing is skipped.
-     */
-    public void closeMonth(String tenantId, String schoolId, YearMonth month) {
-        for (LocalDate date = month.atDay(1); !date.isAfter(month.atEndOfMonth()); date = date.plusDays(1)) {
-            closeDay(tenantId, date, schoolId);
-        }
-    }
-
-    /**
-     * Serialises recomputes of one (user, day) until commit, so a stale snapshot never overwrites a newer one (M1).
-     * shortcut: closeDay does not take it (one lock per person per day would exhaust the lock table for a month
-     * close); take it there too, or upsert, if the 00:30 close is seen racing approvals.
-     */
-    private void lockDay(String tenantId, String userId, LocalDate date) {
-        requests.lockSubmitsOf("tk-day:" + tenantId + ":" + userId + ":" + date);
-    }
-
-    private int closeDay(String tenantId, LocalDate date, String onlySchoolId) {
         Map<String, List<TkPunch>> punchesByUser = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, date)
                 .stream().collect(Collectors.groupingBy(TkPunch::getUserId, LinkedHashMap::new, Collectors.toList()));
         Set<String> people = new LinkedHashSet<>(users.findActiveUserIdsHoldingPermission(tenantId, SELF_PERMISSION, date));
@@ -184,6 +248,7 @@ public class DayAggregationService {
                 .collect(Collectors.toMap(TkDay::getUserId, Function.identity(), (a, b) -> a));
         List<TkHoliday> dayHolidays = holidays.findByTenantIdAndHolidayDate(tenantId, date);
         Optional<SaturdayMode> saturdayMode = saturdays.modeOn(tenantId, date);
+        Optional<Map<String, List<TeacherPeriod>>> dayPeriods = periods.readMany(tenantId, people, date, date);
         Map<String, SchoolDay> schools = new HashMap<>();
 
         List<TkDay> rows = new ArrayList<>();
@@ -191,13 +256,14 @@ public class DayAggregationService {
             try {
                 List<TkPunch> dayPunches = punchesByUser.getOrDefault(userId, List.of());
                 String schoolId = schoolOf(dayPunches).orElse(schoolOf.get(userId));
-                if (schoolId == null || (onlySchoolId != null && !onlySchoolId.equals(schoolId))) continue;
+                if (schoolId == null) continue;
                 SchoolDay school = schools.computeIfAbsent(schoolId, id -> schoolDay(tenantId, id, date,
                         dayHolidays.stream().filter(h -> h.getSchoolId() == null || h.getSchoolId().equals(id)).toList(),
                         saturdayMode));
                 if (school.locked()) continue;
                 build(school, userId, date, dayPunches, requestsByUser.getOrDefault(userId, List.of()),
-                        existing.get(userId), true).ifPresent(rows::add);
+                        existing.get(userId), true, () -> dayPeriods.map(all -> all.getOrDefault(userId, List.of())))
+                        .ifPresent(rows::add);
             } catch (RuntimeException ex) {
                 log.warn("Daily close failed for tenant {} user {} date {}: {}", tenantId, userId, date,
                         ex.getClass().getSimpleName());
@@ -205,6 +271,84 @@ public class DayAggregationService {
         }
         days.saveAll(rows);
         return rows.size();
+    }
+
+    /**
+     * Closes every day of {@code month} for one school, before its period lock (I1): the nightly close may not have
+     * reached the last day yet, or may have missed a night. The caller locks only afterwards, so nothing is skipped.
+     * Same result as {@link #closeDay} for each day, but read once for the month and scoped to the school's people:
+     * punches, approved requests and stored rows in one query each, the teaching periods in one, written in one batch.
+     * Only the roster (its active status depends on the join/leave date) is still asked per day.
+     */
+    public void closeMonth(String tenantId, String schoolId, YearMonth month) {
+        LocalDate first = month.atDay(1);
+        LocalDate last = month.atEndOfMonth();
+        Map<LocalDate, Set<String>> rosterOn = new LinkedHashMap<>();
+        Set<String> candidates = new LinkedHashSet<>();
+        for (LocalDate date = first; !date.isAfter(last); date = date.plusDays(1)) {
+            Set<String> roster = new LinkedHashSet<>(users.findActiveUserIdsHoldingPermission(tenantId, SELF_PERMISSION, date));
+            rosterOn.put(date, roster);
+            candidates.addAll(roster);
+        }
+        Set<String> atSchool = punches.findByTenantIdAndSchoolIdAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId,
+                schoolId, first, last).stream().map(TkPunch::getUserId).collect(Collectors.toSet());
+        candidates.addAll(atSchool);
+        Map<String, String> schoolOf = context.schoolsOf(tenantId, candidates);
+        // a person closes here when their school is this one, or when they punched here (a punch's school wins that day)
+        Set<String> members = candidates.stream()
+                .filter(u -> atSchool.contains(u) || schoolId.equals(schoolOf.get(u))).collect(Collectors.toCollection(LinkedHashSet::new));
+        if (members.isEmpty()) return;
+        Map<String, Map<LocalDate, List<TkPunch>>> punchesOf = new HashMap<>();
+        punches.findByTenantIdAndUserIdInAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId, members, first, last)
+                .forEach(p -> punchesOf.computeIfAbsent(p.getUserId(), k -> new HashMap<>())
+                        .computeIfAbsent(p.getWorkDate(), k -> new ArrayList<>()).add(p));
+        Map<String, List<TkRequest>> approvedOf = requests.findApprovedBetween(tenantId, members, first, last).stream()
+                .collect(Collectors.groupingBy(TkRequest::getUserId));
+        Map<String, Map<LocalDate, TkDay>> existingOf = new HashMap<>();
+        days.findByTenantIdAndUserIdInAndWorkDateBetween(tenantId, members, first, last)
+                .forEach(d -> existingOf.computeIfAbsent(d.getUserId(), k -> new HashMap<>()).putIfAbsent(d.getWorkDate(), d));
+        List<TkHoliday> monthHolidays = holidays.findForSchool(tenantId, schoolId, first, last);
+        Optional<Map<String, List<TeacherPeriod>>> monthPeriods = periods.readMany(tenantId, members, first, last);
+
+        List<TkDay> rows = new ArrayList<>();
+        for (LocalDate date = first; !date.isAfter(last); date = date.plusDays(1)) {
+            LocalDate day = date;
+            SchoolDay school = schoolDay(tenantId, schoolId, day,
+                    monthHolidays.stream().filter(h -> day.equals(h.getHolidayDate())).toList(), saturdays.modeOn(tenantId, day));
+            if (school.locked()) continue;
+            Set<String> people = new LinkedHashSet<>(rosterOn.get(day));
+            members.stream().filter(u -> punchesOf.getOrDefault(u, Map.of()).containsKey(day)).forEach(people::add);
+            for (String userId : members) {
+                if (!people.contains(userId)) continue;
+                try {
+                    List<TkPunch> dayPunches = punchesOf.getOrDefault(userId, Map.of()).getOrDefault(day, List.of());
+                    if (!schoolId.equals(schoolOf(dayPunches).orElse(schoolOf.get(userId)))) continue;
+                    List<TkRequest> approved = approvedOf.getOrDefault(userId, List.of()).stream().filter(r -> covers(r, day)).toList();
+                    build(school, userId, day, dayPunches, approved, existingOf.getOrDefault(userId, Map.of()).get(day), true,
+                            () -> monthPeriods.map(all -> TeacherPeriodReader.onDay(all.getOrDefault(userId, List.of()), day)))
+                            .ifPresent(rows::add);
+                } catch (RuntimeException ex) {
+                    log.warn("Month close failed for tenant {} user {} date {}: {}", tenantId, userId, day,
+                            ex.getClass().getSimpleName());
+                }
+            }
+        }
+        days.saveAll(rows);
+    }
+
+    /** Whether an approved request shapes {@code day}: LEAVE / BUSINESS covering it, an EXPLANATION for it. */
+    private static boolean covers(TkRequest r, LocalDate day) {
+        return r.getType() == RequestType.EXPLANATION ? day.equals(r.getWorkDate())
+                : !day.isBefore(r.getFromDate()) && !day.isAfter(r.getToDate());
+    }
+
+    /**
+     * Serialises recomputes of one (user, day) until commit, so a stale snapshot never overwrites a newer one (M1).
+     * shortcut: closeDay does not take it (one lock per person per day would exhaust the lock table for a month
+     * close); take it there too, or upsert, if the 00:30 close is seen racing approvals.
+     */
+    private void lockDay(String tenantId, String userId, LocalDate date) {
+        requests.lockSubmitsOf("tk-day:" + tenantId + ":" + userId + ":" + date);
     }
 
     /** {@code holidayPay}: how the school's day off is paid (null = not a holiday); {@code saturday}: the day's Saturday mode. */
@@ -258,7 +402,8 @@ public class DayAggregationService {
     }
 
     private Optional<TkDay> build(SchoolDay school, String userId, LocalDate date, List<TkPunch> dayPunches,
-            List<TkRequest> approved, TkDay existing, boolean closed) {
+            List<TkRequest> approved, TkDay existing, boolean closed,
+            Supplier<Optional<List<TeacherPeriod>>> dayPeriods) {
         Optional<TkPunch> in = firstIn(dayPunches);
         Optional<TkPunch> out = latestOut(dayPunches);
         TkShift shift = school.shift();
@@ -313,10 +458,8 @@ public class DayAggregationService {
                 day.setMissing(result.missing());
             }
         }
-        // shortcut: one calendar call per person and day (calendar has no bulk teacherPeriods); add a bulk read
-        // to CalendarReadPort when the daily close of a large tenant gets slow.
         // A failed read keeps the row's previous count (0 for a new row); the day itself is still written.
-        periods.read(school.tenantId(), userId, date, date).ifPresent(list -> day.setPeriods(list.size()));
+        dayPeriods.get().ifPresent(list -> day.setPeriods(list.stream().mapToInt(p -> p.periodCount()).sum()));
         return Optional.of(day);
     }
 

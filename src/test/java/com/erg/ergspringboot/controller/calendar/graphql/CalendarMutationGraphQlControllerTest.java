@@ -16,6 +16,7 @@ import com.erg.ergspringboot.common.response.calendar.CalendarResponses.Calendar
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarEventPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarPreviewPayload;
 import com.erg.ergspringboot.common.response.calendar.CalendarResponses.CalendarRoomOption;
+import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.calendar.persistence.CalendarBatch;
 import com.erg.ergspringboot.calendar.persistence.CalendarEvent;
@@ -528,39 +529,26 @@ class CalendarMutationGraphQlControllerTest {
         }
 
         @Test
-        void resolvesSchoolScopeFromPrincipalWhenInputSchoolIdsAreEmpty() {
+        void rejectsEmptySchoolIdsEvenWhenPrincipalManagesSchools() {
             authenticate(principal("tenant-a",
                     List.of("lms.schedule.manage", "lms.manage"),
                     List.of(),
-                    List.of(),      // managedClassIds empty
+                    List.of(),
                     List.of("school-1", "school-2")));
             DeleteTeacherScheduleRequest noSchoolInput = new DeleteTeacherScheduleRequest(
                     null, "teacher-2", Collections.emptyList(), "2026-01-01", "2026-01-31");
-            CalendarDeletePayload expected = new CalendarDeletePayload("teacher-2", true, 5);
-            when(commandService.deleteTeacherSchedule(
-                    "tenant-a", "teacher-2", List.of("school-1", "school-2"),
-                    "2026-01-01", "2026-01-31", "teacher-1"))
-                    .thenReturn(expected);
-
-            CalendarDeletePayload result = controller.deleteTeacherSchedule(noSchoolInput);
-
-            verify(commandService).deleteTeacherSchedule(
-                    "tenant-a", "teacher-2", List.of("school-1", "school-2"),
-                    "2026-01-01", "2026-01-31", "teacher-1");
-            assert result.equals(expected);
+            assertThatThrownBy(() -> controller.deleteTeacherSchedule(noSchoolInput))
+                    .isInstanceOf(BadRequestException.class);
+            verifyNoInteractions(commandService);
         }
 
         @Test
-        void rejectsEmptySchoolScopeWhenNoManagedIdsAvailable() {
-            authenticate(principal("tenant-a",
-                    List.of("lms.schedule.manage", "lms.manage"),
-                    List.of(),
-                    List.of(),      // managedClassIds empty
-                    List.of()));    // no managedEducationUnitIds
+        void rejectsMissingSchoolIdsForWildcardPrincipal() {
+            authenticate(ErgPrincipal.systemAdmin());
             DeleteTeacherScheduleRequest noSchoolInput = new DeleteTeacherScheduleRequest(
-                    null, "teacher-2", Collections.emptyList(), "2026-01-01", "2026-01-31");
+                    null, "teacher-2", null, "2026-01-01", "2026-01-31");
             assertThatThrownBy(() -> controller.deleteTeacherSchedule(noSchoolInput))
-                    .isInstanceOf(ForbiddenException.class);
+                    .isInstanceOf(BadRequestException.class);
             verifyNoInteractions(commandService);
         }
 

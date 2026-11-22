@@ -24,7 +24,7 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=jvm-builder --chown=erg:erg /workspace/target/erg-spring-0.0.1-SNAPSHOT.jar /app/erg-spring.jar
-# Same path as the native image, so compose.native.yml's FLYWAY_LOCATIONS works for either runtime.
+# compose.native.yml points FLYWAY_LOCATIONS at this path (migrations load from the filesystem, not the jar).
 COPY --from=jvm-builder --chown=erg:erg /workspace/target/classes/db/migration/postgres/ /app/db/migration/postgres/
 
 # Punch photos live on the tk-photos volume (compose.native.yml); the dir must exist owned by erg so the volume inherits it.
@@ -36,56 +36,4 @@ EXPOSE 1606
 HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=8 \
     CMD curl --fail --silent http://127.0.0.1:1606/ready >/dev/null || exit 1
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/erg-spring.jar"]
-
-FROM --platform=$TARGETPLATFORM ghcr.io/graalvm/native-image-community:25 AS native-builder
-
-ARG TARGETARCH
-ENV LANG=C \
-    LC_ALL=C \
-    NATIVE_IMAGE_OPTIONS=-march=compatibility \
-    SPRING_PROFILES_ACTIVE=prod \
-    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,prometheus \
-    MANAGEMENT_ENDPOINT_PROMETHEUS_ACCESS=read-only \
-    MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED=true \
-    FLYWAY_ENABLED=true \
-    ERG_REDIS_STATE_ENABLED=true \
-    ERG_REDIS_STATE_URL=redis://:native-build-placeholder@redis-state:6379 \
-    ERG_REDIS_CACHE_ENABLED=true \
-    ERG_REDIS_CACHE_URL=redis://:native-build-placeholder@redis-cache:6379 \
-    SPRING_AUTOCONFIGURE_EXCLUDE=org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration,org.springframework.modulith.observability.autoconfigure.ModuleObservabilityAutoConfiguration,org.springframework.modulith.observability.autoconfigure.SpringDataRestModuleObservabilityAutoConfiguration,org.springframework.modulith.actuator.autoconfigure.ApplicationModulesEndpointConfiguration
-WORKDIR /workspace
-
-RUN test "$TARGETARCH" = "amd64"
-
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-RUN --mount=type=cache,target=/root/.m2 \
-    chmod +x mvnw && ./mvnw -B -ntp -DskipTests dependency:go-offline
-
-COPY src/ src/
-RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw -B -ntp -Pnative -Dmaven.test.skip=true native:compile
-
-FROM debian:bookworm-slim AS native-runtime
-
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 999 erg \
-    && useradd --system --uid 999 --gid 999 --home-dir /app --shell /usr/sbin/nologin erg
-
-WORKDIR /app
-COPY --from=native-builder --chown=erg:erg /workspace/target/erg-spring-native /app/erg-spring
-COPY --from=native-builder --chown=erg:erg /workspace/target/classes/db/migration/postgres/ /app/db/migration/postgres/
-
-# Punch photos live on the tk-photos volume (compose.native.yml); the dir must exist owned by erg so the volume inherits it.
-RUN install -d -o erg -g erg /var/lib/erg/tk-photos
-
-USER erg
-EXPOSE 1606
-
-HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \
-    CMD curl --fail --silent http://127.0.0.1:1606/ready >/dev/null || exit 1
-
-ENTRYPOINT ["/app/erg-spring"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+UseG1GC", "-XX:+ExitOnOutOfMemoryError", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/erg-spring.jar"]

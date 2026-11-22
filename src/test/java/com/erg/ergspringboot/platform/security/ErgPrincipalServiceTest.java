@@ -3,6 +3,8 @@ package com.erg.ergspringboot.platform.security;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.users.persistence.auth.AuthSession;
@@ -16,6 +18,7 @@ import com.erg.ergspringboot.auth.AuthTokenService;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -29,6 +32,42 @@ class ErgPrincipalServiceTest {
 
     @Mock
     private UserRoleAssignmentRepository assignmentRepository;
+
+    @Mock
+    private AuthSessionTenantResolver tenantResolver;
+
+    @Test
+    void unknownTokenIsResolvedAgainstTheDatabaseOnlyOncePerWindow() {
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, new AuthTokenService(), tenantResolver);
+        when(tenantResolver.resolve(any())).thenReturn(Optional.empty());
+
+        assertThat(service.resolveTenantId("nope")).isEmpty();
+        assertThat(service.resolveTenantId("nope")).isEmpty();
+
+        verify(tenantResolver, times(1)).resolve(any());
+    }
+
+    @Test
+    void aTransientResolverErrorIsNotRememberedAsUnknown() {
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, new AuthTokenService(), tenantResolver);
+        when(tenantResolver.resolve(any())).thenThrow(new IllegalStateException("db down")).thenReturn(Optional.of("erg"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.resolveTenantId("good"))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(service.resolveTenantId("good")).contains("erg");
+    }
+
+    @Test
+    void resolvedTenantIsReusedWithoutASecondResolveTransaction() {
+        ErgPrincipalService service = new ErgPrincipalService(sessionRepository, new AuthTokenService(), tenantResolver);
+        when(tenantResolver.resolve(any())).thenReturn(Optional.of("erg"));
+
+        assertThat(service.resolveTenantId("good")).contains("erg");
+        assertThat(service.resolveTenantId("good")).contains("erg");
+
+        verify(tenantResolver, times(1)).resolve(any());
+    }
 
     @Test
     void bearerLookupResolvesMissingTenantFromTheServerSideSession() {

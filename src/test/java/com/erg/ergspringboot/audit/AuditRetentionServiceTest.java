@@ -66,4 +66,18 @@ class AuditRetentionServiceTest {
         assertThatThrownBy(() -> new AuditRetentionService(mock(AuditEventRepository.class), mock(EntityManager.class), 25, 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void purgeKeepsDeletingUntilAPartialBatch() {
+        AuditEventRepository repository = mock(AuditEventRepository.class);
+        EntityManager entityManager = mock(EntityManager.class);
+        when(entityManager.createNativeQuery(any(String.class))).thenReturn(mock(Query.class));
+        when(repository.deleteExpired(any(), org.mockito.ArgumentMatchers.eq(25))).thenReturn(25, 25, 7);
+
+        int total = new AuditRetentionService(repository, entityManager, 25, 365)
+                .purge(OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+
+        assertThat(total).isEqualTo(57);
+        verify(repository, org.mockito.Mockito.times(3)).deleteExpired(any(), org.mockito.ArgumentMatchers.eq(25));
+    }
 }

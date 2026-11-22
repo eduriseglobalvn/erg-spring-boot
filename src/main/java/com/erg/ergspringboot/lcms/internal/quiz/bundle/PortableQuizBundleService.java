@@ -6,7 +6,6 @@ import com.erg.ergspringboot.lcms.LcmsQuizBundleResponse;
 import com.erg.ergspringboot.lcms.LcmsQuizPackageManifest;
 import com.erg.ergspringboot.lcms.LcmsQuizPackageUpdateFeedResponse;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackage;
-import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizPackageRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
 import java.nio.charset.StandardCharsets;
@@ -60,22 +59,21 @@ public class PortableQuizBundleService {
      * revoked/expired, an older immutable version is a safe rollback target.
      */
     public Map<String, Object> exportActive(String tenantId, String quizId) {
-        QuizVersion active = quizVersionRepository.findByQuizIdAndTenantIdAndIsActiveTrue(quizId, tenantId)
+        QuizVersionRepository.Lineage active = quizVersionRepository.findLineageByQuizIdAndTenantIdAndIsActiveTrue(quizId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("quiz has no active published version"));
-
-        List<QuizVersion> candidates = new ArrayList<>();
-        candidates.add(active);
-        quizVersionRepository.findByQuizIdAndTenantIdOrderByVersionNumberDesc(quizId, tenantId)
-                .stream()
-                .filter(candidate -> !candidate.getId().equals(active.getId()))
-                .forEach(candidates::add);
-
-        for (QuizVersion candidate : candidates) {
+        try {
+            return export(tenantId, active, true);
+        } catch (ResourceNotFoundException ignored) {
+            // A revoked/expired/missing package is not a reason to expose a different tenant or draft; fall back only within lineage.
+        }
+        // Rollback candidates are column projections, and a package is fetched only when its turn comes.
+        for (QuizVersionRepository.Lineage candidate : quizVersionRepository
+                .findLineagesByQuizIdAndTenantIdOrderByVersionNumberDesc(quizId, tenantId)) {
+            if (candidate.getId().equals(active.getId())) continue;
             try {
-                return export(tenantId, candidate);
+                return export(tenantId, candidate, true);
             } catch (ResourceNotFoundException ignored) {
-                // A revoked/expired/missing package is not a reason to expose
-                // a different tenant or draft; continue only within lineage.
+                // next older version
             }
         }
         throw new ResourceNotFoundException("quiz has no usable portable package");
@@ -83,18 +81,18 @@ public class PortableQuizBundleService {
 
     /** Exports a specific published version; superseded versions remain immutable. */
     public Map<String, Object> exportVersion(String tenantId, String quizVersionId) {
-        QuizVersion version = quizVersionRepository.findByIdAndTenantId(quizVersionId, tenantId)
+        QuizVersionRepository.Lineage version = quizVersionRepository.findLineageByIdAndTenantId(quizVersionId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("quiz version not found"));
-        return export(tenantId, version);
+        return export(tenantId, version, true);
     }
 
     /** Returns only signed package metadata; no package JSON or answer key is returned. */
     public LcmsQuizPackageManifest manifest(String tenantId, String packageId) {
         QuizPackage pkg = packageRepository.findByIdAndTenantId(packageId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("portable package not found"));
-        QuizVersion version = quizVersionRepository.findByIdAndTenantId(pkg.getQuizVersionId(), tenantId)
+        QuizVersionRepository.Lineage version = quizVersionRepository.findLineageByIdAndTenantId(pkg.getQuizVersionId(), tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("published version not found"));
-        LcmsQuizBundleResponse bundle = LcmsQuizBundleResponse.fromLegacy(export(tenantId, version));
+        LcmsQuizBundleResponse bundle = LcmsQuizBundleResponse.fromLegacy(export(tenantId, version, pkg, false));
         if (!packageId.equals(bundle.packageId())) {
             throw new ResourceNotFoundException("portable package lineage is invalid");
         }
@@ -124,15 +122,23 @@ public class PortableQuizBundleService {
         }
 
         List<LcmsQuizPackageManifest> available = new ArrayList<>();
-        List<QuizVersion> versions = quizVersionRepository
-                .findByQuizIdAndTenantIdOrderByVersionNumberDesc(quizId, tenantId, PageRequest.of(0, MAX_UPDATE_ITEMS));
-        for (QuizVersion version : versions) {
-            if (version.getPublishedAt() == null
-                    || (currentVersionNumber != null && version.getVersionNumber() <= currentVersionNumber)) {
-                continue;
-            }
+        // Version rows as columns only; the packages of the versions newer than the caller's come in one query.
+        List<QuizVersionRepository.Lineage> versions = quizVersionRepository
+                .findLineagesByQuizIdAndTenantIdOrderByVersionNumberDesc(quizId, tenantId, PageRequest.of(0, MAX_UPDATE_ITEMS))
+                .stream()
+                .filter(version -> version.getPublishedAt() != null
+                        && (currentVersionNumber == null || version.getVersionNumber() > currentVersionNumber))
+                .toList();
+        Map<String, QuizPackage> packages = new java.util.HashMap<>();
+        if (!versions.isEmpty()) {
+            packageRepository.findByQuizVersionIdInAndTenantId(
+                    versions.stream().map(QuizVersionRepository.Lineage::getId).toList(), tenantId)
+                    .forEach(pkg -> packages.put(pkg.getQuizVersionId(), pkg));
+        }
+        for (QuizVersionRepository.Lineage version : versions) {
             try {
-                LcmsQuizPackageManifest manifest = manifestForVersion(tenantId, version);
+                LcmsQuizPackageManifest manifest = LcmsQuizPackageManifest.fromBundle(LcmsQuizBundleResponse.fromLegacy(
+                        export(tenantId, version, packages.get(version.getId()), false)));
                 if (!manifest.portableReady()
                         || !channel.equals(normalizeChannel(manifest.releaseChannel()))
                         || !runtimeCompatible(manifest.minRuntimeVersion(), runtimeVersion)) {
@@ -158,6 +164,18 @@ public class PortableQuizBundleService {
                 OffsetDateTime.now(ZoneOffset.UTC).toString());
     }
 
+    /** The quiz a published version belongs to, for the caller's ownership check; 404 when it is not in the tenant. */
+    public String quizIdOfVersion(String tenantId, String quizVersionId) {
+        return quizVersionRepository.findQuizIdByIdAndTenantId(quizVersionId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("quiz version not found"));
+    }
+
+    /** The quiz a portable package belongs to, for the caller's ownership check; 404 when it is not in the tenant. */
+    public String quizIdOfPackage(String tenantId, String packageId) {
+        return packageRepository.findQuizIdByIdAndTenantId(packageId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("portable package not found"));
+    }
+
     /** Idempotently revokes a package for one authenticated tenant. */
     @Transactional(value = "postgresTransactionManager", readOnly = false)
     public QuizPackage revoke(String tenantId, String packageId, String reason) {
@@ -174,10 +192,19 @@ public class PortableQuizBundleService {
         return pkg;
     }
 
-    private Map<String, Object> export(String tenantId, QuizVersion version) {
+    private Map<String, Object> export(String tenantId, QuizVersionRepository.Lineage version, boolean withRuntime) {
         requirePublishedLineage(tenantId, version);
-        QuizPackage pkg = packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("published version has no compiled package"));
+        QuizPackage pkg = packageRepository.findByQuizVersionIdAndTenantId(version.getId(), tenantId).orElse(null);
+        return export(tenantId, version, pkg, withRuntime);
+    }
+
+    /** withRuntime=false skips copying the package body: a manifest never carries it. */
+    private Map<String, Object> export(
+            String tenantId, QuizVersionRepository.Lineage version, QuizPackage pkg, boolean withRuntime) {
+        requirePublishedLineage(tenantId, version);
+        if (pkg == null) {
+            throw new ResourceNotFoundException("published version has no compiled package");
+        }
         requirePackageLineage(tenantId, version, pkg);
         if (pkg.getRevokedAt() != null || isExpired(pkg)) {
             throw new ResourceNotFoundException("portable package is no longer available");
@@ -195,7 +222,8 @@ public class PortableQuizBundleService {
             throw new ResourceNotFoundException("portable package assets exceed the supported bounds");
         }
 
-        Map<String, Object> runtime = PortableQuizPackageContentPolicy.sanitizedRuntime(sourcePackage, serverAuthoritative);
+        Map<String, Object> runtime = withRuntime
+                ? PortableQuizPackageContentPolicy.sanitizedRuntime(sourcePackage, serverAuthoritative) : Map.of();
         String contentHash = text(pkg.getContentHash());
         String signature = text(pkg.getSignature());
         String publicKeyId = text(pkg.getPublicKeyId());
@@ -235,11 +263,6 @@ public class PortableQuizBundleService {
                 ? OffsetDateTime.now(ZoneOffset.UTC).toString()
                 : pkg.getGeneratedAt().withOffsetSameInstant(ZoneOffset.UTC).toString());
         return bundle;
-    }
-
-    private LcmsQuizPackageManifest manifestForVersion(String tenantId, QuizVersion version) {
-        return LcmsQuizPackageManifest.fromBundle(
-                LcmsQuizBundleResponse.fromLegacy(export(tenantId, version)));
     }
 
     private String normalizeChannel(String value) {
@@ -303,7 +326,7 @@ public class PortableQuizBundleService {
         }
     }
 
-    private void requirePublishedLineage(String tenantId, QuizVersion version) {
+    private void requirePublishedLineage(String tenantId, QuizVersionRepository.Lineage version) {
         if (tenantId == null || tenantId.isBlank()
                 || version == null
                 || !tenantId.equals(version.getTenantId())
@@ -314,7 +337,7 @@ public class PortableQuizBundleService {
         }
     }
 
-    private void requirePackageLineage(String tenantId, QuizVersion version, QuizPackage pkg) {
+    private void requirePackageLineage(String tenantId, QuizVersionRepository.Lineage version, QuizPackage pkg) {
         if (pkg == null
                 || !tenantId.equals(pkg.getTenantId())
                 || !version.getId().equals(pkg.getQuizVersionId())

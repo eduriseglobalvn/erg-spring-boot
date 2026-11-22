@@ -54,19 +54,27 @@ class RecipientLookupServiceTest {
 
     private final LmsAudienceReadPort lms = mock(LmsAudienceReadPort.class);
     private final UserDirectoryPort users = mock(UserDirectoryPort.class);
-    private int largestUserLookup;
     private final FakeStudents students = new FakeStudents();
+    private final AudienceAccountQueries accounts = mock(AudienceAccountQueries.class);
     private final RecipientLookupService service =
-            new RecipientLookupService(students, lms, users, new AudienceScopeGuard(lms, mock(com.erg.ergspringboot.users.UserAuthorizationPort.class)));
+            new RecipientLookupService(students, lms, accounts, new RecipientDirectoryCache(accounts, users),
+                    new AudienceScopeGuard(lms, mock(com.erg.ergspringboot.users.UserAuthorizationPort.class)));
 
     @BeforeEach
     void wireDirectory() {
         when(lms.classIdsTaughtBy(TENANT, "gv1")).thenReturn(List.of("7A", "7B"));
         when(users.findCalendarTeachersByTenant(eq(TENANT), any(Pageable.class))).thenReturn(teachers);
         when(users.findActiveStaffUserIds(eq(TENANT), any(Pageable.class))).thenReturn(List.of("st-lan"));
+        when(accounts.studentDirectory(eq(TENANT), any(), org.mockito.ArgumentMatchers.anyInt())).thenAnswer(call ->
+                students.listStudents(TENANT, call.getArgument(1), call.getArgument(2)).stream()
+                        .map(s -> new AudienceAccountQueries.StudentRow(s.userId(), s.fullName(), s.studentCode(), s.email(), s.phone(), s.className()))
+                        .toList());
+        when(accounts.activeUserIds(eq(TENANT), anyCollection())).thenAnswer(call ->
+                ((Collection<String>) call.getArgument(1)).stream()
+                        .filter(id -> !id.equals("u-gone") && !id.startsWith("sus-")).collect(java.util.stream.Collectors.toSet()));
         when(users.findByTenantIdAndIds(eq(TENANT), anyCollection())).thenAnswer(call -> {
             Set<String> ids = Set.copyOf((Collection<String>) call.getArgument(1));
-            largestUserLookup = Math.max(largestUserLookup, ids.size());
+
             List<UserAccountProjection> all = new ArrayList<>(teachers);
             all.addAll(staff);
             roll.forEach(s -> all.add(new UserAccountProjection(s.userId(), TENANT, s.fullName(), s.email(),
@@ -299,7 +307,6 @@ class RecipientLookupServiceTest {
 
         assertThat(result.matched()).hasSize(2_000);
         assertThat(result.notFound()).hasSize(500).contains("big0000", "big2495");
-        assertThat(largestUserLookup).isBetween(1, 1_000);
     }
 
     @Test

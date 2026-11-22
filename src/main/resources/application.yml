@@ -14,10 +14,10 @@ spring:
         schema-initialization:
           enabled: false
   autoconfigure:
-    # MongoDB and Redis are optional infrastructure in the current Spring service.
-    # Keep them opt-in so local/dev boots and actuator health do not block on
-    # localhost:27017 or unavailable external Redis DNS.
-    exclude: ${SPRING_AUTOCONFIGURE_EXCLUDE:org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration,org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration}
+    # Redis is optional infrastructure in the current Spring service.
+    # Keep it opt-in so local/dev boots and actuator health do not block on
+    # unavailable external Redis DNS.
+    exclude: ${SPRING_AUTOCONFIGURE_EXCLUDE:org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration}
   threads:
     virtual:
       enabled: ${SPRING_THREADS_VIRTUAL_ENABLED:false}
@@ -37,6 +37,7 @@ spring:
       initialization-fail-timeout: ${SPRING_DATASOURCE_HIKARI_INITIALIZATION_FAIL_TIMEOUT:1}
       idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:300000}
       max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:1800000}
+      keepalive-time: ${SPRING_DATASOURCE_HIKARI_KEEPALIVE_TIME:120000}
       auto-commit: false
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
@@ -44,11 +45,6 @@ spring:
     baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:true}
     baseline-version: ${FLYWAY_BASELINE_VERSION:0}
   data:
-    mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI:${MONGODB__URI}}
-      database: ${SPRING_DATA_MONGODB_DATABASE:${MONGODB__DATABASE}}
-      authentication-database: ${SPRING_DATA_MONGODB_AUTHENTICATION_DATABASE:${MONGODB__AUTH_SOURCE}}
-      auto-index-creation: ${SPRING_DATA_MONGODB_AUTO_INDEX_CREATION:false}
     redis:
       repositories:
         enabled: false
@@ -75,6 +71,8 @@ spring:
           batch_versioned_data: ${SPRING_JPA_HIBERNATE_JDBC_BATCH_VERSIONED_DATA:true}
           time_zone: Asia/Ho_Chi_Minh
           timeout: ${SPRING_JPA_HIBERNATE_JDBC_TIMEOUT_SECONDS:5}
+        query:
+          in_clause_parameter_padding: true
         order_inserts: ${SPRING_JPA_HIBERNATE_ORDER_INSERTS:true}
         order_updates: ${SPRING_JPA_HIBERNATE_ORDER_UPDATES:true}
       jakarta:
@@ -112,7 +110,11 @@ spring:
     scheduling:
       pool:
         # Ten @Scheduled workers share this pool; one slow job must not stall the rest.
-        size: ${SPRING_TASK_SCHEDULING_POOL_SIZE:4}
+        size: ${SPRING_TASK_SCHEDULING_POOL_SIZE:8}
+    # Let in-flight @Scheduled jobs finish on SIGTERM instead of cutting them off.
+    shutdown:
+      await-termination: true
+      await-termination-period: 30s
   graphql:
     http:
       path: ${SPRING_GRAPHQL_PATH:/api/v1/graphql}
@@ -151,18 +153,14 @@ server:
     threads:
       max: ${SERVER_TOMCAT_THREADS_MAX:200}
     accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:100}
+    # Default 100 closes every keep-alive connection after 100 requests; behind nginx keepalive that is constant reconnect churn.
+    max-keep-alive-requests: ${SERVER_TOMCAT_MAX_KEEP_ALIVE_REQUESTS:10000}
   error:
     include-message: never
     include-stacktrace: never
     include-binding-errors: never
 
 management:
-  tracing:
-    sampling:
-      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:0.1}
-    export:
-      zipkin:
-        endpoint: ${MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
   endpoints:
     web:
       exposure:
@@ -186,11 +184,7 @@ management:
       percentiles-histogram:
         http.server.requests: true
         graphql.operation.duration: true
-      percentiles:
-        http.server.requests: 0.5, 0.95, 0.99
   health:
-    mongo:
-      enabled: ${MANAGEMENT_HEALTH_MONGO_ENABLED:false}
     redis:
       enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}
 
@@ -232,7 +226,7 @@ erg:
     io:
       core-size: ${ERG_MODULE_EVENTS_IO_CORE_SIZE:8}
       max-size: ${ERG_MODULE_EVENTS_IO_MAX_SIZE:16}
-      queue-capacity: ${ERG_MODULE_EVENTS_IO_QUEUE_CAPACITY:0}
+      queue-capacity: ${ERG_MODULE_EVENTS_IO_QUEUE_CAPACITY:256}
     cpu:
       parallelism: ${ERG_MODULE_EVENTS_CPU_PARALLELISM:4}
       queue-capacity: ${ERG_MODULE_EVENTS_CPU_QUEUE_CAPACITY:32}
@@ -272,8 +266,6 @@ erg:
       command-timeout: ${ERG_REDIS_CACHE_COMMAND_TIMEOUT:500ms}
       pool-size: ${ERG_REDIS_CACHE_POOL_SIZE:24}
       min-idle: ${ERG_REDIS_CACHE_MIN_IDLE:4}
-  process-local:
-    enabled: ${ERG_PROCESS_LOCAL_ENABLED:false}
   outbox:
     worker:
       enabled: ${ERG_OUTBOX_WORKER_ENABLED:true}
@@ -299,7 +291,6 @@ erg:
       # fcm | webpush. Empty: fcm when ERG_FCM_CREDENTIALS_FILE (path only, never the content) is set, else webpush.
       provider: ${NOTIFICATIONS__PUSH__PROVIDER:}
       sender-mode: ${NOTIFICATIONS__PUSH__SENDER_MODE:http-v1}
-      native-image-strict: ${NOTIFICATIONS__PUSH__NATIVE_IMAGE_STRICT:true}
       project-id: ${FIREBASE_PROJECT_ID:}
       endpoint: ${FIREBASE_FCM_ENDPOINT:https://fcm.googleapis.com}
       connect-timeout: ${NOTIFICATIONS__PUSH__CONNECT_TIMEOUT:3s}
@@ -442,9 +433,6 @@ spring:
     properties:
       hibernate:
         generate_statistics: true
-erg:
-  process-local:
-    enabled: ${ERG_PROCESS_LOCAL_ENABLED:true}
 # API docs stay off by default (see shared document); local development opts back in.
 springdoc:
   api-docs:
@@ -459,9 +447,6 @@ spring:
       on-profile: test
   autoconfigure:
     exclude:
-      - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
-      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
-      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
       - org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration
       - org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration
   datasource:
@@ -470,9 +455,6 @@ spring:
     username: sa
     password:
   data:
-    mongodb:
-      uri: mongodb://localhost:27017
-      database: erg_test
     redis:
       host: localhost
       port: 6379
@@ -483,8 +465,6 @@ erg:
   # No @Scheduled workers in tests: they write to the shared DB and skew query counts.
   scheduling:
     enabled: false
-  process-local:
-    enabled: true
   quiz:
     media:
       # Test-only signing key; prod reads SECRET_MEDIA_URL_SIGNING_KEY.

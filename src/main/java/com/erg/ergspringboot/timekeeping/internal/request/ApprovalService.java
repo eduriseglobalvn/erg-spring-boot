@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.timekeeping.internal.request;
 
+import com.erg.ergspringboot.calendar.TeacherPeriod;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.platform.security.ErgPolicyService;
 import com.erg.ergspringboot.platform.security.ErgPrincipal;
@@ -62,18 +63,28 @@ public class ApprovalService {
 
     @Transactional
     public void approveStep(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment) {
-        act(tenantId, requestId, actor, onBehalf, comment, true);
+        act(tenantId, requestId, actor, onBehalf, comment, true, null);
+    }
+
+    /**
+     * As above, with the requester's teaching periods over the request's dates read by the caller before this
+     * transaction (a final approval needs them to rebuild the days; no second connection is borrowed inside it).
+     */
+    @Transactional
+    public void approveStep(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment,
+            Optional<List<TeacherPeriod>> periodsInRange) {
+        act(tenantId, requestId, actor, onBehalf, comment, true, periodsInRange);
     }
 
     /** {@code comment} is required (400). */
     @Transactional
     public void rejectStep(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment) {
         if (comment == null || comment.isBlank()) throw RequestRules.bad("COMMENT_REQUIRED", "Nhập lý do từ chối");
-        act(tenantId, requestId, actor, onBehalf, comment, false);
+        act(tenantId, requestId, actor, onBehalf, comment, false, null);
     }
 
     private void act(String tenantId, String requestId, ErgPrincipal actor, boolean onBehalf, String comment,
-            boolean approve) {
+            boolean approve, Optional<List<TeacherPeriod>> periodsInRange) {
         if (comment != null && comment.length() > RequestRules.NOTE_MAX) {
             throw RequestRules.bad("NOTE_TOO_LONG", "Ghi chú tối đa 1000 ký tự");
         }
@@ -129,8 +140,13 @@ public class ApprovalService {
         }
         r.setStatus(RequestStatus.APPROVED);
         requests.flush(); // the aggregation reads APPROVED requests
-        for (LocalDate date : dates(r)) {
-            days.recompute(tenantId, r.getUserId(), date);
+        if (r.getType() != RequestType.WFH) { // a WFH approval changes no day row: only leave, business and explanations count
+            List<LocalDate> covered = dates(r);
+            if (periodsInRange == null) {
+                days.recomputeDays(tenantId, r.getUserId(), covered);
+            } else {
+                days.recomputeDays(tenantId, r.getUserId(), covered, periodsInRange);
+            }
         }
         notifier.approved(r, stepNo);
     }
@@ -159,7 +175,8 @@ public class ApprovalService {
         audit.save(row);
     }
 
-    private static List<LocalDate> dates(TkRequest r) {
+    /** The days a request covers, oldest first (an explanation covers its one work date). */
+    public static List<LocalDate> dates(TkRequest r) {
         if (r.getType() == RequestType.EXPLANATION) return List.of(r.getWorkDate());
         return r.getFromDate().datesUntil(r.getToDate().plusDays(1)).toList();
     }

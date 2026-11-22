@@ -29,7 +29,13 @@ public class StudentQuestionThreadOperations {
     }
 
     public List<QuestionThreadResponse> list(String tenantId, String userId, boolean tenantWide, boolean teacherSide, String status) {
-        return threads.list(new Actor(tenantId, userId, tenantWide), teacherSide, status);
+        return list(tenantId, userId, tenantWide, teacherSide, status, true);
+    }
+
+    /** {@code includeCorrectAnswer = false}: the list skips the correct-answer lookup (correctAnswerText stays null). */
+    public List<QuestionThreadResponse> list(String tenantId, String userId, boolean tenantWide, boolean teacherSide, String status,
+                                             boolean includeCorrectAnswer) {
+        return threads.list(new Actor(tenantId, userId, tenantWide), teacherSide, status, includeCorrectAnswer);
     }
 
     public boolean markRead(String tenantId, String userId, String threadId) {

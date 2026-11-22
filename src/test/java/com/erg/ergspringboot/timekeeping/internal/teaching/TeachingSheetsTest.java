@@ -55,4 +55,13 @@ class TeachingSheetsTest {
         assertThat(TeachingSheets.role(null)).isEqualTo("MAIN");
         assertThatThrownBy(() -> TeachingSheets.role("BOSS")).isInstanceOf(ApiException.class);
     }
+
+    @Test
+    void anExportOrSheetOverTheCapIsRefusedBeforeItIsExpanded() {
+        TeachingHoursService.checkExportSize(List.of(period("t1", "MAIN", "6A", "2026-10-06", 2)));
+        List<TeachingPeriod> many = java.util.Collections.nCopies(TeachingHoursService.MAX_EXPORT_PERIODS + 1,
+                period("t1", "MAIN", "6A", "2026-10-06", 1));
+        assertThatThrownBy(() -> TeachingHoursService.checkExportSize(many)).isInstanceOf(ApiException.class)
+                .hasFieldOrPropertyWithValue("code", "TEACHING_RANGE_TOO_LARGE");
+    }
 }

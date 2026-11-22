@@ -41,9 +41,11 @@ public class CrmWorkspaceController {
     public ApiResponse<WorkspaceResponse> workspace(
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "500") int size,
+            @RequestParam(required = false, defaultValue = "false") boolean openFollowUpsOnly,
             HttpServletRequest request
     ) {
-        return ok("CRM workspace loaded", service.workspace(UserAccessContext.from(request), page, size), request);
+        return ok("CRM workspace loaded",
+                service.workspace(UserAccessContext.from(request), page, size, openFollowUpsOnly), request);
     }
 
     @PatchMapping("/leads/{leadId}/status")

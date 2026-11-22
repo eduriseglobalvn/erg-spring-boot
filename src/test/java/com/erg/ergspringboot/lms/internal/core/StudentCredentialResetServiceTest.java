@@ -46,7 +46,8 @@ class StudentCredentialResetServiceTest {
             mock(com.erg.ergspringboot.lms.LmsCallerPermissions.class);
     private final StudentCredentialResetService service = new StudentCredentialResetService(
             classrooms, students, users, assignments, sessions, activities, hasher,
-            mock(com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository.class), permissions);
+            mock(com.erg.ergspringboot.users.persistence.auth.AuthLoginAttemptRepository.class), permissions,
+            new com.erg.ergspringboot.platform.security.ErgAuthProperties());
 
     @Test
     void schoolScopedStaffNeedTheStudentManagePermission() {
@@ -90,19 +91,19 @@ class StudentCredentialResetServiceTest {
     }
 
     @Test
-    void resetSetsThePasswordBackToTheDefault() {
+    void resetAlwaysSetsTheConfiguredDefaultPasswordNotTheUsername() {
         givenStudentInClass("student.workspace.access");
         User user = users.findByIdAndTenantId("u1", "t1").orElseThrow();
         user.setUsername("thcstcd.nguyenvana0123");
-        assertEquals(StudentCredentialResetService.DEFAULT_PASSWORD, service.reset(teacherOf("c1"), "c1", "stu-1", null, null, null).password());
+        assertEquals("erg2026", service.reset(teacherOf("c1"), "c1", "stu-1", null, null, null).password());
     }
 
     @Test
-    void teacherOfTheClassGetsANewPasswordOnceAndSessionsAreRevoked() {
+    void teacherOfTheClassGetsTheDefaultPasswordAndSessionsAreRevoked() {
         givenStudentInClass("student.workspace.access");
         StudentCredentialResetResponse response = service.reset(teacherOf("c1"), "c1", "stu-1", "req", "1.1.1.1", "ua");
         assertEquals("hs01", response.username());
-        assertEquals(StudentCredentialResetService.DEFAULT_PASSWORD, response.password());
+        assertEquals("erg2026", response.password());
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(users).save(saved.capture());
         assertEquals("hashed", saved.getValue().getPasswordHash());

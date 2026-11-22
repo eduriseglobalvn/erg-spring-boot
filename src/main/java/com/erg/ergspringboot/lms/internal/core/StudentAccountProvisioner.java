@@ -3,6 +3,7 @@ package com.erg.ergspringboot.lms.internal.core;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ConflictException;
 import com.erg.ergspringboot.platform.security.UserAccessContext;
+import com.erg.ergspringboot.platform.security.ErgAuthProperties;
 import com.erg.ergspringboot.users.CredentialHasher;
 import com.erg.ergspringboot.users.persistence.User;
 import com.erg.ergspringboot.users.persistence.UserRepository;
@@ -23,8 +24,11 @@ class StudentAccountProvisioner {
     private final UserRepository users;
     private final UserRoleAssignmentRepository assignments;
     private final CredentialHasher passwords;
+    private final ErgAuthProperties authProperties;
 
-    StudentAccountProvisioner(UserRepository users, UserRoleAssignmentRepository assignments, CredentialHasher passwords) {
+    StudentAccountProvisioner(UserRepository users, UserRoleAssignmentRepository assignments, CredentialHasher passwords,
+                              ErgAuthProperties authProperties) {
+        this.authProperties = authProperties;
         this.users = users;
         this.assignments = assignments;
         this.passwords = passwords;
@@ -46,15 +50,15 @@ class StudentAccountProvisioner {
     record ImportedAccount(String userId, String login) { }
 
     /**
-     * Import path: a taken login is numbered instead of refused, and a password that equals the requested
-     * username (owner rule 17/11/2026) follows the login actually created.
+     * Import path: a taken login is numbered instead of refused. Owner rule 21/11/2026: a missing password, or one
+     * equal to the username (older frontends), becomes the default password (erg.auth.student-default-password).
      */
     ImportedAccount provisionForImport(UserAccessContext access, String schoolId, String username, String email,
                                        String fullName, String phone, String password) {
         String login = freeLogin(username);
         boolean sameAsUsername = password != null && username != null && password.equalsIgnoreCase(username.trim());
         return new ImportedAccount(
-                provision(access, schoolId, login, email, fullName, phone, sameAsUsername ? login : password), login);
+                provision(access, schoolId, login, email, fullName, phone, sameAsUsername ? null : password), login);
     }
 
     /** Returns the new user's id. Throws {@link ConflictException} when the username or email is taken. */
@@ -62,7 +66,9 @@ class StudentAccountProvisioner {
                      String phone, String password) {
         String login = username == null || username.isBlank() ? null : username.trim().toLowerCase();
         if (login == null) throw new BadRequestException("Username is required to create a student account.");
-        if (password == null || password.length() < 6 || password.length() > 128) {
+        if (password != null && password.isBlank()) password = null;
+        if (password == null || password.equalsIgnoreCase(login)) password = authProperties.getStudentDefaultPassword();
+        if (password.length() < 6 || password.length() > 128) {
             throw new BadRequestException("Student password must be 6-128 characters.");
         }
         String mail = email == null || email.isBlank() ? null : email.trim().toLowerCase();

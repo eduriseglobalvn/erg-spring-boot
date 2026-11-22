@@ -24,7 +24,8 @@ class StudentAccountProvisionerTest {
     private final UserRepository users = mock(UserRepository.class);
     private final UserRoleAssignmentRepository assignments = mock(UserRoleAssignmentRepository.class);
     private final CredentialHasher hasher = mock(CredentialHasher.class);
-    private final StudentAccountProvisioner provisioner = new StudentAccountProvisioner(users, assignments, hasher);
+    private final StudentAccountProvisioner provisioner = new StudentAccountProvisioner(users, assignments, hasher,
+            new com.erg.ergspringboot.platform.security.ErgAuthProperties());
     private final UserAccessContext access = new UserAccessContext("admin-1", "erg", List.of(), List.of(), null, null);
 
     @Test
@@ -63,15 +64,27 @@ class StudentAccountProvisionerTest {
     }
 
     @Test
-    void anImportedPasswordThatEqualsTheUsernameFollowsTheRenumberedLogin() {
+    void anImportedPasswordThatEqualsTheUsernameBecomesTheDefaultPassword() {
         when(users.existsByUsernameIgnoreCase("thcstcd.voan0123")).thenReturn(true);
-        when(hasher.hash("thcstcd.voan01232")).thenReturn("hash");
+        when(hasher.hash("erg2026")).thenReturn("hash");
 
         var account = provisioner.provisionForImport(access, "school-1", "thcstcd.voan0123", null, "Võ An", null,
                 "thcstcd.voan0123");
 
         assertThat(account.login()).isEqualTo("thcstcd.voan01232");
-        verify(hasher).hash("thcstcd.voan01232");
+        verify(hasher).hash("erg2026");
+    }
+
+    @Test
+    void aMissingPasswordGetsTheDefaultAndAnExplicitOneIsKept() {
+        when(hasher.hash("erg2026")).thenReturn("default");
+        when(hasher.hash("Sheet-pw1")).thenReturn("explicit");
+
+        provisioner.provision(access, "school-1", "an.one", null, "An", null, null);
+        provisioner.provision(access, "school-1", "an.two", null, "An", null, "Sheet-pw1");
+
+        verify(hasher).hash("erg2026");
+        verify(hasher).hash("Sheet-pw1");
     }
 
     @Test

@@ -63,17 +63,31 @@ public class ScheduleConflictService {
     /** Conflicts of PUBLISHED events of a batch, comparing against everything but themselves (event edit gate). */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
     public List<ConflictDetailResponse> checkPublishedEvents(String tenantId, String batchId, Set<String> eventIds) {
-        List<Occurrence> own = loader.loadBatchCandidates(tenantId, batchId, "PUBLISHED").stream()
-                .filter(o -> eventIds.contains(o.eventId())).toList();
+        // only the edited events are read (not the whole batch); batchStatus carries the EVENT status here
+        List<Occurrence> own = loader.loadEvents(tenantId, eventIds).stream()
+                .filter(o -> batchId.equals(o.batchId()) && "PUBLISHED".equals(o.batchStatus())).toList();
         return engine.detect(tenantId, own, eventIds, false);
     }
 
     /** A room id sent by a client must be an existing room of this school and tenant. */
     @Transactional(value = "postgresTransactionManager", readOnly = true)
-    public void requireRoomOfSchool(String tenantId, String schoolId, String roomId) {
-        if (loader.names(tenantId, "teaching_schedule_rooms", "name", Set.of(roomId), schoolId).isEmpty()) {
+    public String requireRoomOfSchool(String tenantId, String schoolId, String roomId) {
+        String name = loader.names(tenantId, "teaching_schedule_rooms", "name", Set.of(roomId), schoolId).get(roomId);
+        if (name == null) {
             throw TeachingScheduleException.badRequest("ROOM_INVALID", "Phòng không thuộc trường này");
         }
+        return name;
+    }
+
+    /** An active room of the school and its stored name. */
+    public record RoomMatch(String id, String name) {}
+
+    /** The active room of the school with this name (any case); empty when the name is free text. */
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    public java.util.Optional<RoomMatch> roomByName(String tenantId, String schoolId, String name) {
+        if (name == null || name.isBlank()) return java.util.Optional.empty();
+        return loader.loadRooms(tenantId, schoolId).stream().filter(r -> r.name().equalsIgnoreCase(name.trim()))
+                .findFirst().map(r -> new RoomMatch(r.id(), r.name()));
     }
 
     /** Every date a row occurs on, minus holidays; slots without a time make the whole call fail. */

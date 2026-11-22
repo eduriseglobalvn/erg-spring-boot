@@ -1,5 +1,6 @@
 package com.erg.ergspringboot.timekeeping.internal.punch;
 
+import com.erg.ergspringboot.calendar.TeacherPeriod;
 import com.erg.ergspringboot.timekeeping.PunchDirection;
 import com.erg.ergspringboot.timekeeping.PunchStatus;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
@@ -34,17 +35,19 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Records a punch at the server clock. Order: key, coordinates, replay of the same key, school/shift,
- * already-punched IN, period lock, punch window, face consent/photo, location verdict; then the photo is uploaded
- * (network I/O, outside the counter lock), the code drawn (its counter row lock serialises writers of the tenant-day
- * until commit), the already-punched IN re-checked and the row saved. A REJECTED verdict is never stored.
+ * already-punched IN, period lock, punch window, face consent/photo, location verdict (all in one read-only
+ * transaction); then the periods are read and the photo uploaded (network I/O, no transaction open); then in one write
+ * transaction the code is drawn (its counter row lock serialises writers of the tenant-day until commit), the
+ * already-punched IN re-checked, the row saved and the day recomputed. A REJECTED verdict is never stored.
  */
 @Service
 public class PunchService {
@@ -63,11 +66,13 @@ public class PunchService {
     private final DayAggregationService days;
     private final TeacherPeriodReader calendar;
     private final Clock clock;
+    private final TransactionTemplate readOnly;
+    private final TransactionTemplate write;
 
     PunchService(TkPunchRepository punches, TkSiteRepository sites, TkShiftRepository shifts,
             WorkContextResolver context, PunchPhotoService photos,
             FaceConsentService consents, PunchCodeGenerator codes, DayAggregationService days,
-            TeacherPeriodReader calendar, Clock clock) {
+            TeacherPeriodReader calendar, Clock clock, PlatformTransactionManager transactionManager) {
         this.punches = punches;
         this.sites = sites;
         this.shifts = shifts;
@@ -78,14 +83,40 @@ public class PunchService {
         this.days = days;
         this.calendar = calendar;
         this.clock = clock;
+        this.readOnly = new TransactionTemplate(transactionManager);
+        this.readOnly.setReadOnly(true);
+        this.write = new TransactionTemplate(transactionManager);
     }
 
-    @Transactional
+    /**
+     * Three phases so a pooled connection is never held across network I/O or a second connection: (1) read-only
+     * checks in one short transaction, (2) the teacher's periods and the selfie upload with no transaction open,
+     * (3) one write transaction: counter row, IN re-check, save, day recompute. A failed phase 3 deletes the object.
+     */
     public PunchResult punch(String tenantId, String userId, String idempotencyKey, PunchCommand cmd) {
         String key = requireKey(idempotencyKey);
         requireValidReading(cmd);
+        Checked checked = readOnly.execute(status -> check(tenantId, userId, key, cmd));
+        if (checked.done() != null) return result(checked.done().punch(), checked.done().already(), null);
+
+        Optional<List<TeacherPeriod>> periods = calendar.read(tenantId, userId, checked.date(), checked.date());
+        boolean hasPhoto = cmd.photo() != null && cmd.photo().length > 0;
+        String photoKey = hasPhoto ? photos.storePunchPhoto(tenantId, userId, cmd.photo()) : null;
+        Saved saved;
+        try {
+            saved = write.execute(status -> save(tenantId, userId, key, cmd, checked, photoKey, periods));
+        } catch (RuntimeException failed) {
+            // shortcut: a crash between upload and commit leaves an orphan object; the retention job only sees committed keys.
+            photos.discardPhoto(photoKey);
+            throw failed;
+        }
+        if (saved.discardPhoto()) photos.discardPhoto(photoKey);
+        return result(saved.punch(), saved.already(), saved.already() ? null : checked.check().messageVi(), () -> periods);
+    }
+
+    private Checked check(String tenantId, String userId, String key, PunchCommand cmd) {
         Optional<TkPunch> replay = punches.findByTenantIdAndUserIdAndIdempotencyKey(tenantId, userId, key);
-        if (replay.isPresent()) return result(replay.get(), false, null);
+        if (replay.isPresent()) return Checked.done(replay.get(), false);
 
         Instant now = clock.instant();
         LocalDate date = LocalDate.ofInstant(now, WorkContextResolver.ZONE);
@@ -96,7 +127,7 @@ public class PunchService {
         List<TkPunch> today = punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date);
         if (cmd.direction() == PunchDirection.IN) {
             Optional<TkPunch> firstIn = DayAggregationService.firstIn(today);
-            if (firstIn.isPresent()) return result(firstIn.get(), true, null);
+            if (firstIn.isPresent()) return Checked.done(firstIn.get(), true);
         }
         if (context.isLocked(tenantId, schoolId, date)) throw WorkContextResolver.periodLocked();
         requireInsideWindow(cmd.direction(), now, date, shift);
@@ -119,65 +150,64 @@ public class PunchService {
                         : new SitePolicy(site.getLat().doubleValue(), site.getLng().doubleValue(), site.getRadiusM(),
                                 policy.getAllowOutside()));
         if (check.verdict() == PunchStatus.REJECTED) throw unprocessable("PUNCH_REJECTED", check.messageVi());
+        return new Checked(null, now, date, schoolId, shift, remote, site, check);
+    }
 
-        String photoKey = hasPhoto ? storePhotoDiscardedOnRollback(tenantId, userId, cmd.photo()) : null;
-        String code = codes.next(tenantId, date);
+    private Saved save(String tenantId, String userId, String key, PunchCommand cmd, Checked c, String photoKey,
+            Optional<List<TeacherPeriod>> periods) {
+        String code = codes.next(tenantId, c.date());
         if (cmd.direction() == PunchDirection.IN) {
             // A concurrent IN with another key may have committed between the first check and the counter lock.
             Optional<TkPunch> firstIn = DayAggregationService.firstIn(
-                    punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, date));
-            if (firstIn.isPresent()) {
-                if (photoKey != null) photos.discardPhoto(photoKey);
-                return result(firstIn.get(), true, null);
-            }
+                    punches.findByTenantIdAndUserIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, userId, c.date()));
+            if (firstIn.isPresent()) return new Saved(firstIn.get(), true, photoKey != null);
         }
         TkPunch punch = new TkPunch();
         punch.setPhotoKey(photoKey);
         punch.setTenantId(tenantId);
-        punch.setSchoolId(schoolId);
+        punch.setSchoolId(c.schoolId());
         punch.setUserId(userId);
-        punch.setShiftId(shift.getId());
-        punch.setWorkDate(date);
+        punch.setShiftId(c.shift().getId());
+        punch.setWorkDate(c.date());
         punch.setDirection(cmd.direction());
-        punch.setServerTime(now);
-        punch.setStatus(check.verdict());
-        punch.setRemote(remote);
+        punch.setServerTime(c.now());
+        punch.setStatus(c.check().verdict());
+        punch.setRemote(c.remote());
         punch.setMockReported(cmd.mockReported());
-        punch.setMethod((remote ? "REMOTE" : "GPS") + (hasPhoto ? "_FACE" : ""));
-        if (!remote) {
-            punch.setSiteId(site.getId());
+        punch.setMethod((c.remote() ? "REMOTE" : "GPS") + (photoKey != null ? "_FACE" : ""));
+        if (!c.remote()) {
+            punch.setSiteId(c.site().getId());
             punch.setLat(BigDecimal.valueOf(cmd.lat()).setScale(6, RoundingMode.HALF_UP));
             punch.setLng(BigDecimal.valueOf(cmd.lng()).setScale(6, RoundingMode.HALF_UP));
             punch.setAccuracyM(cmd.accuracyM() == null ? null
                     : (int) Math.min(Math.round(cmd.accuracyM()), 1_000_000));
-            punch.setDistanceM(check.distanceM());
+            punch.setDistanceM(c.check().distanceM());
         }
         punch.setReason(blankToNull(cmd.reason()));
         punch.setIdempotencyKey(key);
         punch.setCode(code);
         TkPunch saved = punches.saveAndFlush(punch);
-        days.recompute(tenantId, userId, date);
-        return result(saved, false, check.messageVi());
+        days.recompute(tenantId, userId, c.date(), periods);
+        return new Saved(saved, false, false);
     }
+
+    /** Phase-1 outcome: {@code done} is a replay / already-punched answer, otherwise the verdict inputs for phase 3. */
+    private record Checked(Done done, Instant now, LocalDate date, String schoolId, TkShift shift, boolean remote,
+            TkSite site, PunchCheck check) {
+        static Checked done(TkPunch punch, boolean already) {
+            return new Checked(new Done(punch, already), null, null, null, null, false, null, null);
+        }
+    }
+
+    private record Done(TkPunch punch, boolean already) {}
+
+    private record Saved(TkPunch punch, boolean already, boolean discardPhoto) {}
 
     /** Read-only replay for the facade after a concurrent insert of the same key lost the unique-constraint race. */
     @Transactional(readOnly = true)
     public Optional<PunchResult> replay(String tenantId, String userId, String idempotencyKey) {
         return punches.findByTenantIdAndUserIdAndIdempotencyKey(tenantId, userId, idempotencyKey)
                 .map(p -> result(p, false, null));
-    }
-
-    private String storePhotoDiscardedOnRollback(String tenantId, String userId, byte[] photo) {
-        String key = photos.storePunchPhoto(tenantId, userId, photo);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCompletion(int status) {
-                    if (status == STATUS_ROLLED_BACK) photos.discardPhoto(key);
-                }
-            });
-        }
-        return key;
     }
 
     /** Nearest active site; when none is within its radius the nearest one still gives the distance message. */
@@ -191,6 +221,12 @@ public class PunchService {
 
     /** Always built from the stored row, so a replay or an already-punched answer equals the original response. */
     private PunchResult result(TkPunch punch, boolean alreadyPunched, String messageVi) {
+        return result(punch, alreadyPunched, messageVi,
+                () -> calendar.read(punch.getTenantId(), punch.getUserId(), punch.getWorkDate(), punch.getWorkDate()));
+    }
+
+    private PunchResult result(TkPunch punch, boolean alreadyPunched, String messageVi,
+            Supplier<Optional<List<TeacherPeriod>>> dayPeriods) {
         String siteName = punch.getSiteId() == null ? null
                 : sites.findById(punch.getSiteId()).map(TkSite::getName).orElse(null);
         TkShift shift = punch.getShiftId() == null ? null : shifts.findById(punch.getShiftId()).orElse(null);
@@ -201,8 +237,7 @@ public class PunchService {
             LocalDateTime reference = punch.getWorkDate().atTime(
                     punch.getDirection() == PunchDirection.IN ? shift.getStartTime() : shift.getEndTime());
             minutesVsShift = (int) Duration.between(reference, local).toMinutes();
-            next = calendar.read(punch.getTenantId(), punch.getUserId(), punch.getWorkDate(), punch.getWorkDate())
-                    .orElse(List.of()).stream()
+            next = dayPeriods.get().orElse(List.of()).stream()
                     .filter(p -> p.start().isAfter(punch.getServerTime()))
                     .findFirst()
                     .map(p -> new PeriodView(p.start(), p.end(), p.className(), p.subject(), p.room()))

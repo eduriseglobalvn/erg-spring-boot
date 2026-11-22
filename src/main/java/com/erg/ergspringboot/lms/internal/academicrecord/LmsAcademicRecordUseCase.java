@@ -7,6 +7,7 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.SyncConflictException;
 import com.erg.ergspringboot.lms.LmsAcademicRecordOperations;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.common.response.sync.SyncMutationResponses.ConflictPayload;
 import com.erg.ergspringboot.platform.sync.LmsSyncOperationService;
 import com.erg.ergspringboot.utils.IdGenerator;
@@ -15,35 +16,45 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LmsAcademicRecordUseCase implements LmsAcademicRecordOperations {
+    static final int MAX_ATTENDANCE_ROWS = 20_000;
     private static final Set<String> ATTENDANCE_STATUSES = Set.of("PRESENT", "ABSENT", "LATE", "EXCUSED");
     private static final Set<String> GRADE_KINDS = Set.of("TOPIC", "QUIZ", "OFFLINE");
 
     private final JdbcTemplate jdbc;
     private final LmsSyncOperationService sync;
+    private final LmsReadCacheInvalidator caches;
+    private final AttendanceBatchWriter batch;
 
     public LmsAcademicRecordUseCase(JdbcTemplate jdbc) {
-        this(jdbc, (LmsSyncOperationService) null);
+        this(jdbc, (LmsSyncOperationService) null, (LmsReadCacheInvalidator) null);
     }
 
     @Autowired
-    public LmsAcademicRecordUseCase(JdbcTemplate jdbc, ObjectProvider<LmsSyncOperationService> sync) {
-        this(jdbc, sync == null ? null : sync.getIfAvailable());
+    public LmsAcademicRecordUseCase(JdbcTemplate jdbc, ObjectProvider<LmsSyncOperationService> sync,
+                                    ObjectProvider<LmsReadCacheInvalidator> caches) {
+        this(jdbc, sync == null ? null : sync.getIfAvailable(), caches == null ? null : caches.getIfAvailable());
     }
 
-    private LmsAcademicRecordUseCase(JdbcTemplate jdbc, LmsSyncOperationService sync) {
+    private LmsAcademicRecordUseCase(JdbcTemplate jdbc, LmsSyncOperationService sync, LmsReadCacheInvalidator caches) {
         this.jdbc = jdbc;
         this.sync = sync;
+        this.caches = caches;
+        this.batch = new AttendanceBatchWriter(jdbc);
     }
 
+    @Cacheable(cacheNames = "lmsAttendanceWorkspace", sync = true, key = "{#tenantId, #classId, #subjectId, #fromValue, #toValue}")
     @Transactional(readOnly = true)
     public AttendanceWorkspaceResponse attendanceWorkspace(String tenantId, String classId, String subjectId,
                                                             String fromValue, String toValue) {
@@ -57,11 +68,16 @@ public class LmsAcademicRecordUseCase implements LmsAcademicRecordOperations {
                 from lms_attendance_records
                 where tenant_id = ? and class_id = ? and subject_id = ? and attendance_date between ? and ?
                 order by attendance_date, lesson_index, student_id
+                limit ?
                 """, (rs, row) -> new AttendanceRecordResponse(
                 rs.getString("id"), rs.getString("student_id"), rs.getString("subject_id"),
                 rs.getObject("attendance_date", LocalDate.class).toString(), rs.getInt("lesson_index"),
                 rs.getString("status"), rs.getInt("version"), rs.getObject("updated_at", OffsetDateTime.class)
-        ), tenantId, required(classId, "classId", 36), required(subjectId, "subjectId", 100), from, to);
+        ), tenantId, required(classId, "classId", 36), required(subjectId, "subjectId", 100), from, to, MAX_ATTENDANCE_ROWS + 1);
+        if (records.size() > MAX_ATTENDANCE_ROWS) {
+            throw com.erg.ergspringboot.exception.TeachingScheduleException.badRequest("ATTENDANCE_RANGE_TOO_LARGE",
+                    "Too many attendance rows; request a shorter date range.");
+        }
         return new AttendanceWorkspaceResponse(tenantId, classId, subjectId, from.toString(), to.toString(), records);
     }
 
@@ -150,11 +166,33 @@ public class LmsAcademicRecordUseCase implements LmsAcademicRecordOperations {
             }
             AttendanceRecordResponse result = attendanceByNaturalKey(command, attendanceDate).getFirst();
             complete(receipt, result, result.version());
+            evictAttendance(command.tenantId(), command.classId());
             return result;
         } catch (RuntimeException exception) {
             abandon(receipt);
             throw exception;
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void assertStudentsInClass(String tenantId, String classId, Collection<String> studentIds) {
+        batch.assertStudentsInClass(tenantId, classId, studentIds);
+    }
+
+    @Override
+    @Transactional
+    public List<AttendanceRecordResponse> upsertAttendanceBatch(String tenantId, String actorUserId, String classId, String subjectId,
+                                                                String attendanceDate, int lessonIndex, List<AttendanceMark> marks) {
+        if (lessonIndex < 1 || lessonIndex > 20) throw new BadRequestException("lessonIndex must be between 1 and 20.");
+        List<AttendanceRecordResponse> saved = batch.upsert(tenantId, actorUserId, required(classId, "classId", 36),
+                required(subjectId, "subjectId", 100), date(attendanceDate, "attendanceDate"), lessonIndex, marks, serverTime());
+        if (!saved.isEmpty()) evictAttendance(tenantId, classId);
+        return saved;
+    }
+
+    private void evictAttendance(String tenantId, String classId) {
+        if (caches != null) caches.evictScopesAfterCommit(tenantId, Map.of("lmsAttendanceWorkspace", List.of(classId)));
     }
 
     @Transactional

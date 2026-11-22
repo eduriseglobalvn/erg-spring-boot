@@ -4,6 +4,8 @@ import com.erg.ergspringboot.calendar.CalendarEventChanged;
 import com.erg.ergspringboot.calendar.CalendarHolidayCancelled;
 import com.erg.ergspringboot.calendar.CalendarHolidayPort;
 import com.erg.ergspringboot.calendar.LessonReportCounter;
+import com.erg.ergspringboot.calendar.TeachingScheduleResponses.ConflictDetailResponse;
+import com.erg.ergspringboot.calendar.persistence.CalendarBatchRepository;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -11,13 +13,14 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.cache.annotation.CacheEvict;
+import com.erg.ergspringboot.calendar.CalendarCacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -33,15 +36,24 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional("postgresTransactionManager")
 public class ScheduleHolidayService implements CalendarHolidayPort {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ScheduleHolidayService.class);
     private static final String VN_DAY = "(e.start_at at time zone 'Asia/Ho_Chi_Minh')::date";
+    private static final java.time.ZoneId VIETNAM = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ApplicationEventPublisher publisher;
     private final ObjectProvider<LessonReportCounter> reports;
     private final Clock clock;
+    private final CalendarBatchRepository batches;
+    private final ScheduleDataLoader loader;
+    private final ScheduleConflictEngine engine;
 
     public ScheduleHolidayService(NamedParameterJdbcTemplate jdbc, ApplicationEventPublisher publisher,
-            ObjectProvider<LessonReportCounter> reports, Clock clock) {
+            ObjectProvider<LessonReportCounter> reports, Clock clock, CalendarBatchRepository batches, ScheduleDataLoader loader,
+            ScheduleConflictEngine engine) {
+        this.batches = batches;
+        this.loader = loader;
+        this.engine = engine;
         this.jdbc = jdbc;
         this.publisher = publisher;
         this.reports = reports;
@@ -88,7 +100,7 @@ public class ScheduleHolidayService implements CalendarHolidayPort {
     }
 
     @Override
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public int cancelPeriods(String tenantId, String schoolId, Collection<LocalDate> dates, String holidayId,
             String holidayName, String actorId) {
         if (dates.isEmpty()) return 0;
@@ -109,13 +121,17 @@ public class ScheduleHolidayService implements CalendarHolidayPort {
     }
 
     @Override
-    @CacheEvict(cacheNames = "calendarWorkspace", allEntries = true)
+    @CalendarCacheEvict
     public int restorePeriods(String tenantId, String holidayId, String actorId) {
         record Restored(String id, String batchId, long version) {
         }
+        // the same lock as publish and slot edits: the conflict check below reads PUBLISHED periods
+        batches.lockTenantPublish(tenantId);
         MapSqlParameterSource p = new MapSqlParameterSource("tenant", tenantId).addValue("holiday", holidayId);
-        List<String> ids = jdbc.queryForList("select id from teaching_schedule_events where tenant_id = :tenant"
-                + " and cancelled_by_holiday_id = :holiday order by id for update", p, String.class);
+        List<Cancelled> cancelled = jdbc.query("select e.id, e.school_id, " + VN_DAY + " d from teaching_schedule_events e"
+                + " where e.tenant_id = :tenant and e.cancelled_by_holiday_id = :holiday order by e.id for update", p,
+                (rs, i) -> new Cancelled(rs.getString("id"), rs.getString("school_id"), rs.getDate("d").toLocalDate()));
+        List<String> ids = restorable(tenantId, holidayId, cancelled);
         if (ids.isEmpty()) return 0;
         OffsetDateTime now = OffsetDateTime.now(clock);
         List<Restored> restored = jdbc.query("update teaching_schedule_events set status = 'PUBLISHED',"
@@ -124,11 +140,63 @@ public class ScheduleHolidayService implements CalendarHolidayPort {
                         + " and status = 'CANCELLED' returning id, batch_id, record_version",
                 p.addValue("actor", actorId).addValue("now", Timestamp.from(now.toInstant())).addValue("ids", ids),
                 (rs, i) -> new Restored(rs.getString("id"), rs.getString("batch_id"), rs.getLong("record_version")));
+        // shortcut: one CalendarEventChanged per restored row; a batch event would change the contract of other modules
         for (Restored r : restored) {
             publisher.publishEvent(new CalendarEventChanged("schedule-event-changed:" + r.id() + ":" + r.version(),
                     tenantId, r.id(), r.batchId(), actorId, now, 1, r.version()));
         }
         return restored.size();
+    }
+
+    record Cancelled(String id, String schoolId, LocalDate day) {
+    }
+
+    /** The periods whose day no other cancelling holiday covers ({@code others}: day to school ids, "" is every school). */
+    static List<String> notCovered(List<Cancelled> cancelled, Map<LocalDate, Set<String>> others) {
+        return cancelled.stream().filter(c -> {
+            Set<String> covering = others.getOrDefault(c.day(), Set.of());
+            return !covering.contains("") && !covering.contains(c.schoolId());
+        }).map(Cancelled::id).toList();
+    }
+
+    /**
+     * Periods with an ERROR conflict against something else. A clash between two periods that are restored together was
+     * already there when both were published, so it does not block (the old test data has one teacher in two schools).
+     */
+    static Set<String> blockedBy(List<ConflictDetailResponse> conflicts, Set<String> restoring) {
+        Set<String> blocked = new HashSet<>();
+        for (ConflictDetailResponse conflict : conflicts) {
+            if (!"ERROR".equals(conflict.severity())) continue;
+            if (conflict.other() != null && restoring.contains(conflict.other().eventId())) continue;
+            blocked.add(conflict.mine().eventId());
+        }
+        return blocked;
+    }
+
+    /**
+     * The cancelled periods that may go back: not on a day another cancelling holiday still covers, and without an
+     * ERROR conflict against what was published while the day was off. The rest stay CANCELLED (logged).
+     */
+    private List<String> restorable(String tenantId, String holidayId, List<Cancelled> cancelled) {
+        if (cancelled.isEmpty()) return List.of();
+        Map<LocalDate, Set<String>> others = new HashMap<>();
+        jdbc.query("select holiday_date, school_id from tk_holidays where tenant_id = :tenant and id <> :holiday"
+                        + " and teaching_action = 'CANCEL' and holiday_date in (:days)",
+                new MapSqlParameterSource("tenant", tenantId).addValue("holiday", holidayId)
+                        .addValue("days", cancelled.stream().map(c -> java.sql.Date.valueOf(c.day())).distinct().toList()),
+                rs -> {
+                    others.computeIfAbsent(rs.getDate("holiday_date").toLocalDate(), k -> new HashSet<>())
+                            .add(rs.getString("school_id") == null ? "" : rs.getString("school_id"));
+                });
+        List<String> free = notCovered(cancelled, others);
+        if (free.isEmpty()) return free;
+        Set<String> blocked = blockedBy(engine.detect(tenantId, loader.loadEvents(tenantId, free), new HashSet<>(free), false),
+                new HashSet<>(free));
+        if (blocked.size() + cancelled.size() - free.size() > 0) {
+            LOG.warn("holiday {} deleted: {} periods stay cancelled (still a holiday: {}, conflict: {})", holidayId,
+                    blocked.size() + cancelled.size() - free.size(), cancelled.size() - free.size(), blocked.size());
+        }
+        return free.stream().filter(id -> !blocked.contains(id)).toList();
     }
 
     @Override
@@ -174,10 +242,15 @@ public class ScheduleHolidayService implements CalendarHolidayPort {
         MapSqlParameterSource p = new MapSqlParameterSource("tenant", tenantId).addValue("days",
                 dates.stream().map(java.sql.Date::valueOf).toList());
         if (schoolId != null) p.addValue("school", schoolId);
-        return p;
+        // the start_at range lets the tenant index work (the exact day is still the Vietnam date of each row)
+        LocalDate first = dates.stream().min(LocalDate::compareTo).orElseThrow();
+        LocalDate last = dates.stream().max(LocalDate::compareTo).orElseThrow();
+        return p.addValue("rangeFrom", Timestamp.from(first.atStartOfDay(VIETNAM).toInstant()))
+                .addValue("rangeTo", Timestamp.from(last.plusDays(1).atStartOfDay(VIETNAM).toInstant()));
     }
 
     private static String dayFilter(String schoolId) {
-        return VN_DAY + " in (:days)" + (schoolId == null ? "" : " and e.school_id = :school");
+        return "e.start_at >= :rangeFrom and e.start_at < :rangeTo and " + VN_DAY + " in (:days)"
+                + (schoolId == null ? "" : " and e.school_id = :school");
     }
 }

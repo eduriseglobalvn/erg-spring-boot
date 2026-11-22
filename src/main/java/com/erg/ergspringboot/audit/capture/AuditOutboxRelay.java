@@ -5,6 +5,7 @@ import com.erg.ergspringboot.audit.AuditOutcome;
 import com.erg.ergspringboot.audit.AuditRecord;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ public class AuditOutboxRelay {
     private static final Logger log = LoggerFactory.getLogger(AuditOutboxRelay.class);
     private static final int BATCH_SIZE = 50;
     private static final int MAX_ATTEMPTS = 8;
+    private static final Duration TICK_BUDGET = Duration.ofSeconds(4);
 
     private static final String CLAIM = """
             update audit_outbox set status = 'processing', lease_until = now() + interval '60 seconds'
@@ -65,7 +67,11 @@ public class AuditOutboxRelay {
     @Scheduled(fixedDelayString = "${erg.audit.relay.fixed-delay-ms:5000}")
     public void scheduledRun() {
         try {
-            runDueBatch();
+            // A full batch means more is waiting: keep claiming within the budget instead of idling to the next tick.
+            long deadline = System.nanoTime() + TICK_BUDGET.toNanos();
+            while (runDueBatch() >= BATCH_SIZE && System.nanoTime() - deadline < 0) {
+                // next batch
+            }
         } catch (RuntimeException failure) {
             log.error("Audit outbox relay batch failed", failure);
             meters.counter("erg.audit.relay.failures").increment();

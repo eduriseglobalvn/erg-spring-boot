@@ -4,7 +4,6 @@ import com.erg.ergspringboot.timekeeping.SaturdayMode;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.persistence.TkPeriodLockRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkPolicy;
-import com.erg.ergspringboot.timekeeping.persistence.TkPolicyRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRemoteRule;
 import com.erg.ergspringboot.timekeeping.persistence.TkRemoteRuleRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
@@ -23,6 +22,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,24 +48,24 @@ public class WorkContextResolver {
     private final UserRoleAssignmentRepository assignments;
     private final TkShiftRepository shifts;
     private final TkSiteRepository sites;
-    private final TkPolicyRepository policies;
     private final TkRemoteRuleRepository remoteRules;
     private final TkPeriodLockRepository locks;
     private final TkRequestRepository requests;
     private final SaturdayModeResolver saturdays;
+    private final SchoolSetupCache setups;
 
     WorkContextResolver(UserAccessScopeRepository scopes, UserRoleAssignmentRepository assignments, TkShiftRepository shifts, TkSiteRepository sites,
-            TkPolicyRepository policies, TkRemoteRuleRepository remoteRules, TkPeriodLockRepository locks,
-            TkRequestRepository requests, SaturdayModeResolver saturdays) {
+            TkRemoteRuleRepository remoteRules, TkPeriodLockRepository locks,
+            TkRequestRepository requests, SaturdayModeResolver saturdays, SchoolSetupCache setups) {
         this.scopes = scopes;
         this.assignments = assignments;
         this.shifts = shifts;
         this.sites = sites;
-        this.policies = policies;
         this.remoteRules = remoteRules;
         this.locks = locks;
         this.requests = requests;
         this.saturdays = saturdays;
+        this.setups = setups;
     }
 
     /**
@@ -73,7 +73,20 @@ public class WorkContextResolver {
      * school-level role assignments, the model accounts are provisioned with today) that has a shift or a site.
      */
     public Optional<String> schoolOf(String tenantId, String userId) {
-        return Optional.ofNullable(schoolsOf(tenantId, List.of(userId)).get(userId));
+        // two queries on the person, then the cached setup of each candidate school: nothing tenant-wide is read
+        Set<String> tried = new HashSet<>();
+        for (UserAccessScope scope : scopes.findByUserIdInOrderByCreatedAtAsc(List.of(userId))) {
+            String school = scope.getEducationUnitId();
+            if (school != null && tried.add(school) && setups.get(tenantId, school).configured()) return Optional.of(school);
+        }
+        for (UserRoleAssignment assignment : assignments.findActiveForUsers(tenantId, List.of(userId), OffsetDateTime.now())) {
+            String school = assignment.getScopeId();
+            if (AccessScopeAssembler.isEducationUnitScopeType(assignment.getScopeType()) && school != null
+                    && tried.add(school) && setups.get(tenantId, school).configured()) {
+                return Optional.of(school);
+            }
+        }
+        return Optional.empty();
     }
 
     /** {@link #schoolOf} for many people in a few queries (daily close); people without a school are left out. */
@@ -103,7 +116,7 @@ public class WorkContextResolver {
 
     /** Every shift of the school, retired ones included: resolve a day's shift with {@link #shiftOn}. */
     public List<TkShift> shiftsOf(String tenantId, String schoolId) {
-        return shifts.findByTenantIdAndSchoolIdOrderByStartTimeAsc(tenantId, schoolId);
+        return setups.get(tenantId, schoolId).shifts().stream().map(SchoolSetup::toShift).toList();
     }
 
     /**
@@ -127,8 +140,8 @@ public class WorkContextResolver {
 
     /** Falls back to the column defaults (tolerance 5, block 15, face required, ...) when nothing is configured. */
     public TkPolicy policyFor(String tenantId, String schoolId, LocalDate date) {
-        return policies.findFirstByTenantIdAndSchoolIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
-                tenantId, schoolId, date).orElseGet(() -> {
+        return setups.get(tenantId, schoolId).policies().stream().filter(p -> !p.effectiveFrom().isAfter(date))
+                .max(Comparator.comparing(SchoolSetup.PolicyCopy::effectiveFrom)).map(SchoolSetup::toPolicy).orElseGet(() -> {
                     TkPolicy defaults = new TkPolicy();
                     defaults.setTenantId(tenantId);
                     defaults.setSchoolId(schoolId);
@@ -138,7 +151,7 @@ public class WorkContextResolver {
     }
 
     public List<TkSite> activeSites(String tenantId, String schoolId) {
-        return sites.findByTenantIdAndSchoolIdAndActiveTrueOrderByNameAsc(tenantId, schoolId);
+        return setups.get(tenantId, schoolId).sites().stream().map(SchoolSetup::toSite).toList();
     }
 
     /**

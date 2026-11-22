@@ -17,7 +17,3 @@ springdoc:
 
 scalar:
   enabled: true
-
-erg:
-  process-local:
-    enabled: true

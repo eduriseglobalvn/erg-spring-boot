@@ -4,6 +4,7 @@ import com.erg.ergspringboot.common.response.elearning.StudentDashboardResponses
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.AnnouncementReadResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.ClassLeaderboardResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.LeaderboardClassResponse;
+import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentPageResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionCommentResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionFeedResponse;
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionModerationClassResponse;
@@ -12,6 +13,7 @@ import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponse
 import com.erg.ergspringboot.common.response.elearning.StudentEngagementResponses.StudentDiscussionReactionResponse;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.CreateDiscussionCommand;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DashboardReadQuery;
+import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionCommentsQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionFeedQuery;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.DiscussionModerator;
 import com.erg.ergspringboot.elearning.api.ElearningCommands.LeaderboardManager;
@@ -61,6 +63,11 @@ public class ElearningOperations {
                 query.tenantId(), query.actorUserId(), query.page(), query.size(), query.filter(), query.subject()));
     }
 
+    public StudentDiscussionCommentPageResponse discussionComments(DiscussionCommentsQuery query) {
+        return engagement.comments(new StudentEngagementService.CommentsScope(
+                query.tenantId(), query.actorUserId(), query.postId(), query.parentId(), query.page(), query.size()));
+    }
+
     public StudentDiscussionPostResponse createDiscussion(CreateDiscussionCommand command) {
         return engagement.createDiscussion(new StudentEngagementService.CreateDiscussionCommand(
                 command.tenantId(), command.actorUserId(), command.idempotencyKey(), command.title(), command.content(),
@@ -98,6 +105,11 @@ public class ElearningOperations {
         return moderation.feed(moderator(moderator), classId, page, size);
     }
 
+    public StudentDiscussionCommentPageResponse discussionModerationComments(
+            DiscussionModerator moderator, String postId, String parentId, int page, int size) {
+        return moderation.comments(moderator(moderator), postId, parentId, page, size);
+    }
+
     public StudentDiscussionModerationResponse setDiscussionHidden(
             DiscussionModerator moderator, String targetType, String targetId, boolean hidden) {
         return moderation.setHidden(moderator(moderator), targetType, targetId, hidden);
@@ -115,6 +127,12 @@ public class ElearningOperations {
     public ClassLeaderboardResponse studentClassLeaderboard(String tenantId, String userId, String classId,
                                                             String period, String scope) {
         return leaderboard.forStudent(tenantId, userId, classId, period, scope);
+    }
+
+    /** {@code viewerOnly}: the sidebar only needs the viewer's own row and rank. */
+    public ClassLeaderboardResponse studentClassLeaderboard(String tenantId, String userId, String classId,
+                                                            String period, String scope, boolean viewerOnly) {
+        return leaderboard.forStudent(tenantId, userId, classId, period, scope, viewerOnly);
     }
 
     public boolean setMyLeaderboardHidden(String tenantId, String userId, boolean hidden) {

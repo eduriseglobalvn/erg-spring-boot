@@ -25,6 +25,7 @@ class TeachingScheduleSlotChangeIT extends TeachingScheduleITBase {
 
     @Autowired TeachingScheduleOperations schedule;
     @Autowired ApplicationEvents recorded;
+    @Autowired CalendarHolidayPort holidayPort;
 
     private String tenant;
     private String school;
@@ -303,5 +304,43 @@ class TeachingScheduleSlotChangeIT extends TeachingScheduleITBase {
 
         assertThat(dry.blocking()).isTrue();
         assertThat(dry.conflicts()).extracting(c -> c.kind()).contains("ROOM_TIME");
+    }
+
+    @Test
+    void movingADoublePeriodKeepsItsLengthAndAnUnconfiguredSecondSlotIsRejected() {
+        setUp();
+        String first = wednesdays.get(0);
+        write("update teaching_schedule_events set period_count = 2, end_at = start_at + interval '90 minutes' where id = ?", first);
+
+        schedule.editSlot(tenant, edit(first, scope("THIS_ONLY"), 7, false), admin);
+
+        // periods 7 and 8 are 14:15-15:00 and 15:30-16:15: the event ends with its last period, not with slot 7
+        assertThat(jdbc.queryForObject("select to_char(end_at at time zone 'Asia/Ho_Chi_Minh', 'HH24:MI') from teaching_schedule_events"
+                + " where id = ?", String.class, first)).isEqualTo("16:15");
+        expectCode(() -> schedule.editSlot(tenant, edit(first, scope("THIS_ONLY"), 9, false), admin), "PERIOD_HAS_NO_TIME");
+    }
+
+    @Test
+    void deletingAHolidayKeepsPeriodsThatCollideOrAreStillCoveredCancelled() {
+        setUp();
+        String ending = id();
+        String other = id();
+        write("insert into tk_holidays (id, tenant_id, holiday_date, name) values (?, ?, date '2026-11-18', 'Nghỉ A')", ending, tenant);
+        write("insert into tk_holidays (id, tenant_id, holiday_date, name) values (?, ?, date '2026-12-02', 'Nghỉ B')", other, tenant);
+        holidayPort.cancelPeriods(tenant, null, List.of(java.time.LocalDate.parse("2026-11-18"), java.time.LocalDate.parse("2026-11-25"),
+                java.time.LocalDate.parse("2026-12-02")), ending, "Nghỉ A", admin);
+        // a replacement lesson was placed in the freed 25/11 slot of the same class
+        event(tenant, batch, school, classId, subject, "PUBLISHED", at("2026-11-25", "13:30"), 6, substitute, null, null);
+
+        int restored = holidayPort.restorePeriods(tenant, ending, admin);
+
+        assertThat(restored).isEqualTo(1);
+        assertThat(status(wednesdays.get(0))).isEqualTo("PUBLISHED");
+        assertThat(status(wednesdays.get(1))).isEqualTo("CANCELLED");
+        assertThat(status(wednesdays.get(2))).isEqualTo("CANCELLED");
+    }
+
+    private String status(String eventId) {
+        return jdbc.queryForObject("select status from teaching_schedule_events where id = ?", String.class, eventId);
     }
 }

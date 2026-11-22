@@ -7,13 +7,13 @@ import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.lms.LmsAudienceReadPort;
 import com.erg.ergspringboot.lms.LmsStudentLookupPort;
 import com.erg.ergspringboot.lms.LmsStudentLookupPort.StudentCard;
-import com.erg.ergspringboot.users.UserAccountProjection;
-import com.erg.ergspringboot.users.UserDirectoryPort;
+import com.erg.ergspringboot.notifications.internal.campaign.RecipientDirectoryCache.Entry;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -24,10 +24,6 @@ import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -41,30 +37,17 @@ public class RecipientLookupService {
 
     static final int MAX_LINES = 5_000;
     static final int MAX_SEARCH_LIMIT = 20;
-    // shortcut: names are matched in memory (no unaccent in the DB); lists past this many students are cut, move to an unaccent column then.
-    static final int DIRECTORY_CAP = 20_000;
-    private static final int ACTIVE_CHUNK = 1_000;
-    private static final Pageable STAFF_PAGE = PageRequest.ofSize(MAX_LINES + 1);
-    private static final String SEP = " · ";
-    private static final Logger log = LoggerFactory.getLogger(RecipientLookupService.class);
     private static final Pattern PHONE_STRIP = Pattern.compile("[\\s.\\-()]");
     private static final Pattern PHONE_SHAPE = Pattern.compile("0\\d{8,10}");
     private static final Pattern MARKS = Pattern.compile("\\p{M}+");
     private static final Pattern SPACES = Pattern.compile("\\s+");
 
-    private record Person(String userId, String name, String role, String meta,
-                          String code, String email, String phone, boolean student, String folded) {
-        RecipientCard card() {
-            return new RecipientCard(userId, name, role, meta);
-        }
-    }
-
     /** Per-request lookup tables so every pasted line costs O(1). Keys are never empty. */
-    private record Index(Map<String, List<Person>> byCode, Map<String, List<Person>> byEmail,
-                         Map<String, List<Person>> byPhone) {
-        static Index of(List<Person> people) {
+    private record Index(Map<String, List<Entry>> byCode, Map<String, List<Entry>> byEmail,
+                         Map<String, List<Entry>> byPhone) {
+        static Index of(List<Entry> people) {
             Index index = new Index(new HashMap<>(), new HashMap<>(), new HashMap<>());
-            for (Person p : people) {
+            for (Entry p : people) {
                 if (p.student() && p.code() != null && !p.code().isBlank()) {
                     index.byCode.computeIfAbsent(p.code().trim().toUpperCase(Locale.ROOT), k -> new ArrayList<>()).add(p);
                 }
@@ -81,8 +64,8 @@ public class RecipientLookupService {
             return index;
         }
 
-        List<Person> find(String line) {
-            Map<String, Person> hit = new LinkedHashMap<>();
+        List<Entry> find(String line) {
+            Map<String, Entry> hit = new LinkedHashMap<>();
             if (line.indexOf('@') >= 0) {
                 byEmail.getOrDefault(line.toLowerCase(Locale.ROOT), List.of()).forEach(p -> hit.putIfAbsent(p.userId(), p));
             } else {
@@ -120,14 +103,16 @@ public class RecipientLookupService {
 
     private final LmsStudentLookupPort students;
     private final LmsAudienceReadPort lms;
-    private final UserDirectoryPort users;
+    private final AudienceAccountQueries accounts;
+    private final RecipientDirectoryCache directories;
     private final AudienceScopeGuard guard;
 
-    public RecipientLookupService(
-            LmsStudentLookupPort students, LmsAudienceReadPort lms, UserDirectoryPort users, AudienceScopeGuard guard) {
+    public RecipientLookupService(LmsStudentLookupPort students, LmsAudienceReadPort lms, AudienceAccountQueries accounts,
+            RecipientDirectoryCache directories, AudienceScopeGuard guard) {
         this.students = students;
         this.lms = lms;
-        this.users = users;
+        this.accounts = accounts;
+        this.directories = directories;
         this.guard = guard;
     }
 
@@ -147,7 +132,7 @@ public class RecipientLookupService {
         if (needle.isEmpty()) {
             return List.of();
         }
-        Map<String, Person> found = new LinkedHashMap<>();
+        Map<String, Entry> found = new LinkedHashMap<>();
         keyedStudents(tenantId, scope, List.of(text)).forEach(p -> found.putIfAbsent(p.userId(), p));
         directory(tenantId, scope).stream()
                 .filter(p -> p.folded().contains(needle)).forEach(p -> found.putIfAbsent(p.userId(), p));
@@ -156,12 +141,12 @@ public class RecipientLookupService {
                     .filter(p -> p.folded().contains(needle) || text.equalsIgnoreCase(p.email()))
                     .forEach(p -> found.putIfAbsent(p.userId(), p));
         }
-        List<Person> sorted = found.values().stream()
-                .sorted(Comparator.comparing(Person::folded).thenComparing(Person::userId)).toList();
+        List<Entry> sorted = found.values().stream()
+                .sorted(Comparator.comparing(Entry::folded).thenComparing(Entry::userId)).toList();
         List<RecipientCard> cards = new ArrayList<>();
         for (int from = 0; from < sorted.size() && cards.size() < max; from += max) {
             withActiveLogin(tenantId, sorted.subList(from, Math.min(sorted.size(), from + max))).stream()
-                    .limit(max - cards.size()).map(Person::card).forEach(cards::add);
+                    .limit(max - cards.size()).map(Entry::card).forEach(cards::add);
         }
         return cards;
     }
@@ -178,9 +163,9 @@ public class RecipientLookupService {
         Scope scope = scopeOf(actor);
         List<String> clean = lines.stream().filter(l -> l != null && !l.isBlank()).map(String::trim).toList();
 
-        Supplier<List<Person>> staff = new Once<>(() -> staffDirectory(tenantId));
-        Map<String, List<Person>> byLine = new HashMap<>();
-        List<Person> keyed = keyedStudents(tenantId, scope, clean);
+        Supplier<List<Entry>> staff = new Once<>(() -> staffDirectory(tenantId));
+        Map<String, List<Entry>> byLine = new HashMap<>();
+        List<Entry> keyed = keyedStudents(tenantId, scope, clean);
         if (scope.staffVisible() && clean.stream().anyMatch(l -> l.indexOf('@') >= 0)) {
             keyed = Stream.concat(keyed.stream(), staff.get().stream()).toList();
         }
@@ -197,7 +182,7 @@ public class RecipientLookupService {
         List<String> notFound = new ArrayList<>();
         List<AmbiguousLine> ambiguous = new ArrayList<>();
         for (String line : clean) {
-            List<Person> candidates = byLine.get(line);
+            List<Entry> candidates = byLine.get(line);
             if (candidates.isEmpty()) {
                 notFound.add(line);
             } else if (candidates.size() > 1) {
@@ -223,7 +208,7 @@ public class RecipientLookupService {
     }
 
     /** One batched query for every code, email and phone among {@code texts}; students not yet login-checked. */
-    private List<Person> keyedStudents(String tenantId, Scope scope, List<String> texts) {
+    private List<Entry> keyedStudents(String tenantId, Scope scope, List<String> texts) {
         Set<String> codes = new LinkedHashSet<>();
         Set<String> emails = new LinkedHashSet<>();
         Set<String> phones = new LinkedHashSet<>();
@@ -249,8 +234,8 @@ public class RecipientLookupService {
     }
 
     private void matchByName(String tenantId, Scope scope, List<String> unmatched,
-            Map<String, List<Person>> byLine, Supplier<List<Person>> staff) {
-        Map<String, List<Person>> index = new HashMap<>();
+            Map<String, List<Entry>> byLine, Supplier<List<Entry>> staff) {
+        Map<String, List<Entry>> index = new HashMap<>();
         directory(tenantId, scope).stream().filter(p -> !p.folded().isEmpty())
                 .forEach(p -> index.computeIfAbsent(p.folded(), k -> new ArrayList<>()).add(p));
         Set<String> staffIds = new LinkedHashSet<>();
@@ -260,10 +245,10 @@ public class RecipientLookupService {
                 staffIds.add(p.userId());
             });
         }
-        Map<String, List<Person>> byName = new HashMap<>();
-        Map<String, Person> candidates = new LinkedHashMap<>();
+        Map<String, List<Entry>> byName = new HashMap<>();
+        Map<String, Entry> candidates = new LinkedHashMap<>();
         for (String line : unmatched) {
-            List<Person> found = index.getOrDefault(fold(line), List.of());
+            List<Entry> found = index.getOrDefault(fold(line), List.of());
             byName.put(line, found);
             found.forEach(p -> candidates.put(p.userId(), p));
         }
@@ -274,61 +259,43 @@ public class RecipientLookupService {
                 byLine.put(line, found.stream().filter(p -> active.contains(p.userId())).toList()));
     }
 
-    private List<Person> directory(String tenantId, Scope scope) {
-        List<StudentCard> cards = students.listStudents(tenantId, scope.classIds(), DIRECTORY_CAP);
-        if (cards.size() >= DIRECTORY_CAP) {
-            log.warn("Student directory hit its cap of {} for tenant {}; name search is truncated", DIRECTORY_CAP, tenantId);
+    private List<Entry> directory(String tenantId, Scope scope) {
+        if (scope.classIds() != null && scope.classIds().isEmpty()) {
+            return List.of();
         }
-        return cards.stream().map(RecipientLookupService::person).toList();
+        return directories.students(tenantId, scopeKey(scope), scope.classIds()).entries();
     }
 
     /** Teachers and staff are visible to admins only; both are already filtered to active accounts. */
-    private List<Person> staffDirectory(String tenantId) {
-        Map<String, Person> byId = new LinkedHashMap<>();
-        users.findCalendarTeachersByTenant(tenantId, STAFF_PAGE).stream().filter(RecipientLookupService::isActive)
-                .forEach(u -> byId.putIfAbsent(u.id(), person(u, "TEACHER", "Giáo viên")));
-        if (byId.size() >= STAFF_PAGE.getPageSize()) {
-            log.warn("Teacher directory hit its cap of {} for tenant {}", STAFF_PAGE.getPageSize(), tenantId);
-        }
-        List<String> staffIds = users.findActiveStaffUserIds(tenantId, STAFF_PAGE);
-        if (staffIds.size() >= STAFF_PAGE.getPageSize()) {
-            log.warn("Staff directory hit its cap of {} for tenant {}", STAFF_PAGE.getPageSize(), tenantId);
-        }
-        if (!staffIds.isEmpty()) {
-            users.findByTenantIdAndIds(tenantId, staffIds).stream().filter(RecipientLookupService::isActive)
-                    .forEach(u -> byId.putIfAbsent(u.id(), person(u, "STAFF", "Nhân viên")));
-        }
-        return List.copyOf(byId.values());
+    private List<Entry> staffDirectory(String tenantId) {
+        return directories.staff(tenantId).entries();
     }
 
-    /** Drops students whose login is missing or not active; staff/teacher persons pass through untouched. */
-    private List<Person> withActiveLogin(String tenantId, List<Person> people) {
-        List<Person> studentsOnly = people.stream().filter(Person::student).toList();
-        Set<String> active = new LinkedHashSet<>();
-        for (int from = 0; from < studentsOnly.size(); from += ACTIVE_CHUNK) {
-            List<String> ids = studentsOnly.subList(from, Math.min(studentsOnly.size(), from + ACTIVE_CHUNK)).stream()
-                    .map(Person::userId).toList();
-            users.findByTenantIdAndIds(tenantId, ids).stream().filter(RecipientLookupService::isActive)
-                    .forEach(u -> active.add(u.id()));
+    /** Cache key of a scope: the whole tenant, or a digest of the sorted class ids the caller may see. */
+    private static String scopeKey(Scope scope) {
+        if (scope.classIds() == null) {
+            return "all";
         }
+        String joined = scope.classIds().stream().sorted().collect(Collectors.joining(","));
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(joined.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "c:" + HexFormat.of().formatHex(digest);
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    /** Drops students whose login is missing or not active (checked live); staff/teacher persons pass through untouched. */
+    private List<Entry> withActiveLogin(String tenantId, List<Entry> people) {
+        List<String> studentIds = people.stream().filter(Entry::student).map(Entry::userId).toList();
+        Set<String> active = studentIds.isEmpty() ? Set.of() : accounts.activeUserIds(tenantId, studentIds);
         return people.stream().filter(p -> !p.student() || active.contains(p.userId())).toList();
     }
 
-    private static boolean isActive(UserAccountProjection user) {
-        return user.status() == null || "ACTIVE".equalsIgnoreCase(user.status());
-    }
-
-    private static Person person(StudentCard s) {
-        return new Person(s.userId(), s.fullName(), "STUDENT", join("Học sinh", s.className(), s.studentCode()),
-                s.studentCode(), s.email(), s.phone(), true, fold(s.fullName()));
-    }
-
-    private static Person person(UserAccountProjection u, String role, String label) {
-        return new Person(u.id(), u.displayName(), role, join(label, u.email()), null, u.email(), null, false, fold(u.displayName()));
-    }
-
-    private static String join(String... parts) {
-        return Stream.of(parts).filter(p -> p != null && !p.isBlank()).collect(Collectors.joining(SEP));
+    private static Entry person(StudentCard s) {
+        return Entry.ofStudent(new AudienceAccountQueries.StudentRow(
+                s.userId(), s.fullName(), s.studentCode(), s.email(), s.phone(), s.className()));
     }
 
     /** Strips spaces, dots, dashes and brackets; a +84 prefix becomes the national leading 0. */

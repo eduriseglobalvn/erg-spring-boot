@@ -8,6 +8,9 @@ public interface LmsNotificationProjection {
 
     Optional<AssignmentAudience> assignmentAudience(String tenantId, String assignmentId);
 
+    /** Same lookup without the recipient list, for events that need only the title and the assigning teacher. */
+    Optional<AssignmentSummary> assignmentSummary(String tenantId, String assignmentId);
+
     Optional<Submitter> submitter(String tenantId, String studentId);
 
     /** {@code studentUserIds} holds only recipients linked to a login account. */
@@ -21,6 +24,9 @@ public interface LmsNotificationProjection {
         public AssignmentAudience {
             studentUserIds = studentUserIds == null ? List.of() : List.copyOf(studentUserIds);
         }
+    }
+
+    record AssignmentSummary(String assignmentId, String title, String classId, String assignedBy) {
     }
 
     /** {@code userId} is the student's login account ({@code users.id}); null when none is linked. */

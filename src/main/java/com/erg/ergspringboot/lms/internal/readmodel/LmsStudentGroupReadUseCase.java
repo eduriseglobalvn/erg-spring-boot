@@ -9,9 +9,11 @@ import java.util.stream.Collectors;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Scoped student-group projection for the LMS homework workspace. */
 @Service
+@Transactional(value = "postgresTransactionManager", readOnly = true)
 public class LmsStudentGroupReadUseCase {
     private final StudentGroupRepository groups;
     private final StudentGroupMemberRepository members;
@@ -20,9 +22,10 @@ public class LmsStudentGroupReadUseCase {
         this.groups = groups; this.members = members;
     }
 
-    @Cacheable(cacheNames = "lmsStudentGroups", key = "{#tenantId, #classId, #allowedClassIds, #ownerUserId}", unless = "#result == null")
+    @Cacheable(cacheNames = "lmsStudentGroups", key = "{#tenantId, #classId, #allowedClassIds, #ownerUserId, #includeMembers}",
+            unless = "#result == null")
     public StudentGroupWorkspaceResponse query(String tenantId, String classId,
-            Collection<String> allowedClassIds, String ownerUserId) {
+            Collection<String> allowedClassIds, String ownerUserId, boolean includeMembers) {
         String tenant = requireText(tenantId, "tenantId"); String requestedClass = blank(classId);
         Set<String> allowed = normalize(allowedClassIds); String owner = blank(ownerUserId);
         PageRequest limit = PageRequest.of(0, 201); List<StudentGroup> source;
@@ -35,7 +38,8 @@ public class LmsStudentGroupReadUseCase {
         if (source == null) source = groups.findByTenantIdOrderByCreatedAtDesc(tenant, limit);
         source = source.stream().filter(group -> matches(group, requestedClass, allowed, owner)).limit(200).toList();
         List<String> ids = source.stream().map(StudentGroup::getId).toList();
-        Map<String,List<String>> studentIds = ids.isEmpty() ? Map.of() : members
+        // includeMembers=false skips the member rows: the list then carries studentCount only.
+        Map<String,List<String>> studentIds = ids.isEmpty() || !includeMembers ? Map.of() : members
                 .findByTenantIdAndGroupIdIn(tenant, ids, PageRequest.of(0, 10_000)).stream()
                 .collect(Collectors.groupingBy(item -> item.getGroupId(),
                         Collectors.mapping(item -> item.getStudentId(), Collectors.toList())));

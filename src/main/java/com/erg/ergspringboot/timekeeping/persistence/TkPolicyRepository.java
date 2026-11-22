@@ -14,4 +14,7 @@ public interface TkPolicyRepository extends JpaRepository<TkPolicy, String> {
             String tenantId, String schoolId, LocalDate date);
 
     Optional<TkPolicy> findByTenantIdAndSchoolIdAndEffectiveFrom(String tenantId, String schoolId, LocalDate date);
+
+    /** Every version of the school, for the per-school setup cache. */
+    java.util.List<TkPolicy> findByTenantIdAndSchoolId(String tenantId, String schoolId);
 }

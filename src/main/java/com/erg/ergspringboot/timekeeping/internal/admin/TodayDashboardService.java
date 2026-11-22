@@ -12,6 +12,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RecentPunch;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.RemindResult;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteCount;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TodayDashboard;
+import com.erg.ergspringboot.timekeeping.internal.SchoolScope;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkDay;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
@@ -21,6 +22,7 @@ import com.erg.ergspringboot.timekeeping.persistence.TkRequest;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestStep;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestStepRepository;
+import com.erg.ergspringboot.timekeeping.persistence.TkShift;
 import com.erg.ergspringboot.timekeeping.persistence.TkShiftRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkSite;
 import com.erg.ergspringboot.timekeeping.persistence.TkSiteRepository;
@@ -88,23 +90,30 @@ public class TodayDashboardService {
 
     /** {@code schoolId} null = every school with shifts or sites; {@code date} null = today in Vietnam. */
     public TodayDashboard today(String tenantId, String schoolId, LocalDate date) {
+        return today(tenantId, SchoolScope.TENANT, schoolId, date);
+    }
+
+    /** A scoped caller sees only their managed schools: {@code schoolId} outside them is 403, omitted = all of theirs. */
+    public TodayDashboard today(String tenantId, SchoolScope scope, String schoolId, LocalDate date) {
         LocalDate day = date == null ? support.today() : date;
-        Set<String> schools = schoolId != null ? Set.of(support.requireSchool(tenantId, schoolId).getId())
-                : configuredSchools(tenantId);
+        Set<String> schools = schoolId != null ? Set.of(support.requireSchool(tenantId, scope, schoolId).getId())
+                : scope.restrict(configuredSchools(tenantId));
         Instant now = support.clock().instant();
 
         Map<String, String> schoolOf = context.schoolsOf(tenantId,
                 users.findActiveUserIdsHoldingPermission(tenantId, AdminSupport.SELF, day));
         Set<String> roster = schoolOf.entrySet().stream().filter(e -> schools.contains(e.getValue()))
                 .map(Map.Entry::getKey).collect(Collectors.toCollection(LinkedHashSet::new));
-        List<TkPunch> dayPunches = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, day).stream()
-                .filter(p -> schools.contains(p.getSchoolId())).toList();
+        // the school filter runs in SQL: a one-school dashboard no longer loads the whole tenant's day
+        List<TkPunch> dayPunches = schools.isEmpty() ? List.of()
+                : punches.findByTenantIdAndSchoolIdInAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, schools, day);
         List<TkPunch> counted = dayPunches.stream().filter(p -> p.getStatus() != PunchStatus.REJECTED).toList();
         Map<String, String> presentAt = new TreeMap<>(); // user -> school of the first counted IN
         counted.stream().filter(p -> p.getDirection() == PunchDirection.IN)
                 .forEach(p -> presentAt.putIfAbsent(p.getUserId(), p.getSchoolId()));
-        List<TkDay> late = days.findByTenantIdAndWorkDate(tenantId, day).stream()
-                .filter(d -> schools.contains(d.getSchoolId()) && d.getLateMinutes() > 0).toList();
+        List<TkDay> late = (schools.isEmpty() ? List.<TkDay>of()
+                : days.findByTenantIdAndSchoolIdInAndWorkDate(tenantId, schools, day)).stream()
+                .filter(d -> d.getLateMinutes() > 0).toList();
 
         Map<RequestType, Set<String>> away = requests.findApprovedOn(tenantId, day).stream()
                 .filter(r -> schools.contains(r.getSchoolId()) && r.getType() != RequestType.EXPLANATION)
@@ -166,6 +175,11 @@ public class TodayDashboardService {
 
     /** "Nhắc chấm công" to tenant users without a counted IN today; one outbox key per person and day. */
     public RemindResult remind(String tenantId, String actorId, List<String> userIds) {
+        return remind(tenantId, SchoolScope.TENANT, actorId, userIds);
+    }
+
+    /** A scoped caller can only remind people whose school is in their scope; the others count as skipped. */
+    public RemindResult remind(String tenantId, SchoolScope scope, String actorId, List<String> userIds) {
         if (userIds == null || userIds.isEmpty() || userIds.size() > REMIND_MAX) {
             throw AdminSupport.bad("INVALID_USERS", "Chọn từ 1 đến 200 nhân sự");
         }
@@ -173,14 +187,16 @@ public class TodayDashboardService {
         Set<String> wanted = new LinkedHashSet<>(userIds);
         Set<String> known = users.findByTenantIdAndIdIn(tenantId, wanted).stream().map(User::getId)
                 .collect(Collectors.toSet());
-        Set<String> punchedIn = punches.findByTenantIdAndWorkDateOrderByServerTimeAscCodeAsc(tenantId, day).stream()
+        Set<String> punchedIn = known.isEmpty() ? Set.of() : punches
+                .findByTenantIdAndUserIdInAndWorkDateBetweenOrderByServerTimeAscCodeAsc(tenantId, known, day, day).stream()
                 .filter(p -> p.getDirection() == PunchDirection.IN && p.getStatus() != PunchStatus.REJECTED)
                 .map(TkPunch::getUserId).collect(Collectors.toSet());
         Map<String, String> schoolOf = context.schoolsOf(tenantId, known);
         Set<String> working = schoolsWithShift(tenantId, new HashSet<>(schoolOf.values()), day);
         int sent = 0;
         for (String userId : wanted) {
-            if (!known.contains(userId) || punchedIn.contains(userId) || !working.contains(schoolOf.get(userId))) {
+            if (!known.contains(userId) || punchedIn.contains(userId) || !working.contains(schoolOf.get(userId))
+                    || !scope.allows(schoolOf.get(userId))) {
                 continue;
             }
             try {
@@ -202,9 +218,13 @@ public class TodayDashboardService {
                 p.getPhotoKey() != null);
     }
 
-    /** Schools of {@code schools} with a shift in effect on {@code day} (one shift query per school). */
+    /** Schools of {@code schools} with a shift in effect on {@code day}, from one read of the tenant's shifts. */
     private Set<String> schoolsWithShift(String tenantId, Set<String> schools, LocalDate day) {
-        return schools.stream().filter(s -> context.shiftFor(tenantId, s, day).isPresent()).collect(Collectors.toSet());
+        if (schools.isEmpty()) return Set.of();
+        Map<String, List<TkShift>> bySchool = shifts.findByTenantId(tenantId).stream()
+                .filter(s -> schools.contains(s.getSchoolId())).collect(Collectors.groupingBy(TkShift::getSchoolId));
+        return bySchool.entrySet().stream().filter(e -> WorkContextResolver.shiftOn(e.getValue(), day).isPresent())
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
     }
 
     private Set<String> configuredSchools(String tenantId) {

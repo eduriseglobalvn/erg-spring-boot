@@ -221,8 +221,18 @@ public final class CalendarResponses {
             List<CalendarTeacherOptionResponse> assistantTeachers,
             List<CalendarSubjectOptionResponse> subjects,
             List<CalendarLevelOptionResponse> levels,
-            List<CalendarRoomOptionResponse> rooms
+            List<CalendarRoomOptionResponse> rooms,
+            /** True when a list was cut at 500 entries: the rest is reachable through the catalog search read. */
+            boolean catalogTruncated
     ) {
+        public CalendarCatalogResponse(
+                List<CalendarFilterOptionResponse> schools, List<CalendarClassOptionResponse> classes,
+                List<CalendarTeacherOptionResponse> teachers, List<CalendarTeacherOptionResponse> assistantTeachers,
+                List<CalendarSubjectOptionResponse> subjects, List<CalendarLevelOptionResponse> levels,
+                List<CalendarRoomOptionResponse> rooms) {
+            this(schools, classes, teachers, assistantTeachers, subjects, levels, rooms, false);
+        }
+
         public CalendarCatalogResponse {
             schools = listOrEmpty(schools);
             classes = listOrEmpty(classes);

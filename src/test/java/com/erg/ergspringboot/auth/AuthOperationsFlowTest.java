@@ -122,7 +122,7 @@ class AuthOperationsFlowTest {
         role.setPermissions(new java.util.LinkedHashSet<>(List.of(lmsRead, lcmsPublish,
                 perm("admin.workspace.access"), perm("teacher.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
-        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        stubLogin("active@example.com").thenReturn(Optional.of(user));
 
         AuthResponse response = authService.login(
                 new LoginRequest("ACTIVE@example.com", "secret123", "web-1", "Chrome", "fingerprint", "lms", true),
@@ -270,7 +270,7 @@ class AuthOperationsFlowTest {
         role.setName("system.super_admin");
         role.setPermissions(new java.util.LinkedHashSet<>());
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
-        when(userRepository.findForLogin("role-only@example.com")).thenReturn(Optional.of(user));
+        stubLogin("role-only@example.com").thenReturn(Optional.of(user));
 
         AuthResponse response = authService.login(
                 new LoginRequest("role-only@example.com", "secret123", "web-1", "Chrome", null, "admin", false),
@@ -287,7 +287,7 @@ class AuthOperationsFlowTest {
         Permission permission = new Permission(); permission.setName("rbac.role.read");
         Role role = new Role(); role.setName("it_operator"); role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission)));
         UserRoleAssignment assignment = new UserRoleAssignment(); assignment.setRole(role);
-        when(userRepository.findForLogin("scoped@example.com")).thenReturn(Optional.of(user));
+        stubLogin("scoped@example.com").thenReturn(Optional.of(user));
         when(userRoleAssignmentRepository.findActiveForUser(eq("user-scoped"), eq("erg"), any(OffsetDateTime.class)))
                 .thenReturn(List.of(assignment));
 
@@ -308,7 +308,7 @@ class AuthOperationsFlowTest {
         Role role = new Role(); role.setName("lms.learner");
         role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission, perm("student.workspace.access"))));
         UserRoleAssignment assignment = new UserRoleAssignment(); assignment.setRole(role);
-        when(userRepository.findForLogin("hs@example.com")).thenReturn(Optional.of(user));
+        stubLogin("hs@example.com").thenReturn(Optional.of(user));
         when(userRoleAssignmentRepository.findActiveForUser(eq("user-student"), eq("erg"), any(OffsetDateTime.class)))
                 .thenReturn(List.of(assignment));
 
@@ -325,7 +325,7 @@ class AuthOperationsFlowTest {
     void loginAcceptsNormalizedInternalUsernameIdentifier() {
         User user = activeUser("user-username", "student@example.com", "secret123");
         user.setUsername("hs001");
-        when(userRepository.findForLogin("hs001"))
+        stubLogin("hs001")
                 .thenReturn(Optional.of(user));
 
         AuthResponse response = authService.login(
@@ -335,7 +335,24 @@ class AuthOperationsFlowTest {
 
         assertEquals("student@example.com", response.user().email());
         // Once before hashing, once inside the transaction for a current row.
-        verify(userRepository, times(2)).findForLogin("hs001");
+        verify(userRepository).findForLogin("hs001");
+        verify(userRepository).findForLoginById("user-username");
+    }
+
+    @Test
+    void successfulLoginAttemptIsStoredUnderTheUsersOwnTenant() {
+        User user = activeUser("user-1", "tenant-user@example.com", "secret123");
+        user.setTenantId("tenant-b");
+        stubLogin("tenant-user@example.com").thenReturn(Optional.of(user));
+
+        authService.login(
+                new LoginRequest("tenant-user@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
+                new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null));
+
+        ArgumentCaptor<AuthLoginAttempt> recorded = ArgumentCaptor.forClass(AuthLoginAttempt.class);
+        verify(loginAttemptRepository).save(recorded.capture());
+        assertEquals("tenant-b", recorded.getValue().getTenantId());
+        assertEquals("SUCCESS", recorded.getValue().getResult());
     }
 
     @Test
@@ -347,7 +364,7 @@ class AuthOperationsFlowTest {
         role.setName("teacher");
         role.setPermissions(new java.util.LinkedHashSet<>(List.of(permission, perm("teacher.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
-        when(userRepository.findForLogin("lms-only@example.com")).thenReturn(Optional.of(user));
+        stubLogin("lms-only@example.com").thenReturn(Optional.of(user));
 
         AuthResponse response = authService.login(
                 new LoginRequest("lms-only@example.com", "secret123", "web-1", "Chrome", null, "crm", false),
@@ -362,7 +379,7 @@ class AuthOperationsFlowTest {
     void loginRejectsPendingLocalUser() {
         User user = activeUser("user-1", "pending@example.com", "secret123");
         user.setStatus("PENDING");
-        when(userRepository.findForLogin("pending@example.com")).thenReturn(Optional.of(user));
+        stubLogin("pending@example.com").thenReturn(Optional.of(user));
 
         assertThrows(
                 AuthFailure.EmailNotVerified.class,
@@ -378,7 +395,7 @@ class AuthOperationsFlowTest {
         User user = activeUser("user-invited", "invited@example.com", "secret123");
         user.setStatus("INVITED");
         user.setMustChangePassword(true);
-        when(userRepository.findForLogin("invited@example.com")).thenReturn(Optional.of(user));
+        stubLogin("invited@example.com").thenReturn(Optional.of(user));
 
         var response = authService.login(
                 new LoginRequest("invited@example.com", "secret123", null, null, null, "lms", false),
@@ -395,7 +412,7 @@ class AuthOperationsFlowTest {
     void loginRejectsBannedUser() {
         User user = activeUser("user-1", "banned@example.com", "secret123");
         user.setStatus("BANNED");
-        when(userRepository.findForLogin("banned@example.com")).thenReturn(Optional.of(user));
+        stubLogin("banned@example.com").thenReturn(Optional.of(user));
 
         assertThrows(
                 AuthFailure.AccountLocked.class,
@@ -410,7 +427,7 @@ class AuthOperationsFlowTest {
     void loginRejectsInactiveUserBeforeIssuingSession() {
         User user = activeUser("user-inactive", "inactive@example.com", "secret123");
         user.setStatus("INACTIVE");
-        when(userRepository.findForLogin("inactive@example.com")).thenReturn(Optional.of(user));
+        stubLogin("inactive@example.com").thenReturn(Optional.of(user));
 
         assertThrows(
                 AuthFailure.AccountDisabled.class,
@@ -429,8 +446,8 @@ class AuthOperationsFlowTest {
         inactive.setStatus("INACTIVE");
         User banned = activeUser("user-banned", "banned@example.com", "secret123");
         banned.setStatus("BANNED");
-        when(userRepository.findForLogin("inactive@example.com")).thenReturn(Optional.of(inactive));
-        when(userRepository.findForLogin("banned@example.com")).thenReturn(Optional.of(banned));
+        stubLogin("inactive@example.com").thenReturn(Optional.of(inactive));
+        stubLogin("banned@example.com").thenReturn(Optional.of(banned));
 
         assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
                 new LoginRequest("inactive@example.com", "wrong-password", null, null, null, "lms", false),
@@ -443,7 +460,7 @@ class AuthOperationsFlowTest {
     @Test
     void accountIsLockedAfterConfiguredConsecutiveWrongPasswords() {
         User user = activeUser("user-1", "active@example.com", "secret123");
-        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        stubLogin("active@example.com").thenReturn(Optional.of(user));
         OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);
         List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
             AuthLoginAttempt attempt = new AuthLoginAttempt();
@@ -453,8 +470,8 @@ class AuthOperationsFlowTest {
             attempt.setCreatedAt(now.minusMinutes(index));
             return attempt;
         }).toList();
-        when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(failures);
+        when(loginAttemptRepository.findSignalsByUserId(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(failures.stream().map(a -> new com.erg.ergspringboot.users.persistence.auth.LoginAttemptSignal(a.getResult(), a.getReason(), a.getCreatedAt())).toList());
 
         assertThrows(AuthFailure.InvalidCredentials.class, () -> authService.login(
                 new LoginRequest("active@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
@@ -469,7 +486,7 @@ class AuthOperationsFlowTest {
     @Test
     void lockoutExpiresAfterBlockDurationAndSuccessResetsTheCounter() {
         User user = activeUser("user-1", "active@example.com", "secret123");
-        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        stubLogin("active@example.com").thenReturn(Optional.of(user));
         OffsetDateTime old = OffsetDateTime.now(java.time.ZoneOffset.UTC).minusHours(1);
         List<AuthLoginAttempt> failures = java.util.stream.IntStream.range(0, 5).mapToObj(index -> {
             AuthLoginAttempt attempt = new AuthLoginAttempt();
@@ -478,8 +495,8 @@ class AuthOperationsFlowTest {
             attempt.setCreatedAt(old.minusMinutes(index));
             return attempt;
         }).toList();
-        when(loginAttemptRepository.findByUserIdOrderByCreatedAtDesc(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
-                .thenReturn(failures);
+        when(loginAttemptRepository.findSignalsByUserId(eq("user-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(failures.stream().map(a -> new com.erg.ergspringboot.users.persistence.auth.LoginAttemptSignal(a.getResult(), a.getReason(), a.getCreatedAt())).toList());
 
         assertNotNull(authService.login(
                 new LoginRequest("active@example.com", "secret123", "web-1", "Chrome", null, "lms", false),
@@ -491,6 +508,7 @@ class AuthOperationsFlowTest {
         User user = activeUser("user-1", "active@example.com", "secret123");
         user.setUsername("active.user");
         when(userRepository.findForLogin(any(String.class))).thenReturn(Optional.of(user));
+        when(userRepository.findForLoginById("user-1")).thenReturn(Optional.of(user));
         loginFlow.setAuthLoginRateLimiter(new AuthLoginRateLimiter(null, true, 100, 2, 100));
         AuthClientContext context = new AuthClientContext("127.0.0.1", "JUnit", "web-1", "Chrome", null);
 
@@ -521,7 +539,7 @@ class AuthOperationsFlowTest {
         existingLms.setUserAgent("Mozilla Chrome");
         existingLms.setIpAddress("10.0.0.1");
         existingLms.setPortal("lms");
-        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        stubLogin("active@example.com").thenReturn(Optional.of(user));
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull("user-1", "erg"))
                 .thenReturn(List.of(existingLms));
 
@@ -545,7 +563,7 @@ class AuthOperationsFlowTest {
         existing.setDeviceName("Chrome on Windows");
         existing.setUserAgent("Mozilla Chrome");
         existing.setIpAddress("10.0.0.1");
-        when(userRepository.findForLogin("ip-change@example.com")).thenReturn(Optional.of(user));
+        stubLogin("ip-change@example.com").thenReturn(Optional.of(user));
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(), "erg"))
                 .thenReturn(List.of(existing));
 
@@ -570,7 +588,7 @@ class AuthOperationsFlowTest {
         existingLcms.setDeviceId("browser-1");
         existingLcms.setDeviceFingerprint("fp-browser-1");
         existingLcms.setIpAddress("10.0.0.1");
-        when(userRepository.findForLogin("new-context@example.com")).thenReturn(Optional.of(user));
+        stubLogin("new-context@example.com").thenReturn(Optional.of(user));
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(), "erg"))
                 .thenReturn(List.of(existingLms, existingLcms));
 
@@ -590,7 +608,7 @@ class AuthOperationsFlowTest {
         User user = activeUser("user-rapid", "rapid@example.com", "secret123");
         AuthSession existingDesktop = session("session-desktop", user.getId(), "erg");
         existingDesktop.setPlatform("WEB_DESKTOP");
-        when(userRepository.findForLogin("rapid@example.com")).thenReturn(Optional.of(user));
+        stubLogin("rapid@example.com").thenReturn(Optional.of(user));
         when(sessionRepository.findByUserIdAndTenantIdAndRevokedAtIsNull(user.getId(), "erg"))
                 .thenReturn(List.of(existingDesktop));
         when(securityEventRepository.countByTenantIdAndUserIdAndEventTypeAndOccurredAtAfter(
@@ -623,7 +641,7 @@ class AuthOperationsFlowTest {
     void repeatedFailedLoginDoesNotBlockUserOrRevokeSessions() {
         User user = activeUser("user-1", "active@example.com", "secret123");
         AuthSession existingWeb = session("session-1", "user-1", "erg");
-        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        stubLogin("active@example.com").thenReturn(Optional.of(user));
         when(loginAttemptRepository.countByAttemptedEmailIgnoreCaseAndResultInAndCreatedAtAfter(eq("active@example.com"), any(), any()))
                 .thenReturn(5L);
         when(loginAttemptRepository.countByIpAddressAndResultInAndCreatedAtAfter(eq("127.0.0.1"), any(), any()))
@@ -645,7 +663,7 @@ class AuthOperationsFlowTest {
     @Test
     void invalidCredentialsDelegateToIndependentFailureTransaction() {
         User user = activeUser("user-1", "active@example.com", "secret123");
-        when(userRepository.findForLogin("active@example.com")).thenReturn(Optional.of(user));
+        stubLogin("active@example.com").thenReturn(Optional.of(user));
         loginFlow.setLoginFailureEnforcementService(loginFailureEnforcementService);
         AuthClientContext context = new AuthClientContext(
                 "127.0.0.1", "JUnit", "web-1", "Chrome", "fingerprint");
@@ -667,7 +685,7 @@ class AuthOperationsFlowTest {
     @Test
     void concurrentLoginLockTimeoutReturnsControlledLoginInProgressError() {
         User user = activeUser("user-lock", "lock@example.com", "secret123");
-        when(userRepository.findForLogin("lock@example.com")).thenReturn(Optional.of(user));
+        stubLogin("lock@example.com").thenReturn(Optional.of(user));
         when(userRepository.lockIdForSessionMutation("user-lock"))
                 .thenThrow(new QueryTimeoutException("login lock timed out"));
 
@@ -854,7 +872,7 @@ class AuthOperationsFlowTest {
         role.setName("admin");
         role.setPermissions(new java.util.LinkedHashSet<>(List.of(perm("admin.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
-        when(userRepository.findForLogin("admin@example.com")).thenReturn(Optional.of(user));
+        stubLogin("admin@example.com").thenReturn(Optional.of(user));
 
         authService.login(
                 new LoginRequest("admin@example.com", "secret123", "web-1", "Chrome", null, "lms", rememberMe),
@@ -877,7 +895,7 @@ class AuthOperationsFlowTest {
         role.setName("student");
         role.setPermissions(new java.util.LinkedHashSet<>(List.of(perm("student.workspace.access"))));
         user.setRoles(new java.util.LinkedHashSet<>(List.of(role)));
-        when(userRepository.findForLogin("hs001@example.com")).thenReturn(Optional.of(user));
+        stubLogin("hs001@example.com").thenReturn(Optional.of(user));
 
         AuthResponse response = authService.login(
                 new LoginRequest("hs001@example.com", "secret123", "web-1", "Chrome", null, "elearning", rememberMe),
@@ -930,6 +948,18 @@ class AuthOperationsFlowTest {
         attempt.setResult("FAILED");
         attempt.setCreatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC).minusDays(1));
         return attempt;
+    }
+
+    /** Stubs the identifier lookup before the transaction and the by-id re-read inside it. */
+    private LoginStub stubLogin(String identifier) {
+        return found -> {
+            when(userRepository.findForLogin(identifier)).thenReturn(found);
+            found.ifPresent(user -> when(userRepository.findForLoginById(user.getId())).thenReturn(found));
+        };
+    }
+
+    private interface LoginStub {
+        void thenReturn(Optional<User> found);
     }
 
     private User activeUser(String id, String email, String rawPassword) {

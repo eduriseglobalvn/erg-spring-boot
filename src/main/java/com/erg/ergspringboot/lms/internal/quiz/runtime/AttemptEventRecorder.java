@@ -46,6 +46,12 @@ public class AttemptEventRecorder {
         if (eventId != null && !eventId.isBlank() && attemptEventRepository.existsById(id)) {
             return;
         }
+        attemptEventRepository.save(newEvent(id, tenantId, attemptId, quizId, packageId, type, questionId, answer, result,
+                clientCreatedAt));
+    }
+
+    private static AttemptEvent newEvent(String id, String tenantId, String attemptId, String quizId, String packageId,
+            String type, String questionId, Object answer, Map<String, Object> result, OffsetDateTime clientCreatedAt) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         AttemptEvent event = new AttemptEvent();
         event.setId(id);
@@ -59,7 +65,7 @@ public class AttemptEventRecorder {
         event.setResult(result);
         event.setCreatedAt(clientCreatedAt == null ? now : clientCreatedAt);
         event.setReceivedAt(now);
-        attemptEventRepository.save(event);
+        return event;
     }
 
     /** attempt_events.id is varchar(36) but clients send "evt_" + uuid (40 chars): map those to a stable uuid so replays stay idempotent. */
@@ -69,25 +75,40 @@ public class AttemptEventRecorder {
         return id.length() <= 36 ? id : UUID.nameUUIDFromBytes((attemptId + ":" + id).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
-    /** Records a batch of client events (from a draft/sync payload), each idempotent by its own id. */
+    /** Audit events only: a hand-in must never fail on them, so the excess of an oversized batch is dropped, not rejected. */
+    static final int MAX_CLIENT_EVENTS = 500;
+
+    /**
+     * Records a batch of client events (from a draft/sync payload), each idempotent by its own id. One select finds the ids
+     * already stored, one saveAll inserts the rest. At most {@link #MAX_CLIENT_EVENTS} are accepted: the newest ones win.
+     */
     @SuppressWarnings("unchecked")
     public void recordClientBatch(String tenantId, String attemptId, String quizId, String packageId, List<Map<String, Object>> events) {
-        if (events == null) {
+        if (events == null || events.isEmpty()) {
             return;
         }
-        for (Map<String, Object> raw : events) {
+        List<Map<String, Object>> accepted = events.size() > MAX_CLIENT_EVENTS
+                ? events.subList(events.size() - MAX_CLIENT_EVENTS, events.size()) : events;
+        Map<String, AttemptEvent> byId = new java.util.LinkedHashMap<>(); // a duplicate id inside the batch counts once
+        for (Map<String, Object> raw : accepted) {
             if (raw == null) {
                 continue;
             }
-            String eventId = string(raw.get("id"));
             String type = string(raw.getOrDefault("type", "client_event"));
-            String questionId = string(raw.get("questionId"));
-            Object answer = raw.get("answer");
             Map<String, Object> result = raw.get("result") instanceof Map<?, ?> map
                     ? (Map<String, Object>) map
                     : null;
-            record(eventId, tenantId, attemptId, quizId, packageId, type, questionId, answer, result,
-                    parseTime(raw.get("createdAt")));
+            String id = storableId(attemptId, string(raw.get("id")));
+            byId.putIfAbsent(id, newEvent(id, tenantId, attemptId, quizId, packageId, type, string(raw.get("questionId")),
+                    raw.get("answer"), result, parseTime(raw.get("createdAt"))));
+        }
+        if (byId.isEmpty()) {
+            return;
+        }
+        java.util.Set<String> stored = new java.util.HashSet<>(attemptEventRepository.findExistingIds(byId.keySet()));
+        List<AttemptEvent> fresh = byId.values().stream().filter(event -> !stored.contains(event.getId())).toList();
+        if (!fresh.isEmpty()) {
+            attemptEventRepository.saveAll(fresh);
         }
     }
 

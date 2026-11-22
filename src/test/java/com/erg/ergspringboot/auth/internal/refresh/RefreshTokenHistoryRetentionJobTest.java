@@ -20,8 +20,18 @@ class RefreshTokenHistoryRetentionJobTest {
 
         new RefreshTokenHistoryRetentionJob(repository).deleteExpiredHistory();
 
-        verify(repository).deleteByConsumedAtBefore(argThat(cutoff ->
-                cutoff.isAfter(before) && cutoff.isBefore(OffsetDateTime.now().minusDays(29))));
+        verify(repository).deleteConsumedBefore(argThat(cutoff ->
+                cutoff.isAfter(before) && cutoff.isBefore(OffsetDateTime.now().minusDays(29))), eq(1000));
+    }
+
+    @Test
+    void keepsDeletingUntilAPartialBatch() {
+        RefreshTokenHistoryRepository repository = mock(RefreshTokenHistoryRepository.class);
+        org.mockito.Mockito.when(repository.deleteConsumedBefore(any(), eq(1000))).thenReturn(1000, 1000, 3);
+
+        new RefreshTokenHistoryRetentionJob(repository).deleteExpiredHistory();
+
+        verify(repository, org.mockito.Mockito.times(3)).deleteConsumedBefore(any(), eq(1000));
     }
 
     @Test

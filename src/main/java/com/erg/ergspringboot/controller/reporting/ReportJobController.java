@@ -59,9 +59,11 @@ public class ReportJobController {
 
     @GetMapping("/{jobId}")
     @ReportingRead
-    public ApiResponse<ReportJobResponse> status(@PathVariable String jobId, HttpServletRequest request) {
+    public ApiResponse<ReportJobResponse> status(@PathVariable String jobId,
+            @RequestParam(required = false) String include, HttpServletRequest request) {
         UserAccessContext access = UserAccessContext.from(request);
-        return ok("Report status loaded", reporting.status(access, jobId), request);
+        // ?include=result keeps the old body; polling does not need the stored rows, /download serves them
+        return ok("Report status loaded", reporting.status(access, jobId, "result".equalsIgnoreCase(include)), request);
     }
 
     @GetMapping("/assignments/{assignmentId}/progress")

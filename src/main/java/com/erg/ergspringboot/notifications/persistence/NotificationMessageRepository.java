@@ -18,6 +18,8 @@ public interface NotificationMessageRepository extends JpaRepository<Notificatio
 
     Optional<NotificationMessageEntity> findByTenantIdAndDedupeKey(String tenantId, String dedupeKey);
 
+    List<NotificationMessageEntity> findByTenantIdAndDedupeKeyIn(String tenantId, Collection<String> dedupeKeys);
+
     /** First acknowledgement wins: only sets ackedAt while it is still null, and only on the user's own message. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -68,6 +70,25 @@ public interface NotificationMessageRepository extends JpaRepository<Notificatio
             @Param("unreadOnly") boolean unreadOnly,
             @Param("unackedOnly") boolean unackedOnly,
             Pageable pageable);
+
+    /**
+     * Bounded retention purge: messages older than the cutoff, at most {@code batchSize} per call, never those of a
+     * campaign that is still a draft, scheduled or sending. Recipients and outbox rows go with them (FK cascade).
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query(value = """
+            delete from notification_messages
+            where id in (
+                select m.id
+                from notification_messages m
+                left join notification_campaigns c on c.id = m.campaign_id
+                where m.created_at < :cutoff
+                  and (c.id is null or c.status not in ('DRAFT', 'SCHEDULED', 'SENDING'))
+                limit :batchSize
+            )
+            """, nativeQuery = true)
+    int deleteOlderThan(@Param("cutoff") OffsetDateTime cutoff, @Param("batchSize") int batchSize);
 
     /** (recipients, viewed) over campaigns sent since {@code since}. */
     @Query("""

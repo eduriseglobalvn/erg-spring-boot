@@ -30,12 +30,14 @@ import com.erg.ergspringboot.platform.security.UserAccessContext;
 import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathNodeRepository;
 import com.erg.ergspringboot.learningoutcomes.persistence.LearningPathRepository;
 import com.erg.ergspringboot.utils.IdGenerator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,18 +79,19 @@ public class LearningPathCommands {
         String requestedClassId = trimToNull(classId);
         visibility.ensureScope(access, requestedEducationUnitId, requestedClassId);
         String requestedStatus = trimToNull(status);
-        List<LearningPath> candidates = requestedStatus == null
-                ? paths.findTop100ByTenantIdOrderByUpdatedAtDesc(tenant)
-                : paths.findTop100ByTenantIdAndStatusOrderByUpdatedAtDesc(tenant,
-                        requestedStatus.toUpperCase(Locale.ROOT));
-        return candidates.stream()
-                .filter(value -> requestedEducationUnitId == null
-                        || requestedEducationUnitId.equals(trimToNull(value.getEducationUnitId())))
-                .filter(value -> requestedClassId == null
-                        || requestedClassId.equals(trimToNull(value.getClassId())))
-                .filter(value -> visibility.canSee(access, value))
-                .map(this::pathResponseWithNodeCount)
-                .toList();
+        List<String> units = access.managedEducationUnitIds();
+        List<String> classes = access.managedClassIds();
+        List<LearningPath> visible = paths.findScoped(tenant,
+                requestedStatus == null ? "" : requestedStatus.toUpperCase(Locale.ROOT),
+                requestedEducationUnitId == null ? "" : requestedEducationUnitId,
+                requestedClassId == null ? "" : requestedClassId,
+                units.contains("*"), units.isEmpty() ? List.of("-") : units,
+                classes.contains("*"), classes.isEmpty() ? List.of("-") : classes, PageRequest.of(0, 100));
+        if (visible.isEmpty()) return List.of();
+        Map<String, Integer> counts = new HashMap<>();
+        nodes.countGroupedByPathId(tenant, visible.stream().map(LearningPath::getId).toList())
+                .forEach(row -> counts.put(row.getPathId(), (int) Math.min(row.getNodeCount(), MAX_LIST)));
+        return visible.stream().map(value -> pathResponse(value, counts.getOrDefault(value.getId(), 0))).toList();
     }
 
     @Transactional("postgresTransactionManager")

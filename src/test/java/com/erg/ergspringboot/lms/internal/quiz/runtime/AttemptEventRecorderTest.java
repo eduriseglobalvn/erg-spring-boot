@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -24,11 +25,51 @@ class AttemptEventRecorderTest {
 
         recorder.recordClientBatch("erg", "attempt-1", "quiz-1", null, List.of(Map.of("id", clientId, "type", "answer_graded")));
 
-        ArgumentCaptor<AttemptEvent> saved = ArgumentCaptor.forClass(AttemptEvent.class);
-        verify(repository).save(saved.capture());
-        assertThat(saved.getValue().getId()).hasSize(36).isEqualTo(AttemptEventRecorder.storableId("attempt-1", clientId));
+        List<AttemptEvent> saved = savedBatch(repository);
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getId()).hasSize(36).isEqualTo(AttemptEventRecorder.storableId("attempt-1", clientId));
         assertThat(AttemptEventRecorder.storableId("attempt-1", "short-id")).isEqualTo("short-id");
-        assertThat(AttemptEventRecorder.storableId("attempt-2", clientId)).isNotEqualTo(saved.getValue().getId());
+        assertThat(AttemptEventRecorder.storableId("attempt-2", clientId)).isNotEqualTo(saved.get(0).getId());
+    }
+
+    @Test
+    void aReplayedBatchCostsOneLookupAndInsertsOnlyTheEventsNotStoredYet() {
+        AttemptEventRepository repository = mock(AttemptEventRepository.class);
+        AttemptEventRecorder recorder = new AttemptEventRecorder(repository);
+        when(repository.findExistingIds(any())).thenReturn(List.of("evt-1"));
+
+        recorder.recordClientBatch("erg", "attempt-1", "quiz-1", null, List.of(
+                Map.of("id", "evt-1"), Map.of("id", "evt-2"), Map.of("id", "evt-2"), Map.of("id", "evt-3", "type", "x")));
+
+        verify(repository, times(1)).findExistingIds(any());
+        verify(repository, never()).existsById(any());
+        verify(repository, never()).save(any());
+        // evt-1 is stored already, the duplicate evt-2 counts once.
+        assertThat(savedBatch(repository)).extracting(AttemptEvent::getId).containsExactly("evt-2", "evt-3");
+    }
+
+    @Test
+    void anOversizedBatchKeepsTheNewestEventsAndNeverRejects() {
+        AttemptEventRepository repository = mock(AttemptEventRepository.class);
+        AttemptEventRecorder recorder = new AttemptEventRecorder(repository);
+        List<Map<String, Object>> events = new java.util.ArrayList<>();
+        for (int i = 0; i < AttemptEventRecorder.MAX_CLIENT_EVENTS + 20; i++) events.add(Map.of("id", "evt-" + i));
+
+        recorder.recordClientBatch("erg", "attempt-1", "quiz-1", null, events);
+
+        List<AttemptEvent> saved = savedBatch(repository);
+        assertThat(saved).hasSize(AttemptEventRecorder.MAX_CLIENT_EVENTS);
+        assertThat(saved.get(0).getId()).isEqualTo("evt-20");
+        assertThat(saved.get(saved.size() - 1).getId()).isEqualTo("evt-" + (AttemptEventRecorder.MAX_CLIENT_EVENTS + 19));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<AttemptEvent> savedBatch(AttemptEventRepository repository) {
+        ArgumentCaptor<Iterable<AttemptEvent>> batch = ArgumentCaptor.forClass(Iterable.class);
+        verify(repository).saveAll(batch.capture());
+        List<AttemptEvent> out = new java.util.ArrayList<>();
+        batch.getValue().forEach(out::add);
+        return out;
     }
 
     @Test

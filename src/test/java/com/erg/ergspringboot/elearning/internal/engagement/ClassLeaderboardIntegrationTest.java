@@ -50,6 +50,7 @@ class ClassLeaderboardIntegrationTest {
 
     @BeforeEach
     void seed() {
+        service.clearBoardCache(); // the 45-second board cache outlives each test's rolled-back transaction
         EducationUnit school = new EducationUnit();
         school.setId("school-lb"); school.setTenantId(TENANT); school.setName("Leaderboard School"); school.setType("school");
         entityManager.persist(school);
@@ -75,6 +76,7 @@ class ClassLeaderboardIntegrationTest {
         attempt("s-cuong", "a2", "in_progress", 20, false, null); // not handed in
         attempt("s-cuong", "a3", "submitted", 20, false, lastWeek); // last week's leader
         student("s-dung", "Dũng", CLASS_A);
+        attempt("s-dung", "a1", "submitted", 10, false, NOW.minusMinutes(1), 0); // handed in blank: no XP
         // Primary class B, enrolled in A: listed in both; XP belongs to the student, from every class.
         student("s-em", "Em", CLASS_B);
         enrollment("s-em", CLASS_A);
@@ -103,6 +105,21 @@ class ClassLeaderboardIntegrationTest {
                 .containsExactly(null, null, null, -3, null);
         assertThat(board.entries()).extracting(ClassLeaderboardEntryResponse::isViewer)
                 .containsExactly(true, false, false, false, false);
+    }
+
+    @Test
+    void viewerOnlyReturnsJustTheViewerRowWithRankComputedAgainstTheWholeBoard() {
+        ClassLeaderboardResponse board = service.forStudent(TENANT, "usr-s-binh", null, null, null, true);
+
+        assertThat(board.entries()).singleElement().satisfies(entry -> {
+            assertThat(entry.studentName()).isEqualTo("Bình");
+            assertThat(entry.rank()).isEqualTo(3);
+        });
+        assertThat(board.me().rank()).isEqualTo(3);
+        assertThat(board.me().size()).isEqualTo(5);
+        // A blank hand-in (Dũng, zero answers) earns no XP, so he stays unranked.
+        assertThat(service.forStudent(TENANT, "usr-s-dung", null, null, null).entries())
+                .filteredOn(ClassLeaderboardEntryResponse::isViewer).extracting(ClassLeaderboardEntryResponse::xp).containsExactly(0);
     }
 
     @Test
@@ -241,6 +258,11 @@ class ClassLeaderboardIntegrationTest {
 
     private void attempt(String studentId, String assignmentId, String status, Integer questions, boolean late,
                          OffsetDateTime submittedAt) {
+        attempt(studentId, assignmentId, status, questions, late, submittedAt, 1);
+    }
+
+    private void attempt(String studentId, String assignmentId, String status, Integer questions, boolean late,
+                         OffsetDateTime submittedAt, int answered) {
         Attempt attempt = new Attempt();
         attempt.setId("att-lb-" + (++attempts));
         attempt.setTenantId(TENANT);
@@ -249,6 +271,7 @@ class ClassLeaderboardIntegrationTest {
         attempt.setStudentId(studentId);
         attempt.setStatus(status);
         attempt.setTotalQuestions(questions);
+        attempt.setSubmittedCount(answered);
         attempt.setLate(late);
         attempt.setPercent(50.0D);
         attempt.setScore(50.0D);

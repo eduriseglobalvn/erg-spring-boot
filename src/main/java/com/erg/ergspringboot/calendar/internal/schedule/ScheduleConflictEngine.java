@@ -67,10 +67,25 @@ public class ScheduleConflictEngine {
     private record Hit(String kind, Occurrence mine, Occurrence other, TeacherRef focus, Integer gap, Integer required,
             Occurrence earlier, Leave leave) {}
 
-    @Transactional(value = "postgresTransactionManager", readOnly = true)
     /** {@code withSuggestions} false skips the per-conflict fix search (it queries the DB): overview and gates do not show it. */
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
     List<ConflictDetailResponse> detect(String tenantId, List<Occurrence> candidates, Set<String> excludeEventIds,
             boolean withSuggestions) {
+        return detect(tenantId, candidates, excludeEventIds, withSuggestions, null, false);
+    }
+
+    /**
+     * Overview form: {@code candidates} already hold every PUBLISHED event of {@code coveredSchools} (null with
+     * {@code coversAll} = every school), so only the published events of other schools are read as the existing side.
+     */
+    @Transactional(value = "postgresTransactionManager", readOnly = true)
+    List<ConflictDetailResponse> detectCovering(String tenantId, List<Occurrence> candidates, Collection<String> coveredSchools) {
+        Set<String> ids = candidates.stream().map(Occurrence::eventId).collect(Collectors.toSet());
+        return detect(tenantId, candidates, ids, false, coveredSchools, coveredSchools == null);
+    }
+
+    private List<ConflictDetailResponse> detect(String tenantId, List<Occurrence> candidates, Set<String> excludeEventIds,
+            boolean withSuggestions, Collection<String> coveredSchools, boolean coversAll) {
         if (candidates.isEmpty()) return List.of();
         Set<String> classIds = candidates.stream().map(Occurrence::classId).collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> roomIds = candidates.stream().map(Occurrence::roomId).filter(Objects::nonNull)
@@ -82,7 +97,8 @@ public class ScheduleConflictEngine {
         OffsetDateTime from = firstDate.atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime();
         OffsetDateTime to = lastDate.plusDays(1).atStartOfDay(ScheduleDataLoader.VN).toOffsetDateTime();
 
-        List<Occurrence> existing = loader.loadPublished(tenantId, from, to, classIds, roomIds, teacherIds, excludeEventIds);
+        List<Occurrence> existing = coversAll ? List.of()
+                : loader.loadPublished(tenantId, from, to, classIds, roomIds, teacherIds, excludeEventIds, coveredSchools);
         Map<String, List<Leave>> leaves = loader.loadLeaves(tenantId, teacherIds, firstDate, lastDate);
         Context ctx = new Context(tenantId, candidates, existing, excludeEventIds, from, to, withSuggestions);
 
@@ -194,19 +210,12 @@ public class ScheduleConflictEngine {
     private FixSuggestionResponse suggestTeacher(Context ctx, String schoolId, List<Occurrence> windows, Occurrence target,
             String kind, String reason) {
         Set<String> exclude = target.teachers().stream().map(TeacherRef::id).collect(Collectors.toSet());
-        List<UserAccountProjection> pool = users.findCalendarTeachersByTenantAndSchoolIds(ctx.tenantId, List.of(schoolId)).stream()
-                .filter(u -> !exclude.contains(u.id())).toList();
-        if (pool.isEmpty()) return null;
-        Set<String> poolIds = pool.stream().map(UserAccountProjection::id).collect(Collectors.toSet());
-        List<Occurrence> busy = new ArrayList<>(loader.loadPublished(ctx.tenantId, ctx.from, ctx.to, Set.of(), Set.of(), poolIds,
-                ctx.excludeEventIds));
-        busy.addAll(ctx.candidates);
-        Set<String> taughtHere = loader.teachersWhoTaughtAt(ctx.tenantId, schoolId, poolIds);
+        TeacherPool pool = ctx.teacherPool(schoolId);
         LocalDate week = weekStart(windows.get(0).date());
-        UserAccountProjection best = pool.stream()
-                .filter(u -> windows.stream().noneMatch(w -> busy.stream().anyMatch(b -> b.hasTeacher(u.id()) && b.overlaps(w))))
-                .min(Comparator.<UserAccountProjection, Boolean>comparing(u -> !taughtHere.contains(u.id()))
-                        .thenComparingLong(u -> busy.stream().filter(b -> b.hasTeacher(u.id()) && weekStart(b.date()).equals(week)).count())
+        UserAccountProjection best = pool.users().stream().filter(u -> !exclude.contains(u.id()))
+                .filter(u -> windows.stream().noneMatch(w -> pool.busy().overlaps(u.id(), w)))
+                .min(Comparator.<UserAccountProjection, Boolean>comparing(u -> !pool.taughtHere().contains(u.id()))
+                        .thenComparingLong(u -> pool.busy().countInWeek(u.id(), week))
                         .thenComparing(u -> nz(u.displayName())))
                 .orElse(null);
         if (best == null) return null;
@@ -216,16 +225,12 @@ public class ScheduleConflictEngine {
 
     private FixSuggestionResponse suggestRoom(Context ctx, List<Hit> group) {
         Occurrence c = group.get(0).mine();
-        List<RoomRef> rooms = loader.loadRooms(ctx.tenantId, c.schoolId());
-        Integer currentSeats = rooms.stream().filter(r -> r.id().equals(c.roomId())).map(RoomRef::seatCount)
+        RoomPool pool = ctx.roomPool(c.schoolId());
+        Integer currentSeats = pool.rooms().stream().filter(r -> r.id().equals(c.roomId())).map(RoomRef::seatCount)
                 .filter(Objects::nonNull).findFirst().orElse(null);
-        Set<String> roomIds = rooms.stream().map(RoomRef::id).collect(Collectors.toSet());
-        List<Occurrence> busy = new ArrayList<>(loader.loadPublished(ctx.tenantId, ctx.from, ctx.to, Set.of(), roomIds, Set.of(),
-                ctx.excludeEventIds));
-        busy.addAll(ctx.candidates);
         List<Occurrence> windows = group.stream().map(Hit::mine).toList();
-        RoomRef best = rooms.stream().filter(r -> !r.id().equals(c.roomId()))
-                .filter(r -> windows.stream().noneMatch(w -> busy.stream().anyMatch(b -> r.id().equals(b.roomId()) && b.overlaps(w))))
+        RoomRef best = pool.rooms().stream().filter(r -> !r.id().equals(c.roomId()))
+                .filter(r -> windows.stream().noneMatch(w -> pool.busy().overlaps(r.id(), w)))
                 .min(Comparator.<RoomRef, Integer>comparing(r -> r.seatCount() == null || currentSeats == null
                                 ? Integer.MAX_VALUE : Math.abs(r.seatCount() - currentSeats))
                         .thenComparing(RoomRef::name))
@@ -288,6 +293,34 @@ public class ScheduleConflictEngine {
         return value == null ? "" : value;
     }
 
+    private record TeacherPool(List<UserAccountProjection> users, BusyIndex busy, Set<String> taughtHere) {}
+
+    private record RoomPool(List<RoomRef> rooms, BusyIndex busy) {}
+
+    /** Periods of one resource (teacher or room) by date, so a window is checked against that day only. */
+    private record BusyIndex(Map<String, Map<LocalDate, List<Occurrence>>> byKey) {
+        static BusyIndex of(List<Occurrence> busy, java.util.function.Function<Occurrence, List<String>> keys) {
+            Map<String, Map<LocalDate, List<Occurrence>>> index = new HashMap<>();
+            for (Occurrence o : busy) {
+                for (String key : keys.apply(o)) {
+                    index.computeIfAbsent(key, k -> new HashMap<>()).computeIfAbsent(o.date(), d -> new ArrayList<>()).add(o);
+                }
+            }
+            return new BusyIndex(index);
+        }
+
+        boolean overlaps(String key, Occurrence window) {
+            return byKey.getOrDefault(key, Map.of()).getOrDefault(window.date(), List.of()).stream().anyMatch(b -> b.overlaps(window));
+        }
+
+        long countInWeek(String key, LocalDate monday) {
+            Map<LocalDate, List<Occurrence>> days = byKey.getOrDefault(key, Map.of());
+            long n = 0;
+            for (int i = 0; i < 7; i++) n += days.getOrDefault(monday.plusDays(i), List.of()).size();
+            return n;
+        }
+    }
+
     /** Per-call lookups over candidates plus the published events they could collide with. */
     private final class Context {
         final String tenantId;
@@ -300,6 +333,8 @@ public class ScheduleConflictEngine {
         final Map<String, List<Occurrence>> byRoom = new HashMap<>();
         final Map<String, List<Occurrence>> byTeacher = new HashMap<>();
         private final Map<String, Integer> requiredByPair = new HashMap<>();
+        private final Map<String, TeacherPool> teacherPools = new HashMap<>();
+        private final Map<String, RoomPool> roomPools = new HashMap<>();
 
         Context(String tenantId, List<Occurrence> candidates, List<Occurrence> existing, Set<String> excludeEventIds,
                 OffsetDateTime from, OffsetDateTime to, boolean withSuggestions) {
@@ -316,6 +351,30 @@ public class ScheduleConflictEngine {
                 if (o.roomId() != null) byRoom.computeIfAbsent(o.roomId(), k -> new ArrayList<>()).add(o);
                 for (TeacherRef t : o.teachers()) byTeacher.computeIfAbsent(t.id(), k -> new ArrayList<>()).add(o);
             }
+        }
+
+        /** Teachers of a school with their busy periods, loaded once per detect call however many conflicts ask. */
+        TeacherPool teacherPool(String schoolId) {
+            return teacherPools.computeIfAbsent(schoolId, id -> {
+                List<UserAccountProjection> teachers = users.findCalendarTeachersByTenantAndSchoolIds(tenantId, List.of(id));
+                Set<String> poolIds = teachers.stream().map(UserAccountProjection::id).collect(Collectors.toSet());
+                List<Occurrence> busy = new ArrayList<>(loader.loadPublished(tenantId, from, to, Set.of(), Set.of(), poolIds,
+                        excludeEventIds));
+                busy.addAll(candidates);
+                return new TeacherPool(teachers, BusyIndex.of(busy, o -> o.teachers().stream().map(TeacherRef::id).toList()),
+                        loader.teachersWhoTaughtAt(tenantId, id, poolIds));
+            });
+        }
+
+        RoomPool roomPool(String schoolId) {
+            return roomPools.computeIfAbsent(schoolId, id -> {
+                List<RoomRef> rooms = loader.loadRooms(tenantId, id);
+                Set<String> roomIds = rooms.stream().map(RoomRef::id).collect(Collectors.toSet());
+                List<Occurrence> busy = new ArrayList<>(loader.loadPublished(tenantId, from, to, Set.of(), roomIds, Set.of(),
+                        excludeEventIds));
+                busy.addAll(candidates);
+                return new RoomPool(rooms, BusyIndex.of(busy, o -> o.roomId() == null ? List.of() : List.of(o.roomId())));
+            });
         }
 
         boolean differentAndOverlapping(Occurrence c, Occurrence x) {

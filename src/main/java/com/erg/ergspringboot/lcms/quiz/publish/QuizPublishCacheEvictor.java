@@ -18,6 +18,13 @@ final class QuizPublishCacheEvictor {
      */
     void evictQuizCachesAfterCommit(String tenantId, String quizId) {
         evictAll("quizRuntimePackage");
+        evictAll("quizStartInfo"); // the 'active' start info changes with every publish
+        evictAll("lcmsQuestionBankWorkspace");
+        evictAll("lcmsQuizWorkspace");
+    }
+
+    /** Authoring-only writes (fork): the workspace lists change, the student start caches do not. */
+    void evictAuthoringCachesAfterCommit() {
         evictAll("lcmsQuestionBankWorkspace");
         evictAll("lcmsQuizWorkspace");
     }

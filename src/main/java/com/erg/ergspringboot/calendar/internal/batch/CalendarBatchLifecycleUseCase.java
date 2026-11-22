@@ -62,7 +62,7 @@ public class CalendarBatchLifecycleUseCase {
     @Transactional("postgresTransactionManager")
     public BatchResponse publishBatch(String tenantId, String batchId, Integer expectedVersion, String actorId) {
         // two batches of a tenant published at once would each pass the check below (the engine sees PUBLISHED only)
-        batches.advisoryXactLock("teaching-schedule-publish:" + tenantId);
+        batches.lockTenantPublish(tenantId);
         CalendarBatch batch = lock(tenantId, batchId, expectedVersion);
         rejectCancelled(batch);
         if (!DRAFT.equals(batch.getStatus())) {

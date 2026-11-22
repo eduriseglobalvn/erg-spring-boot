@@ -337,6 +337,8 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 5000,
+            "minItems": 0,
             "type": "array"
           }
         },
@@ -1076,6 +1078,32 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/CalendarBulkPayload"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseCalendarCatalogSearchResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CalendarCatalogSearchResponse"
           },
           "errors": {},
           "message": {
@@ -4996,10 +5024,62 @@
         },
         "type": "object"
       },
+      "ApiResponseSessionIdentityResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionIdentityResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseSessionListResponse": {
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SessionListResponse"
+          },
+          "errors": {},
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "statusCode": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseSessionScopeResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionScopeResponse"
           },
           "errors": {},
           "message": {
@@ -7087,6 +7167,9 @@
             },
             "type": "array"
           },
+          "catalogTruncated": {
+            "type": "boolean"
+          },
           "classes": {
             "items": {
               "$ref": "#/components/schemas/CalendarClassOptionResponse"
@@ -7122,6 +7205,31 @@
               "$ref": "#/components/schemas/CalendarTeacherOptionResponse"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CalendarCatalogSearchResponse": {
+        "properties": {
+          "hasMore": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -7795,6 +7903,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "userIdCount": {
+            "description": "Size of audience.userIds, so a list can show it without reading the ids",
+            "format": "int32",
+            "type": "integer"
+          },
           "viewedCount": {
             "description": "Recipients who opened the message",
             "format": "int64",
@@ -7906,7 +8019,7 @@
         "properties": {
           "new_password": {
             "maxLength": 128,
-            "minLength": 8,
+            "minLength": 6,
             "type": "string"
           },
           "old_password": {
@@ -11068,6 +11181,26 @@
           "learnerId",
           "learningPathId"
         ],
+        "type": "object"
+      },
+      "Item": {
+        "properties": {
+          "academicYear": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "schoolId": {
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "JoinRequest": {
@@ -14943,6 +15076,9 @@
       },
       "SessionBootstrapResponse": {
         "properties": {
+          "classesTruncated": {
+            "type": "boolean"
+          },
           "currentScope": {
             "$ref": "#/components/schemas/SessionBootstrapScope"
           },
@@ -15112,6 +15248,35 @@
         },
         "type": "object"
       },
+      "SessionIdentityResponse": {
+        "properties": {
+          "lifecycle": {
+            "$ref": "#/components/schemas/AccountLifecycleResponse"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/SessionBootstrapPermissions"
+          },
+          "portals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/SessionBootstrapUser"
+          },
+          "workspaces": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "SessionListResponse": {
         "properties": {
           "items": {
@@ -15163,6 +15328,63 @@
           },
           "userAgent": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SessionScopeClasses": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionBootstrapClass"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "SessionScopeResponse": {
+        "properties": {
+          "classes": {
+            "$ref": "#/components/schemas/SessionScopeClasses"
+          },
+          "currentScope": {
+            "$ref": "#/components/schemas/SessionBootstrapScope"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "units": {
+            "$ref": "#/components/schemas/SessionScopeUnits"
+          }
+        },
+        "type": "object"
+      },
+      "SessionScopeUnits": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionBootstrapUnit"
+            },
+            "type": "array"
+          },
+          "page": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalItems": {
+            "format": "int64",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -19098,6 +19320,75 @@
         ]
       }
     },
+    "/api/v1/calendar/catalog/search": {
+      "get": {
+        "operationId": "catalogSearch",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "schoolIds",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCalendarCatalogSearchResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "calendar-rest-controller"
+        ]
+      }
+    },
     "/api/v1/calendar/events/{eventId}": {
       "delete": {
         "operationId": "deleteEvent",
@@ -20260,6 +20551,15 @@
               "default": 500,
               "format": "int32",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "openFollowUpsOnly",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -25523,6 +25823,14 @@
               "format": "int32",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -26881,6 +27189,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -27029,6 +27345,94 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseSessionBootstrapResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "session-controller"
+        ]
+      }
+    },
+    "/api/v1/sessions/me": {
+      "get": {
+        "operationId": "currentIdentity",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSessionIdentityResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "session-controller"
+        ]
+      }
+    },
+    "/api/v1/sessions/scope": {
+      "get": {
+        "operationId": "currentScope",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unitQ",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unitPage",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unitSize",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unitId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "classSize",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSessionScopeResponse"
                 }
               }
             },
@@ -27898,6 +28302,23 @@
             "in": "query",
             "name": "year",
             "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "schoolId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
             "schema": {
               "format": "int32",
               "type": "integer"

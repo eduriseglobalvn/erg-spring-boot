@@ -45,9 +45,10 @@ class ContentLifecycleOperationsTest {
     private final QuizRepository quizzes = mock(QuizRepository.class);
     private final QuizDraftRepository quizDrafts = mock(QuizDraftRepository.class);
     private final QuizVersionRepository quizVersions = mock(QuizVersionRepository.class);
+    private final org.springframework.cache.CacheManager caches = mock(org.springframework.cache.CacheManager.class);
     private final ContentLifecycleOperations operations = new ContentLifecycleOperations(
             transitions, subjects, levels, topics, contentItems, questions, quizzes,
-            quizDrafts, quizVersions, new AuthorizationOperations(new ErgPolicyService()));
+            quizDrafts, quizVersions, new AuthorizationOperations(new ErgPolicyService()), caches);
 
     @AfterEach
     void clearSecurityContext() {
@@ -119,7 +120,7 @@ class ContentLifecycleOperationsTest {
 
         assertThat(response.replayed()).isTrue();
         assertThat(response.state()).isEqualTo(LifecycleState.IN_REVIEW);
-        verifyNoInteractions(contentItems);
+        verifyNoInteractions(contentItems, caches);
     }
 
     @Test
@@ -149,10 +150,15 @@ class ContentLifecycleOperationsTest {
         when(contentItems.saveAndFlush(any(ContentItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(transitions.save(any(ContentLifecycleTransition.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
+        org.springframework.cache.Cache library = mock(org.springframework.cache.Cache.class);
+        when(caches.getCache("learningResourceLibrary")).thenReturn(library);
+
         var response = operations.transition(
                 access("tenant-a", "user-1"), LifecycleResourceKind.CONTENT_ITEM, "item-1",
                 request("IN_REVIEW", "key-1", "submit"));
 
+        verify(library).clear();
+        verify(caches, org.mockito.Mockito.never()).getCache("curriculumTree");
         assertThat(response.state()).isEqualTo(LifecycleState.IN_REVIEW);
         assertThat(item.getLifecycleState()).isEqualTo(LifecycleState.IN_REVIEW.name());
         assertThat(item.getStatus()).isEqualTo("in_review");

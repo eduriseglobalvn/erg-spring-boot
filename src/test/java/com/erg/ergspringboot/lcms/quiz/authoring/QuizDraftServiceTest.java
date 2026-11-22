@@ -78,6 +78,26 @@ class QuizDraftServiceTest {
     }
 
     @Test
+    void startInfoCacheIsDroppedOnlyWhenTheQuestionListChanged() {
+        QuizStartInfoCacheEvictor evictor = org.mockito.Mockito.mock(QuizStartInfoCacheEvictor.class);
+        service.setStartInfoEvictor(evictor);
+        Quiz quiz = new Quiz();
+        quiz.setId("quiz-1");
+        quiz.setQuestionIds(List.of("q-1"));
+        stubLatestDraft(draftAtVersion(5L));
+        when(quizQuestionLinkService.syncManualQuestionLinks(any(), any(), anyList())).thenReturn(List.of("q-1"));
+        when(quizRepository.findByIdAndTenantId("quiz-1", "tenant-a")).thenReturn(Optional.of(quiz));
+        SaveDraftRequest request = new SaveDraftRequest(null, null, null, List.of(Map.of("slides", List.of(Map.of("questionId", "q-1")))));
+
+        service.saveDraft("tenant-a", "quiz-1", request);
+        org.mockito.Mockito.verifyNoInteractions(evictor);
+
+        when(quizQuestionLinkService.syncManualQuestionLinks(any(), any(), anyList())).thenReturn(List.of("q-1", "q-2"));
+        service.saveDraft("tenant-a", "quiz-1", request);
+        verify(evictor).evictAll();
+    }
+
+    @Test
     void saveDraftWithMatchingDocVersionSucceeds() {
         stubLatestDraft(draftAtVersion(5L));
 

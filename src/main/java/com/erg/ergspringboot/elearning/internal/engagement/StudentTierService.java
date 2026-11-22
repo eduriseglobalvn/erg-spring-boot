@@ -15,6 +15,7 @@ import com.erg.ergspringboot.elearning.internal.engagement.TierMath.Standing;
 import com.erg.ergspringboot.elearning.internal.engagement.TierMath.State;
 import com.erg.ergspringboot.exception.BadRequestException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
+import com.erg.ergspringboot.lms.LmsReadCacheInvalidator;
 import com.erg.ergspringboot.lms.LmsStatePolicy;
 import com.erg.ergspringboot.lms.persistence.Student;
 import com.erg.ergspringboot.lms.persistence.StudentRepository;
@@ -50,8 +51,11 @@ public class StudentTierService {
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    public StudentTierService(JdbcTemplate jdbc) {
+    private final LmsReadCacheInvalidator caches;
+
+    public StudentTierService(JdbcTemplate jdbc, LmsReadCacheInvalidator caches) {
         this.jdbc = new NamedParameterJdbcTemplate(jdbc);
+        this.caches = caches;
     }
 
     /** Students of one school and grade compete together (the school year is the week's). */
@@ -124,6 +128,8 @@ public class StudentTierService {
                 insert into student_frame (tenant_id, student_id, tier_key, unlocked_at, school_year)
                 values (:t, :student, :tier, :week, :year) on conflict (tenant_id, student_id, tier_key) do nothing
                 """, frames.toArray(SqlParameterSource[]::new));
+        // Cutoffs are cached per school (10 min); students' own studentTier/studentFrames entries expire within 60 s.
+        caches.evictScopesAfterCommit(cohort.tenantId(), Map.of("tierCutoffs", List.of(cohort.schoolId())));
         return ids.size();
     }
 

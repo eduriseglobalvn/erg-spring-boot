@@ -49,6 +49,7 @@ class CurriculumLookup {
         private final Map<String, TreeMap<Integer, CurriculumProgramRow>> framework = new HashMap<>();
         private final Map<String, TreeMap<Integer, CurriculumProgramRow>> allocated = new HashMap<>();
         private final Map<String, String> allocatedSubject = new HashMap<>();
+        private final Map<String, Map<String, List<CurriculumClassSubjectAllocation>>> allocationsBySchool = new HashMap<>();
 
         private Scope(String tenantId) {
             this.tenantId = tenantId;
@@ -72,9 +73,7 @@ class CurriculumLookup {
             if (!own.isEmpty()) return own;
             String year = academicYear(date);
             return allocated.computeIfAbsent(schoolId + '|' + classId + '|' + year, k -> {
-                for (CurriculumClassSubjectAllocation a : allocations
-                        .findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(tenantId, schoolId, year)) {
-                    if (!classId.equals(a.getAcademicClassId())) continue;
+                for (CurriculumClassSubjectAllocation a : allocationsOf(schoolId, year).getOrDefault(classId, List.of())) {
                     if (a.getLevelId() != null && !framework(a.getSubjectId(), a.getLevelId(), date).isEmpty()) {
                         allocatedSubject.put(k, a.getSubjectId());
                         return framework(a.getSubjectId(), a.getLevelId(), date);
@@ -88,6 +87,14 @@ class CurriculumLookup {
                 }
                 return new TreeMap<>();
             });
+        }
+
+        /** Allocations of a school and year grouped by class, in query order: loaded once per request, not once per class. */
+        private Map<String, List<CurriculumClassSubjectAllocation>> allocationsOf(String schoolId, String year) {
+            return allocationsBySchool.computeIfAbsent(schoolId + '|' + year, k -> allocations
+                    .findByTenantIdAndSchoolIdAndAcademicYearOrderByAcademicClassIdAscSubjectIdAsc(tenantId, schoolId, year).stream()
+                    .collect(java.util.stream.Collectors.groupingBy(CurriculumClassSubjectAllocation::getAcademicClassId,
+                            java.util.LinkedHashMap::new, java.util.stream.Collectors.toList())));
         }
 
         /** The subject the slot is taught as: the allocated curriculum subject (e.g. IC3) when its KCT came from the allocation, else the slot's own. */

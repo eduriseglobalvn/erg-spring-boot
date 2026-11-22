@@ -12,6 +12,7 @@ import com.erg.ergspringboot.users.persistence.UserRepository;
 import com.erg.ergspringboot.users.persistence.authorization.Permission;
 import com.erg.ergspringboot.users.persistence.authorization.Role;
 import com.erg.ergspringboot.users.persistence.authorization.RoleRepository;
+import com.erg.ergspringboot.users.persistence.authorization.RolePermissionIndex;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignment;
 import com.erg.ergspringboot.users.persistence.authorization.UserRoleAssignmentRepository;
 import java.time.OffsetDateTime;
@@ -19,9 +20,12 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,20 +58,34 @@ public class AccountActionGuard {
     private final UserRepository users;
     private final RoleRepository roles;
     private final UserRoleAssignmentRepository assignments;
+    private RolePermissionIndex rolePermissions;
     private final AuthorizationCapabilityPolicy capabilityPolicy = new AuthorizationCapabilityPolicy();
 
     public AccountActionGuard(UserRepository users, RoleRepository roles, UserRoleAssignmentRepository assignments) {
         this.users = users;
         this.roles = roles;
         this.assignments = assignments;
+        this.rolePermissions = new RolePermissionIndex(roles);
+    }
+
+    /** The cached index; the constructor default reads uncached (unit tests without a Spring context). */
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRolePermissionIndex(RolePermissionIndex rolePermissions) {
+        this.rolePermissions = rolePermissions;
     }
 
     @Transactional(readOnly = true)
     public void assertCanActOn(ErgPrincipal actor, String targetUserId, AccountAction action) {
         User target = load(actor, targetUserId);
+        OffsetDateTime now = OffsetDateTime.now();
+        check(actor, target, action, assignments.findActiveForUser(target.getId(), target.getTenantId(), now), now);
+    }
+
+    private void check(ErgPrincipal actor, User target, AccountAction action, List<UserRoleAssignment> active,
+            OffsetDateTime now) {
         assertNotSelf(actor, target);
-        assertWithinActor(actor, effectivePermissions(target));
-        if (REMOVES_ACCESS.contains(action) && currentRoleIds(target).contains(SUPER_ADMIN_ROLE_ID)) {
+        assertWithinActor(actor, new TreeSet<>(EffectivePermissionResolver.resolve(target, active, now).granted()));
+        if (REMOVES_ACCESS.contains(action) && roleIds(target, active).contains(SUPER_ADMIN_ROLE_ID)) {
             assertAnotherActiveSuperAdmin(actor, target);
         }
     }
@@ -79,7 +97,19 @@ public class AccountActionGuard {
         if (ids.size() > BULK_LIMIT) {
             throw new BadRequestException("Tối đa " + BULK_LIMIT + " tài khoản mỗi lần");
         }
-        ids.forEach(id -> assertCanActOn(actor, id, action));
+        if (ids.isEmpty()) return;
+        requireActor(actor);
+        // Same decisions as assertCanActOn per target, from one user query and one assignment query.
+        Map<String, User> targets = users.findWithAuthorityByTenantIdAndIdIn(actor.tenantId(), ids).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity(), (a, b) -> a));
+        OffsetDateTime now = OffsetDateTime.now();
+        Map<String, List<UserRoleAssignment>> held = assignments.findActiveForUsers(actor.tenantId(), ids, now).stream()
+                .collect(Collectors.groupingBy(UserRoleAssignment::getUserId));
+        for (String id : ids) {
+            User target = targets.get(id);
+            if (target == null) throw new ResourceNotFoundException("user not found");
+            check(actor, target, action, held.getOrDefault(id, List.of()), now);
+        }
     }
 
     /** {@code roleIdsAfter} is the full set of role ids the target would hold after the change. */
@@ -87,10 +117,52 @@ public class AccountActionGuard {
     public void assertCanAssign(ErgPrincipal actor, String targetUserId, Set<String> roleIdsAfter,
             String scopeType, String scopeId) {
         User target = load(actor, targetUserId);
-        assertNotSelf(actor, target);
-        assertWithinActor(actor, effectivePermissions(target));
+        OffsetDateTime now = OffsetDateTime.now();
+        List<UserRoleAssignment> held = assignments.findActiveForUser(target.getId(), target.getTenantId(), now);
         Set<String> after = roleIdsAfter == null ? Set.of() : roleIdsAfter;
-        List<Role> afterRoles = roles.findAllById(after);
+        checkAssign(actor, target, held, now, after, roles.findAllById(after), scopeType, scopeId);
+    }
+
+    /**
+     * Adding {@code roleId} to every target: the same decisions as {@link #assertCanAssign} per target (roles held now
+     * plus the new one), from one user, one assignment and one role query. The batch is rejected whole or not at all.
+     */
+    @Transactional(readOnly = true)
+    public void assertCanAssignAll(ErgPrincipal actor, Collection<String> targetUserIds, String roleId) {
+        Set<String> ids = new LinkedHashSet<>(targetUserIds == null ? List.of() : targetUserIds);
+        if (ids.size() > BULK_LIMIT) {
+            throw new BadRequestException("Tối đa " + BULK_LIMIT + " tài khoản mỗi lần");
+        }
+        if (ids.isEmpty()) return;
+        requireActor(actor);
+        Map<String, User> targets = users.findWithAuthorityByTenantIdAndIdIn(actor.tenantId(), ids).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity(), (a, b) -> a));
+        OffsetDateTime now = OffsetDateTime.now();
+        Map<String, List<UserRoleAssignment>> held = assignments.findActiveForUsers(actor.tenantId(), ids, now).stream()
+                .collect(Collectors.groupingBy(UserRoleAssignment::getUserId));
+        Map<String, Set<String>> afterByTarget = new java.util.LinkedHashMap<>();
+        Set<String> allRoleIds = new LinkedHashSet<>();
+        for (String id : ids) {
+            User target = targets.get(id);
+            if (target == null) throw new ResourceNotFoundException("user not found");
+            Set<String> after = new LinkedHashSet<>(roleIds(target, held.getOrDefault(id, List.of())));
+            after.add(roleId);
+            afterByTarget.put(id, after);
+            allRoleIds.addAll(after);
+        }
+        Map<String, Role> rolesById = roles.findAllById(allRoleIds).stream()
+                .collect(Collectors.toMap(Role::getId, Function.identity(), (a, b) -> a));
+        for (String id : ids) {
+            Set<String> after = afterByTarget.get(id);
+            List<Role> afterRoles = after.stream().map(rolesById::get).filter(Objects::nonNull).toList();
+            checkAssign(actor, targets.get(id), held.getOrDefault(id, List.of()), now, after, afterRoles, null, null);
+        }
+    }
+
+    private void checkAssign(ErgPrincipal actor, User target, List<UserRoleAssignment> held, OffsetDateTime now,
+            Set<String> after, List<Role> afterRoles, String scopeType, String scopeId) {
+        assertNotSelf(actor, target);
+        assertWithinActor(actor, new TreeSet<>(EffectivePermissionResolver.resolve(target, held, now).granted()));
         if (afterRoles.size() != after.size()) {
             throw new BadRequestException("one or more roles were not found");
         }
@@ -101,7 +173,7 @@ public class AccountActionGuard {
                 && !capabilityPolicy.canAccessScope(actor, type, scopeId.trim())) {
             throw new ForbiddenException(DENIED_MESSAGE);
         }
-        if (currentRoleIds(target).contains(SUPER_ADMIN_ROLE_ID) && !after.contains(SUPER_ADMIN_ROLE_ID)) {
+        if (roleIds(target, held).contains(SUPER_ADMIN_ROLE_ID) && !after.contains(SUPER_ADMIN_ROLE_ID)) {
             assertAnotherActiveSuperAdmin(actor, target);
         }
     }
@@ -124,21 +196,25 @@ public class AccountActionGuard {
     /** Roles whose whole permission set lies within the caller's own permissions. */
     @Transactional(readOnly = true)
     public List<AssignableRole> assignableRoles(ErgPrincipal actor) {
-        return roles.findAllWithPermissionsAndUsers().stream()
-                .filter(role -> withinActor(actor, permissionNames(role)))
+        return rolePermissions.entries().stream()
+                .filter(role -> withinActor(actor, role.permissionNames()))
                 .map(role -> {
                     BusinessRole meta = BusinessRoleCatalog.all().stream()
-                            .filter(r -> r.id().equals(role.getId())).findFirst().orElse(null);
-                    return new AssignableRole(role.getId(), role.getName(),
-                            meta == null ? role.getName() : meta.label(), meta != null && meta.exclusive());
+                            .filter(r -> r.id().equals(role.id())).findFirst().orElse(null);
+                    return new AssignableRole(role.id(), role.name(),
+                            meta == null ? role.name() : meta.label(), meta != null && meta.exclusive());
                 })
                 .toList();
     }
 
-    private User load(ErgPrincipal actor, String targetUserId) {
+    private static void requireActor(ErgPrincipal actor) {
         if (actor == null || actor.userId() == null || actor.userId().isBlank()) {
             throw new ForbiddenException(DENIED_MESSAGE);
         }
+    }
+
+    private User load(ErgPrincipal actor, String targetUserId) {
+        requireActor(actor);
         return users.findByIdAndTenantId(targetUserId, actor.tenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("user not found"));
     }
@@ -149,17 +225,14 @@ public class AccountActionGuard {
         }
     }
 
-    private Set<String> effectivePermissions(User target) {
-        OffsetDateTime now = OffsetDateTime.now();
-        return new TreeSet<>(EffectivePermissionResolver.resolve(
-                target, assignments.findActiveForUser(target.getId(), target.getTenantId(), now), now).granted());
+    private Set<String> currentRoleIds(User target) {
+        return roleIds(target, assignments.findActiveForUser(target.getId(), target.getTenantId(), OffsetDateTime.now()));
     }
 
-    private Set<String> currentRoleIds(User target) {
+    private static Set<String> roleIds(User target, List<UserRoleAssignment> active) {
         Set<String> ids = new LinkedHashSet<>();
         if (target.getRoles() != null) target.getRoles().stream().map(Role::getId).filter(Objects::nonNull).forEach(ids::add);
-        assignments.findActiveForUser(target.getId(), target.getTenantId(), OffsetDateTime.now()).stream()
-                .map(UserRoleAssignment::getRoleId).filter(Objects::nonNull).forEach(ids::add);
+        active.stream().map(UserRoleAssignment::getRoleId).filter(Objects::nonNull).forEach(ids::add);
         return ids;
     }
 

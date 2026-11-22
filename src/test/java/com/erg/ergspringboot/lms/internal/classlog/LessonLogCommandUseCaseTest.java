@@ -143,6 +143,32 @@ class LessonLogCommandUseCaseTest {
     }
 
     @Test
+    void attendanceOfAPeriodIsOneMembershipCheckAndOneBatchWrite() {
+        given(row(null, 10, 10, 0, null));
+        var marks = List.of(new LessonLogCommandUseCase.AttendanceMark("s1", "ABSENT"), new LessonLogCommandUseCase.AttendanceMark("s2", "PRESENT"));
+
+        useCase.saveAttendanceAndLog("tn", "t1", "e1", "2026-11-09", 1, marks, 10, null, null);
+
+        verify(attendance).assertStudentsInClass("tn", "6A6", List.of("s1", "s2"));
+        verify(attendance).upsertAttendanceBatch("tn", "t1", "6A6", "tin", "2026-11-09", 1, List.of(
+                new LmsAcademicRecordOperations.AttendanceMark("s1", "ABSENT"), new LmsAcademicRecordOperations.AttendanceMark("s2", "PRESENT")));
+        verify(attendance, never()).upsertAttendance(any());
+        verify(lock, org.mockito.Mockito.times(1)).isClosed(any(), any());
+    }
+
+    @Test
+    void aStudentOutsideTheClassStopsTheWholeSave() {
+        given(row(null, 10, 10, 0, null));
+        org.mockito.Mockito.doThrow(new com.erg.ergspringboot.exception.ForbiddenException("Student does not belong to this class."))
+                .when(attendance).assertStudentsInClass(any(), any(), any());
+
+        org.junit.jupiter.api.Assertions.assertThrows(com.erg.ergspringboot.exception.ForbiddenException.class, () ->
+                useCase.saveAttendanceAndLog("tn", "t1", "e1", "2026-11-09", 1,
+                        List.of(new LessonLogCommandUseCase.AttendanceMark("other", "ABSENT")), 10, null, null));
+        verify(attendance, never()).upsertAttendanceBatch(any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), any());
+    }
+
+    @Test
     void confirmationIsLateOnlyAfterMidnightOfTheTeachingDayInVietnam() {
         // 23:59 on 09/11 in Vietnam is 16:59Z
         assertThat(LessonLogCommandUseCase.isLate(DAY, Instant.parse("2026-11-09T16:59:00Z"))).isFalse();
