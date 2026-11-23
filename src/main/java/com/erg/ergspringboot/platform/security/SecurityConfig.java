@@ -231,6 +231,8 @@ public class SecurityConfig {
                         // Fallback catch-all for other notification routes
                         .requestMatchers("/api/v1/notifications/**")
                         .access((auth, context) -> permissions.require("notifications.manage", auth, context))
+                        // Game sockets: authenticated here; the handshake interceptor checks the games permission.
+                        .requestMatchers("/ws/games/**").authenticated()
                         .requestMatchers("/api/v1/**").authenticated()
                         .anyRequest().denyAll()
                 )
