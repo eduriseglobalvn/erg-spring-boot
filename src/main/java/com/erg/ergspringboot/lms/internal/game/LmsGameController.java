@@ -4,7 +4,7 @@ import com.erg.ergspringboot.common.response.ApiResponse;
 import com.erg.ergspringboot.lms.authorization.LmsGamesAccess;
 import com.erg.ergspringboot.lms.authorization.LmsGamesHost;
 import com.erg.ergspringboot.lms.authorization.LmsGamesPlay;
-import com.erg.ergspringboot.lms.internal.game.GameDtos.CreateRoomRequest;
+import com.erg.ergspringboot.lms.internal.game.GameDtos.CreateGameRoomRequest;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.JoinRequest;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.JoinResponse;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.RoomSummary;
@@ -42,7 +42,7 @@ public class LmsGameController {
 
     @PostMapping("/rooms")
     @LmsGamesHost
-    public ApiResponse<RoomSummary> create(@RequestBody CreateRoomRequest body, HttpServletRequest request) {
+    public ApiResponse<RoomSummary> create(@RequestBody CreateGameRoomRequest body, HttpServletRequest request) {
         return ok("Room created", service.create(UserAccessContext.from(request), body), request);
     }
 

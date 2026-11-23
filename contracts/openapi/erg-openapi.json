@@ -8758,6 +8758,30 @@
         ],
         "type": "object"
       },
+      "CreateGameRoomRequest": {
+        "properties": {
+          "classId": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "gameType": {
+            "type": "string"
+          },
+          "questionSet": {
+            "type": "string"
+          },
+          "quizVersionId": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/RulesRequest"
+          }
+        },
+        "type": "object"
+      },
       "CreateGoogleSlidesLectureRequest": {
         "properties": {
           "googleSlidesUrl": {
@@ -9104,24 +9128,14 @@
       },
       "CreateRoomRequest": {
         "properties": {
-          "classId": {
+          "roomName": {
             "type": "string"
           },
-          "durationMinutes": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "gameType": {
+          "schoolId": {
             "type": "string"
           },
-          "questionSet": {
+          "tenantId": {
             "type": "string"
-          },
-          "quizVersionId": {
-            "type": "string"
-          },
-          "rules": {
-            "$ref": "#/components/schemas/RulesRequest"
           }
         },
         "type": "object"
@@ -25368,7 +25382,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateRoomRequest"
+                "$ref": "#/components/schemas/CreateGameRoomRequest"
               }
             }
           },

@@ -11,7 +11,7 @@ public final class GameDtos {
     public record RulesRequest(Boolean allowHack, Boolean emergencyPatch, Boolean showLeaderboard,
                                Boolean showSolution, Boolean allowLateJoin, String questionOrder) { }
 
-    public record CreateRoomRequest(String gameType, String quizVersionId, String classId, Integer durationMinutes,
+    public record CreateGameRoomRequest(String gameType, String quizVersionId, String classId, Integer durationMinutes,
                                     String questionSet, RulesRequest rules) { }
 
     public record JoinRequest(String code) { }

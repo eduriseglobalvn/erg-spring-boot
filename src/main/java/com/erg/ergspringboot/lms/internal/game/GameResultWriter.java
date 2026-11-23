@@ -4,6 +4,7 @@ import com.erg.ergspringboot.lms.internal.game.GameModel.AnswerRecord;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Player;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Room;
 import com.erg.ergspringboot.lms.internal.game.GameModel.Status;
+import com.erg.ergspringboot.platform.security.TenantContext;
 import jakarta.annotation.PreDestroy;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -60,6 +61,13 @@ public class GameResultWriter {
     }
 
     void write(Room room) {
+        // Runs on the writer thread, outside any request: without the tenant scope RLS rejects the insert.
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(room.tenantId, null, "system"))) {
+            writeInScope(room);
+        }
+    }
+
+    private void writeInScope(Room room) {
         transaction.executeWithoutResult(status -> {
             jdbc.update("""
                     insert into game_room (id, tenant_id, game_type, join_code, quiz_version_id, class_id, host_user_id,

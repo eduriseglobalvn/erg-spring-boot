@@ -18,6 +18,14 @@ CREATE TABLE game_room (
 CREATE INDEX idx_game_room_host ON game_room (tenant_id, host_user_id, created_at DESC);
 CREATE INDEX idx_game_room_class ON game_room (tenant_id, class_id, created_at DESC);
 
+-- game_player and game_answer carry no tenant_id; they are reached only through game_room.
+ALTER TABLE game_room ENABLE ROW LEVEL SECURITY;
+CREATE POLICY game_room_tenant_isolation ON game_room
+    USING ((select current_setting('app.maintenance_mode', true)) = 'true'
+           OR tenant_id = nullif((select current_setting('app.tenant_id', true)), ''))
+    WITH CHECK ((select current_setting('app.maintenance_mode', true)) = 'true'
+           OR tenant_id = nullif((select current_setting('app.tenant_id', true)), ''));
+
 CREATE TABLE game_player (
     room_id          varchar(36)  NOT NULL REFERENCES game_room (id) ON DELETE CASCADE,
     user_id          varchar(64)  NOT NULL,

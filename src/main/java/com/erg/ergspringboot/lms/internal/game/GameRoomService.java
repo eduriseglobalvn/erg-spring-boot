@@ -11,7 +11,7 @@ import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersion;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestion;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionQuestionRepository;
 import com.erg.ergspringboot.lcms.persistence.quiz.version.QuizVersionRepository;
-import com.erg.ergspringboot.lms.internal.game.GameDtos.CreateRoomRequest;
+import com.erg.ergspringboot.lms.internal.game.GameDtos.CreateGameRoomRequest;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.JoinRequest;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.JoinResponse;
 import com.erg.ergspringboot.lms.internal.game.GameDtos.RoomSummary;
@@ -96,7 +96,7 @@ public class GameRoomService {
 
     // ---- create ---------------------------------------------------------------------------------------------
 
-    public RoomSummary create(UserAccessContext access, CreateRoomRequest request) {
+    public RoomSummary create(UserAccessContext access, CreateGameRoomRequest request) {
         if (request == null || !GameModel.GAME_TYPE_HACK.equals(request.gameType())) {
             throw new BadRequestException("gameType must be HACK");
         }
