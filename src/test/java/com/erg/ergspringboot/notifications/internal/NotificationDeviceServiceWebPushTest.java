@@ -235,6 +235,39 @@ class NotificationDeviceServiceWebPushTest {
         verify(devices).findByTenantIdAndRegistrationTokenHash(eq("t"), eq(sha256("fcm-token")));
     }
 
+    @Test
+    void anotherUserSigningInOnTheSameBrowserTakesOverItsSubscription() {
+        NotificationDeviceRegistrationEntity previous = new NotificationDeviceRegistrationEntity();
+        previous.setId("device-shared");
+        previous.setTenantId("tenant");
+        previous.setUserId("teacher-a");
+        previous.setPortal("lms");
+        previous.setEnabled(true);
+        when(devices.findByTenantIdAndRegistrationTokenHash("tenant", sha256(ENDPOINT))).thenReturn(Optional.of(previous));
+
+        service.register("tenant", "teacher-b", "lms", request("WEB_PUSH", ENDPOINT, P256DH, AUTH));
+
+        // Same row (the endpoint is unique per tenant), now delivering to the user signed in on that browser.
+        assertThat(previous.getUserId()).isEqualTo("teacher-b");
+        assertThat(previous.getEnabled()).isTrue();
+    }
+
+    @Test
+    void heartbeatOnARevokedDeviceIsNotFoundSoTheBrowserRegistersAgain() {
+        NotificationDeviceRegistrationEntity revoked = new NotificationDeviceRegistrationEntity();
+        revoked.setId("device-old");
+        revoked.setUserId("u");
+        revoked.setPortal("lms");
+        revoked.setEnabled(false);
+        revoked.setRevokedAt(java.time.OffsetDateTime.now());
+        when(devices.findByTenantIdAndUserIdAndPortalAndId("t", "u", "lms", "device-old")).thenReturn(Optional.of(revoked));
+
+        assertThatThrownBy(() -> service.heartbeat("t", "u", "lms",
+                new com.erg.ergspringboot.common.request.notifications.NotificationRequests.HeartbeatDeviceRequest(
+                        "lms", "device-old", null, null, "granted")))
+                .isInstanceOf(com.erg.ergspringboot.exception.ResourceNotFoundException.class);
+    }
+
     private static RegisterDeviceRequest request(String transport, String endpoint, String p256dh, String auth) {
         return new RegisterDeviceRequest("lms", "web_pwa", null, endpoint, endpoint, null, "granted", null, null, null,
                 transport, new WebPushKeysRequest(p256dh, auth));
