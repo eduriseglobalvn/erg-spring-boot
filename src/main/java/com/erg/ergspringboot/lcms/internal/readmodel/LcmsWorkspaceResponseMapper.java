@@ -29,6 +29,10 @@ final class LcmsWorkspaceResponseMapper {
         return runtime == null ? null : JSON.writeValueAsString(runtime);
     }
 
+    /** The quiz and slide a row mirrored by the quiz editor comes from. */
+    record QuizEditorSource(String quizId, String slideId) {
+    }
+
     static PageResponse<QuestionBankQuestionRowResponse> toQuestionPage(
             Page<QuestionBankQuestionProjection> questions,
             Map<String, Long> usageCounts
@@ -38,16 +42,18 @@ final class LcmsWorkspaceResponseMapper {
 
     /**
      * {@code includeRuntimeQuestion} false leaves runtimeQuestion null: nobody selected it, so it is not serialised.
-     * {@code quizEditorIds} is null when nobody selected fromQuizEditor; it is then false on every row.
+     * {@code quizEditorSources} is null when nobody selected fromQuizEditor or the source fields; they are then empty on every row.
      */
     static PageResponse<QuestionBankQuestionRowResponse> toQuestionPage(
             Page<QuestionBankQuestionProjection> questions,
             Map<String, Long> usageCounts,
             boolean includeRuntimeQuestion,
-            java.util.Set<String> quizEditorIds
+            Map<String, QuizEditorSource> quizEditorSources
     ) {
         List<QuestionBankQuestionRowResponse> items = questions.getContent().stream()
-                .map(question -> new QuestionBankQuestionRowResponse(
+                .map(question -> {
+                    QuizEditorSource source = quizEditorSources == null ? null : quizEditorSources.get(question.id());
+                    return new QuestionBankQuestionRowResponse(
                         question.id(),
                         scopeType(question),
                         scopeId(question),
@@ -81,8 +87,11 @@ final class LcmsWorkspaceResponseMapper {
                         null,
                         question.updatedAt() == null ? null : question.updatedAt().toString(),
                         includeRuntimeQuestion ? runtimeQuestionJson(question.content()) : null,
-                        quizEditorIds != null && quizEditorIds.contains(question.id())
-                ))
+                        source != null,
+                        source == null ? null : source.quizId(),
+                        source == null ? null : source.slideId()
+                    );
+                })
                 .toList();
         return new PageResponse<>(
                 items,

@@ -313,16 +313,19 @@ class LcmsWorkspaceReadServiceTest {
         QuestionBankQuestionProjection bank = row("q-bank");
         when(questionRepository.findQuestionBankQuestionsWithoutSearchSlim("tenant-a", null, null, null, null, pageRequest))
                 .thenReturn(new PageImpl<>(List.of(editor, bank), pageRequest, 2));
-        when(questionRepository.findQuizEditorIds("tenant-a", List.of("q-editor", "q-bank"))).thenReturn(List.of("q-editor"));
+        when(questionRepository.findQuizEditorSources("tenant-a", List.of("q-editor", "q-bank")))
+                .thenReturn(List.<Object[]>of(new Object[] {"q-editor", "quiz-1", "slide-1"}));
 
         var notSelected = service.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
                 new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(false, false, null));
-        verify(questionRepository, org.mockito.Mockito.never()).findQuizEditorIds(any(), any());
+        verify(questionRepository, org.mockito.Mockito.never()).findQuizEditorSources(any(), any());
         assertThat(notSelected.questions().items()).extracting(item -> item.fromQuizEditor()).containsExactly(false, false);
 
         var selected = service.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
                 new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(false, false, null, true));
         assertThat(selected.questions().items()).extracting(item -> item.fromQuizEditor()).containsExactly(true, false);
+        assertThat(selected.questions().items()).extracting(item -> item.sourceQuizId(), item -> item.sourceSlideId())
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("quiz-1", "slide-1"), org.assertj.core.groups.Tuple.tuple(null, null));
     }
 
     private static QuestionBankQuestionProjection row(String id) {

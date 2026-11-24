@@ -49,7 +49,9 @@ public class LcmsWorkspaceGraphQlController {
                 safeInput.size(),
                 new LcmsReadPort.QuestionBankReadOptions(selectionSet.contains("quizzes"),
                         selectionSet.contains("questions/items/runtimeQuestion"), safeInput.quizLimit(),
-                        selectionSet.contains("questions/items/fromQuizEditor"))
+                        selectionSet.contains("questions/items/fromQuizEditor")
+                                || selectionSet.contains("questions/items/sourceQuizId")
+                                || selectionSet.contains("questions/items/sourceSlideId"))
         );
     }
 

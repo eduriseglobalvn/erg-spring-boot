@@ -162,7 +162,7 @@ public class LcmsWorkspaceReadService {
         return new QuestionBankWorkspaceResponse(
                 normalizedTenantId,
                 LcmsWorkspaceResponseMapper.toQuestionPage(questions, usageCounts, selected.runtimeQuestion(),
-                        selected.fromQuizEditor() ? quizEditorIds(normalizedTenantId, questions.getContent()) : null),
+                        selected.fromQuizEditor() ? quizEditorSources(normalizedTenantId, questions.getContent()) : null),
                 subjectOptions.stream()
                         .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
                         .toList(),
@@ -370,9 +370,13 @@ public class LcmsWorkspaceReadService {
         return accessReads.findScopeOptions(tenantId, PageRequest.of(0, MAX_OPTION_ROWS));
     }
 
-    private java.util.Set<String> quizEditorIds(String tenantId, List<QuestionBankQuestionProjection> questions) {
+    private Map<String, LcmsWorkspaceResponseMapper.QuizEditorSource> quizEditorSources(String tenantId, List<QuestionBankQuestionProjection> questions) {
         List<String> ids = questions.stream().map(QuestionBankQuestionProjection::id).toList();
-        return ids.isEmpty() ? java.util.Set.of() : java.util.Set.copyOf(questionRepository.findQuizEditorIds(tenantId, ids));
+        if (ids.isEmpty()) return Map.of();
+        return questionRepository.findQuizEditorSources(tenantId, ids).stream().collect(Collectors.toMap(
+                row -> (String) row[0],
+                row -> new LcmsWorkspaceResponseMapper.QuizEditorSource((String) row[1], (String) row[2]),
+                (first, second) -> first));
     }
 
     private Map<String, Long> questionUsageCounts(String tenantId, List<QuestionBankQuestionProjection> questions) {
