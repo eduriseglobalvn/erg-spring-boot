@@ -458,6 +458,8 @@ type QuestionBankQuestionRow {
   updatedAt: String
   "JSON of the editor question this row mirrors; null for questions typed into the bank."
   runtimeQuestion: String
+  "True for a row the quiz editor mirrored on publish; false for a question made in the bank itself."
+  fromQuizEditor: Boolean!
 }
 
 type QuestionBankChoice {

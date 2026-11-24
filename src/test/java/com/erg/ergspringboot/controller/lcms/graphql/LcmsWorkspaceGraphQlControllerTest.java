@@ -34,7 +34,7 @@ class LcmsWorkspaceGraphQlControllerTest {
     @Mock
     private LcmsQueryOperations readService;
 
-    private static final LcmsReadPort.QuestionBankReadOptions OPTIONS = new LcmsReadPort.QuestionBankReadOptions(true, true, null);
+    private static final LcmsReadPort.QuestionBankReadOptions OPTIONS = new LcmsReadPort.QuestionBankReadOptions(true, true, null, true);
 
     private final DataFetchingFieldSelectionSet all = mock(DataFetchingFieldSelectionSet.class,
             invocation -> invocation.getMethod().getReturnType() == boolean.class);

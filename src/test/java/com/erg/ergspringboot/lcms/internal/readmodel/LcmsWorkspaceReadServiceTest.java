@@ -307,6 +307,30 @@ class LcmsWorkspaceReadServiceTest {
     }
 
     @Test
+    void fromQuizEditorIsLookedUpOnlyWhenSelectedAndMarksTheRowsTheEditorMirrored() {
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        QuestionBankQuestionProjection editor = row("q-editor");
+        QuestionBankQuestionProjection bank = row("q-bank");
+        when(questionRepository.findQuestionBankQuestionsWithoutSearchSlim("tenant-a", null, null, null, null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(editor, bank), pageRequest, 2));
+        when(questionRepository.findQuizEditorIds("tenant-a", List.of("q-editor", "q-bank"))).thenReturn(List.of("q-editor"));
+
+        var notSelected = service.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
+                new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(false, false, null));
+        verify(questionRepository, org.mockito.Mockito.never()).findQuizEditorIds(any(), any());
+        assertThat(notSelected.questions().items()).extracting(item -> item.fromQuizEditor()).containsExactly(false, false);
+
+        var selected = service.questionBankWorkspace("tenant-a", null, null, null, null, null, null, null, null, null,
+                new com.erg.ergspringboot.lcms.LcmsReadPort.QuestionBankReadOptions(false, false, null, true));
+        assertThat(selected.questions().items()).extracting(item -> item.fromQuizEditor()).containsExactly(true, false);
+    }
+
+    private static QuestionBankQuestionProjection row(String id) {
+        return new QuestionBankQuestionProjection(id, null, "math", "Toan", "level-1", "Level 1", null, null, "Stem", null,
+                "single_choice", "core", "ready", List.of(), List.of(), null, 0.0d, 0, 0, OffsetDateTime.parse("2026-01-01T00:00:00Z"));
+    }
+
+    @Test
     void aTeachersViewerIdReachesTheQuizQuerySoTheOwnerFilterRunsInSqlBeforeTheCap() {
         PageRequest pageRequest = PageRequest.of(0, 20);
         when(questionRepository.findQuestionBankQuestionsWithoutSearch("tenant-a", null, null, null, null, pageRequest))

@@ -14,8 +14,13 @@ public interface LcmsReadPort {
     QuizDraftDocumentResponse quizDraft(String tenantId, String quizId);
     QuizVersionHistoryResponse quizVersions(String tenantId, String quizId);
     /** What the caller selected: the quizzes block, the full runtime question, and how many quizzes at most. */
-    record QuestionBankReadOptions(boolean quizzes, boolean runtimeQuestion, Integer quizLimit) {
+    record QuestionBankReadOptions(boolean quizzes, boolean runtimeQuestion, Integer quizLimit, boolean fromQuizEditor) {
         public static final QuestionBankReadOptions ALL = new QuestionBankReadOptions(true, true, null);
+
+        /** Without fromQuizEditor: it costs one more query, so only a caller that selects it gets it. */
+        public QuestionBankReadOptions(boolean quizzes, boolean runtimeQuestion, Integer quizLimit) {
+            this(quizzes, runtimeQuestion, quizLimit, false);
+        }
     }
 
     default QuestionBankWorkspaceResponse questionBankWorkspace(

@@ -58,7 +58,9 @@ public final class LcmsWorkspaceResponses {
             String rationale,
             String updatedAt,
             /** JSON of the editor question this row mirrors (any kind), so a package built from the bank gets all of it. */
-            String runtimeQuestion
+            String runtimeQuestion,
+            /** True for a row the quiz editor mirrored on publish; false for one made in the bank itself. */
+            boolean fromQuizEditor
     ) {
     }
 
