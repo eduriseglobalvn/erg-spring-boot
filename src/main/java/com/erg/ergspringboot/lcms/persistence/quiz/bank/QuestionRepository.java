@@ -64,6 +64,15 @@ public interface QuestionRepository extends JpaRepository<Question, String> {
             """)
     List<Object[]> countActiveByTopic(@Param("tenantId") String tenantId, @Param("topicIds") List<String> topicIds);
 
+    /** Which of these rows the quiz editor mirrored on publish (AuthoredQuestionBankSync); the rest were made in the bank. */
+    @Query(value = """
+            select q.id from lms_questions q
+            where q.tenant_id = :tenantId
+              and q.id in (:ids)
+              and q.metadata ->> 'source' = 'quiz-editor'
+            """, nativeQuery = true)
+    List<String> findQuizEditorIds(@Param("tenantId") String tenantId, @Param("ids") List<String> ids);
+
     // The list rows are built from one select list; the "Slim" queries leave out the content jsonb (runtimeQuestion) that
     // only a caller selecting runtimeQuestion needs.
     String ROW_SELECT = """

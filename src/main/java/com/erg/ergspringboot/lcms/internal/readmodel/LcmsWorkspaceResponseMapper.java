@@ -33,14 +33,18 @@ final class LcmsWorkspaceResponseMapper {
             Page<QuestionBankQuestionProjection> questions,
             Map<String, Long> usageCounts
     ) {
-        return toQuestionPage(questions, usageCounts, true);
+        return toQuestionPage(questions, usageCounts, true, null);
     }
 
-    /** {@code includeRuntimeQuestion} false leaves runtimeQuestion null: nobody selected it, so it is not serialised. */
+    /**
+     * {@code includeRuntimeQuestion} false leaves runtimeQuestion null: nobody selected it, so it is not serialised.
+     * {@code quizEditorIds} is null when nobody selected fromQuizEditor; it is then false on every row.
+     */
     static PageResponse<QuestionBankQuestionRowResponse> toQuestionPage(
             Page<QuestionBankQuestionProjection> questions,
             Map<String, Long> usageCounts,
-            boolean includeRuntimeQuestion
+            boolean includeRuntimeQuestion,
+            java.util.Set<String> quizEditorIds
     ) {
         List<QuestionBankQuestionRowResponse> items = questions.getContent().stream()
                 .map(question -> new QuestionBankQuestionRowResponse(
@@ -76,7 +80,8 @@ final class LcmsWorkspaceResponseMapper {
                         recommendedCluster(question),
                         null,
                         question.updatedAt() == null ? null : question.updatedAt().toString(),
-                        includeRuntimeQuestion ? runtimeQuestionJson(question.content()) : null
+                        includeRuntimeQuestion ? runtimeQuestionJson(question.content()) : null,
+                        quizEditorIds != null && quizEditorIds.contains(question.id())
                 ))
                 .toList();
         return new PageResponse<>(

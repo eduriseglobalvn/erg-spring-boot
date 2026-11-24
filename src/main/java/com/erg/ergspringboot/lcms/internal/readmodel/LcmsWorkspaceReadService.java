@@ -161,7 +161,8 @@ public class LcmsWorkspaceReadService {
         boolean quizzesTruncated = quizRows.size() > quizLimit;
         return new QuestionBankWorkspaceResponse(
                 normalizedTenantId,
-                LcmsWorkspaceResponseMapper.toQuestionPage(questions, usageCounts, selected.runtimeQuestion()),
+                LcmsWorkspaceResponseMapper.toQuestionPage(questions, usageCounts, selected.runtimeQuestion(),
+                        selected.fromQuizEditor() ? quizEditorIds(normalizedTenantId, questions.getContent()) : null),
                 subjectOptions.stream()
                         .map(option -> LcmsWorkspaceResponseMapper.toQuestionBankOption(option, List.of()))
                         .toList(),
@@ -367,6 +368,11 @@ public class LcmsWorkspaceReadService {
     private List<com.erg.ergspringboot.users.persistence.organization.projection.ScopeOptionProjection> boundedScopeOptions(
             String tenantId) {
         return accessReads.findScopeOptions(tenantId, PageRequest.of(0, MAX_OPTION_ROWS));
+    }
+
+    private java.util.Set<String> quizEditorIds(String tenantId, List<QuestionBankQuestionProjection> questions) {
+        List<String> ids = questions.stream().map(QuestionBankQuestionProjection::id).toList();
+        return ids.isEmpty() ? java.util.Set.of() : java.util.Set.copyOf(questionRepository.findQuizEditorIds(tenantId, ids));
     }
 
     private Map<String, Long> questionUsageCounts(String tenantId, List<QuestionBankQuestionProjection> questions) {
