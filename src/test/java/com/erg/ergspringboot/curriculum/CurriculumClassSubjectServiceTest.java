@@ -188,7 +188,7 @@ class CurriculumClassSubjectServiceTest {
                 "class-1", List.of("ic3"), java.util.Map.of("ic3", "lvl-1"))), null);
 
         assertThatThrownBy(() -> service().replace("school-1", "2026-2027", request, access, false))
-                .isInstanceOf(CurriculumException.class).hasMessageContaining("level not found");
+                .isInstanceOf(CurriculumException.class).hasMessageContaining("module not found");
         verify(allocations, never()).deleteScope(any(), any(), any());
     }
 

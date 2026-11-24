@@ -119,7 +119,7 @@ public class CurriculumClassSubjectService {
                 Set<String> knownLevels = Set.copyOf(allocations.existingLevelKeys(tenant, Set.copyOf(levelOf.values())));
                 levelOf.forEach((key, levelId) -> {
                     if (!knownLevels.contains(levelId + '|' + key.substring(key.indexOf('|') + 1))) {
-                        throw CurriculumException.notFound("level", levelId);
+                        throw CurriculumException.notFound("module", levelId);
                     }
                 });
             }

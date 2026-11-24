@@ -182,7 +182,7 @@ public class CurriculumImpactQueryUseCase {
 
     private CurriculumLevel requireLevel(String id, String tenantId) {
         return levels.findByTenantIdAndId(tenantId, id)
-                .orElseThrow(() -> CurriculumException.notFound("level", id));
+                .orElseThrow(() -> CurriculumException.notFound("module", id));
     }
 
     private CurriculumTopic requireTopic(String id, String tenantId) {

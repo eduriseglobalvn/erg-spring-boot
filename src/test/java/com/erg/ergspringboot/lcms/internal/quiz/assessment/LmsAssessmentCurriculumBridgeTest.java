@@ -50,7 +50,7 @@ class LmsAssessmentCurriculumBridgeTest {
 
         assertThatThrownBy(() -> bridge.validateQuestionPlacement("tenant-a", "subject-1", "level-1", "topic-1"))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("topic does not belong to level");
+                .hasMessageContaining("topic does not belong to module");
     }
 
     @Test
@@ -61,7 +61,7 @@ class LmsAssessmentCurriculumBridgeTest {
 
         assertThatThrownBy(() -> bridge.validateQuestionPlacement("tenant-a", "subject-1", "level-1", "topic-1"))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("level does not belong to subject");
+                .hasMessageContaining("module does not belong to subject");
     }
 
     @Test
