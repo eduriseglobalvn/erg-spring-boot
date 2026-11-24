@@ -3,10 +3,10 @@
 #   command="bash /opt/erg/ops/docker/ci-entry.sh",restrict ssh-ed25519 AAAA... github-actions-deploy
 # The key's holder (GitHub Actions) sends one of:
 #   status backend|frontend              -> prints the deployed commit, or "none"
-#   deploy backend|frontend <sha> [force]   (source tar of that commit on stdin)
+#   deploy backend|frontend <sha>   (source tar of that commit on stdin)
 # Anything else is refused, so a leaked key cannot open a shell or read .env.production.
 set -Eeuo pipefail
-read -r action target sha force _ <<<"${SSH_ORIGINAL_COMMAND:-}"
+read -r action target sha _ <<<"${SSH_ORIGINAL_COMMAND:-}"
 case "${target:-}" in
   backend) container=erg-backend-1 ;;
   frontend) container=erg-system-fe ;;
@@ -19,7 +19,6 @@ case "$action" in
     ;;
   deploy)
     [[ ${sha:-} =~ ^[0-9a-f]{40}$ ]] || { echo "ci-entry: sha must be 40 hex characters" >&2; exit 64; }
-    [ "${force:-}" = force ] && export FORCE=1
     # One deploy at a time on this machine; the second (backend and frontend merged together) waits.
     exec 9>/opt/erg/.deploy.lock
     flock -w 3600 9 || { echo "ci-entry: another deploy held the lock for an hour" >&2; exit 75; }
