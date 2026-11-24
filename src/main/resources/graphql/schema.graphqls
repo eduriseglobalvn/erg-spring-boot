@@ -873,6 +873,10 @@ type QuestionBankQuestionRow {
   runtimeQuestion: String
   "True for a row the quiz editor mirrored on publish; false for a question made in the bank itself."
   fromQuizEditor: Boolean!
+  "The quiz a row the quiz editor mirrored comes from; null for a question made in the bank."
+  sourceQuizId: String
+  "The slide of sourceQuizId a mirrored row comes from; null for a question made in the bank."
+  sourceSlideId: String
 }
 
 type QuestionBankChoice {
