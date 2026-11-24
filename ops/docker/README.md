@@ -42,7 +42,7 @@ Merge vào `main` -> workflow `erg-spring-ci` xanh -> `.github/workflows/deploy.
 3. chạy thử migration và khởi động trên bản restore cô lập (worker tắt);
 4. chuyển backend và Nginx sang image mới, chờ healthy; nếu lỗi thì tự quay lại image trước (migration chỉ đi tới, không rollback).
 
-Deploy bị từ chối trong giờ học (06:30-21:30 giờ Việt Nam) trừ khi bấm "Run workflow" với `force`; lịch 21:35 mỗi ngày bù lại. Chạy tay `workflow_dispatch` với một sha phải là commit của `main` đã có CI xanh.
+Deploy chạy ngay sau khi CI xanh, giờ nào cũng được (lúc đổi container backend ngắt khoảng một phút); lịch 21:35 mỗi ngày bù commit bị bỏ qua vì đang có deploy khác. Chạy tay `workflow_dispatch` với một sha phải là commit của `main` đã có CI xanh.
 
 Trước khi chạm production, `deploy.sh` dừng nếu `POSTGRES_PASSWORD`, `POSTGRES_RUNTIME_PASSWORD`, `REDIS_STATE_PASSWORD`, `REDIS_CACHE_PASSWORD`, `GRAFANA_PASSWORD` hoặc `ERG_BOOTSTRAP_ADMIN_PASSWORD` trong `.env.production` trống hoặc còn giá trị mẫu cũ (`bash scripts/deploy-secret-check.test.sh` kiểm phần này). Tạo mỗi giá trị bằng `openssl rand -hex 32`. Xoay mật khẩu: `docs/runbooks/credential-rotation-p0-2.md`.
 
