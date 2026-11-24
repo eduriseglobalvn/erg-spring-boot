@@ -141,7 +141,7 @@ public class CurriculumCommandUseCase {
         String tenantId = tenantId(access);
         requirePayload(request);
         CurriculumLevel level = requireLevel(levelId, tenantId);
-        requireActive(level.getStatus(), "level", levelId);
+        requireActive(level.getStatus(), "module", levelId);
         requireActive(requireSubject(level.getSubjectId(), tenantId).getStatus(),
                 "subject", level.getSubjectId());
         String code = requireCode(request.code());
@@ -257,7 +257,7 @@ public class CurriculumCommandUseCase {
 
     private CurriculumLevel requireLevel(String id, String tenantId) {
         return levels.findByTenantIdAndId(tenantId, id)
-                .orElseThrow(() -> CurriculumException.notFound("level", id));
+                .orElseThrow(() -> CurriculumException.notFound("module", id));
     }
 
     private CurriculumTopic requireTopic(String id, String tenantId) {

@@ -100,7 +100,7 @@ class CurriculumOperationsTest {
 
         assertThatThrownBy(() -> service.validateTopicChain("subject-1", "level-1", "topic-1", access()))
                 .isInstanceOf(CurriculumException.class)
-                .hasMessageContaining("topic does not belong to level");
+                .hasMessageContaining("topic does not belong to module");
     }
 
     @Test

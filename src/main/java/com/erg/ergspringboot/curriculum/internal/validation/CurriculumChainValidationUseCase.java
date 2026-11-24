@@ -44,14 +44,14 @@ public class CurriculumChainValidationUseCase {
         CurriculumTopic topic = requireTopic(topicId, tenantId);
         if (!subject.getId().equals(level.getSubjectId())) {
             throw CurriculumException.badRequest(
-                    "CURRICULUM_CHAIN_MISMATCH", "level does not belong to subject");
+                    "CURRICULUM_CHAIN_MISMATCH", "module does not belong to subject");
         }
         if (!level.getId().equals(topic.getLevelId())) {
             throw CurriculumException.badRequest(
-                    "CURRICULUM_CHAIN_MISMATCH", "topic does not belong to level");
+                    "CURRICULUM_CHAIN_MISMATCH", "topic does not belong to module");
         }
         requireActive(subject.getStatus(), "subject", subjectId);
-        requireActive(level.getStatus(), "level", levelId);
+        requireActive(level.getStatus(), "module", levelId);
         requireActive(topic.getStatus(), "topic", topicId);
         return toTopicResponse(topic, subjectId);
     }
@@ -63,7 +63,7 @@ public class CurriculumChainValidationUseCase {
 
     private CurriculumLevel requireLevel(String id, String tenantId) {
         return levels.findByTenantIdAndId(tenantId, id)
-                .orElseThrow(() -> CurriculumException.notFound("level", id));
+                .orElseThrow(() -> CurriculumException.notFound("module", id));
     }
 
     private CurriculumTopic requireTopic(String id, String tenantId) {

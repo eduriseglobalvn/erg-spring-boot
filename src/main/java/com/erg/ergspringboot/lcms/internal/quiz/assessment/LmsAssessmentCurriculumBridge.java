@@ -96,9 +96,9 @@ public class LmsAssessmentCurriculumBridge implements AssessmentCurriculumBridge
         CurriculumLevel level = null;
         if (levelKey != null) {
             level = levelRepository.findByTenantIdAndId(tenantId, levelKey)
-                    .orElseThrow(() -> new BadRequestException("level not found in tenant: " + levelKey));
+                    .orElseThrow(() -> new BadRequestException("module not found in tenant: " + levelKey));
             if (!subjectKey.equals(level.getSubjectId())) {
-                throw new BadRequestException("level does not belong to subject");
+                throw new BadRequestException("module does not belong to subject");
             }
         }
 
@@ -107,7 +107,7 @@ public class LmsAssessmentCurriculumBridge implements AssessmentCurriculumBridge
             topic = topicRepository.findByTenantIdAndId(tenantId, topicKey)
                     .orElseThrow(() -> new BadRequestException("topic not found in tenant: " + topicKey));
             if (level == null || !levelKey.equals(topic.getLevelId())) {
-                throw new BadRequestException("topic does not belong to level");
+                throw new BadRequestException("topic does not belong to module");
             }
         }
 
