@@ -273,6 +273,10 @@ public class ErgPrincipalService {
                 EffectivePermissionResolver.resolve(user, assignments, OffsetDateTime.now());
         PermissionEnvelope permissions = new PermissionEnvelope(resolved.granted(), resolved.denied());
         List<String> managedEducationUnitIds = managedEducationUnitIds(user, roles, permissions, assignments);
+        // Whoever runs every school also acts in every class of it, teaching or not: the training office assigns work
+        // for a teacher who forgot (owner decision 24/11/2026, replaces the teacher-only rule of 16/11).
+        List<String> managedClassIds = managedEducationUnitIds.contains("*")
+                ? List.of("*") : classIds(user, session.getTenantId(), permissions, assignments);
         return ErgPrincipal.authenticated(
                 user.getId(),
                 session.getSessionId(),
@@ -287,7 +291,7 @@ public class ErgPrincipalService {
                         "assignedScopeIds", assignedScopeIds(assignments),
                         "lifecycleRestricted", !StudentAccountPolicy.isStudentOnly(roles, permissions.granted(), permissions.denied())
                                 && isLifecycleRestricted(user)
-                ), AccessScopeSet.legacy(managedEducationUnitIds, classIds(user, session.getTenantId(), permissions, assignments), null, null))
+                ), AccessScopeSet.legacy(managedEducationUnitIds, managedClassIds, null, null))
         );
     }
 

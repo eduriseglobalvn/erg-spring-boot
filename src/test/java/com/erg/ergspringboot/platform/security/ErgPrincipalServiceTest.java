@@ -205,6 +205,8 @@ class ErgPrincipalServiceTest {
         ErgPrincipal principal = service.fromBearerToken(bearerToken, "erg").orElseThrow();
 
         assertThat(principal.attributes().get("managedEducationUnitIds")).isEqualTo(List.of("*"));
+        // and acts in every class, so it can assign work for a teacher in the teacher portal
+        assertThat(AccessScopeAssembler.from(principal).managedIds(AccessScopeSet.CLASS)).containsExactly("*");
         assertThat(principal.portals()).doesNotContain("*");
         assertThat(principal.accessLevel()).isEqualTo("user");
     }
