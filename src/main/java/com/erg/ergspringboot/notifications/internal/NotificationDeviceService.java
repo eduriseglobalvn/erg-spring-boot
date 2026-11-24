@@ -8,7 +8,6 @@ import com.erg.ergspringboot.common.response.notifications.NotificationResponses
 import com.erg.ergspringboot.notifications.config.NotificationPushProperties;
 import com.erg.ergspringboot.notifications.config.WebPushVapidKeys;
 import com.erg.ergspringboot.exception.BadRequestException;
-import com.erg.ergspringboot.exception.ForbiddenException;
 import com.erg.ergspringboot.exception.ResourceNotFoundException;
 import com.erg.ergspringboot.notifications.persistence.NotificationDeviceRegistrationEntity;
 import com.erg.ergspringboot.notifications.persistence.NotificationTopicMembershipEntity;
@@ -87,7 +86,8 @@ public class NotificationDeviceService {
         NotificationDeviceRegistrationEntity entity = fid == null
                 ? deviceRepository.findByTenantIdAndRegistrationTokenHash(tenantId, tokenHash).orElseGet(NotificationDeviceRegistrationEntity::new)
                 : deviceRepository.findByTenantIdAndFirebaseInstallationId(tenantId, fid).orElseGet(NotificationDeviceRegistrationEntity::new);
-        assertBindableToUser(entity, userId);
+        // Whoever is signed in on the browser holding this (secret) endpoint owns it now: on a shared PC the
+        // previous user's notifications must stop arriving once someone else signs in there.
         OffsetDateTime now = OffsetDateTime.now();
         entity.setTenantId(tenantId);
         entity.setUserId(userId);
@@ -161,7 +161,9 @@ public class NotificationDeviceService {
     ) {
         String id = trimToNull(request.deviceRegistrationId());
         if (id != null) {
+            // A revoked row must not look alive, or the browser keeps heart-beating instead of registering again.
             return deviceRepository.findByTenantIdAndUserIdAndPortalAndId(tenantId, userId, portal, id)
+                    .filter(device -> device.getRevokedAt() == null && !Boolean.FALSE.equals(device.getEnabled()))
                     .orElseThrow(() -> new ResourceNotFoundException("Notification device not found."));
         }
         String fid = trimToNull(request.firebaseInstallationId());
@@ -177,16 +179,6 @@ public class NotificationDeviceService {
                     .orElseThrow(() -> new ResourceNotFoundException("Notification device not found."));
         }
         throw new BadRequestException("deviceRegistrationId, firebaseInstallationId or registrationToken is required.");
-    }
-
-    private void assertBindableToUser(NotificationDeviceRegistrationEntity entity, String userId) {
-        if (entity.getId() == null || userId.equals(entity.getUserId())) {
-            return;
-        }
-        boolean revoked = entity.getRevokedAt() != null || Boolean.FALSE.equals(entity.getEnabled());
-        if (!revoked) {
-            throw new ForbiddenException("Notification device is already registered to another user.");
-        }
     }
 
     private void revoke(NotificationDeviceRegistrationEntity entity) {
