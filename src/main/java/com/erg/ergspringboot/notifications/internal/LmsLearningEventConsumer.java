@@ -10,6 +10,8 @@ import com.erg.ergspringboot.notifications.internal.LmsNotificationEventPublishe
 import java.util.List;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
+import com.erg.ergspringboot.platform.security.TenantContext;
+import org.springframework.transaction.annotation.Propagation;
 
 /** Notifications-owned consumer that turns LMS learning events into in-app notifications (C10). */
 @Component
@@ -23,34 +25,38 @@ public class LmsLearningEventConsumer {
         this.notifications = notifications;
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     public void on(LmsAssignmentCreated event) {
-        // A deleted assignment has nobody left to notify; completing the event is correct.
-        lms.assignmentAudience(event.tenantId(), event.assignmentId()).ifPresent(audience ->
-                notifications.assignmentCreated(event.eventId(), event.tenantId(), audience.assignmentId(),
-                        audience.title(), audience.classId(), audience.studentUserIds(), event.actorId()));
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(event.tenantId(), null, "system"))) {
+            // A deleted assignment has nobody left to notify; completing the event is correct.
+            lms.assignmentAudience(event.tenantId(), event.assignmentId()).ifPresent(audience ->
+                    notifications.assignmentCreated(event.eventId(), event.tenantId(), audience.assignmentId(),
+                            audience.title(), audience.classId(), audience.studentUserIds(), event.actorId()));
+        }
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     public void on(LmsAttemptSubmitted event) {
-        // Submit is the hot path: it must not load the whole recipient list just to find the teacher.
-        AssignmentSummary audience = lms.assignmentSummary(event.tenantId(), event.assignmentId()).orElse(null);
-        if (audience == null || audience.assignedBy() == null) {
-            return;
-        }
-        List<String> teachers = List.of(audience.assignedBy());
-        Submitter student = lms.submitter(event.tenantId(), event.studentId())
-                .orElse(new Submitter(event.studentId(), null));
-        // created_by references users(id): the student's login account, never the lms_students id.
-        String studentUserId = student.userId();
-        String studentName = student.fullName();
-        notifications.attemptSubmitted(event.eventId(), event.tenantId(), event.assignmentId(), audience.title(),
-                event.attemptId(), event.studentId(), studentUserId, studentName, teachers);
-        // A needs_review score is provisional (manual answers count as 0), so it is not a low score yet.
-        if (!event.passed() && !LmsStatePolicy.attemptNeedsReview(event.status())) {
-            notifications.supportNeededLowScore(event.eventId() + ":low-score", event.tenantId(),
-                    event.assignmentId(), audience.title(), event.attemptId(), event.studentId(), studentUserId, studentName,
-                    event.score(), event.maxScore(), teachers);
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(event.tenantId(), null, "system"))) {
+            // Submit is the hot path: it must not load the whole recipient list just to find the teacher.
+            AssignmentSummary audience = lms.assignmentSummary(event.tenantId(), event.assignmentId()).orElse(null);
+            if (audience == null || audience.assignedBy() == null) {
+                return;
+            }
+            List<String> teachers = List.of(audience.assignedBy());
+            Submitter student = lms.submitter(event.tenantId(), event.studentId())
+                    .orElse(new Submitter(event.studentId(), null));
+            // created_by references users(id): the student's login account, never the lms_students id.
+            String studentUserId = student.userId();
+            String studentName = student.fullName();
+            notifications.attemptSubmitted(event.eventId(), event.tenantId(), event.assignmentId(), audience.title(),
+                    event.attemptId(), event.studentId(), studentUserId, studentName, teachers);
+            // A needs_review score is provisional (manual answers count as 0), so it is not a low score yet.
+            if (!event.passed() && !LmsStatePolicy.attemptNeedsReview(event.status())) {
+                notifications.supportNeededLowScore(event.eventId() + ":low-score", event.tenantId(),
+                        event.assignmentId(), audience.title(), event.attemptId(), event.studentId(), studentUserId, studentName,
+                        event.score(), event.maxScore(), teachers);
+            }
         }
     }
 }

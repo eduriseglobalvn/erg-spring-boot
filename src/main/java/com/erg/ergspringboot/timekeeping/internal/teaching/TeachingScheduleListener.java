@@ -7,6 +7,7 @@ import com.erg.ergspringboot.calendar.CalendarSlotsChanged;
 import com.erg.ergspringboot.platform.security.TenantContext;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 
 /**
  * A timetable batch was published or cancelled: teachers who already confirmed a month whose totals just moved go back
@@ -22,23 +23,23 @@ class TeachingScheduleListener {
         this.months = months;
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     void on(CalendarBatchPublished event) {
         recheck(event.tenantId());
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     void on(CalendarBatchCancelled event) {
         recheck(event.tenantId());
     }
 
     /** A swap moves periods between teachers and an edit between days or months: totals move like a publish. */
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     void on(CalendarSlotsChanged event) {
         recheck(event.tenantId());
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     void on(CalendarHolidayCancelled event) {
         recheck(event.tenantId());
     }
