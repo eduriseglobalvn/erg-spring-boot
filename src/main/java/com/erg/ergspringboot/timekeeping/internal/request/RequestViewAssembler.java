@@ -86,6 +86,7 @@ public class RequestViewAssembler {
     private static RequestView view(TkRequest r, List<RequestStepView> stepViews, List<EvidenceView> evidenceViews) {
         return new RequestView(r.getId(), r.getCode(), r.getType(), r.getLeaveKind(), r.getFromDate(), r.getToDate(),
                 r.getPart(), r.getDays(), r.getWorkDate(), r.getProposedOut(), r.getExplanationReason(), r.getNote(),
-                r.getStatus(), r.getCurrentStep(), r.getSubmittedAt(), r.getLastRemindedAt(), stepViews, evidenceViews);
+                r.getStatus(), r.getCurrentStep(), r.getSubmittedAt(), r.getLastRemindedAt(), stepViews, evidenceViews,
+                r.getFormFileName());
     }
 }

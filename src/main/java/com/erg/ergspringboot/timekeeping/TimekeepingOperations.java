@@ -26,6 +26,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.SiteConfig;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.Timesheet;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TodayDashboard;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.ExplanationContext;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.FormFile;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.LeavePreview;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestPage;
@@ -156,6 +157,14 @@ public class TimekeepingOperations {
 
     public RequestView updateRequest(ErgPrincipal principal, String id, RequestCommand command) {
         return requests.update(principal.tenantId(), principal.userId(), id, command);
+    }
+
+    public RequestView attachRequestForm(ErgPrincipal principal, String id, String fileName, byte[] bytes) {
+        return requests.attachForm(principal.tenantId(), principal.userId(), id, fileName, bytes);
+    }
+
+    public FormFile requestForm(ErgPrincipal principal, String id) {
+        return requests.form(principal.tenantId(), principal.userId(), id);
     }
 
     public RequestView submitRequest(ErgPrincipal principal, String id) {
@@ -310,6 +319,10 @@ public class TimekeepingOperations {
 
     public ApprovalDetail approval(ErgPrincipal p, String requestId) {
         return admin.inbox().detail(p, requestId);
+    }
+
+    public FormFile approvalForm(ErgPrincipal p, String requestId) {
+        return admin.inbox().form(p, requestId);
     }
 
     public RequestView approve(ErgPrincipal p, String requestId, String comment) {

@@ -8,15 +8,24 @@ import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
 import com.erg.ergspringboot.timekeeping.RequestStatus;
 import com.erg.ergspringboot.timekeeping.TimekeepingOperations;
+import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.ExplanationContext;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.FormFile;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.LeavePreview;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestPage;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestView;
 import com.erg.ergspringboot.timekeeping.authorization.TimekeepingSelf;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +33,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /** The caller's own requests (leave, explanation, WFH, business trip). Another person's request id answers 404. */
 @RestController
@@ -48,6 +59,38 @@ public class TimekeepingRequestController {
     public ApiResponse<RequestView> update(@PathVariable String id, @RequestBody RequestCommand command,
             HttpServletRequest request) {
         return ok("Draft updated", timekeeping.updateRequest(principal(), id, command), request);
+    }
+
+    /** The filled-in leave form (Word). Size is capped by spring.servlet.multipart.max-file-size. */
+    @PostMapping(path = "/{id}/form", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @TimekeepingSelf
+    public ApiResponse<RequestView> attachForm(@PathVariable String id, @RequestPart("file") MultipartFile file,
+            HttpServletRequest request) {
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException unreadable) {
+            throw new TimekeepingException(HttpStatus.BAD_REQUEST, "INVALID_FORM", "Không đọc được file đơn");
+        }
+        return ok("Form attached", timekeeping.attachRequestForm(principal(), id, file.getOriginalFilename(), bytes),
+                request);
+    }
+
+    @GetMapping("/{id}/form")
+    @TimekeepingSelf
+    public ResponseEntity<byte[]> form(@PathVariable String id) {
+        return download(timekeeping.requestForm(principal(), id));
+    }
+
+    /** Always a download: never rendered inline, whatever the uploaded file really contains. */
+    static ResponseEntity<byte[]> download(FormFile file) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .header("X-Content-Type-Options", "nosniff")
+                .body(file.bytes());
     }
 
     @PostMapping("/{id}/submit")

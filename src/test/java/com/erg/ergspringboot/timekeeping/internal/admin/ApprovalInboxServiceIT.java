@@ -15,6 +15,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestStepView;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestView;
 import com.erg.ergspringboot.timekeeping.internal.request.RequestService;
+import com.erg.ergspringboot.timekeeping.internal.request.RequestServiceIT;
 import com.erg.ergspringboot.timekeeping.internal.request.RequestServiceIT.Fixture;
 import java.time.LocalDate;
 import java.util.List;
@@ -92,6 +93,6 @@ class ApprovalInboxServiceIT extends AdminITBase {
     private String submit(String t, Fixture f, LeaveKind kind, LocalDate from, LocalDate to) {
         RequestView draft = requests.create(t, f.teacher(),
                 new RequestCommand(RequestType.LEAVE, kind, from, to, DayPart.FULL, null, null, null, "Việc riêng"));
-        return requests.submit(t, f.teacher(), draft.id()).id();
+        return RequestServiceIT.send(requests, t, f.teacher(), draft.id()).id();
     }
 }

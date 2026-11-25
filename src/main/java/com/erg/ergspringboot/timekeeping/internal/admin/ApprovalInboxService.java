@@ -18,11 +18,13 @@ import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.BulkApproveResult
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.MonthContext;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.Skipped;
 import com.erg.ergspringboot.timekeeping.TimekeepingAdminViews.TeammateLeave;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.FormFile;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestView;
 import com.erg.ergspringboot.timekeeping.TimekeepingViews.PeriodView;
 import com.erg.ergspringboot.timekeeping.internal.request.AffectedPeriodsService;
 import com.erg.ergspringboot.timekeeping.internal.request.ApprovalService;
 import com.erg.ergspringboot.timekeeping.internal.request.LeaveBalanceService;
+import com.erg.ergspringboot.timekeeping.internal.request.RequestService;
 import com.erg.ergspringboot.timekeeping.internal.request.RequestViewAssembler;
 import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
@@ -140,6 +142,12 @@ public class ApprovalInboxService {
                         .orElse(List.of())
                 : List.of();
         return readOnly.execute(status -> detailOf(me, r, affected, from, to));
+    }
+
+    /** The requester's leave form, for whoever may see the request. */
+    @Transactional(readOnly = true)
+    public FormFile form(ErgPrincipal me, String requestId) {
+        return RequestService.formOf(requests, visible(me, requestId));
     }
 
     private ApprovalDetail detailOf(ErgPrincipal me, TkRequest r, List<PeriodView> affected, LocalDate from, LocalDate to) {

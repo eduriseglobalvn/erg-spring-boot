@@ -16,6 +16,7 @@ import com.erg.ergspringboot.timekeeping.TimekeepingOperations;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestView;
 import com.erg.ergspringboot.timekeeping.authorization.TimekeepingApprove;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,6 +60,12 @@ public class TimekeepingApprovalController {
     @TimekeepingApprove
     public ApiResponse<ApprovalDetail> detail(@PathVariable String requestId, HttpServletRequest request) {
         return ok("Approval loaded", timekeeping.approval(principal(), requestId), request);
+    }
+
+    @GetMapping("/{requestId}/form")
+    @TimekeepingApprove
+    public ResponseEntity<byte[]> form(@PathVariable String requestId) {
+        return TimekeepingRequestController.download(timekeeping.approvalForm(principal(), requestId));
     }
 
     @PostMapping("/{requestId}/approve")

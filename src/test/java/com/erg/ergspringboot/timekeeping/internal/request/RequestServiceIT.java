@@ -75,6 +75,8 @@ import org.testcontainers.DockerClientFactory;
 public class RequestServiceIT {
 
     static final Instant NOW = Instant.parse("2026-11-12T01:00:00Z");
+    /** The first bytes of any .docx (a zip). */
+    static final byte[] DOCX = {0x50, 0x4B, 0x03, 0x04, 0x14, 0x00};
     private static final String TENANT = "tk-req-it";
     private static final LocalDate MON = LocalDate.of(2026, 11, 16);
     private static final LocalDate TUE = LocalDate.of(2026, 11, 17);
@@ -111,13 +113,35 @@ public class RequestServiceIT {
         f = Fixture.seed(jdbc, TENANT, "");
     }
 
+    /** Submits as the UI does: a LEAVE draft first gets its (required) Word form. */
+    public static RequestView send(RequestService requests, String tenant, String user, String id) {
+        if (requests.get(tenant, user, id).type() == RequestType.LEAVE) requests.attachForm(tenant, user, id, "don.docx", DOCX);
+        return requests.submit(tenant, user, id);
+    }
+
+    @Test
+    void leaveCannotBeSubmittedWithoutItsWordForm() {
+        String id = requests.create(TENANT, f.teacher, leave(LeaveKind.SICK, MON, MON, DayPart.FULL)).id();
+        assertError(() -> requests.submit(TENANT, f.teacher, id), HttpStatus.UNPROCESSABLE_CONTENT,
+                "Tải lên đơn xin nghỉ phép (file Word) trước khi gửi");
+        assertError(() -> requests.attachForm(TENANT, f.teacher, id, "don.docx", "not a zip".getBytes()),
+                HttpStatus.BAD_REQUEST, null);
+        assertError(() -> requests.attachForm(TENANT, f.teacher, id, "don.pdf", DOCX), HttpStatus.BAD_REQUEST, null);
+
+        assertThat(requests.attachForm(TENANT, f.teacher, id, "C:\\Users\\gv\\don.docx", DOCX).formFileName())
+                .isEqualTo("don.docx");
+        assertThat(requests.form(TENANT, f.teacher, id).bytes()).isEqualTo(DOCX);
+        assertThat(requests.submit(TENANT, f.teacher, id).status()).isEqualTo(RequestStatus.PENDING);
+        assertError(() -> requests.attachForm(TENANT, f.teacher, id, "don.docx", DOCX), HttpStatus.CONFLICT, null);
+    }
+
     @Test
     void submittingTwoDaysOfLeaveBuildsTwoStepsACodeAndScheduleEvidence() {
         RequestView draft = requests.create(TENANT, f.teacher, leave(LeaveKind.ANNUAL, MON, TUE, DayPart.FULL));
         assertThat(draft.status()).isEqualTo(RequestStatus.DRAFT);
         assertThat(draft.code()).matches("DT-2026-\\d{4}");
 
-        RequestView sent = requests.submit(TENANT, f.teacher, draft.id());
+        RequestView sent = send(requests, TENANT, f.teacher, draft.id());
 
         assertThat(sent.status()).isEqualTo(RequestStatus.PENDING);
         assertThat(sent.days()).isEqualByComparingTo("2");
@@ -337,7 +361,7 @@ public class RequestServiceIT {
     @Test
     void anotherUsersRequestDoesNotExistForMe() {
         RequestView mine = requests.create(TENANT, f.teacher, leave(LeaveKind.ANNUAL, MON, MON, DayPart.FULL));
-        requests.submit(TENANT, f.teacher, requests.create(TENANT, f.teacher,
+        send(requests, TENANT, f.teacher, requests.create(TENANT, f.teacher,
                 leave(LeaveKind.SICK, TUE, TUE, DayPart.FULL)).id());
 
         assertThatThrownBy(() -> requests.get(TENANT, f.lead, mine.id())).isInstanceOf(ResourceNotFoundException.class);
@@ -385,7 +409,7 @@ public class RequestServiceIT {
         jdbc.update("update employee_profiles set manager_id = null where user_id = ?", lonely.teacher);
         jdbc.update("delete from user_roles where user_id in (?, ?, ?)", lonely.lead, lonely.vp, lonely.vp2);
 
-        assertError(() -> requests.submit(TENANT, lonely.teacher, requests.create(TENANT, lonely.teacher,
+        assertError(() -> send(requests, TENANT, lonely.teacher, requests.create(TENANT, lonely.teacher,
                 leave(LeaveKind.SICK, MON, MON, DayPart.FULL)).id()), HttpStatus.UNPROCESSABLE_CONTENT,
                 "Chưa có người duyệt cho đơn này");
     }
@@ -410,7 +434,7 @@ public class RequestServiceIT {
         String sfx = tenant.substring(8, 12);
         Fixture race = transactions.execute(status -> Fixture.seed(jdbc, tenant, sfx));
         try {
-            String id = transactions.execute(status -> requests.submit(tenant, race.teacher,
+            String id = transactions.execute(status -> send(requests, tenant, race.teacher,
                     requests.create(tenant, race.teacher, leave(LeaveKind.ANNUAL, MON, TUE, DayPart.FULL)).id()).id());
             transactions.executeWithoutResult(status -> approvals.approveStep(tenant, id, principalIn(tenant, race.lead), false, null));
 
@@ -473,7 +497,7 @@ public class RequestServiceIT {
                 results.add(pool.submit(() -> {
                     start.await();
                     try {
-                        transactions.executeWithoutResult(status -> requests.submit(tenant, race.teacher, draft));
+                        transactions.executeWithoutResult(status -> send(requests, tenant, race.teacher, draft));
                         return "submitted";
                     } catch (ApiException lost) {
                         return lost.getCode();
@@ -500,7 +524,7 @@ public class RequestServiceIT {
         org.mockito.Mockito.doThrow(new IllegalStateException("outbox down")).when(notifications)
                 .send(anyString(), anyString(), any());
         try {
-            String id = transactions.execute(status -> requests.submit(tenant, race.teacher,
+            String id = transactions.execute(status -> send(requests, tenant, race.teacher,
                     requests.create(tenant, race.teacher, new RequestCommand(RequestType.WFH, null, MON, MON, null,
                             null, null, null, "Ở nhà")).id()).id());
             transactions.executeWithoutResult(status -> approvals.approveStep(tenant, id, principalIn(tenant, race.lead),
@@ -517,7 +541,7 @@ public class RequestServiceIT {
     }
 
     private RequestView submit(RequestCommand command) {
-        return requests.submit(TENANT, f.teacher, requests.create(TENANT, f.teacher, command).id());
+        return send(requests, TENANT, f.teacher, requests.create(TENANT, f.teacher, command).id());
     }
 
     private void approvedAnnual(LocalDate from, String days) {

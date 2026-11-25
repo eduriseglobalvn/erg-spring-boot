@@ -14191,6 +14191,9 @@
             ],
             "type": "string"
           },
+          "formFileName": {
+            "type": "string"
+          },
           "fromDate": {
             "format": "date",
             "type": "string"
@@ -28862,6 +28865,37 @@
         ]
       }
     },
+    "/api/v1/timekeeping/approvals/{requestId}/form": {
+      "get": {
+        "operationId": "form_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-approval-controller"
+        ]
+      }
+    },
     "/api/v1/timekeeping/approvals/{requestId}/reject": {
       "post": {
         "operationId": "reject",
@@ -29598,6 +29632,83 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRequestView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      }
+    },
+    "/api/v1/timekeeping/requests/{id}/form": {
+      "get": {
+        "operationId": "form",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "byte",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "timekeeping-request-controller"
+        ]
+      },
+      "post": {
+        "operationId": "attachForm",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
