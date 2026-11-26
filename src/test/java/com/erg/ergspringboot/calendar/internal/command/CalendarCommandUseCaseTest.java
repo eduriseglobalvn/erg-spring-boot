@@ -156,7 +156,7 @@ class CalendarCommandUseCaseTest {
                 new CalendarBatchLifecycleUseCase(
                         batchRepository, eventRepository, scheduleConflicts, eventPublisher, clockProvider),
                 new CalendarEventMutationUseCase(eventRepository, eventTeacherRepository, readPort,
-                        scheduleConflicts, eventPublisher),
+                        scheduleConflicts, eventPublisher, clockAt("2026-06-01T00:00:00Z")),
                 new CalendarRoomCommandUseCase(roomRepository),
                 new CalendarBulkPreviewUseCase(inputNormalizer, refs, validationService, expansionService, conflictService),
                 new CalendarBulkCreateUseCase(batchRepository, eventRepository, eventTeacherRepository,
@@ -890,6 +890,14 @@ class CalendarCommandUseCaseTest {
     // =========================================================================
     // 10. deleteTeacherSchedule - bulk cancel by teacher
     // =========================================================================
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<Clock> clockAt(String instant) {
+        ObjectProvider<Clock> provider = org.mockito.Mockito.mock(ObjectProvider.class);
+        org.mockito.Mockito.lenient().when(provider.getIfAvailable(any()))
+                .thenReturn(Clock.fixed(java.time.Instant.parse(instant), java.time.ZoneOffset.UTC));
+        return provider;
+    }
 
     @Nested
     class DeleteTeacherScheduleTest {
