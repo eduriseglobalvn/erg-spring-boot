@@ -116,4 +116,26 @@ class CalendarBatchPublishedConsumerTest {
 
         org.mockito.Mockito.verifyNoInteractions(notifications);
     }
+
+    /** Production 25/11/2026: the async listener thread had no tenant, so RLS hid the batch and nobody was notified. */
+    @Test
+    void readsAndWritesRunInsideTheEventsTenantAndLeaveTheThreadClean() {
+        CalendarPublishedBatchProjection calendar = org.mockito.Mockito.mock(CalendarPublishedBatchProjection.class);
+        NotificationCommandService notifications = org.mockito.Mockito.mock(NotificationCommandService.class);
+        List<String> seen = new java.util.ArrayList<>();
+        when(calendar.findPublishedBatch("tenant-1", "batch-1")).thenAnswer(invocation -> {
+            seen.add(com.erg.ergspringboot.platform.security.TenantContext.current().tenantId());
+            return Optional.of(ScheduleNotificationFixtures.published());
+        });
+        org.mockito.Mockito.doAnswer(invocation -> {
+            seen.add(com.erg.ergspringboot.platform.security.TenantContext.current().tenantId());
+            return null;
+        }).when(notifications).enqueueAll(any());
+
+        new CalendarBatchPublishedConsumer(calendar, notifications).on(new CalendarBatchPublished(
+                "schedule-published:batch-1", "tenant-1", "batch-1", "user-1", OffsetDateTime.now(), 1));
+
+        assertThat(seen).containsExactly("tenant-1", "tenant-1");
+        assertThat(com.erg.ergspringboot.platform.security.TenantContext.current()).isNull();
+    }
 }

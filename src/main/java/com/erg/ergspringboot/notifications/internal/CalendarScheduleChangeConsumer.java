@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
+import com.erg.ergspringboot.platform.security.TenantContext;
+import org.springframework.transaction.annotation.Propagation;
 
 /** SCHEDULE_CHANGED (an edited PUBLISHED period) and SCHEDULE_CANCELLED (a cancelled published batch or periods a day off cancelled). */
 @Component
@@ -27,54 +29,62 @@ public class CalendarScheduleChangeConsumer {
         this.notifications = notifications;
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     public void on(CalendarEventChanged event) {
-        var batch = calendar.findChangedEvent(event.tenantId(), event.calendarEventId()).orElse(null);
-        if (batch == null || batch.slots().isEmpty()) {
-            log.info("Skip schedule-changed notification {}: period gone or no longer published", event.eventId());
-            return;
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(event.tenantId(), null, "system"))) {
+            var batch = calendar.findChangedEvent(event.tenantId(), event.calendarEventId()).orElse(null);
+            if (batch == null || batch.slots().isEmpty()) {
+                log.info("Skip schedule-changed notification {}: period gone or no longer published", event.eventId());
+                return;
+            }
+            // Single-event edits (room/note) never change the people, so current people = old people. Teacher swaps and
+            // moved slots publish CalendarSlotsChanged instead (V157), which also tells whoever lost a period.
+            notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(),
+                            event.actorId(), "schedule-event-changed:" + event.calendarEventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch));
         }
-        // Single-event edits (room/note) never change the people, so current people = old people. Teacher swaps and
-        // moved slots publish CalendarSlotsChanged instead (V157), which also tells whoever lost a period.
-        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(),
-                        event.actorId(), "schedule-event-changed:" + event.calendarEventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch));
     }
 
     /**
      * Several published periods moved, re-roomed or reassigned: whoever is on them now hears CHANGED once; whoever
      * lost a period (old teacher, removed assistant) hears REMOVED. Keys carry the change id, so a retry never doubles.
      */
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     public void on(CalendarSlotsChanged event) {
-        var batch = calendar.findChangedEvents(event.tenantId(), event.batchId(), event.calendarEventIds()).orElse(null);
-        if (batch != null && !batch.slots().isEmpty()) {
-            notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(), event.actorId(),
-                            event.eventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch));
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(event.tenantId(), null, "system"))) {
+            var batch = calendar.findChangedEvents(event.tenantId(), event.batchId(), event.calendarEventIds()).orElse(null);
+            if (batch != null && !batch.slots().isEmpty()) {
+                notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CHANGED, event.tenantId(), event.actorId(),
+                                event.eventId(), event.aggregateVersion(), "SCHEDULE_CHANGED", batch));
+            }
+            if (batch == null || event.removed().isEmpty()) return;
+            var lost = new CalendarPublishedBatchProjection.PublishedBatch(batch.batchId(), batch.schoolId(), batch.schoolName(),
+                    batch.schoolShortName(), batch.status(), batch.slots().stream().map(slot -> new CalendarPublishedBatchProjection.Slot(
+                            slot.eventId(), slot.classId(), slot.className(), slot.startAt(), slot.periodStart(), slot.periodCount(),
+                            slot.roomName(), event.removed().stream().filter(r -> r.calendarEventId().equals(slot.eventId()))
+                                    .map(r -> new CalendarPublishedBatchProjection.Person(r.userId(), r.name(), r.role())).toList()))
+                    .filter(slot -> !slot.people().isEmpty()).toList());
+            notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.REMOVED, event.tenantId(), event.actorId(),
+                            event.eventId() + ":removed", event.aggregateVersion(), "SCHEDULE_CHANGED", lost));
         }
-        if (batch == null || event.removed().isEmpty()) return;
-        var lost = new CalendarPublishedBatchProjection.PublishedBatch(batch.batchId(), batch.schoolId(), batch.schoolName(),
-                batch.schoolShortName(), batch.status(), batch.slots().stream().map(slot -> new CalendarPublishedBatchProjection.Slot(
-                        slot.eventId(), slot.classId(), slot.className(), slot.startAt(), slot.periodStart(), slot.periodCount(),
-                        slot.roomName(), event.removed().stream().filter(r -> r.calendarEventId().equals(slot.eventId()))
-                                .map(r -> new CalendarPublishedBatchProjection.Person(r.userId(), r.name(), r.role())).toList()))
-                .filter(slot -> !slot.people().isEmpty()).toList());
-        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.REMOVED, event.tenantId(), event.actorId(),
-                        event.eventId() + ":removed", event.aggregateVersion(), "SCHEDULE_CHANGED", lost));
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     public void on(CalendarHolidayCancelled event) {
-        notifications.enqueueAll(HolidayCancelNotificationComposer.compose(event, calendar.findCancelledEvents(event.tenantId(), event.calendarEventIds())));
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(event.tenantId(), null, "system"))) {
+            notifications.enqueueAll(HolidayCancelNotificationComposer.compose(event, calendar.findCancelledEvents(event.tenantId(), event.calendarEventIds())));
+        }
     }
 
-    @ApplicationModuleListener
+    @ApplicationModuleListener(propagation = Propagation.NOT_SUPPORTED)
     public void on(CalendarBatchCancelled event) {
-        var batch = calendar.findCancelledBatch(event.tenantId(), event.batchId(), event.occurredAt()).orElse(null);
-        if (batch == null || batch.slots().isEmpty()) {
-            log.info("Skip schedule-cancelled notification {}: draft batch or no future period", event.eventId());
-            return;
+        try (TenantContext.Scope ignored = TenantContext.scope(TenantContext.of(event.tenantId(), null, "system"))) {
+            var batch = calendar.findCancelledBatch(event.tenantId(), event.batchId(), event.occurredAt()).orElse(null);
+            if (batch == null || batch.slots().isEmpty()) {
+                log.info("Skip schedule-cancelled notification {}: draft batch or no future period", event.eventId());
+                return;
+            }
+            notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CANCELLED, event.tenantId(),
+                            event.actorId(), event.eventId(), event.aggregateVersion(), "SCHEDULE_CANCELLED", batch));
         }
-        notifications.enqueueAll(ScheduleNotificationComposer.compose(ScheduleNotificationComposer.Kind.CANCELLED, event.tenantId(),
-                        event.actorId(), event.eventId(), event.aggregateVersion(), "SCHEDULE_CANCELLED", batch));
     }
 }
