@@ -1,6 +1,7 @@
 package com.erg.ergspringboot.timekeeping.internal.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,12 +10,15 @@ import static org.mockito.Mockito.when;
 
 import com.erg.ergspringboot.timekeeping.DayPart;
 import com.erg.ergspringboot.timekeeping.LeaveKind;
+import com.erg.ergspringboot.timekeeping.RequestType;
+import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.LeavePreview;
 import com.erg.ergspringboot.timekeeping.internal.schedule.TeacherPeriodReader;
 import com.erg.ergspringboot.timekeeping.internal.schedule.WorkContextResolver;
 import com.erg.ergspringboot.timekeeping.persistence.TkCodeCounterRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkDayRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkPunchRepository;
+import com.erg.ergspringboot.timekeeping.persistence.TkRequest;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestEvidenceRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestRepository;
 import com.erg.ergspringboot.timekeeping.persistence.TkRequestStepRepository;
@@ -66,5 +70,22 @@ class RequestServiceTest {
 
         LeavePreview sick = service.previewLeave(T, U, from, to, DayPart.FULL, LeaveKind.SICK);
         assertThat(sick.balanceBefore()).isEqualByComparingTo(sick.balanceAfter());
+    }
+
+    @Test
+    void leaveFormMustBeAWordFileAndIsRequiredAtSubmit() {
+        byte[] docx = {0x50, 0x4B, 0x03, 0x04};
+        byte[] doc = {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0};
+        assertThat(RequestRules.wordFileName("C:\\gv\\Đơn nghỉ.DOCX", docx)).isEqualTo("Đơn nghỉ.DOCX");
+        assertThat(RequestRules.wordFileName("../don.doc", doc)).isEqualTo("don.doc");
+        assertThatThrownBy(() -> RequestRules.wordFileName("don.docx", "MZ..".getBytes()))
+                .isInstanceOf(TimekeepingException.class);
+        assertThatThrownBy(() -> RequestRules.wordFileName("don.pdf", docx)).isInstanceOf(TimekeepingException.class);
+        assertThatThrownBy(() -> RequestRules.wordFileName(null, null)).isInstanceOf(TimekeepingException.class);
+
+        TkRequest leave = new TkRequest();
+        leave.setType(RequestType.LEAVE);
+        assertThatThrownBy(() -> rules.checkForSubmit(leave)).isInstanceOf(TimekeepingException.class)
+                .extracting(e -> ((TimekeepingException) e).getCode()).isEqualTo("FORM_REQUIRED");
     }
 }

@@ -9,6 +9,7 @@ import com.erg.ergspringboot.timekeeping.RequestType;
 import com.erg.ergspringboot.timekeeping.StepStatus;
 import com.erg.ergspringboot.timekeeping.TimekeepingException;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.ExplanationContext;
+import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.FormFile;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.LeavePreview;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestCommand;
 import com.erg.ergspringboot.timekeeping.TimekeepingRequestViews.RequestPage;
@@ -117,6 +118,30 @@ public class RequestService {
         if (r.getStatus() != RequestStatus.DRAFT) throw conflict("NOT_DRAFT", "Chỉ sửa được đơn nháp");
         RequestRules.apply(r, command);
         return views.one(r);
+    }
+
+    /** The leave form of a LEAVE draft; a second upload replaces the first. */
+    @Transactional
+    public RequestView attachForm(String tenantId, String userId, String id, String fileName, byte[] bytes) {
+        TkRequest r = own(tenantId, userId, id);
+        if (r.getStatus() != RequestStatus.DRAFT) throw conflict("NOT_DRAFT", "Chỉ sửa được đơn nháp");
+        if (r.getType() != RequestType.LEAVE) throw RequestRules.unprocessable("NOT_LEAVE", "Chỉ đơn nghỉ phép có file đơn");
+        r.setFormFileName(RequestRules.wordFileName(fileName, bytes));
+        // shortcut: the file sits in tk_requests.form_file (2 MB upload cap), move to object storage if the table grows heavy
+        requests.storeForm(tenantId, id, bytes);
+        return views.one(r);
+    }
+
+    @Transactional(readOnly = true)
+    public FormFile form(String tenantId, String userId, String id) {
+        return formOf(requests, requests.findByTenantIdAndUserIdAndId(tenantId, userId, id).orElseThrow(RequestService::notFound));
+    }
+
+    /** The stored form of a request the caller was already allowed to see; 404 when it has none. */
+    public static FormFile formOf(TkRequestRepository requests, TkRequest r) {
+        byte[] bytes = r.getFormFileName() == null ? null : requests.formOf(r.getTenantId(), r.getId());
+        if (bytes == null) throw new ResourceNotFoundException("Đơn chưa có file đính kèm");
+        return new FormFile(r.getFormFileName(), bytes);
     }
 
     /**

@@ -84,4 +84,8 @@ public class TkRequest extends BaseEntity {
 
     @Column(name = "last_reminded_at")
     private Instant lastRemindedAt;
+
+    /** Name of the uploaded leave form; its bytes ({@code form_file}) are not mapped, so lists never load them. */
+    @Column(name = "form_file_name")
+    private String formFileName;
 }

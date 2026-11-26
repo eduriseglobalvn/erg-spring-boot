@@ -10,6 +10,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -110,6 +111,13 @@ public interface TkRequestRepository extends JpaRepository<TkRequest, String> {
     Page<TkRequest> findByTenantIdAndUserId(String tenantId, String userId, Pageable pageable);
 
     Page<TkRequest> findByTenantIdAndUserIdAndStatus(String tenantId, String userId, RequestStatus status, Pageable pageable);
+
+    @Modifying
+    @Query(value = "update tk_requests set form_file = :bytes where tenant_id = :tenantId and id = :id", nativeQuery = true)
+    int storeForm(@Param("tenantId") String tenantId, @Param("id") String id, @Param("bytes") byte[] bytes);
+
+    @Query(value = "select form_file from tk_requests where tenant_id = :tenantId and id = :id", nativeQuery = true)
+    byte[] formOf(@Param("tenantId") String tenantId, @Param("id") String id);
 
     /** Transaction-scoped advisory lock on {@code key} (released at commit/rollback). */
     @Query(value = "select 1 from (select pg_advisory_xact_lock(hashtext(:key))) locked", nativeQuery = true)

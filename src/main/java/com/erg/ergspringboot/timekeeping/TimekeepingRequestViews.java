@@ -56,7 +56,11 @@ public final class TimekeepingRequestViews {
             Instant submittedAt,
             Instant lastRemindedAt,
             List<RequestStepView> steps,
-            List<EvidenceView> evidence) {}
+            List<EvidenceView> evidence,
+            String formFileName) {}
+
+    /** The leave form (Word file) a requester uploaded to a LEAVE request. */
+    public record FormFile(String fileName, byte[] bytes) {}
 
     public record RequestPage(List<RequestView> items, int page, int size, long total) {}
 

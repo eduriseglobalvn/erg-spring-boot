@@ -40,6 +40,7 @@ class RequestRules {
 
     static final int MAX_SPAN_DAYS = 31;
     static final int NOTE_MAX = 1000;
+    static final int FORM_NAME_MAX = 255;
     private static final int OUT_WINDOW_MIN = 60;
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -105,8 +106,31 @@ class RequestRules {
         }
     }
 
+    /**
+     * The name to keep for an uploaded leave form. Only Word files: the type is told by the magic bytes (.docx is a
+     * zip, .doc an OLE2 file), never by the client's content type.
+     */
+    static String wordFileName(String original, byte[] bytes) {
+        String name = original == null ? "" : original.substring(Math.max(original.lastIndexOf('/'),
+                original.lastIndexOf(92)) + 1).strip(); // 92 = backslash
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        boolean docx = lower.endsWith(".docx") && startsWith(bytes, 0x50, 0x4B, 0x03, 0x04);
+        boolean doc = lower.endsWith(".doc") && startsWith(bytes, 0xD0, 0xCF, 0x11, 0xE0);
+        if (!docx && !doc) throw bad("INVALID_FORM", "Đơn phải là file Word (.docx hoặc .doc)");
+        return name.length() > FORM_NAME_MAX ? name.substring(name.length() - FORM_NAME_MAX) : name;
+    }
+
+    private static boolean startsWith(byte[] bytes, int... magic) {
+        if (bytes == null || bytes.length < magic.length) return false;
+        for (int i = 0; i < magic.length; i++) if ((bytes[i] & 0xFF) != magic[i]) return false;
+        return true;
+    }
+
     /** Sets {@code days} (ranged types). The request already passed {@link #apply}. */
     void checkForSubmit(TkRequest r) {
+        if (r.getType() == RequestType.LEAVE && r.getFormFileName() == null) {
+            throw unprocessable("FORM_REQUIRED", "Tải lên đơn xin nghỉ phép (file Word) trước khi gửi");
+        }
         boolean explanation = r.getType() == RequestType.EXPLANATION;
         LocalDate from = explanation ? r.getWorkDate() : r.getFromDate();
         LocalDate to = explanation ? r.getWorkDate() : r.getToDate();
