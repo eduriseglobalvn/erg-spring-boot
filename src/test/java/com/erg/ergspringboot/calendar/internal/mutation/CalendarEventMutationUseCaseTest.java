@@ -29,8 +29,14 @@ class CalendarEventMutationUseCaseTest {
     private final CalendarEventRepository events = mock(CalendarEventRepository.class);
     private final CalendarEventTeacherRepository links = mock(CalendarEventTeacherRepository.class);
     private final ScheduleConflictService conflicts = mock(ScheduleConflictService.class);
-    private final CalendarEventMutationUseCase useCase = new CalendarEventMutationUseCase(events, links,
-            mock(CalendarReadPort.class), conflicts, mock(ApplicationEventPublisher.class));
+    private final CalendarEventMutationUseCase useCase = useCaseAt("2026-11-01T00:00:00Z");
+
+    @SuppressWarnings("unchecked")
+    private CalendarEventMutationUseCase useCaseAt(String instant) {
+        org.springframework.beans.factory.ObjectProvider<java.time.Clock> clock = mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(clock.getIfAvailable(any())).thenReturn(java.time.Clock.fixed(java.time.Instant.parse(instant), java.time.ZoneOffset.UTC));
+        return new CalendarEventMutationUseCase(events, links, mock(CalendarReadPort.class), conflicts, mock(ApplicationEventPublisher.class), clock);
+    }
 
     private CalendarEvent published() {
         CalendarEvent event = new CalendarEvent();
@@ -112,5 +118,28 @@ class CalendarEventMutationUseCaseTest {
         var result = useCase.deleteTeacherSchedule("t1", "u1", List.of("s1"), "2026-12-01", "2026-12-31", "admin");
 
         assertThat(result.affectedEventCount()).isEqualTo(1);
+    }
+
+    /** Owner decision 26/11/2026: a published period that has started is payroll history; a range delete never reaches it. */
+    @Test
+    void aBulkDeleteSkipsPublishedPeriodsThatHaveStartedButStillClearsPastDrafts() {
+        CalendarEventMutationUseCase midMonth = useCaseAt("2026-12-10T03:00:00Z");
+
+        midMonth.deleteTeacherSchedule("t1", "u1", List.of("s1"), "2026-12-01", "2026-12-31", "admin");
+
+        verify(links).findEventIdsByTeacher("t1", "u1", List.of("s1"), OffsetDateTime.parse("2026-12-10T03:00:00Z"),
+                OffsetDateTime.parse("2027-01-01T00:00:00+07:00"), "PUBLISHED");
+        verify(links).findEventIdsByTeacher("t1", "u1", List.of("s1"), OffsetDateTime.parse("2026-12-01T00:00:00+07:00"),
+                OffsetDateTime.parse("2027-01-01T00:00:00+07:00"), "DRAFT");
+    }
+
+    @Test
+    void aBulkDeleteOfAWhollyPastRangeNeverLooksForPublishedPeriods() {
+        CalendarEventMutationUseCase later = useCaseAt("2027-02-01T00:00:00Z");
+
+        var result = later.deleteTeacherSchedule("t1", "u1", List.of("s1"), "2026-12-01", "2026-12-31", "admin");
+
+        assertThat(result.affectedEventCount()).isZero();
+        verify(links, never()).findEventIdsByTeacher(any(), any(), any(), any(), any(), eq("PUBLISHED"));
     }
 }

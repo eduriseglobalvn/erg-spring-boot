@@ -15,6 +15,7 @@ import com.erg.ergspringboot.calendar.persistence.CalendarEventRepository;
 import com.erg.ergspringboot.calendar.persistence.CalendarEventTeacherRepository;
 import com.erg.ergspringboot.calendar.internal.support.CalendarCancelAnnouncer;
 import com.erg.ergspringboot.calendar.internal.support.CalendarExpansionService;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,18 +47,21 @@ public class CalendarEventMutationUseCase {
     private final CalendarReadPort reads;
     private final ScheduleConflictService conflicts;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectProvider<Clock> clock;
 
     public CalendarEventMutationUseCase(
             CalendarEventRepository events,
             CalendarEventTeacherRepository eventTeachers,
             CalendarReadPort reads,
             ScheduleConflictService conflicts,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            ObjectProvider<Clock> clock) {
         this.events = events;
         this.eventTeachers = eventTeachers;
         this.reads = reads;
         this.conflicts = conflicts;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Transactional("postgresTransactionManager")
@@ -139,13 +144,18 @@ public class CalendarEventMutationUseCase {
         OffsetDateTime from = fromDate.atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
         OffsetDateTime to = toDate.plusDays(1).atStartOfDay(VIETNAM_ZONE).toOffsetDateTime();
 
+        OffsetDateTime now = OffsetDateTime.now(clock.getIfAvailable(Clock::systemUTC));
+        // Owner decision: a published period that has started is history (payroll, teaching hours) and is never deleted,
+        // the same rule as cancelling a published batch. Drafts never happened, so all of them go.
+        OffsetDateTime publishedFrom = from.isBefore(now) ? now : from;
         Set<String> draftIds = new HashSet<>(teacherEventIds(tenantId, teacherUserId, schoolIds, from, to, DRAFT));
-        Set<String> publishedIds = new HashSet<>(teacherEventIds(tenantId, teacherUserId, schoolIds, from, to, PUBLISHED));
+        Set<String> publishedIds = publishedFrom.isBefore(to)
+                ? new HashSet<>(teacherEventIds(tenantId, teacherUserId, schoolIds, publishedFrom, to, PUBLISHED))
+                : Set.of();
         if (draftIds.isEmpty() && publishedIds.isEmpty()) {
             return new CalendarDeletePayload(teacherUserId, true, 0);
         }
 
-        OffsetDateTime now = OffsetDateTime.now();
         int affected = 0;
         if (!draftIds.isEmpty()) {
             affected += events.cancelByIds(tenantId, new ArrayList<>(draftIds), "DRAFT_REMOVED", actorId, now);
